@@ -143,6 +143,7 @@
 
 <div class="toast" id="toast"></div>
 <script src="../assets/common.js"></script>
+<script src="../assets/pagamenti.js"></script>
 <script>
 (() => {
   const R = window.RENMENU, P = R.pagamenti, $ = s => document.querySelector(s);
@@ -158,6 +159,35 @@
     seg.appendChild(b);
   }
 
+  // Validazione IBAN (mod 97): un IBAN sbagliato non viene mai mostrato ai clienti
+  function ibanOk(v) {
+    const s = (v || '').replace(/\s+/g, '').toUpperCase();
+    if (!/^[A-Z]{2}\d{2}[A-Z0-9]{11,30}$/.test(s)) return false;
+    const r = s.slice(4) + s.slice(0, 4);
+    let n = '';
+    for (const c of r) n += /[A-Z]/.test(c) ? (c.charCodeAt(0) - 55) : c;
+    let m = 0; for (const d of n) m = (m * 10 + +d) % 97;
+    return m === 1;
+  }
+  const isStripe = u => /^https:\/\/(buy\.stripe\.com|checkout\.stripe\.com)\//.test(u || '');
+
+  // Pannello di controllo per l'operatore: paga/index.html?check=1
+  if (params.get('check') === '1') {
+    const row = (k, ok, note) => `<div><div><span>${k}</span><br><code>${ok ? '✓ ok' : '✗ ' + note}</code></div></div>`;
+    const box = document.createElement('section'); box.className = 'step';
+    box.innerHTML = `<h2><span class="n">✓</span> Stato configurazione (solo per te)</h2><div class="kv">
+      ${row('IBAN', ibanOk(P.iban), P.iban ? 'IBAN non valido, controlla i caratteri' : 'mancante')}
+      ${row('Intestatario', !!P.intestatario, 'mancante')}
+      ${row('Stripe mensile', isStripe(P.stripe.mensile), P.stripe.mensile ? 'non è un link Stripe' : 'mancante')}
+      ${row('Stripe annuale', isStripe(P.stripe.annuale), P.stripe.annuale ? 'non è un link Stripe' : 'mancante')}
+      ${row('Stripe su misura', isStripe(P.stripe.sumisura), P.stripe.sumisura ? 'non è un link Stripe' : 'mancante')}
+      ${row('PayPal', !!P.paypal, 'non impostato (facoltativo)')}
+      ${row('Satispay', !!P.satispay, 'non impostato (facoltativo)')}
+      ${row('WhatsApp', !!R.contattoWhatsApp, 'mancante')}
+    </div><p style="font-size:var(--text-xs);color:var(--color-text-muted);margin-top:var(--space-3)">Si modifica il file <code>assets/pagamenti.js</code> nel repository GitHub. Guida: CONFIGURAZIONE-PAGAMENTI.md</p>`;
+    document.querySelector('.steps').prepend(box);
+  }
+
   const wa = msg => R.contattoWhatsApp ? `https://wa.me/${R.contattoWhatsApp}?text=${encodeURIComponent(msg)}` : `mailto:${R.contattoEmail}?subject=RenMenu&body=${encodeURIComponent(msg)}`;
   const locale = () => $('#locale').value.trim() || 'il mio locale';
 
@@ -169,7 +199,7 @@
     $('#descr').textContent = p.descr;
 
     // Carta (Stripe)
-    const link = P.stripe && P.stripe[piano];
+    const link = P.stripe && isStripe(P.stripe[piano]) ? P.stripe[piano] : '';
     const ref = encodeURIComponent(locale().replace(/[^\w\- ]/g, '').trim().slice(0, 60) || 'renmenu');
     if (link) {
       $('#card-btn').hidden = false; $('#card-p').hidden = false; $('#card-soon').hidden = true;
@@ -181,7 +211,7 @@
     }
 
     // Bonifico
-    const hasBank = P.iban && P.intestatario;
+    const hasBank = ibanOk(P.iban) && P.intestatario;
     $('#m-bank').hidden = !hasBank;
     if (hasBank) {
       $('#b-name').textContent = P.intestatario;

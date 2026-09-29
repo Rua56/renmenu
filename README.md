@@ -6,6 +6,8 @@ Menù di esempio: https://rua56.github.io/renmenu/menu/index.html?m=bakaro · Ge
 
 Menù digitali QR per bar e ristoranti.
 
+Pagamenti: guida passo passo in [CONFIGURAZIONE-PAGAMENTI.md](CONFIGURAZIONE-PAGAMENTI.md); si compila solo `assets/pagamenti.js`.
+
 Sito statico, zero backend, ospitabile gratis su GitHub Pages.
 
 ```

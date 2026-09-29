@@ -4,23 +4,6 @@ window.RENMENU = {
   tagline: 'Il menù digitale del tuo locale, pronto in 10 minuti.',
   contattoWhatsApp: '393515924327',
   contattoEmail: 'iuran56@gmail.com',
-  /* Pagamenti: compila questi campi e la pagina paga/ si aggiorna da sola.
-     - stripe: incolla i Payment Link creati su dashboard.stripe.com (uno per piano). Vuoto = bottone carta nascosto.
-     - iban/intestatario: per il bonifico. Vuoto = blocco bonifico nascosto.
-     - paypal: es. 'https://paypal.me/tuonome'. satispay: link o vuoto. */
-  pagamenti: {
-    intestatario: '',
-    iban: '',
-    banca: '',
-    paypal: '',
-    satispay: '',
-    stripe: { mensile: '', annuale: '', sumisura: '' },
-    piani: {
-      mensile:  { nome: 'Mensile',  prezzo: 25,  unita: '/ mese', descr: 'Menù online in 24 ore, QR, IT + EN, aggiornamenti illimitati. Primo mese gratis, disdici quando vuoi.', prova: true },
-      annuale:  { nome: 'Annuale',  prezzo: 249, unita: '/ anno', descr: 'Tutto il mensile, una lingua extra, QR con il tuo logo, fattura unica. Due mesi gratis rispetto al mensile.' },
-      sumisura: { nome: 'Su misura', prezzo: 490, unita: 'acconto', descr: 'Grafica disegnata sul tuo locale, fino a 4 lingue, tema giorno/notte. Il preventivo definitivo lo concordiamo su WhatsApp; qui versi l\'acconto per partire.', mensile: 39 }
-    }
-  },
   logo: '<svg viewBox="0 0 32 32" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="3" width="26" height="26" rx="7"/><path d="M10 11h12M10 16h12M10 21h7"/><circle cx="21.5" cy="21" r="1.2" fill="currentColor" stroke="none"/></svg>',
   allergeni: {
     '1': { it: 'Glutine', en: 'Gluten' }, '2': { it: 'Crostacei', en: 'Crustaceans' }, '3': { it: 'Uova', en: 'Eggs' },

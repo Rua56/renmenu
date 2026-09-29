@@ -142,12 +142,12 @@ Messaggio a distanza (Instagram o WhatsApp):
 
 **Cosa devi attivare tu (una volta sola):**
 1. Partita IVA in regime forfettario (5% i primi 5 anni, fino a 85.000 € di ricavi). Apertura gratuita all'Agenzia delle Entrate, oppure con un commercialista online (Fiscozen, Flex Tax, ecc.). Codice attività: servizi web / progettazione siti (ATECO 62.01 o 63.12, te lo conferma il commercialista).
-2. Conto o IBAN dedicato all'attività. Inserisci intestatario e IBAN in `assets/common.js` alla voce `pagamenti`: il blocco bonifico compare da solo nella pagina.
+2. Conto o IBAN dedicato all'attività. Inserisci intestatario e IBAN in `assets/pagamenti.js`: il blocco bonifico compare da solo nella pagina.
 3. Account Stripe (gratuito, serve la partita IVA): crea tre Payment Link, uno per piano.
    - Mensile: prodotto ricorrente 25 €/mese con **periodo di prova 30 giorni** (così "primo mese gratis" è automatico) e disdetta dal portale clienti.
    - Annuale: pagamento singolo 249 €.
    - Su misura: pagamento singolo 490 € (acconto).
-   Incolla i tre link in `assets/common.js` → `pagamenti.stripe`. Il bottone "Paga con carta" si attiva da solo e passa a Stripe il nome del locale come riferimento.
+   Incolla i tre link in `assets/pagamenti.js` → `stripe`. Guida completa: CONFIGURAZIONE-PAGAMENTI.md nel repository; pagina di controllo: https://rua56.github.io/renmenu/paga/index.html?check=1. Il bottone "Paga con carta" si attiva da solo e passa a Stripe il nome del locale come riferimento.
 4. Facoltativi: link PayPal.me o Satispay Business, sempre nella stessa voce di configurazione.
 
 **Commissioni indicative:** Stripe 1,5% + 0,25 € a transazione su carte europee (≈ 0,63 € su 25 €), bonifico 0 €, Satispay Business 0,95% sopra i 10 €, PayPal 3,4% + 0,35 € (da evitare).
