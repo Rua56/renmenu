@@ -1,5 +1,12 @@
 # RenMenu — Kit di vendita
 
+**Link da condividere con i clienti**
+- Sito: https://rua56.github.io/renmenu/
+- Esempio su misura (Al Bakaro originale): https://rua56.github.io/renmenu/demo/index.html
+- Esempio Standard: https://rua56.github.io/renmenu/menu/index.html?m=bakaro
+- Generatore (solo per te): https://rua56.github.io/renmenu/crea/index.html
+- Codice sorgente: https://github.com/Rua56/renmenu
+
 Tutto quello che serve per vendere il menù digitale ai locali, partendo oggi da Gorizia e dal Friuli Venezia Giulia, poi in tutta Italia.
 
 ---
