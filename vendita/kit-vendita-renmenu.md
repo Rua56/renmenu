@@ -7,6 +7,8 @@
 - Generatore (solo per te): https://rua56.github.io/renmenu/crea/index.html
 - Codice sorgente: https://github.com/Rua56/renmenu
 
+A voce basta dire: "rua56 punto github punto io, barra, renmenu". Su WhatsApp incolla il link intero: l'anteprima con logo e titolo compare da sola.
+
 Tutto quello che serve per vendere il menù digitale ai locali, partendo oggi da Gorizia e dal Friuli Venezia Giulia, poi in tutta Italia.
 
 ---
@@ -64,7 +66,7 @@ Vai tra le 15:00 e le 17:30 (dopo il pranzo, prima dell'aperitivo) o alle 10:30�
 | "Ho già il menù cartaceo, va bene così." | "Tienilo. Il QR è per la lista completa e per i turisti; il cartaceo lo usi per i piatti del giorno. Il primo mese è gratis, non perdi niente a provarlo." |
 | "Ai miei clienti non piace il QR." | "Vero per una parte, per questo non ti chiedo di togliere il cartaceo. Ma la traduzione in inglese e gli allergeni sempre aggiornati ti tolgono due domande al giorno." |
 | "Lo faccio già io con il PDF su Google." | "Il PDF va zoomato e non si aggiorna dal telefono. Qui il cliente vede sezioni, cerca il piatto e cambia lingua. E lo aggiorno io, non tu." |
-| "Devo chiedere al socio/titolare." | "Certo. Ti lascio il link del menù demo così glielo fai vedere. Passo giovedì alla stessa ora?" |
+| "Devo chiedere al socio/titolare." | "Certo. Ti lascio il link del menù demo (rua56.github.io/renmenu) così glielo fai vedere. Passo giovedì alla stessa ora?" |
 | "25 euro sono tanti." | "È meno di una ristampa dei menù. E include aggiornamenti illimitati: se cambiassi i prezzi ogni settimana ti costerebbe uguale." |
 | "Non ho tempo di mandarti il menù." | "Lo fotografo io adesso, se hai una copia. Domani ti mando il link da controllare." |
 
@@ -111,24 +113,24 @@ Le zone di Padova sono già mappate: Piazza delle Erbe, Ghetto, Duomo, Santo, Po
 
 Il sito è pensato per vendere anche senza visite. Tre canali, tutti gratuiti:
 
-1. **Caccia ai PDF.** Cerca su Google "menu pdf" + nome città (Bologna, Firenze, Bari…). Ogni locale con un PDF fotografato sul sito è un cliente ideale. Mandagli un messaggio Instagram o WhatsApp con il link di Al Bakaro: "Ho visto il vostro menù in PDF, vi mostro come lo trasformerei in 24 ore, primo mese gratis."
+1. **Caccia ai PDF.** Cerca su Google "menu pdf" + nome città (Bologna, Firenze, Bari…). Ogni locale con un PDF fotografato sul sito è un cliente ideale. Mandagli un messaggio Instagram o WhatsApp con il link di Al Bakaro (https://rua56.github.io/renmenu/demo/index.html): "Ho visto il vostro menù in PDF, vi mostro come lo trasformerei in 24 ore, primo mese gratis."
 2. **Instagram.** Pubblica ogni menù nuovo con un reel di 15 secondi (QR → menù che si apre). Tagga il locale e la città. Polsia può scrivere i testi dei post.
 3. **Polsia.** Nella chat della company chiedi ogni settimana: "Trova 30 ristoranti di [città] con menù in PDF o senza menù online e prepara per ciascuno un messaggio breve." Approvi e invii tu.
 
 Messaggio a distanza (Instagram o WhatsApp):
-> Ciao, sono Riccardo di RenMenu. Ho visto il menù di [locale] sul sito ed è un PDF: sul telefono si legge male e ogni cambio prezzo va ristampato. Guarda cosa abbiamo fatto per Al Bakaro a Gorizia: [link]. Se mi mandi una foto del vostro menù ve lo pubblico entro domani, il primo mese è gratis.
+> Ciao, sono Riccardo di RenMenu. Ho visto il menù di [locale] sul sito ed è un PDF: sul telefono si legge male e ogni cambio prezzo va ristampato. Guarda cosa abbiamo fatto per Al Bakaro a Gorizia: https://rua56.github.io/renmenu/demo/index.html (qui la versione standard: https://rua56.github.io/renmenu/menu/index.html?m=bakaro). Se mi mandi una foto del vostro menù ve lo pubblico entro domani, il primo mese è gratis.
 
 ## 8. Messaggio WhatsApp di follow-up (dopo la visita)
 
-> Ciao [nome], sono Riccardo, sono passato oggi al [locale]. Questo è il menù demo di cui ti parlavo: [link]. Se mi mandi una foto del tuo menù te lo pubblico entro domani e il primo mese è gratis. A presto!
+> Ciao [nome], sono Riccardo, sono passato oggi al [locale]. Questo è il menù demo di cui ti parlavo: https://rua56.github.io/renmenu/menu/index.html?m=bakaro (e il sito: https://rua56.github.io/renmenu/). Se mi mandi una foto del tuo menù te lo pubblico entro domani e il primo mese è gratis. A presto!
 
 ## 9. Messaggio di consegna (quando il menù è online)
 
-> Ciao [nome], il tuo menù è online: [link]. In allegato il QR da stampare (va bene anche in bianco e nero, minimo 3x3 cm) e il cartello da tavolo in A5. Per qualsiasi modifica scrivimi qui: "il fritto passa a 19" basta e avanza.
+> Ciao [nome], il tuo menù è online: https://rua56.github.io/renmenu/menu/index.html?m=[id-locale] . In allegato il QR da stampare (va bene anche in bianco e nero, minimo 3x3 cm) e il cartello da tavolo in A5. Per qualsiasi modifica scrivimi qui: "il fritto passa a 19" basta e avanza.
 
 ## 10. Cosa far fare a Polsia (piano gratuito)
 
-1. Registrati su polsia.com e crea la company "RenMenu": descrivi il servizio con la frase del punto 1, indica Gorizia e il Friuli Venezia Giulia come zona di partenza e l'Italia come mercato, allega il link della landing e quello di Al Bakaro.
+1. Registrati su polsia.com e crea la company "RenMenu": descrivi il servizio con la frase del punto 1, indica Gorizia e il Friuli Venezia Giulia come zona di partenza e l'Italia come mercato, allega il link del sito (https://rua56.github.io/renmenu/) e quello di Al Bakaro (https://rua56.github.io/renmenu/demo/index.html).
 2. Lascia girare il ciclo notturno per una settimana: ti proporrà ricerca sui concorrenti, contenuti per Instagram, idee di outreach. Approva solo quello che ha senso.
 3. Chiedi in chat: "Scrivi 10 post Instagram per RenMenu rivolti ai ristoratori, in italiano, tono diretto" e "Trova 30 ristoranti di Trieste con menù in PDF sul sito".
 4. Passa al piano Pro (49 $/mese) solo quando hai almeno 4 clienti paganti: a quel punto attivi email outreach e supporto automatico.
