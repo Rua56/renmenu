@@ -155,3 +155,65 @@ Messaggio a distanza (Instagram o WhatsApp):
 **Fattura:** in forfettario la fattura elettronica è obbligatoria; si emette gratis dal portale "Fatture e Corrispettivi" dell'Agenzia delle Entrate o dall'app del commercialista. Dicitura tipo: "Servizio RenMenu, piano Mensile, menù digitale per [locale], periodo [mese]". Sulla fattura del forfettario non si applica IVA (indicare "Operazione senza applicazione dell'IVA ai sensi dell'art. 1, commi 54-89, L. 190/2014").
 
 **Se non paga:** promemoria gentile dopo 7 giorni; dopo 30 giorni il menù si mette in pausa cambiando una riga nel file JSON e si riattiva al pagamento.
+
+## 12. Aprire la partita IVA (procedura)
+
+Va fatta **prima del primo incasso reale**: il primo addebito Stripe a un cliente scatta 30 giorni dopo l'attivazione dell'abbonamento, quindi hai circa un mese di tempo da oggi. Il modello si presenta entro 30 giorni dalla data di inizio attività ([Agenzia delle Entrate](https://www.agenziaentrate.gov.it/portale/it/web/guest/schede/istanze/aa9_11-apertura-variazione-chiusura-pf/quando-utilizzare)).
+
+### Inquadramento consigliato
+
+| Voce | Scelta | Perché |
+|---|---|---|
+| Forma | Libero professionista (persona fisica), **non** ditta individuale | Nessuna iscrizione al Registro Imprese, nessun diritto camerale, niente contributi INPS fissi. Vale finché lavori da solo, senza negozio né dipendenti. |
+| Regime | **Forfettario**, imposta sostitutiva **5%** per i primi 5 anni (poi 15%), fino a 85.000 € di ricavi ([Fisco e Tasse](https://www.fiscoetasse.com/approfondimenti/15066-regime-forfettario-2026-tutte-le-regole.html)) | Niente IVA in fattura, niente ritenuta, contabilità minima. |
+| Codice ATECO | **62.10.00** Attività di programmazione informatica (coefficiente 67%) — alternativa 74.12.01 Grafica di pagine web (78%) ([Calcolatore Forfettario](https://calcolatoreforfettario.com/blog/coefficienti-redditivita-regime-forfettario)) | RenMenu è sviluppo e gestione di un servizio web: 62.10.00 descrive l'attività e ha il coefficiente più basso, cioè meno tasse. Il codice va scelto per ciò che fai davvero, non per convenienza ([Regime Minimi](https://www.regimeminimi.com/codice-ateco-per-web-designer/)). |
+| Previdenza | **INPS Gestione Separata**, aliquota 2026 **26,07%** sul reddito forfettario, nessun minimo fisso ([Studio Polli](https://www.studiopolli.it/guide/gestione-separata.html)) | Paghi solo in proporzione a quanto guadagni: se il primo anno fatturi poco, versi poco. |
+
+Le candele: vendere prodotti è attività d'impresa (commercio), con regole e INPS diverse. Tienila separata e chiedi al commercialista come e quando regolarizzarla; per RenMenu non serve.
+
+### Cosa ti serve
+
+- SPID o CIE attivi (la CIE con l'app CieID va benissimo dall'iPhone)
+- Codice fiscale e carta d'identità
+- Indirizzo dove eserciti l'attività (casa tua a Gorizia va bene)
+- Una PEC: non obbligatoria per il professionista forfettario, ma utile; si prende gratis o a pochi euro (es. Aruba, Register)
+- Un IBAN dedicato (quello già inserito sul sito)
+
+### Procedura passo per passo
+
+1. **Apertura partita IVA (30 minuti, gratis).** Entra nell'area riservata dell'Agenzia delle Entrate con SPID/CIE → *Servizi* → *Istanze* → *Partita IVA persone fisiche, modello AA9/12*. Compila: dati anagrafici, data inizio attività (metti la data in cui presenti il modello), codice ATECO 62.10.00, descrizione "Realizzazione e gestione di menù digitali e siti web per attività commerciali", sede a Gorizia, e nel quadro del regime spunta **forfettario** (art. 1, commi 54-89, L. 190/2014) con l'opzione **nuova attività al 5%**. Invia: il numero di partita IVA arriva subito. In alternativa puoi presentarlo di persona all'ufficio dell'Agenzia delle Entrate di Gorizia con appuntamento, o via PEC ([Agenzia delle Entrate](https://www.agenziaentrate.gov.it/portale/it/web/guest/schede/istanze/aa9_11-apertura-variazione-chiusura-pf/quando-utilizzare)).
+2. **Iscrizione INPS Gestione Separata (10 minuti, gratis).** Entro 30 giorni: portale INPS con SPID/CIE → cerca *Iscrizione liberi professionisti* → compila e conferma; ricevi una ricevuta di protocollo ([Studio Polli](https://www.studiopolli.it/guide/gestione-separata.html)).
+3. **Fatturazione elettronica (gratis).** Dal 2024 è obbligatoria anche per i forfettari ([Stripe](https://stripe.com/it/resources/more/e-invoicing-for-flat-rate-tax-regime-italy)). Usa il portale *Fatture e Corrispettivi* dell'Agenzia delle Entrate (funziona anche da iPhone) oppure l'app del commercialista online. Attiva la ricezione delle fatture al tuo indirizzo nel *Registra l'indirizzo telematico* così i fornitori ti trovano.
+4. **Aggiorna Stripe.** Dashboard → Impostazioni → Dettagli attività: inserisci la partita IVA e verifica che il nome sia quello che hai scelto ("RenMenu" va bene come nome commerciale, ma il titolare deve essere "Riccardo Iuran").
+5. **Aggiorna il sito.** Mandami la partita IVA: la metto nel footer e nella pagina pagamenti (è obbligatorio indicarla sul sito).
+
+### Fai da te o commercialista?
+
+Aprire la partita IVA è gratuito e puoi farlo da solo. Quello che conviene delegare è il **dopo**: dichiarazione dei redditi, calcolo di imposta e INPS, F24, bolli. Un commercialista tradizionale per un forfettario costa in media 400–900 € l'anno; i servizi online partono da circa 50 € al mese ([Fiscozen](https://www.fiscozen.it/guide/quanto-costa-la-consulenza-di-un-commercialista/), [Fiscozen prezzi](https://www.fiscozen.it/prezzi/)). Consiglio: apri da solo adesso a costo zero, e attiva il commercialista quando hai i primi 5 clienti paganti, comunque entro la primavera per la dichiarazione.
+
+### Quanto resta in tasca (esempio)
+
+Con 1.000 € al mese, cioè 12.000 € l'anno, codice 62.10.00:
+
+- Reddito forfettario: 12.000 × 67% = **8.040 €**
+- INPS Gestione Separata: 8.040 × 26,07% ≈ **2.096 €** (deducibili l'anno dopo)
+- Imposta sostitutiva 5%: 8.040 × 5% ≈ **402 €** (il primo anno; dal secondo si calcola sul reddito meno i contributi versati, quindi scende)
+- Bolli: 2 € su ogni fattura sopra 77,47 € ([Fiscozen](https://www.fiscozen.it/guide/pagare-marca-da-bollo-fattura-forfettaria/))
+
+Totale tasse e contributi circa **2.500 € l'anno**, cioè ti restano circa **9.500 € netti** su 12.000 incassati. Il primo anno non paghi quasi nulla subito: saldo e acconti si versano con la dichiarazione dell'anno successivo (giugno e novembre), quindi **metti da parte il 22% di ogni incasso** su un conto separato e non avrai sorprese.
+
+### Cosa scrivere in fattura
+
+- Righe: "Servizio RenMenu, piano Standard, menù digitale QR per [locale], periodo [mese/anno]" — importo senza IVA.
+- Dicitura obbligatoria: "Operazione senza applicazione dell'IVA ai sensi dell'art. 1, commi 54-89, L. 190/2014. Compenso non soggetto a ritenuta d'acconto ai sensi dell'art. 1, comma 67, L. 190/2014."
+- Bollo da 2 € se l'importo supera 77,47 € (quindi su Annuale e Premium, non sul mensile da 25 €): si assolve virtualmente e si paga ogni trimestre dal portale ([PMI.it](https://www.pmi.it/professioni/regole-e-compensi/492391/fattura-regime-forfettario.html)).
+- Facoltativo: rivalsa INPS 4% in fattura (la puoi aggiungere al prezzo al cliente); semplice non applicarla e tenere i prezzi tondi.
+
+### Calendario
+
+| Quando | Cosa |
+|---|---|
+| Questa settimana | SPID/CIE pronti, PEC, apertura AA9/12, iscrizione INPS |
+| Entro il 29 ottobre | Partita IVA in Stripe e sul sito, prima fattura pronta |
+| Ogni trimestre | Bolli virtuali dal portale Fatture e Corrispettivi |
+| Primavera 2027 | Dichiarazione dei redditi con commercialista; 30 giugno saldo + primo acconto, 30 novembre secondo acconto |
