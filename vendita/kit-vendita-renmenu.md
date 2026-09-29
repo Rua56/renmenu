@@ -25,7 +25,7 @@ Tutto quello che serve per vendere il menù digitale ai locali, partendo oggi da
 | Annuale | 249 €/anno (2 mesi gratis) | Tutto il mensile + una lingua extra (DE/FR/ES), QR con logo, priorità aggiornamenti. |
 | Lingua extra | 5 €/mese ciascuna | Solo sul mensile; sull'annuale una è inclusa. |
 | Su misura | da 490 € una tantum + 39 €/mese | Grafica dedicata, fino a 4 lingue, tema giorno/notte, extra (sommelier IA, mappa, quiz). È il livello di Al Bakaro. Preventivo a mano. |
-| Promo lancio | Primo mese gratis | Solo per i primi 10 locali del Friuli Venezia Giulia. Crea urgenza: "ne ho ancora 6". |
+| Promo lancio | Primo mese gratis | Per tutti, automatico: la carta viene addebitata solo dopo 30 giorni. Argomento chiave: "lo provi un mese senza spendere nulla". |
 
 Obiettivo: 40 locali attivi = 1.000 €/mese. Con 1 chiusura ogni 5 visite servono 200 visite, cioè circa 8 settimane a 5 visite al giorno per 5 giorni.
 
@@ -54,7 +54,7 @@ Vai tra le 15:00 e le 17:30 (dopo il pranzo, prima dell'aperitivo) o alle 10:30�
 "La parte comoda è questa: quando cambi un prezzo o il piatto del giorno, mi mandi un WhatsApp e lo aggiorno io. Tu non tocchi niente, non ristampi niente."
 
 **Prezzo (10 secondi)**
-"La versione standard costa 25 euro al mese, si disdice quando vuoi. Ai primi 10 locali del Friuli il primo mese lo regalo: te lo pubblico domani, lo usi un mese, e decidi solo dopo. Se poi vuoi una cosa su misura come quella del Bakaro, ne parliamo."
+"La versione standard costa 25 euro al mese, si disdice quando vuoi. Il primo mese è gratis: te lo pubblico domani, lo usi un mese, e la carta parte solo dopo 30 giorni. Se poi vuoi una cosa su misura come quella del Bakaro, ne parliamo."
 
 **Chiusura**
 "Mi mandi una foto del menù su WhatsApp e domani hai il QR? Il numero è questo." (lascia il biglietto o fatti salvare il numero al volo)
@@ -147,7 +147,7 @@ Messaggio a distanza (Instagram o WhatsApp):
    - Mensile: prodotto ricorrente 25 €/mese con **periodo di prova 30 giorni** (così "primo mese gratis" è automatico) e disdetta dal portale clienti.
    - Annuale: pagamento singolo 249 €.
    - Su misura: pagamento singolo 490 € (acconto).
-   Incolla i tre link in `assets/pagamenti.js` → `stripe`. Guida completa: CONFIGURAZIONE-PAGAMENTI.md nel repository; pagina di controllo: https://rua56.github.io/renmenu/paga/index.html?check=1. Il bottone "Paga con carta" si attiva da solo e passa a Stripe il nome del locale come riferimento.
+   I quattro link (Standard mensile con prova 30 giorni, Annuale, Premium acconto, Premium mensile 39 €) sono già configurati in `assets/pagamenti.js` → `stripe`. Guida completa: CONFIGURAZIONE-PAGAMENTI.md nel repository; pagina di controllo: https://rua56.github.io/renmenu/paga/index.html?check=1. Il bottone "Paga con carta" si attiva da solo e passa a Stripe il nome del locale come riferimento.
 4. Facoltativi: link PayPal.me o Satispay Business, sempre nella stessa voce di configurazione.
 
 **Commissioni indicative:** Stripe 1,5% + 0,25 € a transazione su carte europee (≈ 0,63 € su 25 €), bonifico 0 €, Satispay Business 0,95% sopra i 10 €, PayPal 3,4% + 0,35 € (da evitare).

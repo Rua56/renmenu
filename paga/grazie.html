@@ -1,0 +1,53 @@
+<!DOCTYPE html>
+<html lang="it">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Grazie — RenMenu</title>
+<meta name="robots" content="noindex">
+<meta name="theme-color" content="#7a1f2b" media="(prefers-color-scheme: light)">
+<meta name="theme-color" content="#1c1512" media="(prefers-color-scheme: dark)">
+<link rel="icon" href="../assets/favicon.svg" type="image/svg+xml">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,500;9..144,600&family=Instrument+Sans:wght@400;500;600&display=swap">
+<link rel="stylesheet" href="../assets/style.css">
+<style>
+  main { min-height: 100vh; min-height: 100dvh; display: grid; place-items: center; padding: var(--space-8) var(--space-5); }
+  .card { max-width: 520px; width: 100%; background: var(--color-surface); border: 1px solid var(--color-border); border-radius: var(--radius-xl); padding: var(--space-8); text-align: center; }
+  .ok { width: 64px; height: 64px; border-radius: 50%; background: var(--color-primary); color: var(--color-text-inverse); display: inline-grid; place-items: center; margin-bottom: var(--space-5); }
+  h1 { font-size: var(--text-2xl); }
+  p { color: var(--color-text-muted); margin-top: var(--space-3); }
+  ol { text-align: left; margin: var(--space-6) 0; padding-left: var(--space-5); display: grid; gap: var(--space-2); font-size: var(--text-sm); }
+  .btns { display: grid; gap: var(--space-2); margin-top: var(--space-6); }
+  .brand { justify-content: center; margin-bottom: var(--space-6); }
+</style>
+</head>
+<body>
+<main>
+  <div class="card">
+    <a class="brand" href="../index.html"><span data-logo></span><span data-brand-name>RenMenu</span></a>
+    <div class="ok"><svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6 9 17l-5-5"/></svg></div>
+    <h1>Grazie, sei dei nostri.</h1>
+    <p id="msg">Pagamento ricevuto. Ti abbiamo inviato la ricevuta via email.</p>
+    <ol>
+      <li>Mandaci su WhatsApp una foto del menù attuale (o il PDF).</li>
+      <li>Entro 24 ore ricevi il link del menù da controllare.</li>
+      <li>Ti inviamo il QR da stampare e il cartello da tavolo.</li>
+    </ol>
+    <div class="btns">
+      <a class="btn btn--primary" id="wa" href="#">Manda il menù su WhatsApp</a>
+      <a class="btn btn--ghost" href="../index.html">Torna al sito</a>
+    </div>
+  </div>
+</main>
+<script src="../assets/common.js"></script>
+<script src="../assets/pagamenti.js"></script>
+<script>
+  const R = window.RENMENU, piano = new URLSearchParams(location.search).get('piano') || '';
+  const nomi = { mensile: 'Standard mensile', annuale: 'Annuale', sumisura: 'Premium su misura (acconto)', sumisura_mensile: 'Premium, gestione mensile' };
+  if (piano === 'mensile') document.getElementById('msg').textContent = 'Abbonamento attivato. Il primo mese è gratis: la carta verrà addebitata solo tra 30 giorni. Ti abbiamo inviato la conferma via email.';
+  if (piano === 'sumisura') document.getElementById('msg').textContent = 'Acconto ricevuto. Ti contattiamo entro oggi per iniziare il progetto del tuo menù su misura.';
+  const msg = `Ciao! Ho appena attivato RenMenu${nomi[piano] ? ' (' + nomi[piano] + ')' : ''}. Ecco il menù del mio locale:`;
+  document.getElementById('wa').href = R.contattoWhatsApp ? `https://wa.me/${R.contattoWhatsApp}?text=${encodeURIComponent(msg)}` : `mailto:${R.contattoEmail}`;
+</script>
+</body>
+</html>

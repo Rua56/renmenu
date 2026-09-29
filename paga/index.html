@@ -94,6 +94,8 @@
           <h3>💳 Carta di credito o debito</h3>
           <p id="card-p">Pagamento sicuro con Stripe. Per il mensile l'addebito è automatico ogni mese e si disdice con un clic.</p>
           <a class="btn btn--primary" id="card-btn" href="#" rel="noopener">Paga con carta</a>
+          <a class="btn btn--ghost" id="card-btn2" href="#" rel="noopener" hidden>Attiva la gestione mensile · 39 € / mese</a>
+          <p id="card-note2" hidden style="margin-top:var(--space-2)">La gestione mensile si attiva quando il menù su misura è online: aggiornamenti illimitati e assistenza.</p>
           <div id="card-soon" hidden>
             <p><span class="soon">In attivazione</span></p>
             <p>Il pagamento con carta sarà disponibile tra pochi giorni. Nel frattempo puoi pagare con bonifico o chiederci il link su WhatsApp.</p>
@@ -136,7 +138,7 @@
 
   <div class="fine">
     <p>Ricevi sempre la fattura elettronica. I prezzi sono IVA inclusa, nessun costo di attivazione.</p>
-    <p>Mensile: addebito ogni mese, disdetta libera in qualsiasi momento dal portale clienti Stripe. Il primo mese gratis (primi 10 locali del Friuli Venezia Giulia) lo applichiamo noi al momento dell'attivazione. Annuale: fattura unica, rinnovo annuale automatico, disdici quando vuoi. Su misura: l'acconto viene scalato dal preventivo finale.</p>
+    <p>Standard mensile: il primo mese è gratis, la carta viene addebitata solo dopo 30 giorni; disdetta libera in qualsiasi momento dal portale clienti Stripe. Annuale: fattura unica, rinnovo annuale automatico, disdici quando vuoi. Premium su misura: l'acconto di 490 € viene scalato dal preventivo finale; la gestione mensile (39 €) parte quando il menù è online.</p>
     <p>Pagamenti con carta gestiti da Stripe: RenMenu non vede né conserva i dati della tua carta.</p>
   </div>
 </main>
@@ -181,6 +183,7 @@
       ${row('Stripe mensile', isStripe(P.stripe.mensile), P.stripe.mensile ? 'non è un link Stripe' : 'mancante')}
       ${row('Stripe annuale', isStripe(P.stripe.annuale), P.stripe.annuale ? 'non è un link Stripe' : 'mancante')}
       ${row('Stripe su misura', isStripe(P.stripe.sumisura), P.stripe.sumisura ? 'non è un link Stripe' : 'mancante')}
+      ${row('Stripe su misura mensile', isStripe(P.stripe.sumisura_mensile), P.stripe.sumisura_mensile ? 'non è un link Stripe' : 'mancante')}
       ${row('PayPal', !!P.paypal, 'non impostato (facoltativo)')}
       ${row('Satispay', !!P.satispay, 'non impostato (facoltativo)')}
       ${row('WhatsApp', !!R.contattoWhatsApp, 'mancante')}
@@ -204,11 +207,15 @@
     if (link) {
       $('#card-btn').hidden = false; $('#card-p').hidden = false; $('#card-soon').hidden = true;
       $('#card-btn').href = link + (link.includes('?') ? '&' : '?') + 'client_reference_id=' + ref;
-      $('#card-btn').textContent = piano === 'mensile' ? `Paga con carta · ${p.prezzo} € / mese` : `Paga con carta · ${p.prezzo} €`;
+      $('#card-btn').textContent = piano === 'mensile' ? `Paga con carta · ${p.prezzo} € / mese` : (piano === 'sumisura' ? `Versa l'acconto con carta · ${p.prezzo} €` : `Paga con carta · ${p.prezzo} €`);
     } else {
       $('#card-btn').hidden = true; $('#card-p').hidden = true; $('#card-soon').hidden = false;
       $('#card-wa').href = wa(`Ciao! Vorrei pagare con carta il piano ${p.nome} di RenMenu per ${locale()}. Mi mandi il link?`);
     }
+
+    const link2 = piano === 'sumisura' && isStripe(P.stripe.sumisura_mensile) ? P.stripe.sumisura_mensile : '';
+    $('#card-btn2').hidden = !link2; $('#card-note2').hidden = !link2;
+    if (link2) $('#card-btn2').href = link2 + (link2.includes('?') ? '&' : '?') + 'client_reference_id=' + ref;
 
     // Bonifico
     const hasBank = ibanOk(P.iban) && P.intestatario;
