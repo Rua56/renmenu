@@ -1,0 +1,56 @@
+<!DOCTYPE html>
+<html lang="it">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Al Bakaro, Gorizia — menù su misura realizzato con RenMenu</title>
+<meta name="description" content="Il menù digitale su misura di Al Bakaro, la prima cicchetteria di Gorizia: quattro lingue, tema giorno e notte, sommelier IA, mappa del Collio.">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,500;9..144,600&family=Instrument+Sans:wght@400;500;600&display=swap">
+<link rel="stylesheet" href="../assets/style.css">
+<link rel="icon" href="../assets/favicon.svg" type="image/svg+xml">
+<style>
+  html, body { height: 100%; overflow: hidden; }
+  body { display: flex; flex-direction: column; background: #14100d; }
+  .bar { display: flex; align-items: center; justify-content: space-between; gap: var(--space-3); padding: var(--space-2) var(--space-4); padding-top: calc(var(--space-2) + env(safe-area-inset-top)); background: var(--color-bg); border-bottom: 1px solid var(--color-divider); flex: none; min-height: 56px; }
+  .bar__title { font-size: var(--text-xs); color: var(--color-text-muted); text-align: center; flex: 1; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .bar__title b { color: var(--color-text); font-weight: 600; }
+  .bar .brand { font-size: var(--text-base); }
+  .bar .brand svg { width: 22px; height: 22px; }
+  .bar .btn--sm { min-height: 36px; padding: var(--space-1) var(--space-3); white-space: nowrap; }
+  .frame { flex: 1; position: relative; }
+  .frame iframe { position: absolute; inset: 0; width: 100%; height: 100%; border: 0; background: #14100d; }
+  .loading { position: absolute; inset: 0; display: grid; place-items: center; color: #d9c7a8; font-size: var(--text-sm); pointer-events: none; transition: opacity 400ms; }
+  .foot { flex: none; padding: var(--space-2) var(--space-4); padding-bottom: calc(var(--space-2) + env(safe-area-inset-bottom)); background: var(--color-bg); border-top: 1px solid var(--color-divider); display: flex; gap: var(--space-2); align-items: center; justify-content: center; flex-wrap: wrap; font-size: var(--text-xs); color: var(--color-text-muted); }
+  .foot a { color: var(--color-primary); font-weight: 600; text-decoration: none; }
+  @media (max-width: 480px) { .bar__title { display: none; } }
+</style>
+</head>
+<body>
+<header class="bar">
+  <a class="brand" href="../index.html"><span data-logo></span><span data-brand-name>RenMenu</span></a>
+  <div class="bar__title">Menù su misura di <b>Al Bakaro</b>, Gorizia · dal vivo</div>
+  <div style="display:flex;gap:var(--space-2)">
+    <a class="btn btn--ghost btn--sm" href="../index.html#esempi">← Torna</a>
+    <a class="btn btn--primary btn--sm" id="open" href="https://rua56.github.io/Al.bakaro.menu/" target="_blank" rel="noopener">Schermo intero</a>
+  </div>
+</header>
+<main class="frame">
+  <div class="loading" id="loading">Caricamento del menù di Al Bakaro…</div>
+  <iframe id="bak" src="https://rua56.github.io/Al.bakaro.menu/" title="Menù di Al Bakaro, Gorizia" allow="geolocation" onload="document.getElementById('loading').style.opacity=0"></iframe>
+</main>
+<footer class="foot">
+  <span>Questo è un menù reale, realizzato con il piano Su misura.</span>
+  <a href="../menu/index.html?m=bakaro&lang=it">Vedi la versione Standard →</a>
+  <a data-contact href="#">Voglio un menù così</a>
+</footer>
+<script src="../assets/common.js"></script>
+<script>
+  document.addEventListener('DOMContentLoaded', () => {
+    const R = window.RENMENU;
+    const msg = encodeURIComponent('Ciao! Ho visto il menù di Al Bakaro e vorrei un menù su misura per il mio locale.');
+    document.querySelectorAll('[data-contact]').forEach(a => a.href = R.contattoWhatsApp ? `https://wa.me/${R.contattoWhatsApp}?text=${msg}` : `mailto:${R.contattoEmail}`);
+  });
+</script>
+</body>
+</html>
