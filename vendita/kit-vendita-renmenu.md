@@ -130,6 +130,8 @@ Messaggio a distanza (Instagram o WhatsApp):
 
 ## 10. Cosa far fare a Polsia (piano gratuito)
 
+Il prompt completo da incollare come primo messaggio nella chat di Polsia è in `vendita/prompt-polsia.md` (stesso repository).
+
 1. Registrati su polsia.com e crea la company "RenMenu": descrivi il servizio con la frase del punto 1, indica Gorizia e il Friuli Venezia Giulia come zona di partenza e l'Italia come mercato, allega il link del sito (https://rua56.github.io/renmenu/) e quello di Al Bakaro (https://rua56.github.io/renmenu/demo/index.html).
 2. Lascia girare il ciclo notturno per una settimana: ti proporrà ricerca sui concorrenti, contenuti per Instagram, idee di outreach. Approva solo quello che ha senso.
 3. Chiedi in chat: "Scrivi 10 post Instagram per RenMenu rivolti ai ristoratori, in italiano, tono diretto" e "Trova 30 ristoranti di Trieste con menù in PDF sul sito".
