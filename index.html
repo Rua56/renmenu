@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <title>RenMenu — Il menù digitale QR per bar e ristoranti, pronto in 10 minuti</title>
-<meta name="description" content="Menù digitale con QR code per bar, osterie e ristoranti di Padova. Aggiornabile con un messaggio, in italiano e inglese, allergeni a norma. Da 25 € al mese, nessuna app.">
+<meta name="description" content="Menù digitale con QR code per bar, osterie e ristoranti, dal Friuli Venezia Giulia a tutta Italia. Aggiornabile con un messaggio WhatsApp, multilingua, allergeni a norma. Da 25 € al mese, nessuna app.">
 <meta property="og:title" content="RenMenu — Il menù digitale del tuo locale">
 <meta property="og:description" content="QR sul tavolo, menù sul telefono dei clienti. Aggiornato con un messaggio. Da 25 € al mese.">
 <meta property="og:type" content="website">
@@ -13,7 +13,7 @@
 <link rel="stylesheet" href="assets/style.css">
 <link rel="icon" href="assets/favicon.svg" type="image/svg+xml">
 <script type="application/ld+json">
-{"@context":"https://schema.org","@type":"Service","name":"RenMenu","serviceType":"Menù digitale QR per ristoranti","areaServed":"Padova, Veneto","provider":{"@type":"Organization","name":"RenMenu"},"offers":{"@type":"Offer","price":"25","priceCurrency":"EUR","description":"Abbonamento mensile, setup incluso"}}
+{"@context":"https://schema.org","@type":"Service","name":"RenMenu","serviceType":"Menù digitale QR per ristoranti","areaServed":["Friuli Venezia Giulia","Italia"],"provider":{"@type":"Organization","name":"RenMenu"},"offers":{"@type":"Offer","price":"25","priceCurrency":"EUR","description":"Abbonamento mensile, setup incluso"}}
 </script>
 <style>
   header.site { position: sticky; top: 0; z-index: 50; background: color-mix(in oklab, var(--color-bg) 85%, transparent); backdrop-filter: blur(14px); -webkit-backdrop-filter: blur(14px); border-bottom: 1px solid var(--color-divider); }
@@ -69,6 +69,7 @@
   .plan__name { font-size: var(--text-sm); font-weight: 600; text-transform: uppercase; letter-spacing: 0.08em; color: var(--color-text-muted); }
   .plan__price { font-family: var(--font-display); font-size: var(--text-2xl); margin-top: var(--space-3); line-height: 1; }
   .plan__price small { font-family: var(--font-body); font-size: var(--text-sm); color: var(--color-text-muted); }
+  .plan__sub { margin-top: var(--space-2); font-size: var(--text-sm); color: var(--color-text-muted); }
   .plan ul { margin-top: var(--space-6); display: grid; gap: var(--space-2); font-size: var(--text-sm); flex: 1; }
   .plan li { display: flex; gap: var(--space-2); }
   .plan li::before { content: '✓'; color: var(--color-primary); font-weight: 700; }
@@ -80,6 +81,15 @@
   .quote { border-left: 2px solid var(--color-accent); padding-left: var(--space-5); font-family: var(--font-display); font-size: var(--text-lg); font-style: italic; line-height: 1.4; }
   .quote cite { display: block; margin-top: var(--space-3); font-family: var(--font-body); font-style: normal; font-size: var(--text-sm); color: var(--color-text-muted); }
 
+  .examples { display: grid; gap: var(--space-5); grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); }
+  .example { display: flex; flex-direction: column; gap: var(--space-3); padding: var(--space-8); border-radius: var(--radius-xl); background: var(--color-surface); border: 1px solid var(--color-border); text-decoration: none; }
+  .example:hover { transform: translateY(-2px); box-shadow: var(--shadow-md); }
+  .example--hi { background: var(--color-text); color: var(--color-text-inverse); border-color: var(--color-text); }
+  .example__tag { font-size: var(--text-xs); font-weight: 600; text-transform: uppercase; letter-spacing: 0.1em; color: var(--color-accent); }
+  .example h3 { font-size: var(--text-lg); }
+  .example p { font-size: var(--text-sm); opacity: 0.8; flex: 1; }
+  .example__cta { font-weight: 600; font-size: var(--text-sm); color: var(--color-primary); }
+  .example--hi .example__cta { color: var(--color-accent); }
   .faq { display: grid; gap: var(--space-2); max-width: var(--content-default); }
   .faq details { border: 1px solid var(--color-divider); border-radius: var(--radius-lg); background: var(--color-surface); }
   .faq summary { cursor: pointer; padding: var(--space-4) var(--space-5); font-weight: 600; font-size: var(--text-base); list-style: none; display: flex; justify-content: space-between; gap: var(--space-4); }
@@ -114,18 +124,18 @@
 <main>
   <section class="container hero">
     <div>
-      <span class="eyebrow">Per bar, osterie e ristoranti di Padova</span>
+      <span class="eyebrow">Bar, osterie e ristoranti · Friuli Venezia Giulia e tutta Italia</span>
       <h1>Il menù del tuo locale, <em>sul telefono</em> dei tuoi clienti.</h1>
-      <p class="hero__lead">Un QR sul tavolo. Il menù si apre subito, senza app, in italiano e inglese. Cambi un prezzo? Ci scrivi un messaggio ed è aggiornato.</p>
+      <p class="hero__lead">Un QR sul tavolo. Il menù si apre subito, senza app, in più lingue. Cambi un prezzo? Ci scrivi su WhatsApp ed è aggiornato. Ovunque sia il tuo locale.</p>
       <div class="hero__cta">
-        <a class="btn btn--primary" href="menu/index.html?m=bakaro">Guarda il menù di Al Bakaro</a>
-        <a class="btn btn--ghost" data-contact href="#prezzi">Chiedi un preventivo</a>
+        <a class="btn btn--primary" href="https://rua56.github.io/Al.bakaro.menu/" target="_blank" rel="noopener">Guarda il menù di Al Bakaro</a>
+        <a class="btn btn--ghost" data-contact href="#prezzi">Scrivici su WhatsApp</a>
       </div>
-      <p class="hero__note">Pronto in 24 ore · Da 25 € al mese · Disdici quando vuoi</p>
+      <p class="hero__note">Pronto in 24 ore · Da 25 € al mese · Tutto via WhatsApp, in tutta Italia</p>
     </div>
     <div class="phone" aria-label="Anteprima del menù digitale su smartphone">
-      <div class="phone__screen"><iframe src="menu/index.html?m=bakaro&lang=it" title="Menù demo" loading="eager"></iframe></div>
-      <div class="phone__badge"><i></i> Menù reale di Al Bakaro, Gorizia</div>
+      <div class="phone__screen"><iframe src="https://rua56.github.io/Al.bakaro.menu/" title="Menù di Al Bakaro, Gorizia" loading="eager"></iframe></div>
+      <div class="phone__badge"><i></i> Dal vivo: Al Bakaro, Gorizia · 4 lingue</div>
     </div>
   </section>
 
@@ -133,7 +143,7 @@
     <div class="container strip__grid">
       <div><span class="num">Basta PDF</span><h3>Leggibile davvero</h3><p>Niente zoom con due dita su un PDF fotografato. Testo grande, sezioni, ricerca.</p></div>
       <div><span class="num">Zero ristampe</span><h3>Prezzi sempre giusti</h3><p>Cambia un prezzo o il piatto del giorno in un minuto, senza stampare nulla.</p></div>
-      <div><span class="num">IT · EN · +</span><h3>Parla ai turisti</h3><p>Traduzione inglese inclusa. Tedesco, francese o spagnolo su richiesta.</p></div>
+      <div><span class="num">IT · EN · DE · SL</span><h3>Parla ai turisti</h3><p>Inglese incluso. Tedesco, sloveno, francese o spagnolo per chi lavora sul confine o con i turisti.</p></div>
     </div>
   </div>
 
@@ -144,7 +154,7 @@
       <p>Non devi imparare nessun pannello. Il lavoro tecnico lo facciamo noi.</p>
     </div>
     <div class="steps">
-      <div class="step"><h3>Ci mandi il menù</h3><p>Una foto del cartaceo, un PDF o un messaggio vocale su WhatsApp. Bastano quelli.</p></div>
+      <div class="step"><h3>Ci mandi il menù</h3><p>Una foto del cartaceo, un PDF o un messaggio vocale su WhatsApp. Bastano quelli, da Gorizia come da Palermo.</p></div>
       <div class="step"><h3>Lo pubblichiamo entro 24 ore</h3><p>Ricevi il link e i QR pronti da stampare: per i tavoli, la vetrina e il banco. Tradotto in inglese.</p></div>
       <div class="step"><h3>Lo aggiorni con un messaggio</h3><p>"Il fritto passa a 19" oppure "oggi bigoli in salsa". Aggiornamenti illimitati, inclusi nel prezzo.</p></div>
     </div>
@@ -167,11 +177,34 @@
     </div>
   </section>
 
+
+  <section id="esempi" class="container" style="padding-top:0">
+    <div class="section-head">
+      <span class="eyebrow">Un esempio vero</span>
+      <h2>Al Bakaro, Gorizia: lo stesso menù in due versioni.</h2>
+      <p>La prima cicchetteria di Gorizia usa RenMenu per 177 voci tra vini, cicchetti e cocktail. Guardalo dal telefono per farti un'idea del livello.</p>
+    </div>
+    <div class="examples">
+      <a class="example example--hi" href="https://rua56.github.io/Al.bakaro.menu/" target="_blank" rel="noopener">
+        <span class="example__tag">Su misura</span>
+        <h3>Al Bakaro, versione su misura</h3>
+        <p>Grafica disegnata sul locale, quattro lingue (IT, EN, DE, SL), tema giorno e notte, vino della settimana, sommelier con intelligenza artificiale, mappa del Collio, preferiti e quiz.</p>
+        <span class="example__cta">Apri il menù su misura →</span>
+      </a>
+      <a class="example" href="menu/index.html?m=bakaro&lang=it">
+        <span class="example__tag">Standard</span>
+        <h3>Al Bakaro, versione Standard</h3>
+        <p>Lo stesso menù nel formato RenMenu incluso in ogni abbonamento: sezioni, ricerca, allergeni, piatto del giorno, italiano e inglese. Pronto in 24 ore.</p>
+        <span class="example__cta">Apri la versione Standard →</span>
+      </a>
+    </div>
+  </section>
+
   <section id="prezzi" class="container">
     <div class="section-head">
       <span class="eyebrow">Prezzi</span>
       <h2>Meno di una ristampa del menù al mese.</h2>
-      <p>Setup, traduzione in inglese e aggiornamenti illimitati sono sempre inclusi. Nessun costo nascosto.</p>
+      <p>Setup, traduzione in inglese e aggiornamenti illimitati sono sempre inclusi. Nessun costo nascosto. Se vuoi un menù disegnato sul tuo locale come quello di Al Bakaro, c'è il Su misura.</p>
     </div>
     <div class="pricing">
       <div class="plan">
@@ -199,16 +232,29 @@
         </ul>
         <a class="btn btn--primary" data-contact href="#">Scegli l'annuale</a>
       </div>
+      <div class="plan">
+        <div class="plan__name">Su misura</div>
+        <div class="plan__price">da 490 €</div><div class="plan__sub">una tantum + 39 € / mese di gestione</div>
+        <ul role="list">
+          <li>Grafica e colori disegnati sul tuo locale</li>
+          <li>Fino a 4 lingue (es. IT, EN, DE, SL)</li>
+          <li>Tema giorno/notte, foto e storytelling</li>
+          <li>Extra a scelta: sommelier IA, mappa, preferiti, quiz</li>
+          <li>Aggiornamenti illimitati via WhatsApp</li>
+          <li>Come il menù di Al Bakaro</li>
+        </ul>
+        <a class="btn btn--ghost" data-contact href="#">Chiedi un preventivo</a>
+      </div>
     </div>
-    <div class="promo"><b>Primi 10 locali di Padova: il primo mese è gratis.</b>Ti pubblichiamo il menù, lo usi un mese intero e decidi solo dopo se continuare.</div>
+    <div class="promo"><b>Primi 10 locali del Friuli Venezia Giulia: il primo mese è gratis.</b>Ti pubblichiamo il menù, lo usi un mese intero e decidi solo dopo se continuare. Sei fuori regione? Funziona uguale: tutto passa da WhatsApp, non serve che veniamo di persona.</div>
   </section>
 
   <section class="container" style="padding-top:0">
     <div class="ref">
-      <div class="quote" style="font-style:normal"><span class="eyebrow" style="font-family:var(--font-body)">Già in uso</span><p style="margin-top:var(--space-3)">Il primo menù RenMenu è quello di <b>Al Bakaro</b>, la prima cicchetteria di Gorizia: 177 voci tra vini, cicchetti e cocktail, in italiano e inglese.</p><cite><a href="menu/index.html?m=bakaro" style="color:var(--color-primary);font-weight:600">Apri il menù di Al Bakaro →</a></cite></div>
+      <div class="quote" style="font-style:normal"><span class="eyebrow" style="font-family:var(--font-body)">Già in uso</span><p style="margin-top:var(--space-3)">Il primo menù RenMenu è quello di <b>Al Bakaro</b>, la prima cicchetteria di Gorizia: 177 voci tra vini, cicchetti e cocktail, in quattro lingue, con sommelier e mappa del Collio.</p><cite><a href="https://rua56.github.io/Al.bakaro.menu/" target="_blank" rel="noopener" style="color:var(--color-primary);font-weight:600">Apri il menù di Al Bakaro →</a></cite></div>
       <div>
         <span class="eyebrow">Perché costa così poco</span>
-        <p class="muted" style="margin-top:var(--space-3);font-size:var(--text-sm)">Non c'è un'app da mantenere né un pannello complicato. Il menù è una pagina web leggera e velocissima, ospitata su infrastruttura affidabile, e gli aggiornamenti li facciamo noi a mano: per te è un messaggio, per noi un minuto di lavoro. Il risparmio lo passiamo a te.</p>
+        <p class="muted" style="margin-top:var(--space-3);font-size:var(--text-sm)">Non c'è un'app da mantenere né un pannello complicato. Il menù è una pagina web leggera e velocissima, ospitata su infrastruttura affidabile, e gli aggiornamenti li facciamo noi: per te è un messaggio, per noi un minuto di lavoro. Lavoriamo da Gorizia, ma tutto passa da WhatsApp: serviamo locali in tutta Italia allo stesso prezzo.</p>
       </div>
     </div>
   </section>
@@ -221,7 +267,8 @@
       <details><summary>Posso tenere anche il menù cartaceo?</summary><p>Certo. Molti locali usano il QR per la lista completa e lasciano un cartaceo ridotto o la lavagna con i piatti del giorno.</p></details>
       <details><summary>E se voglio smettere?</summary><p>Col piano mensile disdici quando vuoi con un messaggio, senza penali. Il menù resta online fino alla fine del mese pagato.</p></details>
       <details><summary>Serve una partita IVA o un contratto?</summary><p>Ricevi una fattura regolare. Nessun contratto pluriennale: il piano mensile si rinnova di mese in mese, l'annuale di anno in anno.</p></details>
-      <details><summary>Quante lingue posso avere?</summary><p>Italiano e inglese sono inclusi. Tedesco, francese e spagnolo sono inclusi nel piano annuale (una lingua) o aggiungibili al mensile per 5 € al mese ciascuna.</p></details>
+      <details><summary>Siete solo in Friuli Venezia Giulia?</summary><p>No. Siamo di Gorizia e partiamo da qui, ma il servizio è completamente a distanza: foto del menù su WhatsApp, link e QR il giorno dopo. Serviamo locali in tutta Italia allo stesso prezzo.</p></details>
+      <details><summary>Quante lingue posso avere?</summary><p>Italiano e inglese sono inclusi. Tedesco, sloveno, francese e spagnolo: una lingua è inclusa nel piano annuale, sul mensile costano 5 € al mese ciascuna. Il Su misura arriva a quattro lingue.</p></details>
     </div>
   </section>
 
@@ -236,7 +283,7 @@
 
 <footer class="site container">
   <a class="brand" href="./index.html" style="font-size:var(--text-base)"><span data-logo></span><span data-brand-name>RenMenu</span></a>
-  <span>Padova, Veneto · <a data-mail href="#">ciao@renmenu.it</a></span>
+  <span>Gorizia, Friuli Venezia Giulia · attivi in tutta Italia · <a data-mail href="#">ciao@renmenu.it</a></span>
   <a href="crea/index.html">Area operatore</a>
 </footer>
 

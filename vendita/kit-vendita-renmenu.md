@@ -1,6 +1,6 @@
 # RenMenu — Kit di vendita
 
-Tutto quello che serve per vendere il menù digitale ai locali di Padova, partendo oggi.
+Tutto quello che serve per vendere il menù digitale ai locali, partendo oggi da Gorizia e dal Friuli Venezia Giulia, poi in tutta Italia.
 
 ---
 
@@ -15,7 +15,8 @@ Tutto quello che serve per vendere il menù digitale ai locali di Padova, parten
 | Mensile | 25 €/mese | Menù online in 24 h, QR da stampare, IT + EN, aggiornamenti illimitati via WhatsApp, allergeni, piatto del giorno. Disdetta libera. |
 | Annuale | 249 €/anno (2 mesi gratis) | Tutto il mensile + una lingua extra (DE/FR/ES), QR con logo, priorità aggiornamenti. |
 | Lingua extra | 5 €/mese ciascuna | Solo sul mensile; sull'annuale una è inclusa. |
-| Promo lancio | Primo mese gratis | Solo per i primi 10 locali di Padova. Crea urgenza: "ne ho ancora 6". |
+| Su misura | da 490 € una tantum + 39 €/mese | Grafica dedicata, fino a 4 lingue, tema giorno/notte, extra (sommelier IA, mappa, quiz). È il livello di Al Bakaro. Preventivo a mano. |
+| Promo lancio | Primo mese gratis | Solo per i primi 10 locali del Friuli Venezia Giulia. Crea urgenza: "ne ho ancora 6". |
 
 Obiettivo: 40 locali attivi = 1.000 €/mese. Con 1 chiusura ogni 5 visite servono 200 visite, cioè circa 8 settimane a 5 visite al giorno per 5 giorni.
 
@@ -35,16 +36,16 @@ Da evitare per ora: catene, franchising, hotel (decisioni lente, uffici centrali
 Vai tra le 15:00 e le 17:30 (dopo il pranzo, prima dell'aperitivo) o alle 10:30–11:30. Mai durante il servizio.
 
 **Apertura (10 secondi)**
-"Ciao, sono Riccardo, sono di Padova. Ti rubo un minuto: faccio menù digitali col QR per i locali della zona. Posso mostrarti quello che ho fatto per un'osteria? È sul mio telefono."
+"Ciao, sono Riccardo, sono di Gorizia. Ti rubo un minuto: faccio menù digitali col QR per i locali. Quello di Al Bakaro in Piazza Vittoria l'ho fatto io, te lo faccio vedere? È sul mio telefono."
 
-**Demo (30 secondi)** — apri il menù demo sul telefono e daglielo in mano.
+**Demo (30 secondi)** — apri il menù di Al Bakaro sul telefono e daglielo in mano.
 "Il cliente inquadra il QR e si apre questo. Niente app. Qui cambia lingua per i turisti, qui c'è il piatto del giorno, qui gli allergeni a norma. Prova a cercare 'polenta'."
 
 **Il gancio (20 secondi)**
 "La parte comoda è questa: quando cambi un prezzo o il piatto del giorno, mi mandi un WhatsApp e lo aggiorno io. Tu non tocchi niente, non ristampi niente."
 
 **Prezzo (10 secondi)**
-"Costa 25 euro al mese, si disdice quando vuoi. Ai primi 10 locali di Padova il primo mese lo regalo: te lo pubblico domani, lo usi un mese, e decidi solo dopo."
+"La versione standard costa 25 euro al mese, si disdice quando vuoi. Ai primi 10 locali del Friuli il primo mese lo regalo: te lo pubblico domani, lo usi un mese, e decidi solo dopo. Se poi vuoi una cosa su misura come quella del Bakaro, ne parliamo."
 
 **Chiusura**
 "Mi mandi una foto del menù su WhatsApp e domani hai il QR? Il numero è questo." (lascia il biglietto o fatti salvare il numero al volo)
@@ -68,45 +69,47 @@ Vai tra le 15:00 e le 17:30 (dopo il pranzo, prima dell'aperitivo) o alle 10:30�
 - 18:00 — Segna in una nota le visite fatte: nome locale, esito, quando ripassare.
 - Sera — Pubblica un menù nuovo per ogni foto ricevuta in giornata (usa il generatore + carico su GitHub).
 
-## 7. Prime zone da battere a Padova
+## 7. Zone da battere: si parte dal Friuli Venezia Giulia
 
-Ogni zona ha decine di locali a pochi metri; qui ci sono nomi citati da guide locali per orientarti. Verifica orari e titolare su Google Maps prima di andare.
+Ordine consigliato: Gorizia (sei di casa, hai Al Bakaro come referenza a 50 metri), poi Trieste e Udine (più locali, più turisti), poi Collio e costa. Verifica orari e titolare su Google Maps prima di andare.
 
-**Zona A — Piazza delle Erbe, Piazza della Frutta, Piazza dei Signori (sotto il Salone)**
-- Bar Nazionale, Piazza delle Erbe 41 ([Agrodolce](https://www.agrodolce.it/dove-mangiare-a-padova-2023))
-- Bar al Salone – Dai Rosti, Piazza delle Erbe 39 ([2night](https://2night.it/1b5d54-/vino-cicchetti-padova.html))
-- La Folperia di Max e Barbara, Piazza della Frutta 1 ([Gambero Rosso](https://www.gamberorosso.it/rubriche/classifiche/ristoranti-tipici-di-padova-dove-assaggiare-i-piatti-tradizionali/))
-- Pita Gyros da Andrea, sotto il porticato di Palazzo della Ragione ([Apartments Padova](https://www.apartmentspadova.it/osterie-e-nuovi-street-food-nel-centro-storico-di-padova/))
-- Caffè Diemme e i bar di Piazza dei Signori, epicentro dell'aperitivo padovano ([Hotel Giotto](https://hotelgiotto.com/dove-fare-laperitivo-a-padova/), [PadovaOggi](https://www.padovaoggi.it/blog/vivipadova/locali-aperitivo-estate-padova.html))
-- Tutti i bar con dehors sotto il Salone: in 200 metri ci sono più di 15 insegne.
+**Fase 1 — Gorizia e dintorni (settimane 1–2)**
+- Piazza della Vittoria, Corso Verdi, via Rastello, Corso Italia: parti dai vicini di Al Bakaro, puoi dire "il menù del Bakaro l'ho fatto io" e mostrarlo dal telefono.
+- Osteria Vecia Gorizia, Via S. Giovanni 14, tel. 0481 32424 ([Premio Amidei](https://www.amidei.com/bar-ristoranti-fast-food/))
+- La Cicchetteria ai Giardini ([BeerGarden24](https://beergarden24.com/it/bars-pubs/36/gorizia)), Bar Torino, 4:20 Quattroeventi ([Tripadvisor](https://www.tripadvisor.it/Restaurants-g635871-zfg11776-Gorizia_Province_of_Gorizia_Friuli_Venezia_Giulia.html))
+- La mappa "Mangiare a Gorizia" di Confcommercio elenca decine di locali con indirizzo e telefono: stampala e spuntala ([Confcommercio Gorizia](https://confcommerciogorizia.it/wp-content/uploads/2023/05/Mangiare-a-Gorizia-A3-web.pdf))
+- Gorizia è città di confine: la versione con tedesco e sloveno è un argomento di vendita forte, come per Al Bakaro.
 
-**Zona B — Ghetto (via Soncin, via dei Fabbri, via San Martino e Solferino)**
-- Osteria L'Anfora, Via dei Soncin 13 ([Italoblog](https://blog.italotreno.com/italia-da-mangiare/piatti-tipici-di-padova-5-ristoranti/))
-- Bacari del Ghetto con cicchetti a 2–2,50 € ([Coinquilino](https://coinquilino.app/blog/aperitivo-economico-padova))
-- Le vie del Ghetto sono piene di osterie con menù cartaceo: zona perfetta per il porta a porta.
+**Fase 2 — Trieste (settimane 3–4)**
+- I buffet storici sono il target perfetto: menù che cambia col bollito del giorno, tanti turisti. Buffet Da Siora Rosa (Piazza Hortis 3), Buffet Approdo (Via Carducci 34), Buffet Pepi (Via Cassa di Risparmio 3) ([Agrodolce](https://www.agrodolce.it/dove-mangiare-a-trieste))
+- Buffet Clai, Vecio Buffet Marascutti, Buffet Birreria Rudy ([Tripadvisor](https://www.tripadvisor.it/Restaurants-g187813-zfp49-Trieste_Province_of_Trieste_Friuli_Venezia_Giulia.html))
+- Antico Caffè, Corso Italia 2, e i bar dell'aperitivo in centro ([PagineBianche](https://www.paginebianche.it/friuli-venezia-giulia/trieste/aperitivo.html))
+- Osterie e buffet a Opicina e sull'altipiano ([PagineBianche](https://www.paginebianche.it/friuli-venezia-giulia/ts/osterie.html))
 
-**Zona C — Duomo, via Barbarigo, via San Pietro**
-- Bacaro Padovano, Via San Gregorio Barbarigo 3, tel. 049 876 2777 ([Wanderlog](https://wanderlog.com/it/list/geoCategory/74278/dove-mangiare-i-migliori-ristoranti-a-padova))
-- Al Bacareto, Via San Pietro 105 ([Gambero Rosso](https://www.gamberorosso.it/rubriche/classifiche/ristoranti-tipici-di-padova-dove-assaggiare-i-piatti-tradizionali/))
-- Enoteca dei Tadi, Osteria dal Capo, Osteria all'Ombra del Pino, Trattoria San Pietro ([Visitare Padova](https://www.visitarepadova.it/migliori-trattorie-a-padova/))
+**Fase 3 — Udine (settimane 5–6)**
+- Il percorso delle osterie lungo le rogge: Aquila Nera, Alla Tavernetta, Grappolo d'Oro, Il Vecchio Tram, Allegria, Osteria & Staffa, Del Lepre, Speziaria pei Sani, Alla Ghiacciaia, Al Cappello, Pieri Mortadele, Ai Frati ([Turismo FVG](https://www.turismofvg.it/fvglivexperience/a-udine-segui-le-rogge-e-trovi-le-osterie))
+- All'Agricoltura, Via Gorghi 25; Osteria Al Marinaio; Trattoria Antica Maddalena ([TheFork](https://www.thefork.com/restaurants/udine-c564145), [Tripadvisor](https://it.tripadvisor.ch/Restaurants-g187814-zfp30-Udine_Province_of_Udine_Friuli_Venezia_Giulia.html))
+- Osteria Al Tagliato, centro storico ([Touring Club](https://www.touringclub.it/destinazioni/udine/mangiare/324025-osteria-al-tagliato))
+- Nuove aperture: Indiana Highway Station, Largo dei Pecile 15 ([Friuli Oggi](https://www.friulioggi.it/udine/nasce-indiana-highway-station-udine-nuovo-locale-america-on-the-road-27-giugno-2026/))
 
-**Zona D — Santo, Prato della Valle, via Umberto I**
-- Nane della Giulia, Via Santa Sofia 1 ([Gambero Rosso](https://www.gamberorosso.it/rubriche/classifiche/ristoranti-tipici-di-padova-dove-assaggiare-i-piatti-tradizionali/))
-- Al Prato, Via Prato della Valle 4 ([TheFork](https://www.thefork.it/ristoranti/provincia-di-padova-b1982))
-- Otivm Padova, L'Officina al Bersagliere e gli altri locali nel raggio di 500 m da Prato della Valle ([Tripadvisor](https://www.tripadvisor.it/Attraction_Review-g187867-d246565-Reviews-Prato_Della_Valle-Padua_Province_of_Padua_Veneto.html))
-- I bar di via del Santo verso la Basilica: flusso turistico costante, menù in inglese molto richiesto.
+**Fase 4 — Collio, Cividale, Cormons e costa (dalla settimana 7)**
+- Cividale: Civico (Piazza Paolo Diacono 39) e gli oltre 70 bar censiti ([PagineGialle](https://www.paginegialle.it/friuli_venezia_giulia/cividale_del_friuli/bar.html), [Sluurpy](https://www.sluurpy.it/cividale-del-friuli/bar)); Al Monastero e i ristoranti del Collio segnalati dalla Michelin ([Guida Michelin](https://guide.michelin.com/en/it/friuli-venezia-giulia/cividale-del-friuli/restaurants))
+- Cormons: Radici e i bar di Piazza Libertà ([TheFork](https://www.thefork.com/restaurants/cividale-del-friuli-c109834), [PagineBianche](https://www.paginebianche.it/friuli-venezia-giulia/cormons/bar.html))
+- Grado, Lignano, Monfalcone: locali stagionali con clientela austriaca e tedesca, la lingua extra si vende da sola. Da battere in primavera, prima della stagione.
 
-**Zona E — Portello, via Belzoni, Navigli (zona universitaria)**
-- Ai Tre Scalini, Agli Amici (via Belzoni), Civico 4 (via Portello) ([2night](https://2night.it/a5eb3b-/aperitivo-padova.html), [Uniroom](https://uniroompd.com/padova-studenti/))
-- La Yarda, Via Dondi dall'Orologio 1 ([2night](https://2night.it/a5eb3b-/aperitivo-padova.html))
-- BROU bruschetteria gourmet, Via Santa Lucia 55 ([2night](https://2night.it/a5eb3b-/aperitivo-padova.html))
-- Chioschi e bar dei Navigli: menù semplici, prezzi che cambiano spesso.
+**Padova e Veneto (fase successiva)**
+Le zone di Padova sono già mappate: Piazza delle Erbe, Ghetto, Duomo, Santo, Portello ([Gambero Rosso](https://www.gamberorosso.it/rubriche/classifiche/ristoranti-tipici-di-padova-dove-assaggiare-i-piatti-tradizionali/), [2night](https://2night.it/a5eb3b-/aperitivo-padova.html)). Usale quando il Friuli è coperto o quando sei in zona.
 
-**Zona F — Nuove aperture**
-- Controlla ogni settimana la lista dei nuovi ristoranti di Padova su [Restaurant Guru](https://restaurantguru.it/new-restaurants-Padua-b): chi apre deve ancora stampare il menù.
-- Aperture Cocktail Bar, Via Giovanni d'Alemagna 2A ([sito](https://www.aperturecocktailbar.com/)): esempio di locale con eventi e drink list che cambia.
+## 7b. Tutta Italia, a distanza
 
-Nota: Padova ha quasi 1.000 bar censiti ([Sluurpy](https://www.sluurpy.it/padova/bar)). Le zone sopra bastano per i primi due mesi.
+Il sito è pensato per vendere anche senza visite. Tre canali, tutti gratuiti:
+
+1. **Caccia ai PDF.** Cerca su Google "menu pdf" + nome città (Bologna, Firenze, Bari…). Ogni locale con un PDF fotografato sul sito è un cliente ideale. Mandagli un messaggio Instagram o WhatsApp con il link di Al Bakaro: "Ho visto il vostro menù in PDF, vi mostro come lo trasformerei in 24 ore, primo mese gratis."
+2. **Instagram.** Pubblica ogni menù nuovo con un reel di 15 secondi (QR → menù che si apre). Tagga il locale e la città. Polsia può scrivere i testi dei post.
+3. **Polsia.** Nella chat della company chiedi ogni settimana: "Trova 30 ristoranti di [città] con menù in PDF o senza menù online e prepara per ciascuno un messaggio breve." Approvi e invii tu.
+
+Messaggio a distanza (Instagram o WhatsApp):
+> Ciao, sono Riccardo di RenMenu. Ho visto il menù di [locale] sul sito ed è un PDF: sul telefono si legge male e ogni cambio prezzo va ristampato. Guarda cosa abbiamo fatto per Al Bakaro a Gorizia: [link]. Se mi mandi una foto del vostro menù ve lo pubblico entro domani, il primo mese è gratis.
 
 ## 8. Messaggio WhatsApp di follow-up (dopo la visita)
 
@@ -118,8 +121,8 @@ Nota: Padova ha quasi 1.000 bar censiti ([Sluurpy](https://www.sluurpy.it/padova
 
 ## 10. Cosa far fare a Polsia (piano gratuito)
 
-1. Registrati su polsia.com e crea la company "RenMenu": descrivi il servizio con la frase del punto 1, indica Padova come città, allega il link della landing.
+1. Registrati su polsia.com e crea la company "RenMenu": descrivi il servizio con la frase del punto 1, indica Gorizia e il Friuli Venezia Giulia come zona di partenza e l'Italia come mercato, allega il link della landing e quello di Al Bakaro.
 2. Lascia girare il ciclo notturno per una settimana: ti proporrà ricerca sui concorrenti, contenuti per Instagram, idee di outreach. Approva solo quello che ha senso.
-3. Chiedi in chat: "Scrivi 10 post Instagram per RenMenu rivolti ai ristoratori di Padova, in italiano, tono diretto" e "Trova 30 ristoranti di Padova con menù in PDF sul sito".
+3. Chiedi in chat: "Scrivi 10 post Instagram per RenMenu rivolti ai ristoratori, in italiano, tono diretto" e "Trova 30 ristoranti di Trieste con menù in PDF sul sito".
 4. Passa al piano Pro (49 $/mese) solo quando hai almeno 4 clienti paganti: a quel punto attivi email outreach e supporto automatico.
 5. Non collegare Stripe a Polsia: incassa direttamente tu.
