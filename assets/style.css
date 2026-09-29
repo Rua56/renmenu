@@ -68,8 +68,9 @@
 }
 
 *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+a, button { -webkit-tap-highlight-color: transparent; }
 html { -webkit-text-size-adjust: none; text-size-adjust: none; -webkit-font-smoothing: antialiased; text-rendering: optimizeLegibility; scroll-behavior: smooth; scroll-padding-top: var(--space-16); }
-body { min-height: 100dvh; line-height: 1.6; font-family: var(--font-body); font-size: var(--text-base); color: var(--color-text); background: var(--color-bg); }
+body { min-height: 100vh; min-height: 100dvh; line-height: 1.6; font-family: var(--font-body); font-size: var(--text-base); color: var(--color-text); background: var(--color-bg); }
 img, svg, canvas { display: block; max-width: 100%; height: auto; }
 ul[role='list'] { list-style: none; }
 input, button, textarea, select { font: inherit; color: inherit; }

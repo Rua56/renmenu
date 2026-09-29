@@ -8,10 +8,17 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,400;9..144,500;9..144,600&family=Instrument+Sans:wght@400;500;600&display=swap">
 <link rel="stylesheet" href="../assets/style.css">
+<meta name="theme-color" content="#7a1f2b" media="(prefers-color-scheme: light)">
+<meta name="theme-color" content="#1c1512" media="(prefers-color-scheme: dark)">
+<meta name="apple-mobile-web-app-title" content="RenMenu">
+<meta name="format-detection" content="telephone=yes">
+<link rel="apple-touch-icon" href="../assets/apple-touch-icon.png">
+<link rel="manifest" href="../manifest.webmanifest">
+<link rel="canonical" href="https://rua56.github.io/renmenu/crea/index.html">
 <link rel="icon" href="../assets/favicon.svg" type="image/svg+xml">
 <script src="https://cdn.jsdelivr.net/npm/qrcode-generator@1.4.4/qrcode.min.js"></script>
 <style>
-  header.site { position: sticky; top: 0; z-index: 50; background: color-mix(in oklab, var(--color-bg) 85%, transparent); backdrop-filter: blur(14px); -webkit-backdrop-filter: blur(14px); border-bottom: 1px solid var(--color-divider); }
+  header.site { position: sticky; top: 0; z-index: 50; background: var(--color-bg); background: color-mix(in oklab, var(--color-bg) 85%, transparent); backdrop-filter: blur(14px); -webkit-backdrop-filter: blur(14px); border-bottom: 1px solid var(--color-divider); }
   .nav { display: flex; align-items: center; justify-content: space-between; gap: var(--space-3); min-height: 60px; }
   .nav__right { display: flex; align-items: center; gap: var(--space-2); }
   main { padding: var(--space-6) 0 var(--space-24); }
@@ -127,7 +134,7 @@
     <aside class="side">
       <div class="card">
         <h2>Link e QR</h2>
-        <label class="f"><span>Indirizzo del sito pubblicato</span><input type="url" id="baseUrl" placeholder="https://tuonome.github.io/renmenu/" autocapitalize="off"></label>
+        <label class="f"><span>Indirizzo del sito pubblicato</span><input type="url" id="baseUrl" placeholder="https://rua56.github.io/renmenu/" autocapitalize="off"></label>
         <div class="qr" style="margin-top:var(--space-4)"><img id="qrImg" alt="QR code del menù" width="220" height="220"></div>
         <div class="url" id="urlOut"></div>
         <div class="stack">

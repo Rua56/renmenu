@@ -8,15 +8,26 @@
 <meta property="og:title" content="RenMenu — Il menù digitale del tuo locale">
 <meta property="og:description" content="QR sul tavolo, menù sul telefono dei clienti. Aggiornato con un messaggio. Da 25 € al mese.">
 <meta property="og:type" content="website">
+<meta property="og:url" content="https://rua56.github.io/renmenu/">
+<meta property="og:image" content="https://rua56.github.io/renmenu/assets/og.png">
+<meta property="og:locale" content="it_IT">
+<meta name="twitter:card" content="summary_large_image">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,400;9..144,500;9..144,600&family=Instrument+Sans:wght@400;500;600&display=swap">
 <link rel="stylesheet" href="assets/style.css">
+<meta name="theme-color" content="#7a1f2b" media="(prefers-color-scheme: light)">
+<meta name="theme-color" content="#1c1512" media="(prefers-color-scheme: dark)">
+<meta name="apple-mobile-web-app-title" content="RenMenu">
+<meta name="format-detection" content="telephone=yes">
+<link rel="apple-touch-icon" href="assets/apple-touch-icon.png">
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="canonical" href="https://rua56.github.io/renmenu/">
 <link rel="icon" href="assets/favicon.svg" type="image/svg+xml">
 <script type="application/ld+json">
 {"@context":"https://schema.org","@type":"Service","name":"RenMenu","serviceType":"Menù digitale QR per ristoranti","areaServed":["Friuli Venezia Giulia","Italia"],"provider":{"@type":"Organization","name":"RenMenu"},"offers":{"@type":"Offer","price":"25","priceCurrency":"EUR","description":"Abbonamento mensile, setup incluso"}}
 </script>
 <style>
-  header.site { position: sticky; top: 0; z-index: 50; background: color-mix(in oklab, var(--color-bg) 85%, transparent); backdrop-filter: blur(14px); -webkit-backdrop-filter: blur(14px); border-bottom: 1px solid var(--color-divider); }
+  header.site { position: sticky; top: 0; z-index: 50; background: var(--color-bg); background: color-mix(in oklab, var(--color-bg) 85%, transparent); backdrop-filter: blur(14px); -webkit-backdrop-filter: blur(14px); border-bottom: 1px solid var(--color-divider); }
   .nav { display: flex; align-items: center; justify-content: space-between; gap: var(--space-4); min-height: 64px; }
   .nav__links { display: none; gap: var(--space-6); font-size: var(--text-sm); font-weight: 500; }
   .nav__links a { text-decoration: none; color: var(--color-text-muted); }
@@ -44,7 +55,7 @@
   .strip { background: var(--color-text); color: var(--color-text-inverse); padding-block: var(--space-8); }
   .strip__grid { display: grid; gap: var(--space-6); grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); }
   .strip h3 { font-size: var(--text-lg); font-weight: 500; }
-  .strip p { font-size: var(--text-sm); color: color-mix(in oklab, var(--color-text-inverse) 70%, transparent); margin-top: var(--space-2); }
+  .strip p { font-size: var(--text-sm); color: var(--color-text-inverse); opacity: .75; margin-top: var(--space-2); }
   .strip .num { font-family: var(--font-display); font-style: italic; color: var(--color-accent); font-size: var(--text-xl); }
 
   .section-head { max-width: 60ch; margin-bottom: var(--space-10); }

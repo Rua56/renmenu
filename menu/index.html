@@ -9,11 +9,18 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,400;9..144,500;9..144,600&family=Instrument+Sans:wght@400;500;600&display=swap">
 <link rel="stylesheet" href="../assets/style.css">
+<meta name="theme-color" content="#7a1f2b" media="(prefers-color-scheme: light)">
+<meta name="theme-color" content="#1c1512" media="(prefers-color-scheme: dark)">
+<meta name="apple-mobile-web-app-title" content="RenMenu">
+<meta name="format-detection" content="telephone=yes">
+<link rel="apple-touch-icon" href="../assets/apple-touch-icon.png">
+<link rel="manifest" href="../manifest.webmanifest">
+<link rel="canonical" href="https://rua56.github.io/renmenu/menu/index.html">
 <link rel="icon" href="../assets/favicon.svg" type="image/svg+xml">
 <style>
   html { scroll-padding-top: 132px; }
   body { background: var(--color-bg); }
-  .top { position: sticky; top: 0; z-index: 40; background: color-mix(in oklab, var(--color-bg) 88%, transparent); backdrop-filter: blur(14px); -webkit-backdrop-filter: blur(14px); border-bottom: 1px solid var(--color-divider); }
+  .top { position: sticky; top: 0; z-index: 40; background: var(--color-bg); background: color-mix(in oklab, var(--color-bg) 88%, transparent); backdrop-filter: blur(14px); -webkit-backdrop-filter: blur(14px); border-bottom: 1px solid var(--color-divider); }
   .top__row { display: flex; align-items: center; justify-content: space-between; gap: var(--space-3); padding: var(--space-3) 0; }
   .top__name { font-family: var(--font-display); font-size: var(--text-lg); font-weight: 600; line-height: 1.1; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
   .top__actions { display: flex; gap: var(--space-1); align-items: center; flex: none; }

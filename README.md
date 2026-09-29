@@ -1,4 +1,10 @@
-# RenMenu — menù digitali QR per bar e ristoranti
+# RenMenu
+
+Sito online: https://rua56.github.io/renmenu/
+
+Menù di esempio: https://rua56.github.io/renmenu/menu/index.html?m=bakaro · Generatore: https://rua56.github.io/renmenu/crea/index.html
+
+Menù digitali QR per bar e ristoranti.
 
 Sito statico, zero backend, ospitabile gratis su GitHub Pages.
 
