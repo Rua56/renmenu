@@ -10,8 +10,8 @@ window.RENMENU.pagamenti = {
      Intestatario e IBAN del conto su cui vuoi ricevere i pagamenti.
      Lascia iban: '' finché non vuoi mostrare il bonifico.
      Esempio: intestatario: 'Riccardo Iuran', iban: 'IT60X0542811101000000123456' */
-  intestatario: '',
-  iban: '',
+  intestatario: 'Riccardo Iuran',
+  iban: 'IT39Z0306912499100000007430',
   banca: '',              /* facoltativo, es. 'Intesa Sanpaolo' */
 
   /* --- 2. STRIPE (carta) --------------------------------------
@@ -22,9 +22,9 @@ window.RENMENU.pagamenti = {
        sumisura = pagamento singolo 490 € (acconto)
      Lascia '' per nascondere il bottone carta di quel piano. */
   stripe: {
-    mensile:  '',
-    annuale:  '',
-    sumisura: ''
+    mensile:  'https://buy.stripe.com/fZubJ228d1a20lxahm1Nu00',
+    annuale:  'https://buy.stripe.com/cNicN6149g4W3xJ4X21Nu01',
+    sumisura: 'https://buy.stripe.com/aFa4gA5kp8Cu9W74X21Nu02'
   },
 
   /* --- 3. FACOLTATIVI -----------------------------------------
