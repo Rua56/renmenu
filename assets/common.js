@@ -3,7 +3,7 @@ window.RENMENU = {
   brand: 'RenMenu',
   tagline: 'Il menù digitale del tuo locale, pronto in 10 minuti.',
   contattoWhatsApp: '393515924327',
-  contattoEmail: 'ciao@renmenu.it',
+  contattoEmail: 'iuran56@gmail.com',
   logo: '<svg viewBox="0 0 32 32" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="3" width="26" height="26" rx="7"/><path d="M10 11h12M10 16h12M10 21h7"/><circle cx="21.5" cy="21" r="1.2" fill="currentColor" stroke="none"/></svg>',
   allergeni: {
     '1': { it: 'Glutine', en: 'Gluten' }, '2': { it: 'Crostacei', en: 'Crustaceans' }, '3': { it: 'Uova', en: 'Eggs' },

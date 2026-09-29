@@ -42,7 +42,8 @@
      },
      "prezzo": "3,50",
      "descrizione": {
-      "it": "Prosecco DOC Treviso, fresco e vivace"
+      "it": "Prosecco DOC Treviso, fresco e vivace",
+      "en": "Prosecco DOC Treviso, fresh and lively"
      },
      "allergeni": [
       "12"
@@ -54,7 +55,8 @@
      },
      "prezzo": "6,00",
      "descrizione": {
-      "it": "Trento DOC, Chardonnay metodo classico, elegante e persistente"
+      "it": "Trento DOC, Chardonnay metodo classico, elegante e persistente",
+      "en": "Trento DOC, Chardonnay traditional method, elegant and persistent"
      },
      "allergeni": [
       "12"
@@ -62,11 +64,13 @@
     },
     {
      "nome": {
-      "it": "Ribolla Gialla Spumantizzata"
+      "it": "Ribolla Gialla Spumantizzata",
+      "en": "Ribolla Gialla sparkling"
      },
      "prezzo": "5,00",
      "descrizione": {
-      "it": "Collio, bollicine fini e profumate, metodo classico"
+      "it": "Collio, bollicine fini e profumate, metodo classico",
+      "en": "Collio, fine and fragrant bubbles, traditional method"
      },
      "allergeni": [
       "12"
@@ -78,7 +82,8 @@
      },
      "prezzo": "6,00",
      "descrizione": {
-      "it": "Oltrepò Pavese, Pinot Nero vinificato in rosé, fruttato e fresco"
+      "it": "Oltrepò Pavese, Pinot Nero vinificato in rosé, fruttato e fresco",
+      "en": "Oltrepò Pavese, Pinot Noir made as a rosé, fruity and fresh"
      },
      "allergeni": [
       "12"
@@ -102,7 +107,8 @@
      },
      "prezzo": "24,00",
      "descrizione": {
-      "it": "Treviso, Glera in purezza, fresco e fruttato, perlage vivace e persistente"
+      "it": "Treviso, Glera in purezza, fresco e fruttato, perlage vivace e persistente",
+      "en": "Treviso, 100% Glera, fresh and fruity, lively and persistent perlage"
      },
      "allergeni": [
       "12"
@@ -114,7 +120,8 @@
      },
      "prezzo": "40,00",
      "descrizione": {
-      "it": "Trentodoc, Chardonnay 100%, 36 mesi sui lieviti, mela matura e crosta di pane"
+      "it": "Trentodoc, Chardonnay 100%, 36 mesi sui lieviti, mela matura e crosta di pane",
+      "en": "Trentodoc, 100% Chardonnay, 36 months on the lees, ripe apple and bread crust"
      },
      "allergeni": [
       "12"
@@ -126,7 +133,8 @@
      },
      "prezzo": "60,00",
      "descrizione": {
-      "it": "Trentodoc millesimato, 54 mesi sui lieviti, fiori di mandorlo e mela renetta, icona italiana"
+      "it": "Trentodoc millesimato, 54 mesi sui lieviti, fiori di mandorlo e mela renetta, icona italiana",
+      "en": "Trentodoc vintage, 54 months on the lees, almond blossom and renetta apple, an Italian icon"
      },
      "allergeni": [
       "12"
@@ -137,11 +145,13 @@
     },
     {
      "nome": {
-      "it": "Ribolla Gialla Spumantizzata"
+      "it": "Ribolla Gialla Spumantizzata",
+      "en": "Ribolla Gialla sparkling"
      },
      "prezzo": "35,00",
      "descrizione": {
-      "it": "Collio, Metodo Classico, fresco e sapido, mineralita tipica della Ponca"
+      "it": "Collio, Metodo Classico, fresco e sapido, mineralita tipica della Ponca",
+      "en": "Collio, traditional method, fresh and savoury, the typical minerality of Ponca soil"
      },
      "allergeni": [
       "12"
@@ -153,7 +163,8 @@
      },
      "prezzo": "40,00",
      "descrizione": {
-      "it": "Oltrepo Pavese DOCG Cruase, Pinot Nero, 36 mesi sui lieviti, perlage finissimo"
+      "it": "Oltrepo Pavese DOCG Cruase, Pinot Nero, 36 mesi sui lieviti, perlage finissimo",
+      "en": "Oltrepò Pavese DOCG Cruasé, Pinot Noir, 36 months on the lees, very fine perlage"
      },
      "allergeni": [
       "12"
@@ -165,7 +176,8 @@
      },
      "prezzo": "40,00",
      "descrizione": {
-      "it": "Trentino, Chardonnay, vigneti tra 450-600m, pesca e mela, fresco e armonioso"
+      "it": "Trentino, Chardonnay, vigneti tra 450-600m, pesca e mela, fresco e armonioso",
+      "en": "Trentino, Chardonnay from vineyards at 450–600 m, peach and apple, fresh and harmonious"
      },
      "allergeni": [
       "12"
@@ -177,7 +189,8 @@
      },
      "prezzo": "50,00",
      "descrizione": {
-      "it": "Friuli, Metodo Classico, Chardonnay e Pinot Nero, floreale e agrumato, minerale"
+      "it": "Friuli, Metodo Classico, Chardonnay e Pinot Nero, floreale e agrumato, minerale",
+      "en": "Friuli, traditional method, Chardonnay and Pinot Noir, floral, citrusy and mineral"
      },
      "allergeni": [
       "12"
@@ -192,7 +205,8 @@
      },
      "prezzo": "60,00",
      "descrizione": {
-      "it": "Franciacorta DOCG, Chardonnay 75%, 28 mesi sui lieviti, pesca agrumi e mandorla"
+      "it": "Franciacorta DOCG, Chardonnay 75%, 28 mesi sui lieviti, pesca agrumi e mandorla",
+      "en": "Franciacorta DOCG, 75% Chardonnay, 28 months on the lees, peach, citrus and almond"
      },
      "allergeni": [
       "12"
@@ -207,7 +221,8 @@
      },
      "prezzo": "80,00",
      "descrizione": {
-      "it": "Franciacorta DOCG millesimato, 48 mesi sui lieviti, senza zucchero aggiunto, puro e minerale"
+      "it": "Franciacorta DOCG millesimato, 48 mesi sui lieviti, senza zucchero aggiunto, puro e minerale",
+      "en": "Franciacorta DOCG vintage, 48 months on the lees, no added sugar, pure and mineral"
      },
      "allergeni": [
       "12"
@@ -222,7 +237,8 @@
      },
      "prezzo": "120,00",
      "descrizione": {
-      "it": "Epernay, Chardonnay-Pinot Nero-Meunier, floreale e fresco, eleganza della Champagne"
+      "it": "Epernay, Chardonnay-Pinot Nero-Meunier, floreale e fresco, eleganza della Champagne",
+      "en": "Épernay, Chardonnay-Pinot Noir-Meunier, floral and fresh, Champagne elegance"
      },
      "allergeni": [
       "12"
@@ -249,7 +265,8 @@
      },
      "prezzo": "6,00",
      "descrizione": {
-      "it": "Friuli Collio, fresco e minerale"
+      "it": "Friuli Collio, fresco e minerale",
+      "en": "Friuli Collio, fresh and mineral"
      },
      "allergeni": [
       "12"
@@ -261,7 +278,8 @@
      },
      "prezzo": "5,50",
      "descrizione": {
-      "it": "Friuli Collio, elegante con note di frutta gialla"
+      "it": "Friuli Collio, elegante con note di frutta gialla",
+      "en": "Friuli Collio, elegant with yellow fruit notes"
      },
      "allergeni": [
       "12"
@@ -273,7 +291,8 @@
      },
      "prezzo": "5,00",
      "descrizione": {
-      "it": "Collio Goriziano, vivace e sapido"
+      "it": "Collio Goriziano, vivace e sapido",
+      "en": "Collio Goriziano, lively and savoury"
      },
      "allergeni": [
       "12"
@@ -285,7 +304,8 @@
      },
      "prezzo": "5,00",
      "descrizione": {
-      "it": "Collio Goriziano, profumata e aromatica"
+      "it": "Collio Goriziano, profumata e aromatica",
+      "en": "Collio Goriziano, fragrant and aromatic"
      },
      "allergeni": [
       "12"
@@ -297,7 +317,8 @@
      },
      "prezzo": "4,50",
      "descrizione": {
-      "it": "Alto Adige, floreale con acidità fine"
+      "it": "Alto Adige, floreale con acidità fine",
+      "en": "Alto Adige, floral with fine acidity"
      },
      "allergeni": [
       "12"
@@ -309,7 +330,8 @@
      },
      "prezzo": "4,50",
      "descrizione": {
-      "it": "Carso triestino, carattere unico e salino"
+      "it": "Carso triestino, carattere unico e salino",
+      "en": "Trieste Karst, unique salty character"
      },
      "allergeni": [
       "12"
@@ -321,7 +343,8 @@
      },
      "prezzo": "5,50",
      "descrizione": {
-      "it": "Collio, erbaceo con note di passion fruit"
+      "it": "Collio, erbaceo con note di passion fruit",
+      "en": "Collio, herbaceous with passion fruit notes"
      },
      "allergeni": [
       "12"
@@ -333,7 +356,8 @@
      },
      "prezzo": "5,00",
      "descrizione": {
-      "it": "Collio DOC, strutturato e persistente"
+      "it": "Collio DOC, strutturato e persistente",
+      "en": "Collio DOC, structured and persistent"
      },
      "allergeni": [
       "12"
@@ -345,7 +369,8 @@
      },
      "prezzo": "5,00",
      "descrizione": {
-      "it": "Collio DOC, mandorlato con finale lungo"
+      "it": "Collio DOC, mandorlato con finale lungo",
+      "en": "Collio DOC, almondy with a long finish"
      },
      "allergeni": [
       "12"
@@ -357,7 +382,8 @@
      },
      "prezzo": "4,00",
      "descrizione": {
-      "it": "Sicilia, dolce e aromatico, note di albicocca"
+      "it": "Sicilia, dolce e aromatico, note di albicocca",
+      "en": "Sicily, sweet and aromatic, apricot notes"
      },
      "allergeni": [
       "12"
@@ -381,7 +407,8 @@
      },
      "prezzo": "40,00",
      "descrizione": {
-      "it": "Collio, paglierino intenso, crosta di pane e frutta, sorso caldo e strutturato"
+      "it": "Collio, paglierino intenso, crosta di pane e frutta, sorso caldo e strutturato",
+      "en": "Collio, deep straw yellow, bread crust and fruit, warm and structured"
      },
      "allergeni": [
       "12"
@@ -393,7 +420,8 @@
      },
      "prezzo": "35,00",
      "descrizione": {
-      "it": "Collio, fruttato e fresco, note di mela verde e banana, buona struttura"
+      "it": "Collio, fruttato e fresco, note di mela verde e banana, buona struttura",
+      "en": "Collio, fruity and fresh, green apple and banana, good structure"
      },
      "allergeni": [
       "12"
@@ -405,7 +433,8 @@
      },
      "prezzo": "33,00",
      "descrizione": {
-      "it": "Collio, agrumi e pesca, fresca e sapida, mineralità tipica della Ponca"
+      "it": "Collio, agrumi e pesca, fresca e sapida, mineralità tipica della Ponca",
+      "en": "Collio, citrus and peach, fresh and savoury, the typical minerality of Ponca soil"
      },
      "allergeni": [
       "12"
@@ -417,7 +446,8 @@
      },
      "prezzo": "33,00",
      "descrizione": {
-      "it": "Collio, aromatica, fiori di tiglio e albicocca, sapida e minerale"
+      "it": "Collio, aromatica, fiori di tiglio e albicocca, sapida e minerale",
+      "en": "Collio, aromatic, linden blossom and apricot, savoury and mineral"
      },
      "allergeni": [
       "12"
@@ -429,7 +459,8 @@
      },
      "prezzo": "35,00",
      "descrizione": {
-      "it": "Collio, sambuco e passion fruit, erbaceo e intenso su suoli di Ponca"
+      "it": "Collio, sambuco e passion fruit, erbaceo e intenso su suoli di Ponca",
+      "en": "Collio, elderflower and passion fruit, herbaceous and intense, grown on Ponca soil"
      },
      "allergeni": [
       "12"
@@ -441,7 +472,8 @@
      },
      "prezzo": "35,00",
      "descrizione": {
-      "it": "Blend Friulano, Ribolla e Malvasia, profondo e sapido, frutta gialla e agrumi"
+      "it": "Blend Friulano, Ribolla e Malvasia, profondo e sapido, frutta gialla e agrumi",
+      "en": "Blend of Friulano, Ribolla and Malvasia, deep and savoury, yellow fruit and citrus"
      },
      "allergeni": [
       "12"
@@ -453,7 +485,8 @@
      },
      "prezzo": "33,00",
      "descrizione": {
-      "it": "Collio, vigne over 50 anni, floreale e minerale, fresco e sapido"
+      "it": "Collio, vigne over 50 anni, floreale e minerale, fresco e sapido",
+      "en": "Collio, vines over 50 years old, floral and mineral, fresh and savoury"
      },
      "allergeni": [
       "12"
@@ -465,7 +498,8 @@
      },
      "prezzo": "33,00",
      "descrizione": {
-      "it": "Collio, profumo intenso fruttato, gusto ricco e sapido, lunga persistenza"
+      "it": "Collio, profumo intenso fruttato, gusto ricco e sapido, lunga persistenza",
+      "en": "Collio, intense fruity nose, rich and savoury palate, long finish"
      },
      "allergeni": [
       "12"
@@ -477,7 +511,8 @@
      },
      "prezzo": "26,00",
      "descrizione": {
-      "it": "Blend friulano Ribolla-Friulano-Malvasia, il mio bianco, fresco e minerale"
+      "it": "Blend friulano Ribolla-Friulano-Malvasia, il mio bianco, fresco e minerale",
+      "en": "Friulian blend of Ribolla, Friulano and Malvasia, our house white, fresh and mineral"
      },
      "allergeni": [
       "12"
@@ -489,7 +524,8 @@
      },
      "prezzo": "33,00",
      "descrizione": {
-      "it": "Collio, mela e pera, vellutato e fresco, lunga persistenza aromatica"
+      "it": "Collio, mela e pera, vellutato e fresco, lunga persistenza aromatica",
+      "en": "Collio, apple and pear, velvety and fresh, long aromatic finish"
      },
      "allergeni": [
       "12"
@@ -501,7 +537,8 @@
      },
      "prezzo": "33,00",
      "descrizione": {
-      "it": "Collio, fiori bianchi e agrumi, fresco e minerale, bevibilità elegante"
+      "it": "Collio, fiori bianchi e agrumi, fresco e minerale, bevibilità elegante",
+      "en": "Collio, white flowers and citrus, fresh and mineral, elegant drinkability"
      },
      "allergeni": [
       "12"
@@ -513,7 +550,8 @@
      },
      "prezzo": "29,00",
      "descrizione": {
-      "it": "Blend mediterraneo, floreale e fruttato, note di pesca e fiori bianchi"
+      "it": "Blend mediterraneo, floreale e fruttato, note di pesca e fiori bianchi",
+      "en": "Mediterranean blend, floral and fruity, peach and white flowers"
      },
      "allergeni": [
       "12"
@@ -521,11 +559,13 @@
     },
     {
      "nome": {
-      "it": "Viognier in purezza"
+      "it": "Viognier in purezza",
+      "en": "100% Viognier"
      },
      "prezzo": "29,00",
      "descrizione": {
-      "it": "Albicocca, pesca bianca e fiori di acacia, ricco e avvolgente"
+      "it": "Albicocca, pesca bianca e fiori di acacia, ricco e avvolgente",
+      "en": "Apricot, white peach and acacia blossom, rich and enveloping"
      },
      "allergeni": [
       "12"
@@ -537,7 +577,8 @@
      },
      "prezzo": "50,00",
      "descrizione": {
-      "it": "Borgogna, elegante e complesso, burro e frutta tropicale, grande struttura"
+      "it": "Borgogna, elegante e complesso, burro e frutta tropicale, grande struttura",
+      "en": "Burgundy, elegant and complex, butter and tropical fruit, great structure"
      },
      "allergeni": [
       "12"
@@ -552,7 +593,8 @@
      },
      "prezzo": "33,00",
      "descrizione": {
-      "it": "Friuli, color rame, ricco e strutturato, frutta matura e note speziate"
+      "it": "Friuli, color rame, ricco e strutturato, frutta matura e note speziate",
+      "en": "Friuli, copper-coloured, rich and structured, ripe fruit and spicy notes"
      },
      "allergeni": [
       "12"
@@ -564,7 +606,8 @@
      },
      "prezzo": "33,00",
      "descrizione": {
-      "it": "Friuli, aromatica e sapida, note floreali e di agrumi, fresca mineralità"
+      "it": "Friuli, aromatica e sapida, note floreali e di agrumi, fresca mineralità",
+      "en": "Friuli, aromatic and savoury, floral and citrus notes, fresh minerality"
      },
      "allergeni": [
       "12"
@@ -576,7 +619,8 @@
      },
      "prezzo": "33,00",
      "descrizione": {
-      "it": "Friuli, mela e pera, note ammandorlate, pieno e armonico"
+      "it": "Friuli, mela e pera, note ammandorlate, pieno e armonico",
+      "en": "Friuli, apple and pear, almond notes, full and harmonious"
      },
      "allergeni": [
       "12"
@@ -588,7 +632,8 @@
      },
      "prezzo": "70,00",
      "descrizione": {
-      "it": "Oslavia, macerazione sulle bucce 4 settimane, ambrato e tannico, orange wine"
+      "it": "Oslavia, macerazione sulle bucce 4 settimane, ambrato e tannico, orange wine",
+      "en": "Oslavia, 4 weeks of skin maceration, amber and tannic, orange wine"
      },
      "allergeni": [
       "12"
@@ -603,7 +648,8 @@
      },
      "prezzo": "70,00",
      "descrizione": {
-      "it": "Collio, macerazione sulle bucce, color ramato, strutturato e minerale"
+      "it": "Collio, macerazione sulle bucce, color ramato, strutturato e minerale",
+      "en": "Collio, skin maceration, copper colour, structured and mineral"
      },
      "allergeni": [
       "12"
@@ -618,7 +664,8 @@
      },
      "prezzo": "70,00",
      "descrizione": {
-      "it": "Collio, skin contact, dorato e intenso, frutta matura e note di miele"
+      "it": "Collio, skin contact, dorato e intenso, frutta matura e note di miele",
+      "en": "Collio, skin contact, golden and intense, ripe fruit and honey notes"
      },
      "allergeni": [
       "12"
@@ -633,7 +680,8 @@
      },
      "prezzo": "50,00",
      "descrizione": {
-      "it": "Oslavia, Ribolla-Malvasia-Friulano, vino naturale, ambrato e sapido"
+      "it": "Oslavia, Ribolla-Malvasia-Friulano, vino naturale, ambrato e sapido",
+      "en": "Oslavia, Ribolla-Malvasia-Friulano, natural wine, amber and savoury"
      },
      "allergeni": [
       "12"
@@ -648,7 +696,8 @@
      },
      "prezzo": "50,00",
      "descrizione": {
-      "it": "Carso sloveno, Malvasia e Vitovska, artigianale e autentico, sapido e minerale"
+      "it": "Carso sloveno, Malvasia e Vitovska, artigianale e autentico, sapido e minerale",
+      "en": "Slovenian Karst, Malvasia and Vitovska, artisanal and authentic, savoury and mineral"
      },
      "allergeni": [
       "12"
@@ -663,7 +712,8 @@
      },
      "prezzo": "40,00",
      "descrizione": {
-      "it": "Sicilia, Grillo appassito, dolce naturale, frutta candita e miele"
+      "it": "Sicilia, Grillo appassito, dolce naturale, frutta candita e miele",
+      "en": "Sicily, dried Grillo grapes, naturally sweet, candied fruit and honey"
      },
      "allergeni": [
       "12"
@@ -675,7 +725,8 @@
      },
      "prezzo": "50,00",
      "descrizione": {
-      "it": "Mosella, suoli ardesia ripidi, mela verde e lime, acido e salino, fermentazione spontanea"
+      "it": "Mosella, suoli ardesia ripidi, mela verde e lime, acido e salino, fermentazione spontanea",
+      "en": "Mosel, steep slate soils, green apple and lime, sharp and salty, spontaneous fermentation"
      },
      "allergeni": [
       "12"
@@ -690,7 +741,8 @@
      },
      "prezzo": "29,00",
      "descrizione": {
-      "it": "Trentino, rosa e litchi, speziato e avvolgente, classico aromatico alpino"
+      "it": "Trentino, rosa e litchi, speziato e avvolgente, classico aromatico alpino",
+      "en": "Trentino, rose and lychee, spicy and enveloping, the classic Alpine aromatic"
      },
      "allergeni": [
       "12"
@@ -702,7 +754,8 @@
      },
      "prezzo": "50,00",
      "descrizione": {
-      "it": "Brda sloveno, biodinamico, frutta gialla e fiori, finale ammandorlato"
+      "it": "Brda sloveno, biodinamico, frutta gialla e fiori, finale ammandorlato",
+      "en": "Slovenian Brda, biodynamic, yellow fruit and flowers, almond finish"
      },
      "allergeni": [
       "12"
@@ -717,7 +770,8 @@
      },
      "prezzo": "60,00",
      "descrizione": {
-      "it": "Blend Ribolla-Sauvignon-Chardonnay, biodinamico, complesso e minerale"
+      "it": "Blend Ribolla-Sauvignon-Chardonnay, biodinamico, complesso e minerale",
+      "en": "Blend of Ribolla, Sauvignon and Chardonnay, biodynamic, complex and mineral"
      },
      "allergeni": [
       "12"
@@ -732,7 +786,8 @@
      },
      "prezzo": "60,00",
      "descrizione": {
-      "it": "Brda sloveno, biodinamico, affinato in botte, fruttato e minerale, senza filtrazioni"
+      "it": "Brda sloveno, biodinamico, affinato in botte, fruttato e minerale, senza filtrazioni",
+      "en": "Slovenian Brda, biodynamic, barrel-aged, fruity and mineral, unfiltered"
      },
      "allergeni": [
       "12"
@@ -747,7 +802,8 @@
      },
      "prezzo": "26,00",
      "descrizione": {
-      "it": "Sicilia, Grillo fresco e sapido, agrumi e mandorla, bevibile e diretto"
+      "it": "Sicilia, Grillo fresco e sapido, agrumi e mandorla, bevibile e diretto",
+      "en": "Sicily, fresh and savoury Grillo, citrus and almond, easy and direct"
      },
      "allergeni": [
       "12"
@@ -759,7 +815,8 @@
      },
      "prezzo": "26,00",
      "descrizione": {
-      "it": "Sicilia, Zibibbo aromatico, albicocca e fichi, dolce naturale di grande personalità"
+      "it": "Sicilia, Zibibbo aromatico, albicocca e fichi, dolce naturale di grande personalità",
+      "en": "Sicily, aromatic Zibibbo, apricot and figs, naturally sweet with great personality"
      },
      "allergeni": [
       "12"
@@ -771,7 +828,8 @@
      },
      "prezzo": "29,00",
      "descrizione": {
-      "it": "Valle Isarco, alta quota, pesca alpina e fiori di montagna, fresco e aromatico"
+      "it": "Valle Isarco, alta quota, pesca alpina e fiori di montagna, fresco e aromatico",
+      "en": "Isarco Valley, high altitude, Alpine peach and mountain flowers, fresh and aromatic"
      },
      "allergeni": [
       "12"
@@ -795,7 +853,8 @@
      },
      "prezzo": "5,00",
      "descrizione": {
-      "it": "Carso, speziato con note di peperone verde"
+      "it": "Carso, speziato con note di peperone verde",
+      "en": "Karst, spicy with green pepper notes"
      },
      "allergeni": [
       "12"
@@ -807,7 +866,8 @@
      },
      "prezzo": "4,50",
      "descrizione": {
-      "it": "Collio DOC, tannico ed elegante"
+      "it": "Collio DOC, tannico ed elegante",
+      "en": "Collio DOC, tannic and elegant"
      },
      "allergeni": [
       "12"
@@ -819,7 +879,8 @@
      },
      "prezzo": "6,00",
      "descrizione": {
-      "it": "Isonzo del Friuli, finezza e frutti rossi"
+      "it": "Isonzo del Friuli, finezza e frutti rossi",
+      "en": "Isonzo del Friuli, finesse and red fruit"
      },
      "allergeni": [
       "12"
@@ -831,7 +892,8 @@
      },
      "prezzo": "6,00",
      "descrizione": {
-      "it": "Isonzo, blend rosso corposo e avvolgente"
+      "it": "Isonzo, blend rosso corposo e avvolgente",
+      "en": "Isonzo, full-bodied and enveloping red blend"
      },
      "allergeni": [
       "12"
@@ -843,7 +905,8 @@
      },
      "prezzo": "4,50",
      "descrizione": {
-      "it": "Alto Adige, leggero e scorrevole, note di lampone"
+      "it": "Alto Adige, leggero e scorrevole, note di lampone",
+      "en": "Alto Adige, light and easy, raspberry notes"
      },
      "allergeni": [
       "12"
@@ -855,7 +918,8 @@
      },
      "prezzo": "4,50",
      "descrizione": {
-      "it": "Puglia DOC, potente e vellutato, frutti neri maturi"
+      "it": "Puglia DOC, potente e vellutato, frutti neri maturi",
+      "en": "Puglia DOC, powerful and velvety, ripe black fruit"
      },
      "allergeni": [
       "12"
@@ -867,7 +931,8 @@
      },
      "prezzo": "4,50",
      "descrizione": {
-      "it": "Salento IGT, morbido con note di prugna e spezie"
+      "it": "Salento IGT, morbido con note di prugna e spezie",
+      "en": "Salento IGT, soft with plum and spice notes"
      },
      "allergeni": [
       "12"
@@ -891,7 +956,8 @@
      },
      "prezzo": "33,00",
      "descrizione": {
-      "it": "Carso DOC, speziato e complesso, salvia e alloro, 2 anni in barrique"
+      "it": "Carso DOC, speziato e complesso, salvia e alloro, 2 anni in barrique",
+      "en": "Karst DOC, spicy and complex, sage and bay leaf, 2 years in barrique"
      },
      "allergeni": [
       "12"
@@ -903,7 +969,8 @@
      },
      "prezzo": "29,00",
      "descrizione": {
-      "it": "Collio, ribes nero e more, speziato e tannico, affinato nelle cantine medievali"
+      "it": "Collio, ribes nero e more, speziato e tannico, affinato nelle cantine medievali",
+      "en": "Collio, blackcurrant and blackberry, spicy and tannic, aged in medieval cellars"
      },
      "allergeni": [
       "12"
@@ -915,7 +982,8 @@
      },
      "prezzo": "40,00",
      "descrizione": {
-      "it": "Isonzo, elegante e fine, frutti rossi di bosco e viola, terreni ghiaiosi minerali"
+      "it": "Isonzo, elegante e fine, frutti rossi di bosco e viola, terreni ghiaiosi minerali",
+      "en": "Isonzo, elegant and fine, wild red berries and violet, mineral gravel soils"
      },
      "allergeni": [
       "12"
@@ -927,7 +995,8 @@
      },
      "prezzo": "35,00",
      "descrizione": {
-      "it": "Isonzo, Merlot e Cabernet, argille rosse, tannini morbidi e lunga persistenza"
+      "it": "Isonzo, Merlot e Cabernet, argille rosse, tannini morbidi e lunga persistenza",
+      "en": "Isonzo, Merlot and Cabernet, red clay soils, soft tannins and long finish"
      },
      "allergeni": [
       "12"
@@ -939,7 +1008,8 @@
      },
      "prezzo": "29,00",
      "descrizione": {
-      "it": "Alto Adige, rubino chiaro, ciliegia e viola, leggero e scorrevole, anche leggermente fresco"
+      "it": "Alto Adige, rubino chiaro, ciliegia e viola, leggero e scorrevole, anche leggermente fresco",
+      "en": "Alto Adige, pale ruby, cherry and violet, light and easy, also served slightly chilled"
      },
      "allergeni": [
       "12"
@@ -951,7 +1021,8 @@
      },
      "prezzo": "29,00",
      "descrizione": {
-      "it": "Puglia, caldo e avvolgente, frutti rossi in confettura, 14 mesi in tonneau"
+      "it": "Puglia, caldo e avvolgente, frutti rossi in confettura, 14 mesi in tonneau",
+      "en": "Puglia, warm and enveloping, red fruit jam, 14 months in tonneau"
      },
      "allergeni": [
       "12"
@@ -963,7 +1034,8 @@
      },
      "prezzo": "29,00",
      "descrizione": {
-      "it": "Salento, more e gelsi maturi, spezie dolci, tannini setosi e finale lungo"
+      "it": "Salento, more e gelsi maturi, spezie dolci, tannini setosi e finale lungo",
+      "en": "Salento, ripe blackberries and mulberries, sweet spices, silky tannins and long finish"
      },
      "allergeni": [
       "12"
@@ -975,7 +1047,8 @@
      },
      "prezzo": "40,00",
      "descrizione": {
-      "it": "Toscana, Sangiovese 90%, frutti rossi e spezie, tannini morbidi, Tenuta Tignanello"
+      "it": "Toscana, Sangiovese 90%, frutti rossi e spezie, tannini morbidi, Tenuta Tignanello",
+      "en": "Tuscany, 90% Sangiovese, red fruit and spices, soft tannins, Tenuta Tignanello"
      },
      "allergeni": [
       "12"
@@ -999,7 +1072,8 @@
      },
      "prezzo": "2,50",
      "descrizione": {
-      "it": "Vino bianco e soda"
+      "it": "Vino bianco e soda",
+      "en": "White wine and soda"
      }
     },
     {
@@ -1008,7 +1082,8 @@
      },
      "prezzo": "2,50",
      "descrizione": {
-      "it": "Vino rosso e soda"
+      "it": "Vino rosso e soda",
+      "en": "Red wine and soda"
      }
     },
     {
@@ -1017,7 +1092,8 @@
      },
      "prezzo": "5,00",
      "descrizione": {
-      "it": "Prosecco, Aperol e soda"
+      "it": "Prosecco, Aperol e soda",
+      "en": "Prosecco, Aperol and soda"
      }
     },
     {
@@ -1026,7 +1102,8 @@
      },
      "prezzo": "5,00",
      "descrizione": {
-      "it": "Prosecco, Campari e soda"
+      "it": "Prosecco, Campari e soda",
+      "en": "Prosecco, Campari and soda"
      }
     },
     {
@@ -1035,7 +1112,8 @@
      },
      "prezzo": "5,00",
      "descrizione": {
-      "it": "Prosecco, Select e soda — il classico veneziano"
+      "it": "Prosecco, Select e soda — il classico veneziano",
+      "en": "Prosecco, Select and soda: the Venetian classic"
      }
     },
     {
@@ -1044,7 +1122,8 @@
      },
      "prezzo": "5,00",
      "descrizione": {
-      "it": "Prosecco, Sarti Romeo e soda"
+      "it": "Prosecco, Sarti Romeo e soda",
+      "en": "Prosecco, Sarti Romeo and soda"
      }
     },
     {
@@ -1053,7 +1132,8 @@
      },
      "prezzo": "5,00",
      "descrizione": {
-      "it": "Prosecco, sciroppo di sambuco, menta e soda"
+      "it": "Prosecco, sciroppo di sambuco, menta e soda",
+      "en": "Prosecco, elderflower syrup, mint and soda"
      }
     },
     {
@@ -1062,7 +1142,8 @@
      },
      "prezzo": "5,00",
      "descrizione": {
-      "it": "Prosecco, Limoncello e soda"
+      "it": "Prosecco, Limoncello e soda",
+      "en": "Prosecco, Limoncello and soda"
      }
     },
     {
@@ -1071,7 +1152,8 @@
      },
      "prezzo": "5,00",
      "descrizione": {
-      "it": "Prosecco, Cynar e soda — amaro e rinfrescante"
+      "it": "Prosecco, Cynar e soda — amaro e rinfrescante",
+      "en": "Prosecco, Cynar and soda: bitter and refreshing"
      }
     },
     {
@@ -1080,7 +1162,8 @@
      },
      "prezzo": "5,00",
      "descrizione": {
-      "it": "Prosecco, Amaro Nonino e soda"
+      "it": "Prosecco, Amaro Nonino e soda",
+      "en": "Prosecco, Amaro Nonino and soda"
      }
     },
     {
@@ -1089,7 +1172,8 @@
      },
      "prezzo": "5,00",
      "descrizione": {
-      "it": "Aperitivo Nonino Botanical e tonica"
+      "it": "Aperitivo Nonino Botanical e tonica",
+      "en": "Aperitivo Nonino Botanical and tonic"
      }
     },
     {
@@ -1098,7 +1182,8 @@
      },
      "prezzo": "8,00",
      "descrizione": {
-      "it": "Con ginger ale, fetta di mela verde, cetriolo e scorza di limone"
+      "it": "Con ginger ale, fetta di mela verde, cetriolo e scorza di limone",
+      "en": "With ginger ale, a slice of green apple, cucumber and lemon zest"
      }
     }
    ]
@@ -1115,11 +1200,13 @@
    "voci": [
     {
      "nome": {
-      "it": "Moretti Grande"
+      "it": "Moretti Grande",
+      "en": "Moretti large"
      },
      "prezzo": "5,00",
      "descrizione": {
-      "it": "Birra lager italiana, 66 cl"
+      "it": "Birra lager italiana, 66 cl",
+      "en": "Italian lager, 66 cl"
      },
      "allergeni": [
       "1"
@@ -1127,11 +1214,13 @@
     },
     {
      "nome": {
-      "it": "Moretti Piccola"
+      "it": "Moretti Piccola",
+      "en": "Moretti small"
      },
      "prezzo": "3,00",
      "descrizione": {
-      "it": "Birra lager italiana, 33 cl"
+      "it": "Birra lager italiana, 33 cl",
+      "en": "Italian lager, 33 cl"
      },
      "allergeni": [
       "1"
@@ -1139,11 +1228,13 @@
     },
     {
      "nome": {
-      "it": "Messina Cristalli di Sale Grande"
+      "it": "Messina Cristalli di Sale Grande",
+      "en": "Messina Cristalli di Sale large"
      },
      "prezzo": "5,50",
      "descrizione": {
-      "it": "Birra siciliana con cristalli di sale marino, 66 cl"
+      "it": "Birra siciliana con cristalli di sale marino, 66 cl",
+      "en": "Sicilian beer with sea-salt crystals, 66 cl"
      },
      "allergeni": [
       "1"
@@ -1151,11 +1242,13 @@
     },
     {
      "nome": {
-      "it": "Messina Cristalli di Sale Piccola"
+      "it": "Messina Cristalli di Sale Piccola",
+      "en": "Messina Cristalli di Sale small"
      },
      "prezzo": "3,50",
      "descrizione": {
-      "it": "Birra siciliana con cristalli di sale marino, 33 cl"
+      "it": "Birra siciliana con cristalli di sale marino, 33 cl",
+      "en": "Sicilian beer with sea-salt crystals, 33 cl"
      },
      "allergeni": [
       "1"
@@ -1167,7 +1260,8 @@
      },
      "prezzo": "5,00",
      "descrizione": {
-      "it": "Birra artigianale, India Pale Ale, luppolata e amara"
+      "it": "Birra artigianale, India Pale Ale, luppolata e amara",
+      "en": "Craft beer, India Pale Ale, hoppy and bitter"
      },
      "allergeni": [
       "1"
@@ -1179,7 +1273,8 @@
      },
      "prezzo": "5,00",
      "descrizione": {
-      "it": "Birra artigianale, Pale Ale, equilibrata e aromatica"
+      "it": "Birra artigianale, Pale Ale, equilibrata e aromatica",
+      "en": "Craft beer, Pale Ale, balanced and aromatic"
      },
      "allergeni": [
       "1"
@@ -1191,7 +1286,8 @@
      },
      "prezzo": "5,00",
      "descrizione": {
-      "it": "Birra artigianale di frumento, speziata con coriandolo e scorza d'arancia"
+      "it": "Birra artigianale di frumento, speziata con coriandolo e scorza d'arancia",
+      "en": "Craft wheat beer, spiced with coriander and orange peel"
      },
      "allergeni": [
       "1"
@@ -1203,7 +1299,8 @@
      },
      "prezzo": "5,00",
      "descrizione": {
-      "it": "Birra artigianale, amara e complessa con note tostate"
+      "it": "Birra artigianale, amara e complessa con note tostate",
+      "en": "Craft beer, bitter and complex with toasted notes"
      },
      "allergeni": [
       "1"
@@ -1211,11 +1308,13 @@
     },
     {
      "nome": {
-      "it": "Heineken 0 Alcol"
+      "it": "Heineken 0 Alcol",
+      "en": "Heineken 0.0"
      },
      "prezzo": "3,50",
      "descrizione": {
-      "it": "Birra senza alcol, fresca e dissetante"
+      "it": "Birra senza alcol, fresca e dissetante",
+      "en": "Alcohol-free beer, fresh and thirst-quenching"
      },
      "allergeni": [
       "1"
@@ -1259,7 +1358,8 @@
      },
      "prezzo": "7,00",
      "descrizione": {
-      "it": "Campari, vermouth rosso, soda e scorza d'arancia"
+      "it": "Campari, vermouth rosso, soda e scorza d'arancia",
+      "en": "Campari, red vermouth, soda and orange zest"
      }
     },
     {
@@ -1268,7 +1368,8 @@
      },
      "prezzo": "7,00",
      "descrizione": {
-      "it": "Campari, vermouth rosso e Prosecco"
+      "it": "Campari, vermouth rosso e Prosecco",
+      "en": "Campari, red vermouth and Prosecco"
      }
     },
     {
@@ -1277,7 +1378,8 @@
      },
      "prezzo": "8,00",
      "descrizione": {
-      "it": "Gin, Campari, vermouth rosso — il grande classico"
+      "it": "Gin, Campari, vermouth rosso — il grande classico",
+      "en": "Gin, Campari, red vermouth: the great classic"
      }
     },
     {
@@ -1286,7 +1388,8 @@
      },
      "prezzo": "8,00",
      "descrizione": {
-      "it": "Vodka, Campari, vermouth rosso"
+      "it": "Vodka, Campari, vermouth rosso",
+      "en": "Vodka, Campari, red vermouth"
      }
     },
     {
@@ -1295,7 +1398,8 @@
      },
      "prezzo": "7,00",
      "descrizione": {
-      "it": "Campari e vermouth di Torino — Milano-Torino"
+      "it": "Campari e vermouth di Torino — Milano-Torino",
+      "en": "Campari and Turin vermouth: the Milano-Torino"
      }
     },
     {
@@ -1304,7 +1408,8 @@
      },
      "prezzo": "7,00",
      "descrizione": {
-      "it": "Rum bianco, menta fresca, lime, zucchero di canna, soda"
+      "it": "Rum bianco, menta fresca, lime, zucchero di canna, soda",
+      "en": "White rum, fresh mint, lime, cane sugar, soda"
      }
     },
     {
@@ -1313,7 +1418,8 @@
      },
      "prezzo": "8,00",
      "descrizione": {
-      "it": "Rum, succo di ananas, crema di cocco"
+      "it": "Rum, succo di ananas, crema di cocco",
+      "en": "Rum, pineapple juice, coconut cream"
      }
     },
     {
@@ -1322,7 +1428,8 @@
      },
      "prezzo": "8,00",
      "descrizione": {
-      "it": "Vodka, lime fresco e zucchero di canna"
+      "it": "Vodka, lime fresco e zucchero di canna",
+      "en": "Vodka, fresh lime and cane sugar"
      }
     }
    ]
@@ -1343,7 +1450,8 @@
      },
      "prezzo": "6,00",
      "descrizione": {
-      "it": "London Dry Gin, classico e bilanciato"
+      "it": "London Dry Gin, classico e bilanciato",
+      "en": "London Dry Gin, classic and balanced"
      }
     },
     {
@@ -1352,7 +1460,8 @@
      },
      "prezzo": "7,00",
      "descrizione": {
-      "it": "London Dry, note di ginepro e coriandolo"
+      "it": "London Dry, note di ginepro e coriandolo",
+      "en": "London Dry, juniper and coriander notes"
      }
     },
     {
@@ -1361,7 +1470,8 @@
      },
      "prezzo": "8,00",
      "descrizione": {
-      "it": "Botaniche esotiche, morbido e versatile"
+      "it": "Botaniche esotiche, morbido e versatile",
+      "en": "Exotic botanicals, smooth and versatile"
      }
     },
     {
@@ -1370,7 +1480,8 @@
      },
      "prezzo": "8,00",
      "descrizione": {
-      "it": "Gin italiano, limoni costiera, fresco e agrumato"
+      "it": "Gin italiano, limoni costiera, fresco e agrumato",
+      "en": "Italian gin, Amalfi coast lemons, fresh and citrusy"
      }
     },
     {
@@ -1379,7 +1490,8 @@
      },
      "prezzo": "8,00",
      "descrizione": {
-      "it": "Cetriolo e rosa, elegante e inconfondibile"
+      "it": "Cetriolo e rosa, elegante e inconfondibile",
+      "en": "Cucumber and rose, elegant and unmistakable"
      }
     },
     {
@@ -1388,7 +1500,8 @@
      },
      "prezzo": "10,00",
      "descrizione": {
-      "it": "Edizione speciale, note floreali e speziate"
+      "it": "Edizione speciale, note floreali e speziate",
+      "en": "Special edition, floral and spicy notes"
      }
     },
     {
@@ -1397,7 +1510,8 @@
      },
      "prezzo": "12,00",
      "descrizione": {
-      "it": "Gin mediterraneo, oliva, basilico e timo"
+      "it": "Gin mediterraneo, oliva, basilico e timo",
+      "en": "Mediterranean gin, olive, basil and thyme"
      }
     },
     {
@@ -1406,7 +1520,8 @@
      },
      "prezzo": "12,00",
      "descrizione": {
-      "it": "Botaniche della Riviera Ligure, floreale e fresco"
+      "it": "Botaniche della Riviera Ligure, floreale e fresco",
+      "en": "Botanicals from the Ligurian Riviera, floral and fresh"
      }
     },
     {
@@ -1415,7 +1530,8 @@
      },
      "prezzo": "12,00",
      "descrizione": {
-      "it": "Shanghai Dry Gin al mandarino, botaniche orientali esotiche"
+      "it": "Shanghai Dry Gin al mandarino, botaniche orientali esotiche",
+      "en": "Shanghai Dry Gin with mandarin, exotic Eastern botanicals"
      }
     },
     {
@@ -1424,7 +1540,8 @@
      },
      "prezzo": "14,00",
      "descrizione": {
-      "it": "Schwarzwald, 47 botaniche, complesso e aromatico"
+      "it": "Schwarzwald, 47 botaniche, complesso e aromatico",
+      "en": "Black Forest, 47 botanicals, complex and aromatic"
      }
     },
     {
@@ -1433,7 +1550,8 @@
      },
      "prezzo": "14,00",
      "descrizione": {
-      "it": "Gin messicano, agave e fiori di ibisco"
+      "it": "Gin messicano, agave e fiori di ibisco",
+      "en": "Mexican gin, agave and hibiscus flowers"
      }
     }
    ]
@@ -2032,13 +2150,15 @@
    "voci": [
     {
      "nome": {
-      "it": "Acqua Naturale"
+      "it": "Acqua Naturale",
+      "en": "Still water"
      },
      "prezzo": "1,50"
     },
     {
      "nome": {
-      "it": "Acqua Frizzante"
+      "it": "Acqua Frizzante",
+      "en": "Sparkling water"
      },
      "prezzo": "1,50"
     },
@@ -2054,7 +2174,8 @@
      },
      "prezzo": "3,50",
      "descrizione": {
-      "it": "Senza zucchero"
+      "it": "Senza zucchero",
+      "en": "Sugar free"
      }
     },
     {
@@ -2065,7 +2186,8 @@
     },
     {
      "nome": {
-      "it": "Tè alla Pesca"
+      "it": "Tè alla Pesca",
+      "en": "Peach iced tea"
      },
      "prezzo": "3,00"
     },
@@ -2075,25 +2197,30 @@
      },
      "prezzo": "3,00",
      "descrizione": {
-      "it": "Analcolico al gusto di zenzero"
+      "it": "Analcolico al gusto di zenzero",
+      "en": "Non-alcoholic ginger-flavoured aperitif"
      }
     },
     {
      "nome": {
-      "it": "Tonica Indian Fever-Tree"
+      "it": "Tonica Indian Fever-Tree",
+      "en": "Fever-Tree Indian Tonic"
      },
      "prezzo": "4,00",
      "descrizione": {
-      "it": "Tonica premium classica"
+      "it": "Tonica premium classica",
+      "en": "Classic premium tonic"
      }
     },
     {
      "nome": {
-      "it": "Tonica Mediterranean Fever-Tree"
+      "it": "Tonica Mediterranean Fever-Tree",
+      "en": "Fever-Tree Mediterranean Tonic"
      },
      "prezzo": "4,00",
      "descrizione": {
-      "it": "Con note floreali e agrumati"
+      "it": "Con note floreali e agrumati",
+      "en": "With floral and citrus notes"
      }
     },
     {
@@ -2102,7 +2229,8 @@
      },
      "prezzo": "4,00",
      "descrizione": {
-      "it": "Leggero e rinfrescante"
+      "it": "Leggero e rinfrescante",
+      "en": "Light and refreshing"
      }
     },
     {
@@ -2111,16 +2239,19 @@
      },
      "prezzo": "4,00",
      "descrizione": {
-      "it": "Intenso e piccante, zenzero vero"
+      "it": "Intenso e piccante, zenzero vero",
+      "en": "Intense and spicy, real ginger"
      }
     },
     {
      "nome": {
-      "it": "Tonica Lemon Kinley"
+      "it": "Tonica Lemon Kinley",
+      "en": "Kinley Lemon Tonic"
      },
      "prezzo": "3,50",
      "descrizione": {
-      "it": "Al limone, fresca e frizzante"
+      "it": "Al limone, fresca e frizzante",
+      "en": "Lemon tonic, fresh and sparkling"
      }
     }
    ]
@@ -2137,29 +2268,35 @@
    "voci": [
     {
      "nome": {
-      "it": "Spritz Hugo Analcolico"
+      "it": "Spritz Hugo Analcolico",
+      "en": "Non-alcoholic Spritz Hugo"
      },
      "prezzo": "3,50",
      "descrizione": {
-      "it": "Sciroppo di sambuco, menta, soda e limone"
+      "it": "Sciroppo di sambuco, menta, soda e limone",
+      "en": "Elderflower syrup, mint, soda and lemon"
      }
     },
     {
      "nome": {
-      "it": "Spritz Campari Analcolico"
+      "it": "Spritz Campari Analcolico",
+      "en": "Non-alcoholic Spritz Campari"
      },
      "prezzo": "3,50",
      "descrizione": {
-      "it": "Campari Soda analcolico con soda e arancia"
+      "it": "Campari Soda analcolico con soda e arancia",
+      "en": "Non-alcoholic Campari Soda with soda and orange"
      }
     },
     {
      "nome": {
-      "it": "Gin Tonic Tanqueray Analcolico"
+      "it": "Gin Tonic Tanqueray Analcolico",
+      "en": "Non-alcoholic Tanqueray Gin Tonic"
      },
      "prezzo": "5,00",
      "descrizione": {
-      "it": "Tanqueray 0.0%, tonica premium e agrumi"
+      "it": "Tanqueray 0.0%, tonica premium e agrumi",
+      "en": "Tanqueray 0.0%, premium tonic and citrus"
      }
     },
     {
@@ -2168,7 +2305,8 @@
      },
      "prezzo": "5,00",
      "descrizione": {
-      "it": "Succo di ananas, crema di cocco e ghiaccio"
+      "it": "Succo di ananas, crema di cocco e ghiaccio",
+      "en": "Pineapple juice, coconut cream and ice"
      }
     }
    ]
@@ -2189,7 +2327,8 @@
      },
      "prezzo": "5,00",
      "descrizione": {
-      "it": "Friuli, erbe alpine e acquavite d'uva 12 mesi in barrique, ambrato e armonico"
+      "it": "Friuli, erbe alpine e acquavite d'uva 12 mesi in barrique, ambrato e armonico",
+      "en": "Friuli, Alpine herbs and grape brandy aged 12 months in barrique, amber and harmonious"
      }
     },
     {
@@ -2198,7 +2337,8 @@
      },
      "prezzo": "5,00",
      "descrizione": {
-      "it": "Calabria, 29 botaniche, menta anice e liquirizia, capolavoro ghiacciato a -20°C"
+      "it": "Calabria, 29 botaniche, menta anice e liquirizia, capolavoro ghiacciato a -20°C",
+      "en": "Calabria, 29 botanicals, mint, anise and liquorice, a masterpiece served ice-cold at -20°C"
      }
     },
     {
@@ -2207,7 +2347,8 @@
      },
      "prezzo": "5,00",
      "descrizione": {
-      "it": "Carso triestino, erbe carsiche locali, botaniche di confine, amaro del territorio"
+      "it": "Carso triestino, erbe carsiche locali, botaniche di confine, amaro del territorio",
+      "en": "Trieste Karst, local Karst herbs, border botanicals, the bitter of our land"
      }
     },
     {
@@ -2216,7 +2357,8 @@
      },
      "prezzo": "5,00",
      "descrizione": {
-      "it": "Friuli, 80 botaniche selezionate, artigianale, complesso e bilanciato"
+      "it": "Friuli, 80 botaniche selezionate, artigianale, complesso e bilanciato",
+      "en": "Friuli, 80 selected botanicals, artisanal, complex and balanced"
      }
     },
     {
@@ -2225,7 +2367,8 @@
      },
      "prezzo": "5,00",
      "descrizione": {
-      "it": "Germania, 56 erbe spezie e radici, anice liquirizia e agrumi, iconico digestivo"
+      "it": "Germania, 56 erbe spezie e radici, anice liquirizia e agrumi, iconico digestivo",
+      "en": "Germany, 56 herbs, spices and roots, anise, liquorice and citrus, the iconic digestivo"
      }
     },
     {
@@ -2234,7 +2377,8 @@
      },
      "prezzo": "5,00",
      "descrizione": {
-      "it": "Bologna 1885, 40 botaniche da 4 continenti, vaniglia e arancia, liquore delle virtù"
+      "it": "Bologna 1885, 40 botaniche da 4 continenti, vaniglia e arancia, liquore delle virtù",
+      "en": "Bologna 1885, 40 botanicals from 4 continents, vanilla and orange, the liqueur of virtues"
      }
     },
     {
@@ -2243,7 +2387,8 @@
      },
      "prezzo": "5,00",
      "descrizione": {
-      "it": "Valtellina, 24 mesi in rovere di Slavonia, erbe alpine balsamiche, intenso e avvolgente"
+      "it": "Valtellina, 24 mesi in rovere di Slavonia, erbe alpine balsamiche, intenso e avvolgente",
+      "en": "Valtellina, 24 months in Slavonian oak, balsamic Alpine herbs, intense and enveloping"
      }
     },
     {
@@ -2252,7 +2397,8 @@
      },
      "prezzo": "5,00",
      "descrizione": {
-      "it": "Trieste, assenzio e botaniche balcaniche, rabarbaro e fiori di sambuco, 0% coloranti"
+      "it": "Trieste, assenzio e botaniche balcaniche, rabarbaro e fiori di sambuco, 0% coloranti",
+      "en": "Trieste, wormwood and Balkan botanicals, rhubarb and elderflower, no colourings"
      }
     },
     {
@@ -2261,7 +2407,8 @@
      },
      "prezzo": "5,00",
      "descrizione": {
-      "it": "Scorze di limone in infusione, fresco e agrumato, il digestivo del sole"
+      "it": "Scorze di limone in infusione, fresco e agrumato, il digestivo del sole",
+      "en": "Infused lemon peel, fresh and citrusy, the digestivo of the sun"
      }
     },
     {
@@ -2270,7 +2417,8 @@
      },
      "prezzo": "5,00",
      "descrizione": {
-      "it": "Anice stellato e liquirizia, dolce e persistente, servita con la mosca"
+      "it": "Anice stellato e liquirizia, dolce e persistente, servita con la mosca",
+      "en": "Star anise and liquorice, sweet and persistent, served with coffee beans"
      }
     },
     {
@@ -2279,7 +2427,8 @@
      },
      "prezzo": "5,00",
      "descrizione": {
-      "it": "Percoto, Friuli, vinacce fresche selezionate, cristallina e pulita, alambicco di rame"
+      "it": "Percoto, Friuli, vinacce fresche selezionate, cristallina e pulita, alambicco di rame",
+      "en": "Percoto, Friuli, selected fresh pomace, crystal-clear and clean, copper still"
      }
     },
     {
@@ -2288,7 +2437,8 @@
      },
      "prezzo": "5,00",
      "descrizione": {
-      "it": "Percoto, Malvasia in purezza, floreale e aromatica, frutta tropicale e fiori esotici"
+      "it": "Percoto, Malvasia in purezza, floreale e aromatica, frutta tropicale e fiori esotici",
+      "en": "Percoto, 100% Malvasia, floral and aromatic, tropical fruit and exotic flowers"
      }
     },
     {
@@ -2297,43 +2447,52 @@
      },
      "prezzo": "5,00",
      "descrizione": {
-      "it": "Percoto, uva Fragola del Friuli, frutti di bosco e mirtillo, elegante e morbida"
+      "it": "Percoto, uva Fragola del Friuli, frutti di bosco e mirtillo, elegante e morbida",
+      "en": "Percoto, Friulian Fragola grape, wild berries and blueberry, elegant and soft"
      }
     },
     {
      "nome": {
-      "it": "Grappa Nonino Monovitigno Uva Bianca"
+      "it": "Grappa Nonino Monovitigno Uva Bianca",
+      "en": "Grappa Nonino Monovitigno White Grape"
      },
      "prezzo": "5,00",
      "descrizione": {
-      "it": "Percoto, cuvée Chardonnay Pinot Bianco e Malvasia friulani, elegante e delicata"
+      "it": "Percoto, cuvée Chardonnay Pinot Bianco e Malvasia friulani, elegante e delicata",
+      "en": "Percoto, cuvée of Friulian Chardonnay, Pinot Bianco and Malvasia, elegant and delicate"
      }
     },
     {
      "nome": {
-      "it": "Grappa Nonino Barricata 24 mesi"
+      "it": "Grappa Nonino Barricata 24 mesi",
+      "en": "Grappa Nonino Barricata 24 months"
      },
      "prezzo": "5,00",
      "descrizione": {
-      "it": "Percoto, 24 mesi in barrique, ambrata e vellutata, mela verde cioccolato e vaniglia"
+      "it": "Percoto, 24 mesi in barrique, ambrata e vellutata, mela verde cioccolato e vaniglia",
+      "en": "Percoto, 24 months in barrique, amber and velvety, green apple, chocolate and vanilla"
      }
     },
     {
      "nome": {
-      "it": "Grappa Nonino Barricata 5 anni"
+      "it": "Grappa Nonino Barricata 5 anni",
+      "en": "Grappa Nonino Barricata 5 years"
      },
      "prezzo": "7,00",
      "descrizione": {
-      "it": "Percoto, 5 anni in barrique, tostatura miele e spezie dolci, grande complessità"
+      "it": "Percoto, 5 anni in barrique, tostatura miele e spezie dolci, grande complessità",
+      "en": "Percoto, 5 years in barrique, toasty honey and sweet spices, great complexity"
      }
     },
     {
      "nome": {
-      "it": "Grappa Nonino Barricata 8 anni"
+      "it": "Grappa Nonino Barricata 8 anni",
+      "en": "Grappa Nonino Barricata 8 years"
      },
      "prezzo": "9,00",
      "descrizione": {
-      "it": "Percoto, 8 anni in barrique, ambra profondo, cioccolato fondente tabacco e frutta secca"
+      "it": "Percoto, 8 anni in barrique, ambra profondo, cioccolato fondente tabacco e frutta secca",
+      "en": "Percoto, 8 years in barrique, deep amber, dark chocolate, tobacco and dried fruit"
      }
     }
    ]

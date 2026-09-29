@@ -86,7 +86,7 @@
   <div class="skeleton"></div><div class="skeleton" style="width:80%"></div><div class="skeleton" style="width:90%"></div>
 </main>
 
-<footer class="powered"><span>Menù digitale realizzato con </span><a href="../index.html" data-brand-name>RenMenu</a></footer>
+<footer class="powered"><span data-powered>Menù digitale realizzato con </span><a href="../index.html" data-brand-name>RenMenu</a></footer>
 
 <script src="../assets/common.js"></script>
 <script>
@@ -94,7 +94,7 @@
   const R = window.RENMENU;
   const params = new URLSearchParams(location.search);
   const hash = location.hash.startsWith('#data=') ? location.hash.slice(6) : null;
-  const id = params.get('m') || 'demo';
+  const id = params.get('m') || 'bakaro';
   let lang = (params.get('lang') || (navigator.language || 'it').slice(0, 2)).toLowerCase();
   let menu;
 
@@ -120,13 +120,14 @@
   document.documentElement.lang = lang;
 
   const L = {
-    it: { cerca: 'Cerca un piatto…', nessuno: 'Nessun piatto trovato.', info: 'Informazioni', allergeni: 'Allergeni', coperto: 'Coperto', mappa: 'Apri in Google Maps', chiama: 'Chiama', oggi: 'Oggi' },
-    en: { cerca: 'Search a dish…', nessuno: 'No dishes found.', info: 'Info', allergeni: 'Allergens', coperto: 'Cover charge', mappa: 'Open in Google Maps', chiama: 'Call', oggi: 'Today' },
-    de: { cerca: 'Gericht suchen…', nessuno: 'Keine Gerichte gefunden.', info: 'Info', allergeni: 'Allergene', coperto: 'Gedeck', mappa: 'In Google Maps öffnen', chiama: 'Anrufen', oggi: 'Heute' },
-    fr: { cerca: 'Rechercher un plat…', nessuno: 'Aucun plat trouvé.', info: 'Infos', allergeni: 'Allergènes', coperto: 'Couvert', mappa: 'Ouvrir dans Google Maps', chiama: 'Appeler', oggi: "Aujourd'hui" },
-    es: { cerca: 'Buscar un plato…', nessuno: 'No se encontraron platos.', info: 'Información', allergeni: 'Alérgenos', coperto: 'Cubierto', mappa: 'Abrir en Google Maps', chiama: 'Llamar', oggi: 'Hoy' }
+    it: { powered: 'Menù digitale realizzato con', cerca: 'Cerca un piatto…', nessuno: 'Nessun piatto trovato.', info: 'Informazioni', allergeni: 'Allergeni', coperto: 'Coperto', mappa: 'Apri in Google Maps', chiama: 'Chiama', oggi: 'Oggi' },
+    en: { powered: 'Digital menu made with', cerca: 'Search a dish…', nessuno: 'No dishes found.', info: 'Info', allergeni: 'Allergens', coperto: 'Cover charge', mappa: 'Open in Google Maps', chiama: 'Call', oggi: 'Today' },
+    de: { powered: 'Digitale Speisekarte erstellt mit', cerca: 'Gericht suchen…', nessuno: 'Keine Gerichte gefunden.', info: 'Info', allergeni: 'Allergene', coperto: 'Gedeck', mappa: 'In Google Maps öffnen', chiama: 'Anrufen', oggi: 'Heute' },
+    fr: { powered: 'Menu numérique réalisé avec', cerca: 'Rechercher un plat…', nessuno: 'Aucun plat trouvé.', info: 'Infos', allergeni: 'Allergènes', coperto: 'Couvert', mappa: 'Ouvrir dans Google Maps', chiama: 'Appeler', oggi: "Aujourd'hui" },
+    es: { powered: 'Menú digital creado con', cerca: 'Buscar un plato…', nessuno: 'No se encontraron platos.', info: 'Información', allergeni: 'Alérgenos', coperto: 'Cubierto', mappa: 'Abrir en Google Maps', chiama: 'Llamar', oggi: 'Hoy' }
   };
   const S = () => L[lang] || L.it;
+  document.querySelector('[data-powered]').textContent = S().powered + ' ';
 
   function render(query = '') {
     const q = query.trim().toLowerCase();
