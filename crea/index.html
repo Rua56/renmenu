@@ -1,0 +1,303 @@
+<!DOCTYPE html>
+<html lang="it">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Generatore menù — RenMenu</title>
+<meta name="robots" content="noindex">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,400;9..144,500;9..144,600&family=Instrument+Sans:wght@400;500;600&display=swap">
+<link rel="stylesheet" href="../assets/style.css">
+<link rel="icon" href="../assets/favicon.svg" type="image/svg+xml">
+<script src="https://cdn.jsdelivr.net/npm/qrcode-generator@1.4.4/qrcode.min.js"></script>
+<style>
+  header.site { position: sticky; top: 0; z-index: 50; background: color-mix(in oklab, var(--color-bg) 85%, transparent); backdrop-filter: blur(14px); -webkit-backdrop-filter: blur(14px); border-bottom: 1px solid var(--color-divider); }
+  .nav { display: flex; align-items: center; justify-content: space-between; gap: var(--space-3); min-height: 60px; }
+  .nav__right { display: flex; align-items: center; gap: var(--space-2); }
+  main { padding: var(--space-6) 0 var(--space-24); }
+  .layout { display: grid; gap: var(--space-8); }
+  @media (min-width: 1000px) { .layout { grid-template-columns: 1fr 360px; align-items: start; } .side { position: sticky; top: 76px; } }
+  h1 { font-size: var(--text-xl); }
+  .sub { color: var(--color-text-muted); font-size: var(--text-sm); margin-top: var(--space-2); }
+  .toolbar { display: flex; flex-wrap: wrap; gap: var(--space-2); margin-top: var(--space-5); }
+  .card { background: var(--color-surface); border: 1px solid var(--color-divider); border-radius: var(--radius-xl); padding: var(--space-5); margin-top: var(--space-5); }
+  .card h2 { font-size: var(--text-lg); margin-bottom: var(--space-4); display: flex; justify-content: space-between; align-items: center; gap: var(--space-3); }
+  .grid { display: grid; gap: var(--space-3); grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); }
+  label.f { display: block; font-size: var(--text-xs); font-weight: 600; color: var(--color-text-muted); text-transform: uppercase; letter-spacing: 0.06em; }
+  label.f span { display: block; margin-bottom: var(--space-1); }
+  input[type=text], input[type=url], input[type=tel], textarea, select { width: 100%; padding: var(--space-3); border-radius: var(--radius-md); border: 1px solid var(--color-border); background: var(--color-bg); font-size: var(--text-sm); min-height: 44px; text-transform: none; letter-spacing: 0; font-weight: 400; color: var(--color-text); }
+  textarea { min-height: 64px; resize: vertical; }
+  input:focus, textarea:focus, select:focus { outline: none; border-color: var(--color-primary); box-shadow: 0 0 0 3px var(--color-primary-highlight); }
+  .langs { display: flex; flex-wrap: wrap; gap: var(--space-2); }
+  .pill { display: inline-flex; align-items: center; gap: 6px; padding: var(--space-2) var(--space-3); border-radius: var(--radius-full); border: 1px solid var(--color-border); font-size: var(--text-xs); font-weight: 600; cursor: pointer; user-select: none; min-height: 36px; background: var(--color-bg); }
+  .pill[aria-pressed='true'] { background: var(--color-text); color: var(--color-text-inverse); border-color: var(--color-text); }
+  .pill--all[aria-pressed='true'] { background: var(--color-primary); border-color: var(--color-primary); }
+  .sezione { border: 1px solid var(--color-border); border-radius: var(--radius-lg); padding: var(--space-4); margin-top: var(--space-4); background: var(--color-surface-2); }
+  .sezione__head { display: flex; flex-wrap: wrap; gap: var(--space-2); align-items: center; margin-bottom: var(--space-3); }
+  .sezione__head input { flex: 1 1 150px; min-width: 0; }
+  .sezione__head .n { font-family: var(--font-display); font-style: italic; color: var(--color-primary); font-size: var(--text-lg); width: 28px; flex: none; }
+  .voce { border-top: 1px dashed var(--color-divider); padding-top: var(--space-4); margin-top: var(--space-4); }
+  .voce__row { display: grid; gap: var(--space-3); grid-template-columns: 1fr; }
+  .voce__row2 { display: grid; gap: var(--space-3); grid-template-columns: 1fr; margin-top: var(--space-3); }
+  .voce__row2 > label { order: -1; max-width: 160px; }
+  @media (min-width: 640px) { .voce__row { grid-template-columns: 1fr 1fr; } .voce__row2 { grid-template-columns: 1fr 110px; } .voce__row2 > label { order: 0; max-width: none; } }
+  .grid > *, .voce__row > *, .voce__row2 > *, .voce__meta, .sezione, .card, .layout > * { min-width: 0; }
+  .voce__meta { margin-top: var(--space-3); display: grid; gap: var(--space-2); }
+  .voce__meta .lbl { font-size: var(--text-xs); color: var(--color-text-muted); font-weight: 600; }
+  .row-actions { display: flex; gap: var(--space-2); flex-wrap: wrap; margin-top: var(--space-3); }
+  .icon-btn { width: 36px; height: 36px; border-radius: var(--radius-md); border: 1px solid var(--color-border); display: inline-flex; align-items: center; justify-content: center; color: var(--color-text-muted); background: var(--color-bg); flex: none; }
+  .icon-btn:hover { color: var(--color-text); border-color: var(--color-text-muted); }
+  .icon-btn--danger:hover { color: var(--color-error); border-color: var(--color-error); }
+  .side .card { margin-top: 0; }
+  .side .card + .card { margin-top: var(--space-4); }
+  .qr { display: grid; place-items: center; padding: var(--space-4); background: #fff; border-radius: var(--radius-lg); border: 1px solid var(--color-divider); }
+  .qr img { width: 220px; height: 220px; image-rendering: pixelated; }
+  .url { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: var(--text-xs); word-break: break-all; color: var(--color-text-muted); margin-top: var(--space-3); }
+  .stack { display: grid; gap: var(--space-2); margin-top: var(--space-4); }
+  .stack .btn { width: 100%; }
+  pre { font-size: 11px; line-height: 1.4; max-height: 260px; overflow: auto; background: var(--color-bg); border: 1px solid var(--color-divider); border-radius: var(--radius-md); padding: var(--space-3); margin-top: var(--space-3); }
+  .toast { position: fixed; left: 50%; bottom: calc(var(--space-6) + env(safe-area-inset-bottom)); transform: translateX(-50%) translateY(20px); background: var(--color-text); color: var(--color-text-inverse); padding: var(--space-3) var(--space-5); border-radius: var(--radius-full); font-size: var(--text-sm); font-weight: 600; opacity: 0; pointer-events: none; transition: all 220ms cubic-bezier(0.16,1,0.3,1); z-index: 100; box-shadow: var(--shadow-lg); }
+  .toast.show { opacity: 1; transform: translateX(-50%) translateY(0); }
+  .hint { font-size: var(--text-xs); color: var(--color-text-faint); margin-top: var(--space-2); }
+  .steps-help { font-size: var(--text-sm); color: var(--color-text-muted); display: grid; gap: var(--space-2); padding-left: var(--space-5); }
+</style>
+</head>
+<body>
+<header class="site">
+  <div class="container nav">
+    <a class="brand" href="../"><span data-logo></span><span data-brand-name>RenMenu</span></a>
+    <div class="nav__right">
+      <button class="theme-toggle" data-theme-toggle type="button"></button>
+      <a class="btn btn--ghost btn--sm" id="btnPreviewTop" href="#" target="_blank" rel="noopener">Anteprima</a>
+    </div>
+  </div>
+</header>
+
+<main class="container">
+  <span class="eyebrow">Area operatore</span>
+  <h1 style="margin-top:var(--space-2)">Generatore menù</h1>
+  <p class="sub">Compila, guarda l'anteprima, scarica il file <code>.json</code> e caricalo nella cartella <code>menus/</code> del sito. Il QR punta sempre allo stesso link: puoi aggiornare il menù quante volte vuoi senza ristampare.</p>
+  <div class="toolbar">
+    <button class="btn btn--ghost btn--sm" id="btnNew" type="button">Nuovo vuoto</button>
+    <button class="btn btn--ghost btn--sm" id="btnDemo" type="button">Carica demo</button>
+    <label class="btn btn--ghost btn--sm" for="fileIn" style="cursor:pointer">Apri .json <input id="fileIn" type="file" accept="application/json,.json" class="sr-only"></label>
+    <button class="btn btn--ghost btn--sm" id="btnPaste" type="button">Incolla JSON</button>
+  </div>
+
+  <div class="layout">
+    <div>
+      <div class="card">
+        <h2>Il locale</h2>
+        <div class="grid">
+          <label class="f"><span>Identificativo (per il link)</span><input type="text" data-k="id" placeholder="es. osteria-portego" autocapitalize="off"></label>
+          <label class="f"><span>Nome del locale</span><input type="text" data-k="nome" placeholder="Osteria al Portego"></label>
+          <label class="f"><span>Sottotitolo (IT)</span><input type="text" data-k="sottotitolo.it" placeholder="Cucina veneta dal 1987"></label>
+          <label class="f"><span>Sottotitolo (EN)</span><input type="text" data-k="sottotitolo.en" placeholder="Venetian cooking since 1987"></label>
+          <label class="f"><span>Indirizzo</span><input type="text" data-k="indirizzo" placeholder="Via del Santo 42, Padova"></label>
+          <label class="f"><span>Telefono</span><input type="tel" data-k="telefono" placeholder="+39 049 …"></label>
+          <label class="f"><span>Instagram (senza @)</span><input type="text" data-k="instagram" placeholder="osteriaalportego" autocapitalize="off"></label>
+          <label class="f"><span>Link Google Maps</span><input type="url" data-k="maps" placeholder="https://maps.google.com/?q=…"></label>
+          <label class="f"><span>Orari (IT)</span><input type="text" data-k="orari.it" placeholder="Mar–Dom 11–15 · 18–24"></label>
+          <label class="f"><span>Orari (EN)</span><input type="text" data-k="orari.en" placeholder="Tue–Sun 11am–3pm · 6pm–midnight"></label>
+          <label class="f"><span>Wi-Fi (facoltativo)</span><input type="text" data-k="wifi" placeholder="Rete · password"></label>
+          <label class="f"><span>Coperto (€)</span><input type="text" data-k="coperto" placeholder="2,00" inputmode="decimal"></label>
+          <label class="f"><span>Piatto del giorno / avviso (IT)</span><input type="text" data-k="avviso.it" placeholder="Oggi: bigoli in salsa"></label>
+          <label class="f"><span>Piatto del giorno / avviso (EN)</span><input type="text" data-k="avviso.en" placeholder="Today: bigoli in sauce"></label>
+          <label class="f" style="grid-column:1/-1"><span>Note a fondo menù (IT)</span><textarea data-k="note.it" placeholder="* Alcuni prodotti possono essere surgelati all'origine…"></textarea></label>
+          <label class="f" style="grid-column:1/-1"><span>Note a fondo menù (EN)</span><textarea data-k="note.en" placeholder="* Some products may be frozen at origin…"></textarea></label>
+        </div>
+        <div style="margin-top:var(--space-4)"><label class="f"><span>Lingue attive</span></label><div class="langs" id="langs"></div><p class="hint">I campi EN sono usati anche come base per le altre lingue se non tradotte.</p></div>
+      </div>
+
+      <div class="card">
+        <h2>Sezioni e piatti <button class="btn btn--primary btn--sm" id="btnAddSez" type="button">+ Sezione</button></h2>
+        <div id="sezioni"></div>
+      </div>
+
+      <div class="card">
+        <h2>Come si pubblica</h2>
+        <ol class="steps-help">
+          <li>Scarica il file <code>.json</code> qui a lato.</li>
+          <li>Su GitHub apri la cartella <code>menus/</code> del sito e carica il file (Add file → Upload). Il nome deve essere <code>identificativo.json</code>.</li>
+          <li>Dopo un minuto il menù è online al link indicato e il QR funziona. Per aggiornare, ricarica lo stesso file.</li>
+        </ol>
+      </div>
+    </div>
+
+    <aside class="side">
+      <div class="card">
+        <h2>Link e QR</h2>
+        <label class="f"><span>Indirizzo del sito pubblicato</span><input type="url" id="baseUrl" placeholder="https://tuonome.github.io/renmenu/" autocapitalize="off"></label>
+        <div class="qr" style="margin-top:var(--space-4)"><img id="qrImg" alt="QR code del menù" width="220" height="220"></div>
+        <div class="url" id="urlOut"></div>
+        <div class="stack">
+          <a class="btn btn--primary" id="btnPreview" href="#" target="_blank" rel="noopener">Apri anteprima</a>
+          <button class="btn btn--ghost" id="btnDl" type="button">Scarica menù .json</button>
+          <button class="btn btn--ghost" id="btnQr" type="button">Scarica QR (PNG 1024px)</button>
+          <button class="btn btn--ghost" id="btnPrint" type="button">Stampa cartello da tavolo</button>
+          <button class="btn btn--ghost" id="btnCopy" type="button">Copia JSON</button>
+        </div>
+      </div>
+      <div class="card">
+        <h2>JSON</h2>
+        <pre id="jsonOut"></pre>
+      </div>
+    </aside>
+  </div>
+</main>
+<div class="toast" id="toast" role="status"></div>
+
+<script src="../assets/common.js"></script>
+<script>
+(function () {
+  const R = window.RENMENU;
+  const ALL_LANGS = ['it', 'en', 'de', 'fr', 'es'];
+  const blank = () => ({ id: '', nome: '', sottotitolo: { it: '', en: '' }, indirizzo: '', telefono: '', instagram: '', maps: '', orari: { it: '', en: '' }, wifi: '', avviso: { it: '', en: '' }, coperto: '', note: { it: '', en: '' }, lingue: ['it', 'en'], sezioni: [] });
+  let state = blank();
+
+  const $ = s => document.querySelector(s);
+  const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+  const toast = m => { const t = $('#toast'); t.textContent = m; t.classList.add('show'); clearTimeout(t._t); t._t = setTimeout(() => t.classList.remove('show'), 1800); };
+  const slugify = s => s.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '');
+  const get = (o, p) => p.split('.').reduce((a, k) => a?.[k], o);
+  const set = (o, p, v) => { const ks = p.split('.'); let c = o; ks.slice(0, -1).forEach(k => { if (typeof c[k] !== 'object' || c[k] === null) c[k] = {}; c = c[k]; }); c[ks.at(-1)] = v; };
+
+  // ---- default base URL: current site root
+  const root = location.href.replace(/crea\/.*$/, '');
+  $('#baseUrl').value = root;
+
+  function clean() {
+    const s = JSON.parse(JSON.stringify(state));
+    const prune = o => { for (const k in o) { if (o[k] && typeof o[k] === 'object' && !Array.isArray(o[k])) { prune(o[k]); if (!Object.values(o[k]).some(v => v !== '' && v != null)) delete o[k]; } else if (o[k] === '' || o[k] == null) delete o[k]; } };
+    prune(s);
+    s.sezioni = (s.sezioni || []).map(z => { z.voci = (z.voci || []).map(v => { if (!v.allergeni?.length) delete v.allergeni; if (!v.tag?.length) delete v.tag; return v; }); return z; });
+    return s;
+  }
+
+  function bindTop() {
+    document.querySelectorAll('[data-k]').forEach(el => {
+      el.value = get(state, el.dataset.k) ?? '';
+      el.oninput = () => { set(state, el.dataset.k, el.value); if (el.dataset.k === 'nome' && !state._idTouched) { state.id = slugify(el.value); document.querySelector('[data-k=id]').value = state.id; } if (el.dataset.k === 'id') { state._idTouched = true; state.id = slugify(el.value) || el.value; } refreshSide(); };
+    });
+    $('#langs').innerHTML = ALL_LANGS.map(l => `<button type="button" class="pill" data-l="${l}" aria-pressed="${state.lingue.includes(l)}">${l.toUpperCase()}</button>`).join('');
+    $('#langs').querySelectorAll('.pill').forEach(b => b.onclick = () => { const l = b.dataset.l; state.lingue = state.lingue.includes(l) ? state.lingue.filter(x => x !== l) : [...state.lingue, l]; if (!state.lingue.length) state.lingue = ['it']; state.lingue.sort((a, b) => ALL_LANGS.indexOf(a) - ALL_LANGS.indexOf(b)); bindTop(); refreshSide(); });
+  }
+
+  function renderSez() {
+    const wrap = $('#sezioni');
+    if (!state.sezioni.length) { wrap.innerHTML = `<p class="muted" style="font-size:var(--text-sm)">Nessuna sezione. Aggiungi "Antipasti", "Primi", "Bar"…</p>`; return; }
+    wrap.innerHTML = state.sezioni.map((z, i) => `
+      <div class="sezione" data-i="${i}">
+        <div class="sezione__head">
+          <span class="n">${String(i + 1).padStart(2, '0')}</span>
+          <input type="text" data-z="${i}" data-p="nome.it" placeholder="Nome sezione (IT), es. Primi" value="${esc(z.nome?.it)}" style="flex:1">
+          <input type="text" data-z="${i}" data-p="nome.en" placeholder="EN, es. Pasta" value="${esc(z.nome?.en)}" style="flex:1">
+          <button class="icon-btn" type="button" data-act="up" data-z="${i}" aria-label="Sposta su" ${i === 0 ? 'disabled' : ''}>↑</button>
+          <button class="icon-btn" type="button" data-act="down" data-z="${i}" aria-label="Sposta giù" ${i === state.sezioni.length - 1 ? 'disabled' : ''}>↓</button>
+          <button class="icon-btn icon-btn--danger" type="button" data-act="delz" data-z="${i}" aria-label="Elimina sezione">✕</button>
+        </div>
+        <div class="grid"><input type="text" data-z="${i}" data-p="descrizione.it" placeholder="Descrizione sezione IT (facoltativa)" value="${esc(z.descrizione?.it)}"><input type="text" data-z="${i}" data-p="descrizione.en" placeholder="EN (facoltativa)" value="${esc(z.descrizione?.en)}"></div>
+        ${(z.voci || []).map((v, j) => `
+          <div class="voce" data-j="${j}">
+            <div class="voce__row">
+              <input type="text" data-z="${i}" data-j="${j}" data-p="nome.it" placeholder="Piatto (IT)" value="${esc(v.nome?.it)}">
+              <input type="text" data-z="${i}" data-j="${j}" data-p="nome.en" placeholder="Dish (EN)" value="${esc(v.nome?.en)}">
+            </div>
+            <div class="voce__row" style="margin-top:var(--space-3)">
+              <input type="text" data-z="${i}" data-j="${j}" data-p="descrizione.it" placeholder="Descrizione IT (facoltativa)" value="${esc(v.descrizione?.it)}">
+              <input type="text" data-z="${i}" data-j="${j}" data-p="descrizione.en" placeholder="Description EN" value="${esc(v.descrizione?.en)}">
+            </div>
+            <div class="voce__row2">
+              <div class="voce__meta">
+                <span class="lbl">Allergeni (Reg. UE 1169/2011)</span>
+                <div class="langs">${Object.keys(R.allergeni).map(k => `<button type="button" class="pill pill--all" data-z="${i}" data-j="${j}" data-all="${k}" aria-pressed="${(v.allergeni || []).includes(k)}" title="${R.allergeni[k].it}">${k} ${R.allergeni[k].it}</button>`).join('')}</div>
+                <span class="lbl">Etichette</span>
+                <div class="langs">${Object.keys(R.tags).map(k => `<button type="button" class="pill" data-z="${i}" data-j="${j}" data-tag="${k}" aria-pressed="${(v.tag || []).includes(k)}">${R.tags[k].icon} ${R.tags[k].it}</button>`).join('')}</div>
+              </div>
+              <label class="f"><span>Prezzo €</span><input type="text" inputmode="decimal" data-z="${i}" data-j="${j}" data-p="prezzo" placeholder="12,00" value="${esc(v.prezzo)}"></label>
+            </div>
+            <div class="row-actions">
+              <button class="btn btn--ghost btn--sm" type="button" data-act="vup" data-z="${i}" data-j="${j}" ${j === 0 ? 'disabled' : ''}>↑ Su</button>
+              <button class="btn btn--ghost btn--sm" type="button" data-act="vdown" data-z="${i}" data-j="${j}" ${j === z.voci.length - 1 ? 'disabled' : ''}>↓ Giù</button>
+              <button class="btn btn--ghost btn--sm" type="button" data-act="dup" data-z="${i}" data-j="${j}">Duplica</button>
+              <button class="btn btn--ghost btn--sm" type="button" data-act="delv" data-z="${i}" data-j="${j}" style="color:var(--color-error)">Elimina piatto</button>
+            </div>
+          </div>`).join('')}
+        <div class="row-actions"><button class="btn btn--primary btn--sm" type="button" data-act="addv" data-z="${i}">+ Piatto in "${esc(z.nome?.it || 'sezione')}"</button></div>
+      </div>`).join('');
+
+    wrap.querySelectorAll('input[data-p]').forEach(el => el.oninput = () => {
+      const z = state.sezioni[+el.dataset.z];
+      const target = el.dataset.j != null ? z.voci[+el.dataset.j] : z;
+      set(target, el.dataset.p, el.value); refreshSide();
+    });
+    wrap.querySelectorAll('[data-all]').forEach(b => b.onclick = () => { const v = state.sezioni[+b.dataset.z].voci[+b.dataset.j]; v.allergeni = v.allergeni || []; const k = b.dataset.all; v.allergeni = v.allergeni.includes(k) ? v.allergeni.filter(x => x !== k) : [...v.allergeni, k].sort((a, b) => a - b); b.setAttribute('aria-pressed', v.allergeni.includes(k)); refreshSide(); });
+    wrap.querySelectorAll('[data-tag]').forEach(b => b.onclick = () => { const v = state.sezioni[+b.dataset.z].voci[+b.dataset.j]; v.tag = v.tag || []; const k = b.dataset.tag; v.tag = v.tag.includes(k) ? v.tag.filter(x => x !== k) : [...v.tag, k]; b.setAttribute('aria-pressed', v.tag.includes(k)); refreshSide(); });
+    wrap.querySelectorAll('[data-act]').forEach(b => b.onclick = () => {
+      const i = +b.dataset.z, j = +b.dataset.j, S = state.sezioni, act = b.dataset.act;
+      const swap = (arr, a, c) => { [arr[a], arr[c]] = [arr[c], arr[a]]; };
+      if (act === 'up') swap(S, i, i - 1); if (act === 'down') swap(S, i, i + 1);
+      if (act === 'delz' && confirm('Eliminare la sezione e tutti i suoi piatti?')) S.splice(i, 1);
+      if (act === 'addv') { S[i].voci = S[i].voci || []; S[i].voci.push({ nome: { it: '', en: '' }, prezzo: '' }); }
+      if (act === 'vup') swap(S[i].voci, j, j - 1); if (act === 'vdown') swap(S[i].voci, j, j + 1);
+      if (act === 'dup') S[i].voci.splice(j + 1, 0, JSON.parse(JSON.stringify(S[i].voci[j])));
+      if (act === 'delv') S[i].voci.splice(j, 1);
+      renderSez(); refreshSide();
+      if (act === 'addv') { const inputs = wrap.querySelectorAll(`.sezione[data-i="${i}"] .voce input[data-p="nome.it"]`); inputs[inputs.length - 1]?.focus(); }
+    });
+  }
+
+  function menuUrl() { const b = ($('#baseUrl').value || root).replace(/\/?$/, '/'); return `${b}menu/?m=${encodeURIComponent(state.id || 'demo')}`; }
+  function previewUrl() { const json = JSON.stringify(clean()); const b64 = btoa(unescape(encodeURIComponent(json))).replace(/\+/g, '-').replace(/\//g, '_'); return `../menu/#data=${b64}`; }
+  function makeQr(cell) { const qr = qrcode(0, 'M'); qr.addData(menuUrl()); qr.make(); return qr; }
+
+  function refreshSide() {
+    const s = clean();
+    $('#jsonOut').textContent = JSON.stringify(s, null, 2);
+    $('#urlOut').textContent = menuUrl();
+    try { $('#qrImg').src = makeQr().createDataURL(6, 2); } catch (e) { }
+    const p = previewUrl(); $('#btnPreview').href = p; $('#btnPreviewTop').href = p;
+  }
+  $('#baseUrl').oninput = refreshSide;
+
+  function download(name, content, type) { const a = document.createElement('a'); a.href = URL.createObjectURL(new Blob([content], { type })); a.download = name; document.body.appendChild(a); a.click(); a.remove(); }
+  $('#btnDl').onclick = () => { if (!state.id) { toast('Inserisci un identificativo'); return; } download(`${state.id}.json`, JSON.stringify(clean(), null, 2), 'application/json'); toast('Scaricato ' + state.id + '.json'); };
+  $('#btnCopy').onclick = async () => { try { await navigator.clipboard.writeText(JSON.stringify(clean(), null, 2)); toast('JSON copiato'); } catch { toast('Copia manuale dal riquadro'); } };
+  $('#btnQr').onclick = () => {
+    const qr = makeQr(); const n = qr.getModuleCount(); const size = 1024, margin = 64, cell = (size - 2 * margin) / n;
+    const c = document.createElement('canvas'); c.width = c.height = size; const ctx = c.getContext('2d');
+    ctx.fillStyle = '#fff'; ctx.fillRect(0, 0, size, size); ctx.fillStyle = '#111';
+    for (let r = 0; r < n; r++) for (let q = 0; q < n; q++) if (qr.isDark(r, q)) ctx.fillRect(Math.floor(margin + q * cell), Math.floor(margin + r * cell), Math.ceil(cell), Math.ceil(cell));
+    c.toBlob(b => { const a = document.createElement('a'); a.href = URL.createObjectURL(b); a.download = `qr-${state.id || 'menu'}.png`; a.click(); toast('QR scaricato'); });
+  };
+  $('#btnPrint').onclick = () => {
+    const svg = makeQr().createSvgTag({ cellSize: 8, margin: 0, scalable: true });
+    const w = window.open('', '_blank');
+    w.document.write(`<!DOCTYPE html><html lang="it"><head><meta charset="utf-8"><title>Cartello QR — ${esc(state.nome)}</title>
+      <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,500;9..144,600&family=Instrument+Sans:wght@400;600&display=swap">
+      <style>@page{size:A5;margin:0}body{margin:0;font-family:'Instrument Sans',sans-serif;color:#2a2119;background:#fff}.c{width:148mm;height:210mm;padding:16mm;display:flex;flex-direction:column;align-items:center;justify-content:center;text-align:center;box-sizing:border-box}.c h1{font-family:Fraunces,serif;font-weight:500;font-size:26pt;margin:0 0 4mm}.c p{margin:0;font-size:12pt;color:#75695c}.qr{width:80mm;height:80mm;margin:10mm 0;border:1px solid #e3dbcb;border-radius:8mm;padding:6mm;box-sizing:border-box}.qr svg{width:100%;height:100%}.big{font-size:15pt;font-weight:600;color:#7a1f2b;margin-top:2mm}.small{font-size:9pt;color:#b3a897;margin-top:8mm}</style></head>
+      <body><div class="c"><h1>${esc(state.nome || 'Il nostro menù')}</h1><p>Inquadra il codice con la fotocamera</p><div class="qr">${svg}</div><div class="big">Menù · Menu · Speisekarte</div><p>Italiano · English</p><p class="small">${esc(menuUrl())}</p></div><script>setTimeout(()=>window.print(),600)<\/script></body></html>`);
+    w.document.close();
+  };
+
+  $('#btnAddSez').onclick = () => { state.sezioni.push({ nome: { it: '', en: '' }, voci: [] }); renderSez(); refreshSide(); const inputs = document.querySelectorAll('#sezioni input[data-p="nome.it"]'); inputs[inputs.length - 1]?.focus(); };
+  $('#btnNew').onclick = () => { if (!state.sezioni.length || confirm('Svuotare il modulo?')) { state = blank(); bindTop(); renderSez(); refreshSide(); } };
+  $('#btnDemo').onclick = async () => { try { const r = await fetch('../menus/demo.json', { cache: 'no-cache' }); load(await r.json()); toast('Demo caricata'); } catch { toast('Impossibile caricare la demo'); } };
+  $('#fileIn').onchange = e => { const f = e.target.files[0]; if (!f) return; f.text().then(t => { try { load(JSON.parse(t)); toast('Menù caricato'); } catch { toast('File non valido'); } }); };
+  $('#btnPaste').onclick = () => { const t = prompt('Incolla qui il JSON del menù'); if (!t) return; try { load(JSON.parse(t)); toast('Menù caricato'); } catch { toast('JSON non valido'); } };
+
+  function load(m) {
+    const b = blank();
+    state = Object.assign(b, m);
+    ['sottotitolo', 'orari', 'avviso', 'note'].forEach(k => { if (typeof state[k] === 'string') state[k] = { it: state[k], en: '' }; state[k] = Object.assign({ it: '', en: '' }, state[k] || {}); });
+    state.lingue = state.lingue || ['it', 'en']; state.sezioni = state.sezioni || [];
+    state.sezioni.forEach(z => { if (typeof z.nome === 'string') z.nome = { it: z.nome, en: '' }; z.nome = Object.assign({ it: '', en: '' }, z.nome || {}); z.descrizione = Object.assign({ it: '', en: '' }, typeof z.descrizione === 'string' ? { it: z.descrizione } : z.descrizione || {}); z.voci = (z.voci || []).map(v => { if (typeof v.nome === 'string') v.nome = { it: v.nome, en: '' }; v.nome = Object.assign({ it: '', en: '' }, v.nome || {}); v.descrizione = Object.assign({ it: '', en: '' }, typeof v.descrizione === 'string' ? { it: v.descrizione } : v.descrizione || {}); v.prezzo = v.prezzo ?? ''; return v; }); });
+    state._idTouched = true;
+    bindTop(); renderSez(); refreshSide();
+  }
+
+  bindTop(); renderSez(); refreshSide();
+})();
+</script>
+</body>
+</html>

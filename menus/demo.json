@@ -1,0 +1,73 @@
+{
+  "id": "demo",
+  "nome": "Osteria al Portego",
+  "sottotitolo": { "it": "Cicchetti e cucina veneta dal 1987", "en": "Cicchetti and Venetian home cooking since 1987" },
+  "indirizzo": "Via del Santo 42, 35123 Padova",
+  "telefono": "+39 049 000 0000",
+  "instagram": "osteriaalportego",
+  "maps": "https://maps.google.com/?q=Via+del+Santo+42+Padova",
+  "orari": { "it": "Mar–Dom 11:00–15:00 · 18:00–24:00 · Lunedì chiuso", "en": "Tue–Sun 11am–3pm · 6pm–midnight · Closed Mondays" },
+  "wifi": "Portego_Guest · password: spritz1987",
+  "avviso": { "it": "Oggi: bigoli in salsa e baccalà mantecato con polenta.", "en": "Today: bigoli in onion-anchovy sauce and creamed cod with polenta." },
+  "coperto": "2,00",
+  "note": { "it": "* Alcuni prodotti possono essere surgelati all'origine. Per allergie e intolleranze chiedi al personale.", "en": "* Some products may be frozen at origin. Please ask our staff about allergies and intolerances." },
+  "sezioni": [
+    {
+      "nome": { "it": "Cicchetti", "en": "Cicchetti" },
+      "descrizione": { "it": "Piccoli assaggi da banco, come a Venezia.", "en": "Small bar bites, Venice-style." },
+      "voci": [
+        { "nome": { "it": "Baccalà mantecato su crostino", "en": "Creamed cod on toasted bread" }, "prezzo": "2,50", "allergeni": ["1", "4"], "tag": ["top"] },
+        { "nome": { "it": "Sarde in saor", "en": "Sweet & sour sardines with onions" }, "prezzo": "3,00", "allergeni": ["4", "8", "12"] },
+        { "nome": { "it": "Polpetta di carne", "en": "Beef meatball" }, "prezzo": "2,00", "allergeni": ["1", "3", "7"] },
+        { "nome": { "it": "Polpetta di melanzane", "en": "Aubergine ball" }, "prezzo": "2,00", "allergeni": ["1", "3", "7"], "tag": ["veg"] },
+        { "nome": { "it": "Uovo sodo con acciuga", "en": "Boiled egg with anchovy" }, "prezzo": "1,50", "allergeni": ["3", "4"] },
+        { "nome": { "it": "Mozzarella in carrozza", "en": "Fried mozzarella sandwich" }, "prezzo": "3,50", "allergeni": ["1", "3", "7"], "tag": ["veg"] }
+      ]
+    },
+    {
+      "nome": { "it": "Primi", "en": "Pasta & Rice" },
+      "voci": [
+        { "nome": { "it": "Bigoli in salsa", "en": "Bigoli with onion and anchovy sauce" }, "descrizione": { "it": "Pasta fresca, cipolla bianca di Chioggia, acciughe.", "en": "Fresh pasta, Chioggia white onion, anchovies." }, "prezzo": "12,00", "allergeni": ["1", "3", "4"], "tag": ["top"] },
+        { "nome": { "it": "Risi e bisi", "en": "Rice and peas" }, "descrizione": { "it": "Riso Vialone Nano, piselli, pancetta.", "en": "Vialone Nano rice, peas, pancetta." }, "prezzo": "11,00", "allergeni": ["7", "9"] },
+        { "nome": { "it": "Pasta e fasioi", "en": "Pasta and bean soup" }, "prezzo": "10,00", "allergeni": ["1", "9"], "tag": ["veg"] },
+        { "nome": { "it": "Gnocchi al ragù d'anatra", "en": "Gnocchi with duck ragout" }, "prezzo": "13,00", "allergeni": ["1", "3", "7", "9", "12"] }
+      ]
+    },
+    {
+      "nome": { "it": "Secondi", "en": "Mains" },
+      "voci": [
+        { "nome": { "it": "Fegato alla veneziana con polenta", "en": "Venetian-style liver with polenta" }, "prezzo": "15,00", "allergeni": ["12"] },
+        { "nome": { "it": "Baccalà alla vicentina", "en": "Vicenza-style stockfish" }, "descrizione": { "it": "Cottura lenta 4 ore, polenta abbrustolita.", "en": "Slow-cooked for 4 hours, grilled polenta." }, "prezzo": "17,00", "allergeni": ["4", "7"] },
+        { "nome": { "it": "Frittura mista dell'Adriatico", "en": "Adriatic mixed fry" }, "prezzo": "18,00", "allergeni": ["1", "2", "4", "14"], "tag": ["frozen"] },
+        { "nome": { "it": "Verdure di stagione alla griglia", "en": "Grilled seasonal vegetables" }, "prezzo": "9,00", "allergeni": [], "tag": ["vegan", "gf"] }
+      ]
+    },
+    {
+      "nome": { "it": "Dolci", "en": "Desserts" },
+      "voci": [
+        { "nome": { "it": "Tiramisù della casa", "en": "Homemade tiramisù" }, "prezzo": "6,00", "allergeni": ["1", "3", "7"] },
+        { "nome": { "it": "Zaeti con vino dolce", "en": "Cornmeal raisin biscuits with sweet wine" }, "prezzo": "5,00", "allergeni": ["1", "3", "7", "12"] },
+        { "nome": { "it": "Sorbetto al limone", "en": "Lemon sorbet" }, "prezzo": "4,50", "allergeni": [], "tag": ["vegan", "gf"] }
+      ]
+    },
+    {
+      "nome": { "it": "Vini al calice", "en": "Wines by the glass" },
+      "descrizione": { "it": "Ombra 0,1 l · Calice 0,15 l", "en": "Ombra 0.1 l · Glass 0.15 l" },
+      "voci": [
+        { "nome": { "it": "Ombra de vin (bianco o rosso)", "en": "Ombra house wine (white or red)" }, "prezzo": "2,00", "allergeni": ["12"] },
+        { "nome": { "it": "Prosecco Superiore DOCG", "en": "Prosecco Superiore DOCG" }, "prezzo": "4,50", "allergeni": ["12"] },
+        { "nome": { "it": "Raboso del Piave", "en": "Raboso del Piave" }, "prezzo": "5,00", "allergeni": ["12"] },
+        { "nome": { "it": "Colli Euganei Rosso", "en": "Colli Euganei Red" }, "prezzo": "5,00", "allergeni": ["12"], "tag": ["top"] }
+      ]
+    },
+    {
+      "nome": { "it": "Bar e aperitivi", "en": "Bar & Aperitivo" },
+      "voci": [
+        { "nome": { "it": "Spritz Aperol / Select / Campari", "en": "Spritz Aperol / Select / Campari" }, "prezzo": "4,00", "allergeni": ["12"] },
+        { "nome": { "it": "Birra alla spina 0,4 l", "en": "Draught beer 0.4 l" }, "prezzo": "5,00", "allergeni": ["1"] },
+        { "nome": { "it": "Caffè espresso", "en": "Espresso" }, "prezzo": "1,30", "allergeni": [] },
+        { "nome": { "it": "Acqua 0,75 l", "en": "Water 0.75 l" }, "prezzo": "2,50", "allergeni": [] }
+      ]
+    }
+  ]
+}
