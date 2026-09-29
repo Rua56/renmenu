@@ -2,7 +2,7 @@
 window.RENMENU = {
   brand: 'RenMenu',
   tagline: 'Il menù digitale del tuo locale, pronto in 10 minuti.',
-  contattoWhatsApp: '', // es. 393401234567 — compilare prima di pubblicare
+  contattoWhatsApp: '393515924327',
   contattoEmail: 'ciao@renmenu.it',
   logo: '<svg viewBox="0 0 32 32" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="3" width="26" height="26" rx="7"/><path d="M10 11h12M10 16h12M10 21h7"/><circle cx="21.5" cy="21" r="1.2" fill="currentColor" stroke="none"/></svg>',
   allergeni: {
@@ -19,7 +19,9 @@ window.RENMENU = {
     gf: { it: 'Senza glutine', en: 'Gluten free', icon: '🌾' },
     new: { it: 'Novità', en: 'New', icon: '✦' },
     top: { it: 'Consigliato', en: "Chef's pick", icon: '★' },
-    frozen: { it: 'Surgelato*', en: 'Frozen*', icon: '❄' }
+    frozen: { it: 'Surgelato*', en: 'Frozen*', icon: '❄' },
+    hot: { it: 'Servito caldo', en: 'Served hot', icon: '🔥' },
+    riserva: { it: 'Gran riserva', en: 'Grand reserve', icon: '♛' }
   }
 };
 

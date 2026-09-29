@@ -65,7 +65,7 @@
 <body>
 <header class="site">
   <div class="container nav">
-    <a class="brand" href="../"><span data-logo></span><span data-brand-name>RenMenu</span></a>
+    <a class="brand" href="../index.html"><span data-logo></span><span data-brand-name>RenMenu</span></a>
     <div class="nav__right">
       <button class="theme-toggle" data-theme-toggle type="button"></button>
       <a class="btn btn--ghost btn--sm" id="btnPreviewTop" href="#" target="_blank" rel="noopener">Anteprima</a>
@@ -247,8 +247,8 @@
     });
   }
 
-  function menuUrl() { const b = ($('#baseUrl').value || root).replace(/\/?$/, '/'); return `${b}menu/?m=${encodeURIComponent(state.id || 'demo')}`; }
-  function previewUrl() { const json = JSON.stringify(clean()); const b64 = btoa(unescape(encodeURIComponent(json))).replace(/\+/g, '-').replace(/\//g, '_'); return `../menu/#data=${b64}`; }
+  function menuUrl() { const b = ($('#baseUrl').value || root).replace(/\/?$/, '/'); return `${b}menu/index.html?m=${encodeURIComponent(state.id || 'demo')}`; }
+  function previewUrl() { const json = JSON.stringify(clean()); const b64 = btoa(unescape(encodeURIComponent(json))).replace(/\+/g, '-').replace(/\//g, '_'); return `../menu/index.html#data=${b64}`; }
   function makeQr(cell) { const qr = qrcode(0, 'M'); qr.addData(menuUrl()); qr.make(); return qr; }
 
   function refreshSide() {

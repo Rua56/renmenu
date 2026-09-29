@@ -6,7 +6,7 @@ Sito statico, zero backend, ospitabile gratis su GitHub Pages.
 index.html          landing page del servizio (per i ristoratori)
 menu/index.html     visualizzatore del menù: menu/?m=<id> legge menus/<id>.json
 crea/index.html     generatore: compila il menù, scarica il .json, genera QR e cartello A5
-menus/*.json        un file per locale (demo.json è l'esempio)
+menus/*.json        un file per locale (bakaro.json è il primo cliente, demo.json un esempio)
 assets/             stile, logo, helper comuni (nome brand e contatti in common.js)
 vendita/            kit di vendita: listino, script, obiezioni, zone di Padova
 ```

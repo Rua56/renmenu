@@ -1,0 +1,2342 @@
+{
+ "id": "bakaro",
+ "nome": "Al Bakaro",
+ "sottotitolo": {
+  "it": "Vino & tartine · La prima cicchetteria di Gorizia",
+  "en": "Wine & tartines · The first cicchetteria in Gorizia"
+ },
+ "indirizzo": "Piazza della Vittoria 59, 34170 Gorizia",
+ "telefono": "+39 0481 090352",
+ "instagram": "al_bakaro",
+ "maps": "https://maps.google.com/?q=Al+Bakaro+Piazza+della+Vittoria+59+Gorizia",
+ "orari": {
+  "it": "Lun 18–23 · Mar–Gio 11–14 e 18–23 · Ven–Sab 11–14 e 18–00:30 · Dom 11–16",
+  "en": "Mon 6–11pm · Tue–Thu 11am–2pm & 6–11pm · Fri–Sat 11am–2pm & 6pm–12:30am · Sun 11am–4pm"
+ },
+ "avviso": {
+  "it": "Oggi: chiedi al banco i cicchetti della settimana.",
+  "en": "Today: ask at the counter for this week's cicchetti."
+ },
+ "note": {
+  "it": "Per allergie e intolleranze chiedi al personale: gli allergeni indicati sono orientativi. Il vino è il linguaggio più antico della civiltà (Mario Soldati).",
+  "en": "Please ask our staff about allergies and intolerances; allergen numbers are indicative."
+ },
+ "lingue": [
+  "it",
+  "en"
+ ],
+ "sezioni": [
+  {
+   "nome": {
+    "it": "Bollicine — in mescita al calice",
+    "en": "Sparkling — by the glass"
+   },
+   "descrizione": {
+    "it": "Le migliori bollicine del territorio, servite al calice per esaltarne i profumi e la freschezza. Chiedici quale stappa meglio il tuo momento.",
+    "en": "The best local bubbles, served by the glass. Ask us which one suits your moment."
+   },
+   "voci": [
+    {
+     "nome": {
+      "it": "Prosecco"
+     },
+     "prezzo": "3,50",
+     "descrizione": {
+      "it": "Prosecco DOC Treviso, fresco e vivace"
+     },
+     "allergeni": [
+      "12"
+     ]
+    },
+    {
+     "nome": {
+      "it": "Ferrari Maximum"
+     },
+     "prezzo": "6,00",
+     "descrizione": {
+      "it": "Trento DOC, Chardonnay metodo classico, elegante e persistente"
+     },
+     "allergeni": [
+      "12"
+     ]
+    },
+    {
+     "nome": {
+      "it": "Ribolla Gialla Spumantizzata"
+     },
+     "prezzo": "5,00",
+     "descrizione": {
+      "it": "Collio, bollicine fini e profumate, metodo classico"
+     },
+     "allergeni": [
+      "12"
+     ]
+    },
+    {
+     "nome": {
+      "it": "Rosé"
+     },
+     "prezzo": "6,00",
+     "descrizione": {
+      "it": "Oltrepò Pavese, Pinot Nero vinificato in rosé, fruttato e fresco"
+     },
+     "allergeni": [
+      "12"
+     ]
+    }
+   ]
+  },
+  {
+   "nome": {
+    "it": "Bollicine — in bottiglia",
+    "en": "Sparkling — bottles"
+   },
+   "descrizione": {
+    "it": "Dal Prosecco al Trentodoc Ferrari, dalla Franciacorta allo Champagne. Per chi vuole rendere speciale la serata — basta chiedere.",
+    "en": "From Prosecco to Ferrari Trentodoc, Franciacorta and Champagne."
+   },
+   "voci": [
+    {
+     "nome": {
+      "it": "Prosecco L'Infedele"
+     },
+     "prezzo": "24,00",
+     "descrizione": {
+      "it": "Treviso, Glera in purezza, fresco e fruttato, perlage vivace e persistente"
+     },
+     "allergeni": [
+      "12"
+     ]
+    },
+    {
+     "nome": {
+      "it": "Ferrari Maximum"
+     },
+     "prezzo": "40,00",
+     "descrizione": {
+      "it": "Trentodoc, Chardonnay 100%, 36 mesi sui lieviti, mela matura e crosta di pane"
+     },
+     "allergeni": [
+      "12"
+     ]
+    },
+    {
+     "nome": {
+      "it": "Ferrari Perlè"
+     },
+     "prezzo": "60,00",
+     "descrizione": {
+      "it": "Trentodoc millesimato, 54 mesi sui lieviti, fiori di mandorlo e mela renetta, icona italiana"
+     },
+     "allergeni": [
+      "12"
+     ],
+     "tag": [
+      "riserva"
+     ]
+    },
+    {
+     "nome": {
+      "it": "Ribolla Gialla Spumantizzata"
+     },
+     "prezzo": "35,00",
+     "descrizione": {
+      "it": "Collio, Metodo Classico, fresco e sapido, mineralita tipica della Ponca"
+     },
+     "allergeni": [
+      "12"
+     ]
+    },
+    {
+     "nome": {
+      "it": "Rosé"
+     },
+     "prezzo": "40,00",
+     "descrizione": {
+      "it": "Oltrepo Pavese DOCG Cruase, Pinot Nero, 36 mesi sui lieviti, perlage finissimo"
+     },
+     "allergeni": [
+      "12"
+     ]
+    },
+    {
+     "nome": {
+      "it": "Trentodoc"
+     },
+     "prezzo": "40,00",
+     "descrizione": {
+      "it": "Trentino, Chardonnay, vigneti tra 450-600m, pesca e mela, fresco e armonioso"
+     },
+     "allergeni": [
+      "12"
+     ]
+    },
+    {
+     "nome": {
+      "it": "Amadeus"
+     },
+     "prezzo": "50,00",
+     "descrizione": {
+      "it": "Friuli, Metodo Classico, Chardonnay e Pinot Nero, floreale e agrumato, minerale"
+     },
+     "allergeni": [
+      "12"
+     ],
+     "tag": [
+      "riserva"
+     ]
+    },
+    {
+     "nome": {
+      "it": "Franciacorta Cuvée Prestige"
+     },
+     "prezzo": "60,00",
+     "descrizione": {
+      "it": "Franciacorta DOCG, Chardonnay 75%, 28 mesi sui lieviti, pesca agrumi e mandorla"
+     },
+     "allergeni": [
+      "12"
+     ],
+     "tag": [
+      "riserva"
+     ]
+    },
+    {
+     "nome": {
+      "it": "Franciacorta Dosage Zero"
+     },
+     "prezzo": "80,00",
+     "descrizione": {
+      "it": "Franciacorta DOCG millesimato, 48 mesi sui lieviti, senza zucchero aggiunto, puro e minerale"
+     },
+     "allergeni": [
+      "12"
+     ],
+     "tag": [
+      "riserva"
+     ]
+    },
+    {
+     "nome": {
+      "it": "Champagne Perrier-Jouet Grand Brut"
+     },
+     "prezzo": "120,00",
+     "descrizione": {
+      "it": "Epernay, Chardonnay-Pinot Nero-Meunier, floreale e fresco, eleganza della Champagne"
+     },
+     "allergeni": [
+      "12"
+     ],
+     "tag": [
+      "riserva"
+     ]
+    }
+   ]
+  },
+  {
+   "nome": {
+    "it": "Vini Bianchi — in mescita al calice",
+    "en": "White wines — by the glass"
+   },
+   "descrizione": {
+    "it": "Ponca, Carso, Isonzo — ogni calice racconta un terroir preciso. Bianchi con carattere, scelti uno a uno.",
+    "en": "Ponca, Karst, Isonzo: every glass tells a precise terroir."
+   },
+   "voci": [
+    {
+     "nome": {
+      "it": "Pinot Bianco"
+     },
+     "prezzo": "6,00",
+     "descrizione": {
+      "it": "Friuli Collio, fresco e minerale"
+     },
+     "allergeni": [
+      "12"
+     ]
+    },
+    {
+     "nome": {
+      "it": "Chardonnay"
+     },
+     "prezzo": "5,50",
+     "descrizione": {
+      "it": "Friuli Collio, elegante con note di frutta gialla"
+     },
+     "allergeni": [
+      "12"
+     ]
+    },
+    {
+     "nome": {
+      "it": "Ribolla Gialla"
+     },
+     "prezzo": "5,00",
+     "descrizione": {
+      "it": "Collio Goriziano, vivace e sapido"
+     },
+     "allergeni": [
+      "12"
+     ]
+    },
+    {
+     "nome": {
+      "it": "Malvasia"
+     },
+     "prezzo": "5,00",
+     "descrizione": {
+      "it": "Collio Goriziano, profumata e aromatica"
+     },
+     "allergeni": [
+      "12"
+     ]
+    },
+    {
+     "nome": {
+      "it": "Kerner"
+     },
+     "prezzo": "4,50",
+     "descrizione": {
+      "it": "Alto Adige, floreale con acidità fine"
+     },
+     "allergeni": [
+      "12"
+     ]
+    },
+    {
+     "nome": {
+      "it": "Vitovska"
+     },
+     "prezzo": "4,50",
+     "descrizione": {
+      "it": "Carso triestino, carattere unico e salino"
+     },
+     "allergeni": [
+      "12"
+     ]
+    },
+    {
+     "nome": {
+      "it": "Sauvignon"
+     },
+     "prezzo": "5,50",
+     "descrizione": {
+      "it": "Collio, erbaceo con note di passion fruit"
+     },
+     "allergeni": [
+      "12"
+     ]
+    },
+    {
+     "nome": {
+      "it": "Pinot Grigio"
+     },
+     "prezzo": "5,00",
+     "descrizione": {
+      "it": "Collio DOC, strutturato e persistente"
+     },
+     "allergeni": [
+      "12"
+     ]
+    },
+    {
+     "nome": {
+      "it": "Friulano"
+     },
+     "prezzo": "5,00",
+     "descrizione": {
+      "it": "Collio DOC, mandorlato con finale lungo"
+     },
+     "allergeni": [
+      "12"
+     ]
+    },
+    {
+     "nome": {
+      "it": "Zibibbo"
+     },
+     "prezzo": "4,00",
+     "descrizione": {
+      "it": "Sicilia, dolce e aromatico, note di albicocca"
+     },
+     "allergeni": [
+      "12"
+     ]
+    }
+   ]
+  },
+  {
+   "nome": {
+    "it": "Vini Bianchi — in bottiglia",
+    "en": "White wines — bottles"
+   },
+   "descrizione": {
+    "it": "31 etichette selezionate: dagli autoctoni friulani ai vini naturali, dagli orange wine ai grandi bianchi di Movia e Radikon. Se hai un dubbio, parliamone.",
+    "en": "31 labels: Friulian natives, natural and orange wines, great whites from Movia and Radikon."
+   },
+   "voci": [
+    {
+     "nome": {
+      "it": "Pinot Bianco"
+     },
+     "prezzo": "40,00",
+     "descrizione": {
+      "it": "Collio, paglierino intenso, crosta di pane e frutta, sorso caldo e strutturato"
+     },
+     "allergeni": [
+      "12"
+     ]
+    },
+    {
+     "nome": {
+      "it": "Chardonnay"
+     },
+     "prezzo": "35,00",
+     "descrizione": {
+      "it": "Collio, fruttato e fresco, note di mela verde e banana, buona struttura"
+     },
+     "allergeni": [
+      "12"
+     ]
+    },
+    {
+     "nome": {
+      "it": "Ribolla Gialla"
+     },
+     "prezzo": "33,00",
+     "descrizione": {
+      "it": "Collio, agrumi e pesca, fresca e sapida, mineralità tipica della Ponca"
+     },
+     "allergeni": [
+      "12"
+     ]
+    },
+    {
+     "nome": {
+      "it": "Malvasia"
+     },
+     "prezzo": "33,00",
+     "descrizione": {
+      "it": "Collio, aromatica, fiori di tiglio e albicocca, sapida e minerale"
+     },
+     "allergeni": [
+      "12"
+     ]
+    },
+    {
+     "nome": {
+      "it": "Sauvignon"
+     },
+     "prezzo": "35,00",
+     "descrizione": {
+      "it": "Collio, sambuco e passion fruit, erbaceo e intenso su suoli di Ponca"
+     },
+     "allergeni": [
+      "12"
+     ]
+    },
+    {
+     "nome": {
+      "it": "Collio"
+     },
+     "prezzo": "35,00",
+     "descrizione": {
+      "it": "Blend Friulano, Ribolla e Malvasia, profondo e sapido, frutta gialla e agrumi"
+     },
+     "allergeni": [
+      "12"
+     ]
+    },
+    {
+     "nome": {
+      "it": "Malvasia"
+     },
+     "prezzo": "33,00",
+     "descrizione": {
+      "it": "Collio, vigne over 50 anni, floreale e minerale, fresco e sapido"
+     },
+     "allergeni": [
+      "12"
+     ]
+    },
+    {
+     "nome": {
+      "it": "Malvasia"
+     },
+     "prezzo": "33,00",
+     "descrizione": {
+      "it": "Collio, profumo intenso fruttato, gusto ricco e sapido, lunga persistenza"
+     },
+     "allergeni": [
+      "12"
+     ]
+    },
+    {
+     "nome": {
+      "it": "Monblanc"
+     },
+     "prezzo": "26,00",
+     "descrizione": {
+      "it": "Blend friulano Ribolla-Friulano-Malvasia, il mio bianco, fresco e minerale"
+     },
+     "allergeni": [
+      "12"
+     ]
+    },
+    {
+     "nome": {
+      "it": "Rassauer Friulano"
+     },
+     "prezzo": "33,00",
+     "descrizione": {
+      "it": "Collio, mela e pera, vellutato e fresco, lunga persistenza aromatica"
+     },
+     "allergeni": [
+      "12"
+     ]
+    },
+    {
+     "nome": {
+      "it": "Yellow Hills Ribolla Gialla"
+     },
+     "prezzo": "33,00",
+     "descrizione": {
+      "it": "Collio, fiori bianchi e agrumi, fresco e minerale, bevibilità elegante"
+     },
+     "allergeni": [
+      "12"
+     ]
+    },
+    {
+     "nome": {
+      "it": "La Tournée Vermentino-Viognier"
+     },
+     "prezzo": "29,00",
+     "descrizione": {
+      "it": "Blend mediterraneo, floreale e fruttato, note di pesca e fiori bianchi"
+     },
+     "allergeni": [
+      "12"
+     ]
+    },
+    {
+     "nome": {
+      "it": "Viognier in purezza"
+     },
+     "prezzo": "29,00",
+     "descrizione": {
+      "it": "Albicocca, pesca bianca e fiori di acacia, ricco e avvolgente"
+     },
+     "allergeni": [
+      "12"
+     ]
+    },
+    {
+     "nome": {
+      "it": "Chardonnay 2024"
+     },
+     "prezzo": "50,00",
+     "descrizione": {
+      "it": "Borgogna, elegante e complesso, burro e frutta tropicale, grande struttura"
+     },
+     "allergeni": [
+      "12"
+     ],
+     "tag": [
+      "riserva"
+     ]
+    },
+    {
+     "nome": {
+      "it": "Pinot Grigio Ramato"
+     },
+     "prezzo": "33,00",
+     "descrizione": {
+      "it": "Friuli, color rame, ricco e strutturato, frutta matura e note speziate"
+     },
+     "allergeni": [
+      "12"
+     ]
+    },
+    {
+     "nome": {
+      "it": "Somnja Malvasia"
+     },
+     "prezzo": "33,00",
+     "descrizione": {
+      "it": "Friuli, aromatica e sapida, note floreali e di agrumi, fresca mineralità"
+     },
+     "allergeni": [
+      "12"
+     ]
+    },
+    {
+     "nome": {
+      "it": "Friulano"
+     },
+     "prezzo": "33,00",
+     "descrizione": {
+      "it": "Friuli, mela e pera, note ammandorlate, pieno e armonico"
+     },
+     "allergeni": [
+      "12"
+     ]
+    },
+    {
+     "nome": {
+      "it": "Ribolla Gialla Riserva Orange"
+     },
+     "prezzo": "70,00",
+     "descrizione": {
+      "it": "Oslavia, macerazione sulle bucce 4 settimane, ambrato e tannico, orange wine"
+     },
+     "allergeni": [
+      "12"
+     ],
+     "tag": [
+      "riserva"
+     ]
+    },
+    {
+     "nome": {
+      "it": "Pinot Grigio Riserva Orange"
+     },
+     "prezzo": "70,00",
+     "descrizione": {
+      "it": "Collio, macerazione sulle bucce, color ramato, strutturato e minerale"
+     },
+     "allergeni": [
+      "12"
+     ],
+     "tag": [
+      "riserva"
+     ]
+    },
+    {
+     "nome": {
+      "it": "Friulano Riserva Orange"
+     },
+     "prezzo": "70,00",
+     "descrizione": {
+      "it": "Collio, skin contact, dorato e intenso, frutta matura e note di miele"
+     },
+     "allergeni": [
+      "12"
+     ],
+     "tag": [
+      "riserva"
+     ]
+    },
+    {
+     "nome": {
+      "it": "Radikon Pop"
+     },
+     "prezzo": "50,00",
+     "descrizione": {
+      "it": "Oslavia, Ribolla-Malvasia-Friulano, vino naturale, ambrato e sapido"
+     },
+     "allergeni": [
+      "12"
+     ],
+     "tag": [
+      "riserva"
+     ]
+    },
+    {
+     "nome": {
+      "it": "Čotar Gorjansko"
+     },
+     "prezzo": "50,00",
+     "descrizione": {
+      "it": "Carso sloveno, Malvasia e Vitovska, artigianale e autentico, sapido e minerale"
+     },
+     "allergeni": [
+      "12"
+     ],
+     "tag": [
+      "riserva"
+     ]
+    },
+    {
+     "nome": {
+      "it": "Tagòs Grillo Dolce"
+     },
+     "prezzo": "40,00",
+     "descrizione": {
+      "it": "Sicilia, Grillo appassito, dolce naturale, frutta candita e miele"
+     },
+     "allergeni": [
+      "12"
+     ]
+    },
+    {
+     "nome": {
+      "it": "C.A.I. Riesling"
+     },
+     "prezzo": "50,00",
+     "descrizione": {
+      "it": "Mosella, suoli ardesia ripidi, mela verde e lime, acido e salino, fermentazione spontanea"
+     },
+     "allergeni": [
+      "12"
+     ],
+     "tag": [
+      "riserva"
+     ]
+    },
+    {
+     "nome": {
+      "it": "Gewurztraminer"
+     },
+     "prezzo": "29,00",
+     "descrizione": {
+      "it": "Trentino, rosa e litchi, speziato e avvolgente, classico aromatico alpino"
+     },
+     "allergeni": [
+      "12"
+     ]
+    },
+    {
+     "nome": {
+      "it": "Gredič Friulano"
+     },
+     "prezzo": "50,00",
+     "descrizione": {
+      "it": "Brda sloveno, biodinamico, frutta gialla e fiori, finale ammandorlato"
+     },
+     "allergeni": [
+      "12"
+     ],
+     "tag": [
+      "riserva"
+     ]
+    },
+    {
+     "nome": {
+      "it": "Veliko"
+     },
+     "prezzo": "60,00",
+     "descrizione": {
+      "it": "Blend Ribolla-Sauvignon-Chardonnay, biodinamico, complesso e minerale"
+     },
+     "allergeni": [
+      "12"
+     ],
+     "tag": [
+      "riserva"
+     ]
+    },
+    {
+     "nome": {
+      "it": "Pinot Grigio"
+     },
+     "prezzo": "60,00",
+     "descrizione": {
+      "it": "Brda sloveno, biodinamico, affinato in botte, fruttato e minerale, senza filtrazioni"
+     },
+     "allergeni": [
+      "12"
+     ],
+     "tag": [
+      "riserva"
+     ]
+    },
+    {
+     "nome": {
+      "it": "Lillo Grillo"
+     },
+     "prezzo": "26,00",
+     "descrizione": {
+      "it": "Sicilia, Grillo fresco e sapido, agrumi e mandorla, bevibile e diretto"
+     },
+     "allergeni": [
+      "12"
+     ]
+    },
+    {
+     "nome": {
+      "it": "Bibbo Zibibbo"
+     },
+     "prezzo": "26,00",
+     "descrizione": {
+      "it": "Sicilia, Zibibbo aromatico, albicocca e fichi, dolce naturale di grande personalità"
+     },
+     "allergeni": [
+      "12"
+     ]
+    },
+    {
+     "nome": {
+      "it": "Kerner"
+     },
+     "prezzo": "29,00",
+     "descrizione": {
+      "it": "Valle Isarco, alta quota, pesca alpina e fiori di montagna, fresco e aromatico"
+     },
+     "allergeni": [
+      "12"
+     ]
+    }
+   ]
+  },
+  {
+   "nome": {
+    "it": "Vini Rossi — in mescita al calice",
+    "en": "Red wines — by the glass"
+   },
+   "descrizione": {
+    "it": "Dal Terrano carsico al Refosco friulano, fino alle interpretazioni del sud. Rossi con spigoli e profumo — non vini gentili.",
+    "en": "From Karst Terrano to Friulian Refosco, down to the South."
+   },
+   "voci": [
+    {
+     "nome": {
+      "it": "Cabernet Franc"
+     },
+     "prezzo": "5,00",
+     "descrizione": {
+      "it": "Carso, speziato con note di peperone verde"
+     },
+     "allergeni": [
+      "12"
+     ]
+    },
+    {
+     "nome": {
+      "it": "Cabernet Sauvignon"
+     },
+     "prezzo": "4,50",
+     "descrizione": {
+      "it": "Collio DOC, tannico ed elegante"
+     },
+     "allergeni": [
+      "12"
+     ]
+    },
+    {
+     "nome": {
+      "it": "Pinot Nero"
+     },
+     "prezzo": "6,00",
+     "descrizione": {
+      "it": "Isonzo del Friuli, finezza e frutti rossi"
+     },
+     "allergeni": [
+      "12"
+     ]
+    },
+    {
+     "nome": {
+      "it": "Sassirossi"
+     },
+     "prezzo": "6,00",
+     "descrizione": {
+      "it": "Isonzo, blend rosso corposo e avvolgente"
+     },
+     "allergeni": [
+      "12"
+     ]
+    },
+    {
+     "nome": {
+      "it": "Schiava"
+     },
+     "prezzo": "4,50",
+     "descrizione": {
+      "it": "Alto Adige, leggero e scorrevole, note di lampone"
+     },
+     "allergeni": [
+      "12"
+     ]
+    },
+    {
+     "nome": {
+      "it": "Primitivo di Manduria"
+     },
+     "prezzo": "4,50",
+     "descrizione": {
+      "it": "Puglia DOC, potente e vellutato, frutti neri maturi"
+     },
+     "allergeni": [
+      "12"
+     ]
+    },
+    {
+     "nome": {
+      "it": "Malvasia Nera"
+     },
+     "prezzo": "4,50",
+     "descrizione": {
+      "it": "Salento IGT, morbido con note di prugna e spezie"
+     },
+     "allergeni": [
+      "12"
+     ]
+    }
+   ]
+  },
+  {
+   "nome": {
+    "it": "Vini Rossi — in bottiglia",
+    "en": "Red wines — bottles"
+   },
+   "descrizione": {
+    "it": "8 etichette rosse in bottiglia: dal Carso alla Toscana di Antinori, passando per Isonzo, Alto Adige e Puglia. Ogni bottiglia ha una storia — chiedila.",
+    "en": "8 red labels: Karst, Isonzo, Alto Adige, Puglia and Antinori's Tuscany."
+   },
+   "voci": [
+    {
+     "nome": {
+      "it": "Cabernet Franc"
+     },
+     "prezzo": "33,00",
+     "descrizione": {
+      "it": "Carso DOC, speziato e complesso, salvia e alloro, 2 anni in barrique"
+     },
+     "allergeni": [
+      "12"
+     ]
+    },
+    {
+     "nome": {
+      "it": "Cabernet Sauvignon"
+     },
+     "prezzo": "29,00",
+     "descrizione": {
+      "it": "Collio, ribes nero e more, speziato e tannico, affinato nelle cantine medievali"
+     },
+     "allergeni": [
+      "12"
+     ]
+    },
+    {
+     "nome": {
+      "it": "Pinot Nero"
+     },
+     "prezzo": "40,00",
+     "descrizione": {
+      "it": "Isonzo, elegante e fine, frutti rossi di bosco e viola, terreni ghiaiosi minerali"
+     },
+     "allergeni": [
+      "12"
+     ]
+    },
+    {
+     "nome": {
+      "it": "Sassirossi"
+     },
+     "prezzo": "35,00",
+     "descrizione": {
+      "it": "Isonzo, Merlot e Cabernet, argille rosse, tannini morbidi e lunga persistenza"
+     },
+     "allergeni": [
+      "12"
+     ]
+    },
+    {
+     "nome": {
+      "it": "Schiava"
+     },
+     "prezzo": "29,00",
+     "descrizione": {
+      "it": "Alto Adige, rubino chiaro, ciliegia e viola, leggero e scorrevole, anche leggermente fresco"
+     },
+     "allergeni": [
+      "12"
+     ]
+    },
+    {
+     "nome": {
+      "it": "Primitivo di Manduria"
+     },
+     "prezzo": "29,00",
+     "descrizione": {
+      "it": "Puglia, caldo e avvolgente, frutti rossi in confettura, 14 mesi in tonneau"
+     },
+     "allergeni": [
+      "12"
+     ]
+    },
+    {
+     "nome": {
+      "it": "Malvasia Nera"
+     },
+     "prezzo": "29,00",
+     "descrizione": {
+      "it": "Salento, more e gelsi maturi, spezie dolci, tannini setosi e finale lungo"
+     },
+     "allergeni": [
+      "12"
+     ]
+    },
+    {
+     "nome": {
+      "it": "Chianti Classico"
+     },
+     "prezzo": "40,00",
+     "descrizione": {
+      "it": "Toscana, Sangiovese 90%, frutti rossi e spezie, tannini morbidi, Tenuta Tignanello"
+     },
+     "allergeni": [
+      "12"
+     ]
+    }
+   ]
+  },
+  {
+   "nome": {
+    "it": "Aperitivi",
+    "en": "Aperitivo"
+   },
+   "descrizione": {
+    "it": "L'aperitivo è un rito. Da noi lo celebriamo con Prosecco, spiriti selezionati e miscelazione artigianale. Siediti, rilassati — il resto lo facciamo noi.",
+    "en": "Prosecco, selected spirits and handmade mixing. Sit down, relax."
+   },
+   "voci": [
+    {
+     "nome": {
+      "it": "Spritz Bianco"
+     },
+     "prezzo": "2,50",
+     "descrizione": {
+      "it": "Vino bianco e soda"
+     }
+    },
+    {
+     "nome": {
+      "it": "Spritz Rosso"
+     },
+     "prezzo": "2,50",
+     "descrizione": {
+      "it": "Vino rosso e soda"
+     }
+    },
+    {
+     "nome": {
+      "it": "Spritz Aperol"
+     },
+     "prezzo": "5,00",
+     "descrizione": {
+      "it": "Prosecco, Aperol e soda"
+     }
+    },
+    {
+     "nome": {
+      "it": "Spritz Campari"
+     },
+     "prezzo": "5,00",
+     "descrizione": {
+      "it": "Prosecco, Campari e soda"
+     }
+    },
+    {
+     "nome": {
+      "it": "Spritz Select"
+     },
+     "prezzo": "5,00",
+     "descrizione": {
+      "it": "Prosecco, Select e soda — il classico veneziano"
+     }
+    },
+    {
+     "nome": {
+      "it": "Spritz Sarti"
+     },
+     "prezzo": "5,00",
+     "descrizione": {
+      "it": "Prosecco, Sarti Romeo e soda"
+     }
+    },
+    {
+     "nome": {
+      "it": "Spritz Hugo"
+     },
+     "prezzo": "5,00",
+     "descrizione": {
+      "it": "Prosecco, sciroppo di sambuco, menta e soda"
+     }
+    },
+    {
+     "nome": {
+      "it": "Spritz Limoncello"
+     },
+     "prezzo": "5,00",
+     "descrizione": {
+      "it": "Prosecco, Limoncello e soda"
+     }
+    },
+    {
+     "nome": {
+      "it": "Spritz Cynar"
+     },
+     "prezzo": "5,00",
+     "descrizione": {
+      "it": "Prosecco, Cynar e soda — amaro e rinfrescante"
+     }
+    },
+    {
+     "nome": {
+      "it": "Spritz Nonino"
+     },
+     "prezzo": "5,00",
+     "descrizione": {
+      "it": "Prosecco, Amaro Nonino e soda"
+     }
+    },
+    {
+     "nome": {
+      "it": "Aperitivo Nonino"
+     },
+     "prezzo": "5,00",
+     "descrizione": {
+      "it": "Aperitivo Nonino Botanical e tonica"
+     }
+    },
+    {
+     "nome": {
+      "it": "Pimm's N°1"
+     },
+     "prezzo": "8,00",
+     "descrizione": {
+      "it": "Con ginger ale, fetta di mela verde, cetriolo e scorza di limone"
+     }
+    }
+   ]
+  },
+  {
+   "nome": {
+    "it": "Birre",
+    "en": "Beers"
+   },
+   "descrizione": {
+    "it": "Le lager classiche per chi sa cosa vuole, le Antikorpo artigianali per chi vuole scoprire qualcosa. Tutte fredde, tutte servite come meritano.",
+    "en": "Classic lagers and Antikorpo craft beers. All cold."
+   },
+   "voci": [
+    {
+     "nome": {
+      "it": "Moretti Grande"
+     },
+     "prezzo": "5,00",
+     "descrizione": {
+      "it": "Birra lager italiana, 66 cl"
+     },
+     "allergeni": [
+      "1"
+     ]
+    },
+    {
+     "nome": {
+      "it": "Moretti Piccola"
+     },
+     "prezzo": "3,00",
+     "descrizione": {
+      "it": "Birra lager italiana, 33 cl"
+     },
+     "allergeni": [
+      "1"
+     ]
+    },
+    {
+     "nome": {
+      "it": "Messina Cristalli di Sale Grande"
+     },
+     "prezzo": "5,50",
+     "descrizione": {
+      "it": "Birra siciliana con cristalli di sale marino, 66 cl"
+     },
+     "allergeni": [
+      "1"
+     ]
+    },
+    {
+     "nome": {
+      "it": "Messina Cristalli di Sale Piccola"
+     },
+     "prezzo": "3,50",
+     "descrizione": {
+      "it": "Birra siciliana con cristalli di sale marino, 33 cl"
+     },
+     "allergeni": [
+      "1"
+     ]
+    },
+    {
+     "nome": {
+      "it": "Antikorpo IPA"
+     },
+     "prezzo": "5,00",
+     "descrizione": {
+      "it": "Birra artigianale, India Pale Ale, luppolata e amara"
+     },
+     "allergeni": [
+      "1"
+     ]
+    },
+    {
+     "nome": {
+      "it": "Antikorpo Pale Ale"
+     },
+     "prezzo": "5,00",
+     "descrizione": {
+      "it": "Birra artigianale, Pale Ale, equilibrata e aromatica"
+     },
+     "allergeni": [
+      "1"
+     ]
+    },
+    {
+     "nome": {
+      "it": "Antikorpo Blanche"
+     },
+     "prezzo": "5,00",
+     "descrizione": {
+      "it": "Birra artigianale di frumento, speziata con coriandolo e scorza d'arancia"
+     },
+     "allergeni": [
+      "1"
+     ]
+    },
+    {
+     "nome": {
+      "it": "Antikorpo Bitter"
+     },
+     "prezzo": "5,00",
+     "descrizione": {
+      "it": "Birra artigianale, amara e complessa con note tostate"
+     },
+     "allergeni": [
+      "1"
+     ]
+    },
+    {
+     "nome": {
+      "it": "Heineken 0 Alcol"
+     },
+     "prezzo": "3,50",
+     "descrizione": {
+      "it": "Birra senza alcol, fresca e dissetante"
+     },
+     "allergeni": [
+      "1"
+     ]
+    }
+   ]
+  },
+  {
+   "nome": {
+    "it": "Cocktails",
+    "en": "Cocktails"
+   },
+   "descrizione": {
+    "it": "Classici della miscelazione reinterpretati con cura. Ogni drink è un piccolo viaggio. Se hai un'idea in testa, prova a descrivercela.",
+    "en": "Mixology classics, reinterpreted with care."
+   },
+   "voci": [
+    {
+     "nome": {
+      "it": "Gin Tonic"
+     },
+     "prezzo": "",
+     "descrizione": {
+      "it": "Prezzo in base al gin scelto, vedi lista gin",
+      "en": "Price depends on the gin, see gin list"
+     }
+    },
+    {
+     "nome": {
+      "it": "Gin Lemon"
+     },
+     "prezzo": "",
+     "descrizione": {
+      "it": "Prezzo in base al gin scelto, vedi lista gin",
+      "en": "Price depends on the gin, see gin list"
+     }
+    },
+    {
+     "nome": {
+      "it": "Americano"
+     },
+     "prezzo": "7,00",
+     "descrizione": {
+      "it": "Campari, vermouth rosso, soda e scorza d'arancia"
+     }
+    },
+    {
+     "nome": {
+      "it": "Sbagliato"
+     },
+     "prezzo": "7,00",
+     "descrizione": {
+      "it": "Campari, vermouth rosso e Prosecco"
+     }
+    },
+    {
+     "nome": {
+      "it": "Negroni"
+     },
+     "prezzo": "8,00",
+     "descrizione": {
+      "it": "Gin, Campari, vermouth rosso — il grande classico"
+     }
+    },
+    {
+     "nome": {
+      "it": "Negrosky"
+     },
+     "prezzo": "8,00",
+     "descrizione": {
+      "it": "Vodka, Campari, vermouth rosso"
+     }
+    },
+    {
+     "nome": {
+      "it": "Mi-To"
+     },
+     "prezzo": "7,00",
+     "descrizione": {
+      "it": "Campari e vermouth di Torino — Milano-Torino"
+     }
+    },
+    {
+     "nome": {
+      "it": "Mojito"
+     },
+     "prezzo": "7,00",
+     "descrizione": {
+      "it": "Rum bianco, menta fresca, lime, zucchero di canna, soda"
+     }
+    },
+    {
+     "nome": {
+      "it": "Piña Colada"
+     },
+     "prezzo": "8,00",
+     "descrizione": {
+      "it": "Rum, succo di ananas, crema di cocco"
+     }
+    },
+    {
+     "nome": {
+      "it": "Caipiroska"
+     },
+     "prezzo": "8,00",
+     "descrizione": {
+      "it": "Vodka, lime fresco e zucchero di canna"
+     }
+    }
+   ]
+  },
+  {
+   "nome": {
+    "it": "Lista dei Gin",
+    "en": "Gin list"
+   },
+   "descrizione": {
+    "it": "Una collezione di gin da tutto il mondo — dai London Dry ai botanici più esotici. Non sai da dove iniziare? Dicci cosa ti piace e costruiamo insieme il tuo G&T.",
+    "en": "Gins from all over the world, from London Dry to exotic botanicals."
+   },
+   "voci": [
+    {
+     "nome": {
+      "it": "Broker's"
+     },
+     "prezzo": "6,00",
+     "descrizione": {
+      "it": "London Dry Gin, classico e bilanciato"
+     }
+    },
+    {
+     "nome": {
+      "it": "Tanqueray"
+     },
+     "prezzo": "7,00",
+     "descrizione": {
+      "it": "London Dry, note di ginepro e coriandolo"
+     }
+    },
+    {
+     "nome": {
+      "it": "Bulldog"
+     },
+     "prezzo": "8,00",
+     "descrizione": {
+      "it": "Botaniche esotiche, morbido e versatile"
+     }
+    },
+    {
+     "nome": {
+      "it": "Malfy"
+     },
+     "prezzo": "8,00",
+     "descrizione": {
+      "it": "Gin italiano, limoni costiera, fresco e agrumato"
+     }
+    },
+    {
+     "nome": {
+      "it": "Hendricks"
+     },
+     "prezzo": "8,00",
+     "descrizione": {
+      "it": "Cetriolo e rosa, elegante e inconfondibile"
+     }
+    },
+    {
+     "nome": {
+      "it": "Hendricks Gran Cabaret"
+     },
+     "prezzo": "10,00",
+     "descrizione": {
+      "it": "Edizione speciale, note floreali e speziate"
+     }
+    },
+    {
+     "nome": {
+      "it": "Gin Mare"
+     },
+     "prezzo": "12,00",
+     "descrizione": {
+      "it": "Gin mediterraneo, oliva, basilico e timo"
+     }
+    },
+    {
+     "nome": {
+      "it": "Portofino"
+     },
+     "prezzo": "12,00",
+     "descrizione": {
+      "it": "Botaniche della Riviera Ligure, floreale e fresco"
+     }
+    },
+    {
+     "nome": {
+      "it": "Porcelain"
+     },
+     "prezzo": "12,00",
+     "descrizione": {
+      "it": "Shanghai Dry Gin al mandarino, botaniche orientali esotiche"
+     }
+    },
+    {
+     "nome": {
+      "it": "Monkey 47"
+     },
+     "prezzo": "14,00",
+     "descrizione": {
+      "it": "Schwarzwald, 47 botaniche, complesso e aromatico"
+     }
+    },
+    {
+     "nome": {
+      "it": "Condesa"
+     },
+     "prezzo": "14,00",
+     "descrizione": {
+      "it": "Gin messicano, agave e fiori di ibisco"
+     }
+    }
+   ]
+  },
+  {
+   "nome": {
+    "it": "Cicchetti della Settimana",
+    "en": "This week's cicchetti"
+   },
+   "descrizione": {
+    "it": "Quello che trovi oggi in vetrina — cambia ogni settimana con la stagione e con quello che ci ha convinto al mercato. Chiedi se vuoi sapere cosa c'è appena arrivato.",
+    "en": "What you find in the counter today. It changes every week with the season and the market."
+   },
+   "voci": [
+    {
+     "nome": {
+      "it": "Crudo San Daniele",
+      "en": "San Daniele raw ham"
+     },
+     "prezzo": "2,00",
+     "descrizione": {
+      "it": "Diciotto mesi di stagionatura nell'aria dolce del Friuli — si scioglie sul pane, lascia un profumo lungo.",
+      "en": "18-month cured ham from Friuli: it melts on the bread and leaves a long scent."
+     },
+     "allergeni": [
+      "1"
+     ],
+     "tag": [
+      "new"
+     ]
+    },
+    {
+     "nome": {
+      "it": "Cotto e Kren",
+      "en": "Cooked ham & horseradish"
+     },
+     "prezzo": "2,00",
+     "descrizione": {
+      "it": "Il kren fresco pizzica, il cotto ammorbidisce — un contrasto che qui al confine ha senso da sempre.",
+      "en": "Fresh horseradish stings, cooked ham softens: a border-country contrast."
+     },
+     "allergeni": [
+      "1"
+     ],
+     "tag": [
+      "new"
+     ]
+    },
+    {
+     "nome": {
+      "it": "Mortadella, Burrata e Pistacchio",
+      "en": "Mortadella, burrata & pistachio"
+     },
+     "prezzo": "2,00",
+     "descrizione": {
+      "it": "La grassezza setosa della mortadella incontra la burrata che cola — il pistacchio rompe tutto con un crunch verde.",
+      "en": "Silky mortadella meets oozing burrata; pistachio adds a green crunch."
+     },
+     "allergeni": [
+      "1",
+      "7",
+      "8"
+     ],
+     "tag": [
+      "new"
+     ]
+    },
+    {
+     "nome": {
+      "it": "Lardo di Patanegra",
+      "en": "Pata Negra lardo"
+     },
+     "prezzo": "3,00",
+     "descrizione": {
+      "it": "Lardo di Patanegra: si deposita sul pane caldo e si trasforma — non grasso, ma profumo di ghianda e montagna iberica.",
+      "en": "Iberian lardo melting on warm bread: acorn and mountain scents, not fat."
+     },
+     "allergeni": [
+      "1"
+     ],
+     "tag": [
+      "new"
+     ]
+    },
+    {
+     "nome": {
+      "it": "Burrata, Melanzane e Pomodorini",
+      "en": "Burrata, aubergine & cherry tomatoes"
+     },
+     "prezzo": "2,00",
+     "descrizione": {
+      "it": "La burrata si apre sul fumé delle melanzane — i pomodorini confit aggiungono un'acidità dolce che chiude il cerchio.",
+      "en": "Burrata over smoky aubergine, confit tomatoes for a sweet acidity."
+     },
+     "allergeni": [
+      "1",
+      "7"
+     ],
+     "tag": [
+      "veg",
+      "new"
+     ]
+    },
+    {
+     "nome": {
+      "it": "Crema al Dentice",
+      "en": "Snapper cream"
+     },
+     "prezzo": "3,00",
+     "descrizione": {
+      "it": "Dentice fresco lavorato fino a diventare nuvola — marino ma delicato, i crostini all'olio d'oliva fanno da barca.",
+      "en": "Fresh snapper whipped into a cloud, delicate and marine, on olive-oil croutons."
+     },
+     "allergeni": [
+      "1",
+      "4"
+     ],
+     "tag": [
+      "new"
+     ]
+    },
+    {
+     "nome": {
+      "it": "Salmone, Philadelphia e Guacamole",
+      "en": "Salmon, Philadelphia & guacamole"
+     },
+     "prezzo": "3,00",
+     "descrizione": {
+      "it": "Il fumo del salmone, la cremosità del Philadelphia, il verde del guacamole — tre mondi che non ci si aspetta insieme e invece funzionano.",
+      "en": "Smoked salmon, creamy cheese and guacamole: three worlds that work together."
+     },
+     "allergeni": [
+      "1",
+      "4",
+      "7"
+     ],
+     "tag": [
+      "new"
+     ]
+    }
+   ]
+  },
+  {
+   "nome": {
+    "it": "Cicchetti Caldi",
+    "en": "Hot cicchetti"
+   },
+   "descrizione": {
+    "it": "Cicchetti preparati al momento e serviti caldi — il cuore caldo del nostro bancone. Aspetta qualche minuto: ne vale sempre la pena.",
+    "en": "Prepared on the spot and served hot. Worth the wait."
+   },
+   "voci": [
+    {
+     "nome": {
+      "it": "Pinsa Crudo, Rucola e Stracciatella",
+      "en": "Pinsa with raw ham, rocket & stracciatella"
+     },
+     "prezzo": "6,00",
+     "descrizione": {
+      "it": "La base croccante e leggera della pinsa romana regge il crudo che fonde, la rucola che taglia, la stracciatella che ammorbidisce tutto.",
+      "en": "Light, crunchy Roman pinsa with melting ham, sharp rocket and soft stracciatella."
+     },
+     "allergeni": [
+      "1",
+      "7"
+     ],
+     "tag": [
+      "hot"
+     ]
+    },
+    {
+     "nome": {
+      "it": "Pinsa Mortadella, Burrata e Pistacchio",
+      "en": "Pinsa with mortadella, burrata & pistachio"
+     },
+     "prezzo": "6,00",
+     "descrizione": {
+      "it": "Pinsa calda, mortadella che si ammorbidisce al calore, burrata che cola — il pistacchio porta una nota verde e croccante che cambia tutto.",
+      "en": "Warm pinsa, softened mortadella, oozing burrata and crunchy pistachio."
+     },
+     "allergeni": [
+      "1",
+      "7",
+      "8"
+     ],
+     "tag": [
+      "hot"
+     ]
+    },
+    {
+     "nome": {
+      "it": "Pinsa Stracciatella e Acciughe del Cantabrico",
+      "en": "Pinsa with stracciatella & Cantabrian anchovies"
+     },
+     "prezzo": "6,00",
+     "descrizione": {
+      "it": "Le acciughe del Cantabrico sono le migliori al mondo — salate e profonde, con la stracciatella che le addolcisce senza nasconderle.",
+      "en": "The best anchovies in the world, sweetened by stracciatella without hiding them."
+     },
+     "allergeni": [
+      "1",
+      "4",
+      "7"
+     ],
+     "tag": [
+      "hot"
+     ]
+    },
+    {
+     "nome": {
+      "it": "Pinsa Veggie",
+      "en": "Veggie pinsa"
+     },
+     "prezzo": "6,00",
+     "descrizione": {
+      "it": "Cambia ogni settimana seguendo il mercato e la stagione — chiedi oggi cosa c’è.",
+      "en": "Changes every week with the market and the season. Ask us what is on today."
+     },
+     "allergeni": [
+      "1"
+     ],
+     "tag": [
+      "veg",
+      "hot"
+     ]
+    },
+    {
+     "nome": {
+      "it": "Polpette di Carne",
+      "en": "Meatballs"
+     },
+     "prezzo": "2,00",
+     "descrizione": {
+      "it": "Fuori croccante, dentro morbido — il comfort di sempre, senza niente da spiegare.",
+      "en": "Crunchy outside, soft inside. Comfort food, no explanation needed."
+     },
+     "allergeni": [
+      "1",
+      "3"
+     ],
+     "tag": [
+      "hot"
+     ]
+    },
+    {
+     "nome": {
+      "it": "Polpette di Tonno e Olive",
+      "en": "Tuna & olive balls"
+     },
+     "prezzo": "2,00",
+     "descrizione": {
+      "it": "Il tonno e l'oliva si cercano — sapido e rotondo, con una crosta dorata che profuma di mare.",
+      "en": "Savoury and round, with a golden crust that smells of the sea."
+     },
+     "allergeni": [
+      "1",
+      "3",
+      "4"
+     ],
+     "tag": [
+      "hot"
+     ]
+    },
+    {
+     "nome": {
+      "it": "Sarde Panate",
+      "en": "Breaded sardines"
+     },
+     "prezzo": "3,00",
+     "descrizione": {
+      "it": "Sarde dell'Adriatico in una panatura sottile e croccante — un cicchetto onesto che non delude mai.",
+      "en": "Adriatic sardines in a thin, crispy breading. An honest cicchetto."
+     },
+     "allergeni": [
+      "1",
+      "3",
+      "4"
+     ],
+     "tag": [
+      "hot"
+     ]
+    },
+    {
+     "nome": {
+      "it": "Mozzarella in Carrozza con Acciughe",
+      "en": "Fried mozzarella sandwich with anchovies"
+     },
+     "prezzo": "3,00",
+     "descrizione": {
+      "it": "Il formaggio fuso che tira i fili — le acciughe del Cantabrico sopra cambiano tutto, dal dolce al profondo.",
+      "en": "Stringy melted cheese; Cantabrian anchovies on top change everything."
+     },
+     "allergeni": [
+      "1",
+      "3",
+      "4",
+      "7"
+     ],
+     "tag": [
+      "hot"
+     ]
+    }
+   ]
+  },
+  {
+   "nome": {
+    "it": "Cicchetti",
+    "en": "Cicchetti"
+   },
+   "descrizione": {
+    "it": "I nostri cicchetti sempre presenti — un viaggio tra salumi, formaggi e specialità che tornano ogni giorno perché piacciono davvero. Classici per una ragione.",
+    "en": "Our everyday cicchetti: cured meats, cheeses and house specialities."
+   },
+   "voci": [
+    {
+     "nome": {
+      "it": "Crudo San Daniele",
+      "en": "San Daniele raw ham"
+     },
+     "prezzo": "2,00",
+     "descrizione": {
+      "it": "Diciotto mesi di stagionatura nell'aria dolce del Friuli — si scioglie sul pane, lascia un profumo lungo.",
+      "en": "18-month cured ham from Friuli: it melts on the bread and leaves a long scent."
+     },
+     "allergeni": [
+      "1"
+     ]
+    },
+    {
+     "nome": {
+      "it": "Cotto e Kren",
+      "en": "Cooked ham & horseradish"
+     },
+     "prezzo": "2,00",
+     "descrizione": {
+      "it": "Il kren fresco pizzica, il cotto ammorbidisce — un contrasto che qui al confine ha senso da sempre.",
+      "en": "Fresh horseradish stings, cooked ham softens: a border-country contrast."
+     },
+     "allergeni": [
+      "1"
+     ]
+    },
+    {
+     "nome": {
+      "it": "Mortadella, Burrata e Pistacchio",
+      "en": "Mortadella, burrata & pistachio"
+     },
+     "prezzo": "2,00",
+     "descrizione": {
+      "it": "La grassezza setosa della mortadella incontra la burrata che cola — il pistacchio rompe tutto con un crunch verde.",
+      "en": "Silky mortadella meets oozing burrata; pistachio adds a green crunch."
+     },
+     "allergeni": [
+      "1",
+      "7",
+      "8"
+     ]
+    },
+    {
+     "nome": {
+      "it": "Speck e Brie",
+      "en": "Speck & brie"
+     },
+     "prezzo": "2,00",
+     "descrizione": {
+      "it": "Lo speck altoatesino porta fumo e montagna, il brie scioglie e ammorbidisce — un abbinamento che sa di confine nord.",
+      "en": "Smoky Alpine speck and melting brie: a taste of the northern border."
+     },
+     "allergeni": [
+      "1",
+      "7"
+     ]
+    },
+    {
+     "nome": {
+      "it": "Crema Carbonara e Guanciale Nostrano",
+      "en": "Carbonara cream & local guanciale"
+     },
+     "prezzo": "2,00",
+     "descrizione": {
+      "it": "La carbonara distillata in una tartina — la crema di uova e pecorino incontra il guanciale nostrano che scrocchia.",
+      "en": "Carbonara distilled into a tartine: egg and pecorino cream with crispy guanciale."
+     },
+     "allergeni": [
+      "1",
+      "3",
+      "7"
+     ]
+    },
+    {
+     "nome": {
+      "it": "Crema Cacio e Pepe e Guanciale Nostrano",
+      "en": "Cacio e pepe cream & local guanciale"
+     },
+     "prezzo": "2,00",
+     "descrizione": {
+      "it": "Solo tre ingredienti, nessun compromesso — il pepe brucia leggermente, il cacio avvolge, il guanciale chiude in bellezza.",
+      "en": "Three ingredients, no compromise: pepper, pecorino and guanciale."
+     },
+     "allergeni": [
+      "1",
+      "7"
+     ]
+    },
+    {
+     "nome": {
+      "it": "Lardo di Patanegra",
+      "en": "Pata Negra lardo"
+     },
+     "prezzo": "3,00",
+     "descrizione": {
+      "it": "Lardo di Patanegra: si deposita sul pane caldo e si trasforma — non grasso, ma profumo di ghianda e montagna iberica.",
+      "en": "Iberian lardo melting on warm bread: acorn and mountain scents, not fat."
+     },
+     "allergeni": [
+      "1"
+     ]
+    },
+    {
+     "nome": {
+      "it": "Salame e Formaggio",
+      "en": "Salami & cheese"
+     },
+     "prezzo": "2,00",
+     "descrizione": {
+      "it": "Salame artigianale e formaggio stagionato — il cicchetto più antico del bacaro. Funziona perché è sempre stato giusto così.",
+      "en": "Artisan salami and aged cheese: the oldest cicchetto of the bacaro."
+     },
+     "allergeni": [
+      "1",
+      "7"
+     ]
+    },
+    {
+     "nome": {
+      "it": "Formaggio e Miele",
+      "en": "Cheese & honey"
+     },
+     "prezzo": "2,00",
+     "descrizione": {
+      "it": "Il miele di acacia è floreale e quasi invisibile — amplifica il formaggio stagionato senza coprirlo mai.",
+      "en": "Floral acacia honey amplifying aged cheese without covering it."
+     },
+     "allergeni": [
+      "1",
+      "7"
+     ],
+     "tag": [
+      "veg"
+     ]
+    },
+    {
+     "nome": {
+      "it": "Stracciatella, Melanzane e Pomodorini",
+      "en": "Stracciatella, aubergine & cherry tomatoes"
+     },
+     "prezzo": "2,00",
+     "descrizione": {
+      "it": "La stracciatella è latte allo stato puro — sopra la crema fumosa delle melanzane diventa qualcosa di inaspettato.",
+      "en": "Pure milk over smoky aubergine cream: unexpected and good."
+     },
+     "allergeni": [
+      "1",
+      "7"
+     ],
+     "tag": [
+      "veg"
+     ]
+    },
+    {
+     "nome": {
+      "it": "Gorgonzola, Noci e Miele",
+      "en": "Gorgonzola, walnuts & honey"
+     },
+     "prezzo": "2,00",
+     "descrizione": {
+      "it": "Il gorgonzola dolce è già quasi un dessert — il miele millefiori lo porta fino in fondo, le noci portano tutto a terra.",
+      "en": "Sweet gorgonzola, wildflower honey and walnuts to bring it back to earth."
+     },
+     "allergeni": [
+      "1",
+      "7",
+      "8"
+     ],
+     "tag": [
+      "veg"
+     ]
+    },
+    {
+     "nome": {
+      "it": "Gorgonzola e Crema di Radicchio",
+      "en": "Gorgonzola & radicchio cream"
+     },
+     "prezzo": "2,00",
+     "descrizione": {
+      "it": "Il piccante del gorgonzola e l'amaro del radicchio trevigiano si sfidano — nessuno vince, ed è per questo che funziona.",
+      "en": "Spicy gorgonzola versus bitter Treviso radicchio. Nobody wins, and that is why it works."
+     },
+     "allergeni": [
+      "1",
+      "7"
+     ],
+     "tag": [
+      "veg"
+     ]
+    },
+    {
+     "nome": {
+      "it": "Gamberi in Savor",
+      "en": "Sweet & sour prawns"
+     },
+     "prezzo": "3,00",
+     "descrizione": {
+      "it": "Una ricetta veneziana antica — i gamberi marinati in agrodolce con cipolla e uvetta sono il Mediterraneo che incontra Venezia.",
+      "en": "An ancient Venetian recipe: prawns marinated with onion and raisins."
+     },
+     "allergeni": [
+      "1",
+      "2",
+      "4"
+     ]
+    },
+    {
+     "nome": {
+      "it": "Baccalà Mantecato",
+      "en": "Creamed cod"
+     },
+     "prezzo": "3,00",
+     "descrizione": {
+      "it": "Il baccalà mantecato è l'arte veneziana di trasformare il pesce essiccato in seta — sulla polenta bianca abbrustolita è il Nord-Est in un boccone.",
+      "en": "The Venetian art of turning dried fish into silk, on grilled white polenta."
+     },
+     "allergeni": [
+      "1",
+      "4"
+     ]
+    },
+    {
+     "nome": {
+      "it": "Crema al Dentice",
+      "en": "Snapper cream"
+     },
+     "prezzo": "3,00",
+     "descrizione": {
+      "it": "Dentice fresco lavorato fino a diventare nuvola — marino ma delicato, i crostini all'olio d'oliva fanno da barca.",
+      "en": "Fresh snapper whipped into a cloud, delicate and marine, on olive-oil croutons."
+     },
+     "allergeni": [
+      "1",
+      "4"
+     ]
+    },
+    {
+     "nome": {
+      "it": "Salmone e Burro",
+      "en": "Salmon & herb butter"
+     },
+     "prezzo": "3,00",
+     "descrizione": {
+      "it": "Il burro alle erbe porta il salmone affumicato in una dimensione nordica — un accostamento classico che non stanca mai.",
+      "en": "Herb butter takes smoked salmon to a Nordic dimension."
+     },
+     "allergeni": [
+      "1",
+      "4",
+      "7"
+     ]
+    },
+    {
+     "nome": {
+      "it": "Salmone, Philadelphia e Guacamole",
+      "en": "Salmon, Philadelphia & guacamole"
+     },
+     "prezzo": "3,00",
+     "descrizione": {
+      "it": "Il fumo del salmone, la cremosità del Philadelphia, il verde del guacamole — tre mondi che non ci si aspetta insieme e invece funzionano.",
+      "en": "Smoked salmon, creamy cheese and guacamole: three worlds that work together."
+     },
+     "allergeni": [
+      "1",
+      "4",
+      "7"
+     ]
+    }
+   ]
+  },
+  {
+   "nome": {
+    "it": "Bibite",
+    "en": "Soft drinks"
+   },
+   "descrizione": {
+    "it": "Per chi preferisce dissetarsi senza alcol — dalle acque alle bibite premium Fever-Tree. Perché anche una buona bibita merita rispetto.",
+    "en": "Waters and premium Fever-Tree sodas."
+   },
+   "voci": [
+    {
+     "nome": {
+      "it": "Acqua Naturale"
+     },
+     "prezzo": "1,50"
+    },
+    {
+     "nome": {
+      "it": "Acqua Frizzante"
+     },
+     "prezzo": "1,50"
+    },
+    {
+     "nome": {
+      "it": "Coca-Cola"
+     },
+     "prezzo": "3,50"
+    },
+    {
+     "nome": {
+      "it": "Coca-Cola Zero"
+     },
+     "prezzo": "3,50",
+     "descrizione": {
+      "it": "Senza zucchero"
+     }
+    },
+    {
+     "nome": {
+      "it": "Fanta"
+     },
+     "prezzo": "3,00"
+    },
+    {
+     "nome": {
+      "it": "Tè alla Pesca"
+     },
+     "prezzo": "3,00"
+    },
+    {
+     "nome": {
+      "it": "Gingerino"
+     },
+     "prezzo": "3,00",
+     "descrizione": {
+      "it": "Analcolico al gusto di zenzero"
+     }
+    },
+    {
+     "nome": {
+      "it": "Tonica Indian Fever-Tree"
+     },
+     "prezzo": "4,00",
+     "descrizione": {
+      "it": "Tonica premium classica"
+     }
+    },
+    {
+     "nome": {
+      "it": "Tonica Mediterranean Fever-Tree"
+     },
+     "prezzo": "4,00",
+     "descrizione": {
+      "it": "Con note floreali e agrumati"
+     }
+    },
+    {
+     "nome": {
+      "it": "Ginger Ale Fever-Tree"
+     },
+     "prezzo": "4,00",
+     "descrizione": {
+      "it": "Leggero e rinfrescante"
+     }
+    },
+    {
+     "nome": {
+      "it": "Ginger Beer Fever-Tree"
+     },
+     "prezzo": "4,00",
+     "descrizione": {
+      "it": "Intenso e piccante, zenzero vero"
+     }
+    },
+    {
+     "nome": {
+      "it": "Tonica Lemon Kinley"
+     },
+     "prezzo": "3,50",
+     "descrizione": {
+      "it": "Al limone, fresca e frizzante"
+     }
+    }
+   ]
+  },
+  {
+   "nome": {
+    "it": "Aperitivi Analcolici",
+    "en": "Non-alcoholic aperitivo"
+   },
+   "descrizione": {
+    "it": "Tutto il gusto dell'aperitivo, senza alcol. Perché il piacere di stare insieme non dipende da cosa c'è nel bicchiere.",
+    "en": "All the taste of aperitivo, without alcohol."
+   },
+   "voci": [
+    {
+     "nome": {
+      "it": "Spritz Hugo Analcolico"
+     },
+     "prezzo": "3,50",
+     "descrizione": {
+      "it": "Sciroppo di sambuco, menta, soda e limone"
+     }
+    },
+    {
+     "nome": {
+      "it": "Spritz Campari Analcolico"
+     },
+     "prezzo": "3,50",
+     "descrizione": {
+      "it": "Campari Soda analcolico con soda e arancia"
+     }
+    },
+    {
+     "nome": {
+      "it": "Gin Tonic Tanqueray Analcolico"
+     },
+     "prezzo": "5,00",
+     "descrizione": {
+      "it": "Tanqueray 0.0%, tonica premium e agrumi"
+     }
+    },
+    {
+     "nome": {
+      "it": "Virgin Colada"
+     },
+     "prezzo": "5,00",
+     "descrizione": {
+      "it": "Succo di ananas, crema di cocco e ghiaccio"
+     }
+    }
+   ]
+  },
+  {
+   "nome": {
+    "it": "Amari & Grappe",
+    "en": "Amari & grappa"
+   },
+   "descrizione": {
+    "it": "Amari del territorio, grappe Nonino e digestivi per chiudere in bellezza — dalla Selezione Vecchio Amaro del Capo al Fernet. Il modo migliore per salutarsi.",
+    "en": "Local bitters, Nonino grappa and digestivi to end the evening well."
+   },
+   "voci": [
+    {
+     "nome": {
+      "it": "Amaro Nonino Quintessentia"
+     },
+     "prezzo": "5,00",
+     "descrizione": {
+      "it": "Friuli, erbe alpine e acquavite d'uva 12 mesi in barrique, ambrato e armonico"
+     }
+    },
+    {
+     "nome": {
+      "it": "Amaro del Capo"
+     },
+     "prezzo": "5,00",
+     "descrizione": {
+      "it": "Calabria, 29 botaniche, menta anice e liquirizia, capolavoro ghiacciato a -20°C"
+     }
+    },
+    {
+     "nome": {
+      "it": "Amaro del Carso"
+     },
+     "prezzo": "5,00",
+     "descrizione": {
+      "it": "Carso triestino, erbe carsiche locali, botaniche di confine, amaro del territorio"
+     }
+    },
+    {
+     "nome": {
+      "it": "Amaro Ottanta"
+     },
+     "prezzo": "5,00",
+     "descrizione": {
+      "it": "Friuli, 80 botaniche selezionate, artigianale, complesso e bilanciato"
+     }
+    },
+    {
+     "nome": {
+      "it": "Jägermeister"
+     },
+     "prezzo": "5,00",
+     "descrizione": {
+      "it": "Germania, 56 erbe spezie e radici, anice liquirizia e agrumi, iconico digestivo"
+     }
+    },
+    {
+     "nome": {
+      "it": "Montenegro"
+     },
+     "prezzo": "5,00",
+     "descrizione": {
+      "it": "Bologna 1885, 40 botaniche da 4 continenti, vaniglia e arancia, liquore delle virtù"
+     }
+    },
+    {
+     "nome": {
+      "it": "Amaro Braulio"
+     },
+     "prezzo": "5,00",
+     "descrizione": {
+      "it": "Valtellina, 24 mesi in rovere di Slavonia, erbe alpine balsamiche, intenso e avvolgente"
+     }
+    },
+    {
+     "nome": {
+      "it": "Pelinkovac Knez"
+     },
+     "prezzo": "5,00",
+     "descrizione": {
+      "it": "Trieste, assenzio e botaniche balcaniche, rabarbaro e fiori di sambuco, 0% coloranti"
+     }
+    },
+    {
+     "nome": {
+      "it": "Limoncello"
+     },
+     "prezzo": "5,00",
+     "descrizione": {
+      "it": "Scorze di limone in infusione, fresco e agrumato, il digestivo del sole"
+     }
+    },
+    {
+     "nome": {
+      "it": "Sambuca"
+     },
+     "prezzo": "5,00",
+     "descrizione": {
+      "it": "Anice stellato e liquirizia, dolce e persistente, servita con la mosca"
+     }
+    },
+    {
+     "nome": {
+      "it": "Grappa Nonino Bianca"
+     },
+     "prezzo": "5,00",
+     "descrizione": {
+      "it": "Percoto, Friuli, vinacce fresche selezionate, cristallina e pulita, alambicco di rame"
+     }
+    },
+    {
+     "nome": {
+      "it": "Grappa Nonino Monovitigno Malvasia"
+     },
+     "prezzo": "5,00",
+     "descrizione": {
+      "it": "Percoto, Malvasia in purezza, floreale e aromatica, frutta tropicale e fiori esotici"
+     }
+    },
+    {
+     "nome": {
+      "it": "Grappa Nonino Monovitigno Fragolino"
+     },
+     "prezzo": "5,00",
+     "descrizione": {
+      "it": "Percoto, uva Fragola del Friuli, frutti di bosco e mirtillo, elegante e morbida"
+     }
+    },
+    {
+     "nome": {
+      "it": "Grappa Nonino Monovitigno Uva Bianca"
+     },
+     "prezzo": "5,00",
+     "descrizione": {
+      "it": "Percoto, cuvée Chardonnay Pinot Bianco e Malvasia friulani, elegante e delicata"
+     }
+    },
+    {
+     "nome": {
+      "it": "Grappa Nonino Barricata 24 mesi"
+     },
+     "prezzo": "5,00",
+     "descrizione": {
+      "it": "Percoto, 24 mesi in barrique, ambrata e vellutata, mela verde cioccolato e vaniglia"
+     }
+    },
+    {
+     "nome": {
+      "it": "Grappa Nonino Barricata 5 anni"
+     },
+     "prezzo": "7,00",
+     "descrizione": {
+      "it": "Percoto, 5 anni in barrique, tostatura miele e spezie dolci, grande complessità"
+     }
+    },
+    {
+     "nome": {
+      "it": "Grappa Nonino Barricata 8 anni"
+     },
+     "prezzo": "9,00",
+     "descrizione": {
+      "it": "Percoto, 8 anni in barrique, ambra profondo, cioccolato fondente tabacco e frutta secca"
+     }
+    }
+   ]
+  }
+ ]
+}
