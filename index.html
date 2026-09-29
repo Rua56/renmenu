@@ -84,7 +84,8 @@
   .plan ul { margin-top: var(--space-6); display: grid; gap: var(--space-2); font-size: var(--text-sm); flex: 1; }
   .plan li { display: flex; gap: var(--space-2); }
   .plan li::before { content: '✓'; color: var(--color-primary); font-weight: 700; }
-  .plan .btn { margin-top: var(--space-8); }
+  .plan__cta { margin-top: var(--space-8); display: grid; gap: var(--space-2); }
+  .plan__cta .btn { width: 100%; }
   .promo { margin-top: var(--space-8); padding: var(--space-5) var(--space-6); border-radius: var(--radius-lg); background: var(--color-primary-highlight); border-left: 3px solid var(--color-primary); font-size: var(--text-sm); }
   .promo b { font-family: var(--font-display); font-size: var(--text-lg); font-weight: 600; color: var(--color-primary); display: block; margin-bottom: var(--space-1); }
 
@@ -229,7 +230,7 @@
           <li>Allergeni e piatto del giorno</li>
           <li>Disdici quando vuoi</li>
         </ul>
-        <a class="btn btn--ghost" data-contact href="#">Inizia col mensile</a>
+        <div class="plan__cta"><a class="btn btn--primary" href="paga/index.html?piano=mensile">Attiva il mensile</a><a class="btn btn--ghost" data-contact href="#">Prima una domanda</a></div>
       </div>
       <div class="plan plan--hi">
         <div class="plan__name">Annuale · 2 mesi gratis</div>
@@ -241,7 +242,7 @@
           <li>Priorità sugli aggiornamenti</li>
           <li>Fattura unica, niente pensieri</li>
         </ul>
-        <a class="btn btn--primary" data-contact href="#">Scegli l'annuale</a>
+        <div class="plan__cta"><a class="btn btn--primary" href="paga/index.html?piano=annuale">Attiva l'annuale</a><a class="btn btn--ghost" data-contact href="#">Prima una domanda</a></div>
       </div>
       <div class="plan">
         <div class="plan__name">Su misura</div>
@@ -254,7 +255,7 @@
           <li>Aggiornamenti illimitati via WhatsApp</li>
           <li>Come il menù di Al Bakaro</li>
         </ul>
-        <a class="btn btn--ghost" data-contact href="#">Chiedi un preventivo</a>
+        <div class="plan__cta"><a class="btn btn--primary" data-contact href="#">Chiedi un preventivo</a><a class="btn btn--ghost" href="paga/index.html?piano=sumisura">Versa l'acconto</a></div>
       </div>
     </div>
     <div class="promo"><b>Primi 10 locali del Friuli Venezia Giulia: il primo mese è gratis.</b>Ti pubblichiamo il menù, lo usi un mese intero e decidi solo dopo se continuare. Sei fuori regione? Funziona uguale: tutto passa da WhatsApp, non serve che veniamo di persona.</div>
@@ -273,6 +274,10 @@
   <section id="faq" class="container" style="padding-top:0">
     <div class="section-head"><span class="eyebrow">Domande frequenti</span><h2>Quello che ci chiedono tutti.</h2></div>
     <div class="faq">
+      <details>
+        <summary>Come si paga?</summary>
+        <p>Con carta (addebito mensile automatico, disdici quando vuoi) o con bonifico, dalla pagina <a href="paga/index.html">Attiva RenMenu</a>. Ricevi sempre la fattura elettronica. Il primo mese del piano mensile è gratis: il primo addebito arriva 30 giorni dopo l'attivazione.</p>
+      </details>
       <details><summary>Il cliente deve scaricare un'app?</summary><p>No. Inquadra il QR con la fotocamera e il menù si apre nel browser, come una pagina web. Funziona su qualsiasi telefono.</p></details>
       <details><summary>Chi aggiorna il menù?</summary><p>Noi, gratis e senza limiti. Ci mandi un messaggio WhatsApp con la modifica e in genere è online entro un'ora, sempre entro la giornata.</p></details>
       <details><summary>Posso tenere anche il menù cartaceo?</summary><p>Certo. Molti locali usano il QR per la lista completa e lasciano un cartaceo ridotto o la lavagna con i piatti del giorno.</p></details>

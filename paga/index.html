@@ -1,0 +1,213 @@
+<!DOCTYPE html>
+<html lang="it">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Attiva RenMenu — pagamento</title>
+<meta name="description" content="Scegli il piano RenMenu e paga con carta o bonifico. Fattura inclusa, disdetta libera.">
+<meta name="robots" content="noindex">
+<meta name="theme-color" content="#7a1f2b" media="(prefers-color-scheme: light)">
+<meta name="theme-color" content="#1c1512" media="(prefers-color-scheme: dark)">
+<link rel="apple-touch-icon" href="../assets/apple-touch-icon.png">
+<link rel="manifest" href="../manifest.webmanifest">
+<link rel="canonical" href="https://rua56.github.io/renmenu/paga/index.html">
+<link rel="icon" href="../assets/favicon.svg" type="image/svg+xml">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,500;9..144,600&family=Instrument+Sans:wght@400;500;600&display=swap">
+<link rel="stylesheet" href="../assets/style.css">
+<style>
+  header.site { position: sticky; top: 0; z-index: 50; background: var(--color-bg); background: color-mix(in oklab, var(--color-bg) 85%, transparent); backdrop-filter: blur(12px); -webkit-backdrop-filter: blur(12px); border-bottom: 1px solid var(--color-divider); }
+  header.site .wrap { display: flex; align-items: center; justify-content: space-between; gap: var(--space-4); padding-top: var(--space-3); padding-bottom: var(--space-3); }
+  .wrap { max-width: 720px; }
+  main { padding: var(--space-8) 0 var(--space-16); }
+  h1 { font-size: var(--text-2xl); }
+  .lead { color: var(--color-text-muted); margin-top: var(--space-3); }
+  .steps { display: grid; gap: var(--space-6); margin-top: var(--space-8); }
+  .step { background: var(--color-surface); border: 1px solid var(--color-border); border-radius: var(--radius-xl); padding: var(--space-6); }
+  .step h2 { font-size: var(--text-lg); display: flex; align-items: center; gap: var(--space-3); }
+  .step h2 .n { width: 28px; height: 28px; border-radius: 50%; background: var(--color-primary); color: var(--color-text-inverse); font-family: var(--font-body); font-size: var(--text-sm); font-weight: 700; display: inline-grid; place-items: center; flex: none; }
+  .seg { display: grid; grid-template-columns: repeat(3, 1fr); gap: var(--space-2); margin-top: var(--space-5); }
+  .seg button { border: 1px solid var(--color-border); background: var(--color-bg); border-radius: var(--radius-lg); padding: var(--space-3) var(--space-2); text-align: center; cursor: pointer; font: inherit; color: var(--color-text); min-height: 64px; }
+  .seg button b { display: block; font-size: var(--text-sm); }
+  .seg button span { font-size: var(--text-xs); color: var(--color-text-muted); }
+  .seg button[aria-pressed="true"] { border-color: var(--color-primary); background: var(--color-primary); color: var(--color-text-inverse); }
+  .seg button[aria-pressed="true"] span { color: inherit; opacity: .85; }
+  .plan-info { margin-top: var(--space-5); display: flex; justify-content: space-between; gap: var(--space-4); align-items: baseline; flex-wrap: wrap; }
+  .plan-info .price { font-family: var(--font-display); font-size: var(--text-2xl); line-height: 1; }
+  .plan-info .price small { font-family: var(--font-body); font-size: var(--text-sm); color: var(--color-text-muted); }
+  .plan-info p { font-size: var(--text-sm); color: var(--color-text-muted); flex-basis: 100%; }
+  .f { display: grid; gap: var(--space-1); margin-top: var(--space-5); font-size: var(--text-sm); font-weight: 600; }
+  .f input { font: inherit; font-weight: 400; font-size: var(--text-base); padding: var(--space-3) var(--space-4); border: 1px solid var(--color-border); border-radius: var(--radius-lg); background: var(--color-bg); color: var(--color-text); min-height: 48px; }
+  .methods { display: grid; gap: var(--space-4); margin-top: var(--space-5); }
+  .method { border: 1px solid var(--color-border); border-radius: var(--radius-lg); padding: var(--space-5); background: var(--color-bg); }
+  .method h3 { font-family: var(--font-body); font-size: var(--text-base); font-weight: 600; display: flex; align-items: center; gap: var(--space-2); }
+  .method p { font-size: var(--text-sm); color: var(--color-text-muted); margin-top: var(--space-1); }
+  .method .btn { margin-top: var(--space-4); width: 100%; }
+  .kv { display: grid; gap: var(--space-2); margin-top: var(--space-4); }
+  .kv > div { display: flex; align-items: center; justify-content: space-between; gap: var(--space-3); background: var(--color-surface); border: 1px solid var(--color-divider); border-radius: var(--radius-md); padding: var(--space-2) var(--space-3); font-size: var(--text-sm); }
+  .kv span { color: var(--color-text-muted); font-size: var(--text-xs); }
+  .kv > div > div { flex: 1; min-width: 0; }
+  .kv code { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; overflow-wrap: anywhere; font-size: var(--text-sm); }
+  .kv button { font: inherit; font-size: var(--text-xs); font-weight: 600; border: 1px solid var(--color-border); background: var(--color-bg); color: var(--color-text); border-radius: var(--radius-full); padding: var(--space-1) var(--space-3); cursor: pointer; min-height: 32px; flex: none; }
+  .soon { display: inline-block; font-size: var(--text-xs); font-weight: 600; color: var(--color-accent); background: var(--color-surface); border: 1px dashed var(--color-border); border-radius: var(--radius-full); padding: 2px var(--space-3); }
+  .badge { display: inline-flex; align-items: center; gap: 6px; font-size: var(--text-xs); color: var(--color-text-muted); }
+  .fine { margin-top: var(--space-8); font-size: var(--text-xs); color: var(--color-text-muted); display: grid; gap: var(--space-2); }
+  .toast { position: fixed; left: 50%; bottom: calc(var(--space-6) + env(safe-area-inset-bottom)); transform: translateX(-50%) translateY(20px); background: var(--color-text); color: var(--color-bg); padding: var(--space-3) var(--space-5); border-radius: var(--radius-full); font-size: var(--text-sm); opacity: 0; pointer-events: none; transition: all 250ms; }
+  .toast.on { opacity: 1; transform: translateX(-50%); }
+  [hidden] { display: none !important; }
+</style>
+</head>
+<body>
+<header class="site"><div class="wrap">
+  <a class="brand" href="../index.html"><span data-logo></span><span data-brand-name>RenMenu</span></a>
+  <div style="display:flex;gap:var(--space-2);align-items:center">
+    <button class="theme-toggle" data-theme-toggle type="button"></button>
+    <a class="btn btn--ghost btn--sm" href="../index.html#prezzi">← Prezzi</a>
+  </div>
+</div></header>
+
+<main class="wrap">
+  <h1>Attiva RenMenu</h1>
+  <p class="lead">Tre passaggi, due minuti. Se hai dubbi, scrivici su WhatsApp prima di pagare: ti rispondiamo noi, non un robot.</p>
+
+  <div class="steps">
+    <section class="step">
+      <h2><span class="n">1</span> Scegli il piano</h2>
+      <div class="seg" id="seg" role="group" aria-label="Piano"></div>
+      <div class="plan-info">
+        <div class="price" id="price"></div>
+        <span class="badge" id="badge"></span>
+        <p id="descr"></p>
+      </div>
+    </section>
+
+    <section class="step">
+      <h2><span class="n">2</span> Il tuo locale</h2>
+      <label class="f"><span>Nome del locale</span><input id="locale" type="text" placeholder="es. Osteria da Mario, Gorizia" autocomplete="organization"></label>
+      <p style="font-size:var(--text-xs);color:var(--color-text-muted);margin-top:var(--space-2)">Serve per la causale e per collegare il pagamento al tuo menù.</p>
+    </section>
+
+    <section class="step">
+      <h2><span class="n">3</span> Paga come preferisci</h2>
+      <div class="methods">
+        <div class="method" id="m-card">
+          <h3>💳 Carta di credito o debito</h3>
+          <p id="card-p">Pagamento sicuro con Stripe. Per il mensile l'addebito è automatico ogni mese e si disdice con un clic.</p>
+          <a class="btn btn--primary" id="card-btn" href="#" rel="noopener">Paga con carta</a>
+          <div id="card-soon" hidden>
+            <p><span class="soon">In attivazione</span></p>
+            <p>Il pagamento con carta sarà disponibile tra pochi giorni. Nel frattempo puoi pagare con bonifico o chiederci il link su WhatsApp.</p>
+            <a class="btn btn--ghost" id="card-wa" href="#">Chiedi il link su WhatsApp</a>
+          </div>
+        </div>
+
+        <div class="method" id="m-bank">
+          <h3>🏦 Bonifico bancario</h3>
+          <p>Zero commissioni. Attiviamo il menù appena vediamo il bonifico (di solito il giorno lavorativo successivo).</p>
+          <div class="kv">
+            <div><div><span>Intestatario</span><br><code id="b-name"></code></div><button type="button" data-copy="#b-name">Copia</button></div>
+            <div><div><span>IBAN</span><br><code id="b-iban"></code></div><button type="button" data-copy="#b-iban">Copia</button></div>
+            <div><div><span>Importo</span><br><code id="b-amt"></code></div><button type="button" data-copy="#b-amt">Copia</button></div>
+            <div><div><span>Causale</span><br><code id="b-causale"></code></div><button type="button" data-copy="#b-causale">Copia</button></div>
+          </div>
+          <a class="btn btn--ghost" id="bank-wa" href="#">Ho fatto il bonifico, avvisa RenMenu</a>
+        </div>
+
+        <div class="method" id="m-paypal" hidden>
+          <h3>🅿️ PayPal</h3>
+          <p>Paga con il tuo account PayPal o con carta tramite PayPal.</p>
+          <a class="btn btn--ghost" id="paypal-btn" href="#" rel="noopener">Paga con PayPal</a>
+        </div>
+
+        <div class="method" id="m-satispay" hidden>
+          <h3>🔴 Satispay</h3>
+          <p>Se hai Satispay, paghi in due tocchi.</p>
+          <a class="btn btn--ghost" id="satispay-btn" href="#" rel="noopener">Paga con Satispay</a>
+        </div>
+
+        <div class="method" id="m-wa">
+          <h3>💬 Preferisci parlarne?</h3>
+          <p>Scrivici: confermiamo il piano, ti mandiamo la fattura e il link di pagamento su WhatsApp.</p>
+          <a class="btn btn--ghost" id="talk-wa" href="#">Scrivi su WhatsApp</a>
+        </div>
+      </div>
+    </section>
+  </div>
+
+  <div class="fine">
+    <p>Ricevi sempre la fattura elettronica. I prezzi sono IVA inclusa, nessun costo di attivazione.</p>
+    <p>Mensile: il primo mese è gratis, il primo addebito avviene 30 giorni dopo l'attivazione; disdetta libera in qualsiasi momento. Annuale: fattura unica, rinnovo non automatico. Su misura: l'acconto viene scalato dal preventivo finale.</p>
+    <p>Pagamenti con carta gestiti da Stripe: RenMenu non vede né conserva i dati della tua carta.</p>
+  </div>
+</main>
+
+<div class="toast" id="toast"></div>
+<script src="../assets/common.js"></script>
+<script>
+(() => {
+  const R = window.RENMENU, P = R.pagamenti, $ = s => document.querySelector(s);
+  const params = new URLSearchParams(location.search);
+  let piano = ['mensile','annuale','sumisura'].includes(params.get('piano')) ? params.get('piano') : 'mensile';
+  $('#locale').value = params.get('locale') || '';
+
+  const seg = $('#seg');
+  for (const [k, p] of Object.entries(P.piani)) {
+    const b = document.createElement('button'); b.type = 'button'; b.dataset.k = k;
+    b.innerHTML = `<b>${p.nome}</b><span>${p.prezzo} € ${p.unita}</span>`;
+    b.onclick = () => { piano = k; render(); history.replaceState(null, '', `?piano=${k}${$('#locale').value ? '&locale=' + encodeURIComponent($('#locale').value) : ''}`); };
+    seg.appendChild(b);
+  }
+
+  const wa = msg => R.contattoWhatsApp ? `https://wa.me/${R.contattoWhatsApp}?text=${encodeURIComponent(msg)}` : `mailto:${R.contattoEmail}?subject=RenMenu&body=${encodeURIComponent(msg)}`;
+  const locale = () => $('#locale').value.trim() || 'il mio locale';
+
+  function render() {
+    const p = P.piani[piano];
+    seg.querySelectorAll('button').forEach(b => b.setAttribute('aria-pressed', String(b.dataset.k === piano)));
+    $('#price').innerHTML = `${p.prezzo} € <small>${p.unita}${p.mensile ? ` · poi ${p.mensile} € / mese` : ''}</small>`;
+    $('#badge').textContent = p.prova ? '✓ Primo mese gratis' : (piano === 'annuale' ? '✓ 2 mesi gratis' : '✓ Preventivo su misura');
+    $('#descr').textContent = p.descr;
+
+    // Carta (Stripe)
+    const link = P.stripe && P.stripe[piano];
+    const ref = encodeURIComponent(locale().replace(/[^\w\- ]/g, '').trim().slice(0, 60) || 'renmenu');
+    if (link) {
+      $('#card-btn').hidden = false; $('#card-p').hidden = false; $('#card-soon').hidden = true;
+      $('#card-btn').href = link + (link.includes('?') ? '&' : '?') + 'client_reference_id=' + ref;
+      $('#card-btn').textContent = piano === 'mensile' ? `Paga con carta · ${p.prezzo} € / mese` : `Paga con carta · ${p.prezzo} €`;
+    } else {
+      $('#card-btn').hidden = true; $('#card-p').hidden = true; $('#card-soon').hidden = false;
+      $('#card-wa').href = wa(`Ciao! Vorrei pagare con carta il piano ${p.nome} di RenMenu per ${locale()}. Mi mandi il link?`);
+    }
+
+    // Bonifico
+    const hasBank = P.iban && P.intestatario;
+    $('#m-bank').hidden = !hasBank;
+    if (hasBank) {
+      $('#b-name').textContent = P.intestatario;
+      $('#b-iban').textContent = P.iban.replace(/\s+/g, '').replace(/(.{4})/g, '$1 ').trim();
+      $('#b-amt').textContent = `${p.prezzo},00 €`;
+      $('#b-causale').textContent = `RenMenu ${p.nome} - ${locale()}`;
+      $('#bank-wa').href = wa(`Ciao! Ho fatto il bonifico di ${p.prezzo} € per il piano ${p.nome} di RenMenu, locale: ${locale()}. Causale: RenMenu ${p.nome} - ${locale()}.`);
+    }
+
+    // PayPal / Satispay
+    $('#m-paypal').hidden = !P.paypal;
+    if (P.paypal) $('#paypal-btn').href = P.paypal.replace(/\/$/, '') + (P.paypal.includes('paypal.me') ? `/${p.prezzo}EUR` : '');
+    $('#m-satispay').hidden = !P.satispay;
+    if (P.satispay) $('#satispay-btn').href = P.satispay;
+
+    $('#talk-wa').href = wa(`Ciao! Vorrei attivare RenMenu (piano ${p.nome}) per ${locale()}. Come procediamo?`);
+  }
+
+  $('#locale').addEventListener('input', render);
+  document.querySelectorAll('[data-copy]').forEach(b => b.onclick = async () => {
+    const t = $(b.dataset.copy).textContent;
+    try { await navigator.clipboard.writeText(t); toast('Copiato'); } catch { prompt('Copia:', t); }
+  });
+  let tm; function toast(m) { const t = $('#toast'); t.textContent = m; t.classList.add('on'); clearTimeout(tm); tm = setTimeout(() => t.classList.remove('on'), 1600); }
+  render();
+})();
+</script>
+</body>
+</html>

@@ -137,6 +137,9 @@
         <label class="f"><span>Indirizzo del sito pubblicato</span><input type="url" id="baseUrl" placeholder="https://rua56.github.io/renmenu/" autocapitalize="off"></label>
         <div class="qr" style="margin-top:var(--space-4)"><img id="qrImg" alt="QR code del menù" width="220" height="220"></div>
         <div class="url" id="urlOut"></div>
+        <label class="f" style="margin-top:var(--space-3)"><span>Link di pagamento per questo locale</span></label>
+        <div class="url" id="payOut"></div>
+        <button class="btn btn--ghost btn--sm" id="btnPayCopy" type="button" style="margin-top:var(--space-2)">Copia link pagamento</button>
         <div class="stack">
           <a class="btn btn--primary" id="btnPreview" href="#" target="_blank" rel="noopener">Apri anteprima</a>
           <button class="btn btn--ghost" id="btnDl" type="button">Scarica menù .json</button>
@@ -256,12 +259,14 @@
 
   function menuUrl() { const b = ($('#baseUrl').value || root).replace(/\/?$/, '/'); return `${b}menu/index.html?m=${encodeURIComponent(state.id || 'demo')}`; }
   function previewUrl() { const json = JSON.stringify(clean()); const b64 = btoa(unescape(encodeURIComponent(json))).replace(/\+/g, '-').replace(/\//g, '_'); return `../menu/index.html#data=${b64}`; }
+  function payUrl() { const b = ($('#baseUrl').value || root).replace(/\/?$/, '/'); return `${b}paga/index.html?piano=mensile&locale=${encodeURIComponent(state.nome || '')}`; }
   function makeQr(cell) { const qr = qrcode(0, 'M'); qr.addData(menuUrl()); qr.make(); return qr; }
 
   function refreshSide() {
     const s = clean();
     $('#jsonOut').textContent = JSON.stringify(s, null, 2);
     $('#urlOut').textContent = menuUrl();
+    $('#payOut').textContent = payUrl();
     try { $('#qrImg').src = makeQr().createDataURL(6, 2); } catch (e) { }
     const p = previewUrl(); $('#btnPreview').href = p; $('#btnPreviewTop').href = p;
   }
@@ -269,6 +274,7 @@
 
   function download(name, content, type) { const a = document.createElement('a'); a.href = URL.createObjectURL(new Blob([content], { type })); a.download = name; document.body.appendChild(a); a.click(); a.remove(); }
   $('#btnDl').onclick = () => { if (!state.id) { toast('Inserisci un identificativo'); return; } download(`${state.id}.json`, JSON.stringify(clean(), null, 2), 'application/json'); toast('Scaricato ' + state.id + '.json'); };
+  $('#btnPayCopy').onclick = async () => { try { await navigator.clipboard.writeText(payUrl()); toast('Link pagamento copiato'); } catch { toast('Copia manuale dal riquadro'); } };
   $('#btnCopy').onclick = async () => { try { await navigator.clipboard.writeText(JSON.stringify(clean(), null, 2)); toast('JSON copiato'); } catch { toast('Copia manuale dal riquadro'); } };
   $('#btnQr').onclick = () => {
     const qr = makeQr(); const n = qr.getModuleCount(); const size = 1024, margin = 64, cell = (size - 2 * margin) / n;
