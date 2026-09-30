@@ -13,7 +13,7 @@ Questo hosting statico è indipendente da GitHub Pages: GitHub resta il reposito
 
 ## Transizione degli indirizzi
 
-Cloudflare ha assegnato al progetto Pages `https://renmenu.pages.dev/`. In questa fase il sito Cloudflare è un **mirror in preparazione**, non ancora la destinazione ufficiale: i canonical e gli OG URL esistenti puntano ancora a GitHub Pages. Non sostituire i link stampati, i canonical o l'eventuale URL di ritorno Stripe finché il nuovo dominio pubblico non è stato scelto e verificato.
+Cloudflare ha assegnato al progetto Pages `https://renmenu.pages.dev/`. Il primo deployment di produzione è riuscito e sono state verificate le pagine principali, i menu JSON, gli asset, la pagina di pagamento e la pagina 404. In questa fase il sito Cloudflare è un **mirror funzionante**, non ancora la destinazione ufficiale: i canonical e gli OG URL esistenti puntano ancora a GitHub Pages. Non sostituire i link stampati, i canonical o l'eventuale URL di ritorno Stripe finché il nuovo dominio pubblico non è stato scelto e verificato.
 
 Nel pannello Cloudflare esiste anche un **Worker** chiamato `renmenu`, creato separatamente: non è il progetto Pages descritto qui. Questa build Pages non usa `npx wrangler deploy` e non richiede un Worker.
 
