@@ -8,6 +8,8 @@ I QR stampabili si trovano in `qr/trattoria-blanch-qr.png` (1080 × 1080 px) e `
 
 Le voci della cucina, i prezzi, il coperto e l'avviso allergie provengono dalle fotografie del cliente `IMG_9187`–`IMG_9203`. Il biglietto `IMG_9207` conferma nome, indirizzo, telefono e chiusure. Il logo e le fotografie di contesto provengono dal sito ufficiale della trattoria. Le foto originali del menù non sono pubblicate nel repository. Traduzioni EN/DE sono state rese più naturali rispetto alla carta stampata, senza introdurre ingredienti non attestati. La carta vini cartacea non indica annate né volumi delle bottiglie.
 
+Nel restyling editoriale, `assets/blecs.webp` riprende il piatto dalla [galleria ufficiale](https://trattoriablanch.it/galleria/); `assets/insegna.webp` ritrae l'insegna originale fotografata sul sito della trattoria. I file sono copie WebP ottimizzate localmente. Il menù e il QR conservano percorso e dati: il progetto resta una carta consultabile, non una nuova versione della lista prezzi.
+
 ## Aggiornare
 
 1. **Piatti e bevande:** modificare `data/food.json` (nome e prezzo; mantenere le chiavi `it`, `en`, `de`). Sono presenti il coperto e l'avviso allergie in `notes`.
