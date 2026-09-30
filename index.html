@@ -104,6 +104,11 @@
   .example p { font-size: var(--text-sm); opacity: 0.8; flex: 1; }
   .example__cta { font-weight: 600; font-size: var(--text-sm); color: var(--color-primary); }
   .example--hi .example__cta { color: var(--color-accent); }
+  .example--blanch { display: grid; grid-column: 1 / -1; gap: 0; padding: 0; overflow: hidden; background: #253a30; color: #f7f2e7; border-color: #253a30; }
+  .example--blanch img { width: 100%; height: 220px; object-fit: cover; }
+  .example--blanch .example__content { display: flex; flex-direction: column; gap: var(--space-3); padding: var(--space-8); }
+  .example--blanch .example__tag, .example--blanch .example__cta { color: #e4cfa8; }
+  @media (min-width: 800px) { .example--blanch { grid-template-columns: minmax(0, 0.9fr) minmax(0, 1.1fr); } .example--blanch img { height: 100%; min-height: 240px; } }
   .faq { display: grid; gap: var(--space-2); max-width: var(--content-default); }
   .faq details { border: 1px solid var(--color-divider); border-radius: var(--radius-lg); background: var(--color-surface); }
   .faq summary { cursor: pointer; padding: var(--space-4) var(--space-5); font-weight: 600; font-size: var(--text-base); list-style: none; display: flex; justify-content: space-between; gap: var(--space-4); }
@@ -195,9 +200,9 @@
 
   <section id="esempi" class="container" style="padding-top:0">
     <div class="section-head">
-      <span class="eyebrow">Un esempio vero</span>
-      <h2>Al Bakaro, Gorizia: lo stesso menù in due versioni.</h2>
-      <p>La prima cicchetteria di Gorizia usa RenMenu per 177 voci tra vini, cicchetti e cocktail. Guardalo dal telefono per farti un'idea del livello.</p>
+      <span class="eyebrow">Lavori realizzati</span>
+      <h2>Menù diversi per locali diversi.</h2>
+      <p>Una cicchetteria a Gorizia e una trattoria storica a Mossa: esplora i menù dal telefono e scopri come la grafica cambia con l’identità del locale.</p>
     </div>
     <div class="examples">
       <a class="example example--hi" href="demo/index.html">
@@ -211,6 +216,10 @@
         <h3>Al Bakaro, versione Standard</h3>
         <p>Lo stesso menù nel formato RenMenu incluso in ogni abbonamento: sezioni, ricerca, allergeni, piatto del giorno, italiano e inglese. Pronto in 24 ore.</p>
         <span class="example__cta">Apri la versione Standard →</span>
+      </a>
+      <a class="example example--blanch" href="casi-studio/trattoria-blanch/">
+        <img src="blanch/assets/esterno.webp" width="900" height="600" loading="lazy" alt="Esterno della Trattoria Blanch a Mossa">
+        <div class="example__content"><span class="example__tag">Caso studio · su misura</span><h3>Trattoria Blanch, una storia dal 1904</h3><p>Dal marchio con il gallo alla carta dei vini: un menù QR editoriale, in italiano, inglese e tedesco, pensato per l’identità della trattoria.</p><span class="example__cta">Scopri il progetto e apri il menù →</span></div>
       </a>
     </div>
   </section>

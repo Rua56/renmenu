@@ -1,0 +1,132 @@
+<!doctype html>
+<html lang="it">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <title>Trattoria Blanch: menù QR su misura | RenMenu</title>
+  <meta name="description" content="Il caso Trattoria Blanch a Mossa: un menù QR su misura che racconta una trattoria dal 1904, con cucina, vini e tre lingue. Scopri il progetto e apri il menù.">
+  <link rel="canonical" href="https://renmenu.pages.dev/casi-studio/trattoria-blanch/">
+  <meta property="og:type" content="article">
+  <meta property="og:site_name" content="RenMenu">
+  <meta property="og:title" content="Trattoria Blanch: una storia dal 1904, un menù su misura">
+  <meta property="og:description" content="A Mossa, nel Collio, il menù QR della Trattoria Blanch unisce identità storica, cucina, vini e tre lingue. Guarda il progetto realizzato da RenMenu.">
+  <meta property="og:url" content="https://renmenu.pages.dev/casi-studio/trattoria-blanch/">
+  <meta property="og:image" content="https://renmenu.pages.dev/blanch/assets/esterno.webp">
+  <meta property="og:locale" content="it_IT">
+  <meta name="twitter:card" content="summary_large_image">
+  <link rel="icon" href="../../assets/favicon.svg" type="image/svg+xml">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,400;9..144,500;9..144,600&amp;family=Instrument+Sans:wght@400;500;600;700&amp;display=swap">
+  <link rel="stylesheet" href="../../assets/style.css">
+  <script type="application/ld+json">{"@context":"https://schema.org","@type":"Article","headline":"Trattoria Blanch a Mossa: un menù QR su misura","description":"Il progetto RenMenu per la Trattoria Blanch: un menù digitale su misura in italiano, inglese e tedesco, con cucina e carta dei vini.","image":"https://renmenu.pages.dev/blanch/assets/esterno.webp","mainEntityOfPage":"https://renmenu.pages.dev/casi-studio/trattoria-blanch/","author":{"@type":"Organization","name":"RenMenu","url":"https://renmenu.pages.dev/"},"publisher":{"@type":"Organization","name":"RenMenu","url":"https://renmenu.pages.dev/"},"about":{"@type":"Restaurant","name":"Trattoria Blanch","address":{"@type":"PostalAddress","streetAddress":"Via Blanchis 35","postalCode":"34070","addressLocality":"Mossa","addressRegion":"GO","addressCountry":"IT"}}}</script>
+  <style>
+    :root { --forest:#253a30; --forest-deep:#182a22; --forest-muted:#9eae9f; --cream:#f5f0e5; --gold:#d5b884; }
+    body { overflow-x:hidden; }
+    .skip-link { position:absolute; left:16px; top:-80px; z-index:200; background:var(--color-surface); padding:10px 16px; }
+    .skip-link:focus { top:10px; }
+    .case-header { position:sticky; top:0; z-index:30; background:var(--color-bg); background:color-mix(in srgb,var(--color-bg) 92%,transparent); backdrop-filter:blur(12px); border-bottom:1px solid var(--color-divider); }
+    .case-header__inner { display:flex; align-items:center; justify-content:space-between; gap:16px; min-height:68px; }
+    .case-header__inner .brand img { width:28px; height:28px; }
+    .case-header__actions { display:flex; gap:10px; align-items:center; }
+    .case-header__back { font-size:var(--text-sm); color:var(--color-text-muted); text-decoration:none; }
+    .case-header__back:hover { color:var(--color-primary); }
+    .breadcrumb { display:flex; align-items:center; gap:8px; flex-wrap:wrap; font-size:var(--text-xs); padding-block:18px; color:var(--color-text-muted); }
+    .breadcrumb a { text-decoration:underline; text-underline-offset:3px; }
+    .case-hero { display:grid; align-items:stretch; gap:0; background:var(--cream); border:1px solid var(--color-border); border-radius:28px; overflow:hidden; }
+    .case-hero__copy { padding:clamp(30px,5vw,68px); display:flex; flex-direction:column; justify-content:center; }
+    .case-hero__copy .eyebrow { color:var(--color-primary); }
+    .case-hero h1 { font-size:clamp(2.6rem,5.6vw,5.4rem); line-height:1.02; letter-spacing:-0.035em; max-width:11ch; margin-top:24px; }
+    .case-hero h1 em { color:var(--forest); font-style:italic; }
+    .case-hero__lead { max-width:48ch; font-size:var(--text-lg); color:#5b554c; margin-top:24px; line-height:1.48; }
+    .case-hero__actions { display:flex; flex-wrap:wrap; gap:10px; margin-top:30px; }
+    .case-hero__photo { position:relative; min-height:320px; overflow:hidden; background:var(--forest); }
+    .case-hero__photo img { width:100%; height:100%; min-height:320px; object-fit:cover; object-position:center; }
+    .case-hero__photo figcaption { position:absolute; left:18px; bottom:18px; max-width:calc(100% - 36px); color:#fff; font-size:var(--text-xs); padding:8px 12px; background:rgba(24,42,34,.8); border-radius:999px; }
+    .case-facts { display:grid; grid-template-columns:repeat(3,minmax(0,1fr)); gap:1px; margin-block:20px 0; background:var(--color-border); border:1px solid var(--color-border); border-radius:18px; overflow:hidden; }
+    .case-facts div { background:var(--color-surface); padding:22px 26px; }
+    .case-facts strong { font-family:var(--font-display); font-size:clamp(1.45rem,2.5vw,2.25rem); font-weight:500; display:block; line-height:1.15; }
+    .case-facts span { font-size:var(--text-xs); color:var(--color-text-muted); display:block; margin-top:6px; }
+    .case-section { padding-block:clamp(62px,9vw,110px) 0; }
+    .case-section__intro { max-width:730px; }
+    .case-section__intro h2 { font-size:clamp(2rem,4vw,3.7rem); margin-top:12px; }
+    .case-section__intro p { color:var(--color-text-muted); margin-top:18px; line-height:1.7; }
+    .story-grid { display:grid; gap:clamp(28px,5vw,80px); align-items:center; margin-top:36px; }
+    .story-grid figure, .detail-figure { margin:0; }
+    .story-grid figure img, .detail-figure img { width:100%; border-radius:18px; object-fit:cover; }
+    .story-grid figure img { aspect-ratio:4/3; }
+    figcaption { color:var(--color-text-muted); font-size:var(--text-xs); margin-top:10px; }
+    .story-grid__copy { max-width:65ch; }
+    .story-grid__copy h3 { font-size:var(--text-xl); }
+    .story-grid__copy p { color:var(--color-text-muted); margin-top:16px; line-height:1.7; }
+    .story-grid__copy a { color:var(--color-primary); text-underline-offset:3px; }
+    .process { display:grid; gap:14px; margin-top:38px; }
+    .process-item { display:grid; grid-template-columns:48px 1fr; gap:14px; padding:24px; border:1px solid var(--color-divider); border-radius:18px; background:var(--color-surface); }
+    .process-item__number { font-family:var(--font-display); font-size:var(--text-xl); color:var(--color-primary); line-height:1.15; }
+    .process-item h3 { font-size:var(--text-lg); }
+    .process-item p { color:var(--color-text-muted); margin-top:7px; font-size:var(--text-sm); }
+    .result { background:var(--forest); color:#f7f2e7; border-radius:28px; overflow:hidden; margin-top:clamp(60px,9vw,112px); }
+    .result__inner { display:grid; align-items:center; gap:0; }
+    .result__copy { padding:clamp(30px,5vw,70px); }
+    .result__eyebrow { color:var(--gold); font-size:var(--text-xs); text-transform:uppercase; letter-spacing:.12em; font-weight:700; }
+    .result h2 { font-size:clamp(2.15rem,4vw,4rem); max-width:14ch; margin-top:16px; }
+    .result p { color:#e1e8df; max-width:50ch; margin-top:20px; }
+    .result ul { list-style:none; display:grid; gap:12px; margin-top:24px; }
+    .result li { display:flex; align-items:flex-start; gap:12px; font-size:var(--text-sm); }
+    .result li::before { content:'✦'; color:var(--gold); flex:none; }
+    .result__link { display:inline-flex; align-items:center; min-height:44px; margin-top:32px; padding:11px 20px; border-radius:999px; background:#f5f0e5; color:var(--forest-deep); font-size:var(--text-sm); font-weight:700; text-decoration:none; }
+    .result__link:hover { background:#fff; transform:translateY(-1px); }
+    .result__image { width:100%; height:100%; min-height:310px; object-fit:cover; }
+    .result__note { font-size:var(--text-xs); margin-top:14px!important; color:#cdd8cc!important; }
+    .ending { text-align:center; margin-block:clamp(68px,9vw,110px); padding:clamp(32px,6vw,70px); border:1px solid var(--color-divider); border-radius:26px; background:var(--color-surface); }
+    .ending h2 { max-width:17ch; margin:10px auto 0; font-size:clamp(2rem,4vw,3.5rem); }
+    .ending p { color:var(--color-text-muted); max-width:52ch; margin:18px auto 28px; }
+    .ending .btn { margin:4px; }
+    .case-footer { padding:26px 0 calc(26px + env(safe-area-inset-bottom)); border-top:1px solid var(--color-divider); display:flex; justify-content:space-between; flex-wrap:wrap; gap:14px; color:var(--color-text-muted); font-size:var(--text-xs); }
+    .case-footer a { text-underline-offset:3px; }
+    @media(min-width:820px) { .case-hero { grid-template-columns:1.04fr .96fr; min-height:540px; } .story-grid { grid-template-columns:1fr 1fr; } .process { grid-template-columns:repeat(3,minmax(0,1fr)); } .result__inner { grid-template-columns:1.05fr .95fr; } }
+    @media(max-width:650px) { .case-header__back { display:none; } .case-header__inner { min-height:60px; } .case-hero h1 { max-width:13ch; } .case-hero__photo { min-height:220px; } .case-hero__photo img { min-height:220px; max-height:350px; } .case-facts div { padding:16px 12px; } .case-facts strong { font-size:1.2rem; } .case-facts span { font-size:.73rem; } .process-item { padding:20px; } }
+    @media(prefers-reduced-motion:reduce) { * { scroll-behavior:auto!important; } }
+  </style>
+</head>
+<body>
+  <a class="skip-link" href="#contenuto">Vai al contenuto</a>
+  <header class="case-header"><div class="container case-header__inner">
+    <a class="brand" href="../../" aria-label="RenMenu, torna alla home"><img src="../../assets/favicon.svg" width="28" height="28" alt="">RenMenu</a>
+    <div class="case-header__actions"><a class="case-header__back" href="../../#esempi">← Tutti gli esempi</a><a class="btn btn--primary btn--sm" href="../../anteprima/">Prova il tuo menù</a></div>
+  </div></header>
+  <main id="contenuto" class="container">
+    <nav class="breadcrumb" aria-label="Percorso"><a href="../../">RenMenu</a><span aria-hidden="true">/</span><a href="../../#esempi">Esempi</a><span aria-hidden="true">/</span><span aria-current="page">Trattoria Blanch</span></nav>
+    <article>
+      <section class="case-hero" aria-labelledby="case-title">
+        <div class="case-hero__copy">
+          <span class="eyebrow">Caso studio · Trattoria Blanch, Mossa</span>
+          <h1 id="case-title">Una storia dal 1904. <em>Un menù fatto per lei.</em></h1>
+          <p class="case-hero__lead">Per la Trattoria Blanch abbiamo trasformato menù, carta dei vini e identità del locale in un’esperienza QR su misura. Senza farle perdere l’aria di casa e di tradizione.</p>
+          <div class="case-hero__actions"><a class="btn btn--primary" href="https://renmenu.pages.dev/blanch/">Apri il menù Blanch ↗</a><a class="btn btn--ghost" href="#progetto">Scopri il progetto</a></div>
+        </div>
+        <figure class="case-hero__photo"><img src="../../blanch/assets/esterno.webp" width="900" height="600" alt="Esterno della Trattoria Blanch a Mossa" fetchpriority="high"><figcaption>Trattoria Blanch · Mossa, Gorizia</figcaption></figure>
+      </section>
+      <div class="case-facts" aria-label="Il progetto in breve"><div><strong>1904</strong><span>Le origini della trattoria</span></div><div><strong>IT · EN · DE</strong><span>Tre lingue nel menù</span></div><div><strong>2 carte</strong><span>Cucina e vini, ben distinti</span></div></div>
+
+      <section class="case-section" id="progetto" aria-labelledby="progetto-title">
+        <div class="case-section__intro"><span class="eyebrow">La sfida</span><h2 id="progetto-title">Portare una trattoria storica sul telefono, senza farla diventare un’app qualsiasi.</h2><p>A Mossa, tra Gorizia e il Collio, la famiglia Blanch porta avanti un’attività nata come osteria nel 1904. Il suo menù non poteva sembrare quello di una cicchetteria contemporanea: doveva conservare il carattere della casa, ma rendere piatti e vini semplici da consultare da QR.</p></div>
+        <div class="story-grid"><figure><img src="../../blanch/assets/sala.webp" width="902" height="649" loading="lazy" alt="Una sala della Trattoria Blanch con tavoli apparecchiati"><figcaption>Una delle sale della trattoria, ritratta nelle fotografie ufficiali.</figcaption></figure><div class="story-grid__copy"><h3>Il punto di partenza: materiali veri.</h3><p>Il locale ci ha fornito le fotografie del menù completo, la carta dei vini e il proprio marchio. Da questi materiali abbiamo costruito una carta digitale leggibile, senza sostituire il racconto del ristorante con piatti inventati o una grafica generica.</p><p>Il gallo del marchio, il verde bosco e le immagini della trattoria guidano la pagina. La <a href="https://trattoriablanch.it/storia/" target="_blank" rel="noopener noreferrer">storia raccontata dal locale</a> rimane il riferimento per il contesto, non una scenografia artificiale.</p></div></div>
+      </section>
+
+      <section class="case-section" aria-labelledby="metodo-title">
+        <div class="case-section__intro"><span class="eyebrow">Il lavoro RenMenu</span><h2 id="metodo-title">Dalla carta fotografata a una carta da sfogliare.</h2><p>Abbiamo seguito il flusso del nostro servizio: il ristoratore comunica i contenuti; il Team RenMenu organizza, realizza e pubblica il menù. Le future modifiche arriveranno sempre dal locale, senza chiedergli di usare un pannello tecnico.</p></div>
+        <div class="process">
+          <div class="process-item"><span class="process-item__number" aria-hidden="true">01</span><div><h3>Contenuti del locale</h3><p>Piatti, prezzi e vini sono stati ricavati dal materiale consegnato, mantenendo la distinzione fra cucina e carta dei vini.</p></div></div>
+          <div class="process-item"><span class="process-item__number" aria-hidden="true">02</span><div><h3>Identità su misura</h3><p>Marchio originale, fotografia autentica e impaginazione editoriale richiamano la trattoria storica anziché ripetere la demo di Al Bakaro.</p></div></div>
+          <div class="process-item"><span class="process-item__number" aria-hidden="true">03</span><div><h3>Menù e QR pronti</h3><p>Una pagina dedicata e un QR stabile: gli ospiti aprono il menù sul proprio telefono; il Team RenMenu cura le modifiche successive.</p></div></div>
+        </div>
+      </section>
+
+      <section class="result" aria-labelledby="risultato-title"><div class="result__inner"><div class="result__copy"><span class="result__eyebrow">Il risultato è online</span><h2 id="risultato-title">La tradizione si vede. Il menù si usa.</h2><p>Una carta mobile con un percorso rapido verso ciò che conta, senza rinunciare al racconto del locale.</p><ul><li>Italiano, inglese e tedesco selezionabili dall’intestazione.</li><li>Cucina e vini in viste separate, con categorie e ricerca.</li><li>Marchio e fotografie originali, leggibilità e accesso diretto a contatti e indicazioni.</li></ul><a class="result__link" href="https://renmenu.pages.dev/blanch/">Sfoglia il menù reale ↗</a><p class="result__note">Piatti, disponibilità e prezzi possono cambiare: per ordinare e per le allergie fa sempre fede il personale della trattoria.</p></div><img class="result__image" src="../../blanch/assets/blecs.webp" width="902" height="601" loading="lazy" alt="Blecs cul gial fotografati dalla Trattoria Blanch"></div></section>
+    </article>
+    <section class="ending" aria-labelledby="ending-title"><span class="eyebrow">E il tuo locale?</span><h2 id="ending-title">La tua storia merita un menù che le somigli.</h2><p>Ci mandi menù e materiali. Noi prepariamo un progetto adatto al tuo ristorante, bar o trattoria e poi lo aggiorniamo quando ci scrivi.</p><a class="btn btn--primary" href="../../anteprima/">Prova un’anteprima gratuita</a><a class="btn btn--ghost" href="../../#prezzi">Scopri il servizio RenMenu</a></section>
+  </main>
+  <footer class="container case-footer"><span>© RenMenu · menù digitali curati dal nostro team</span><span><a href="../../">Torna alla home</a> · <a href="https://trattoriablanch.it/" target="_blank" rel="noopener noreferrer">Sito ufficiale della Trattoria Blanch</a></span></footer>
+</body>
+</html>

@@ -5,10 +5,9 @@ ROOT=$(CDPATH= cd -- "$(dirname -- "$0")/.." && pwd)
 cd "$ROOT"
 rm -rf dist
 mkdir -p dist/blanch/assets dist/blanch/data dist/blanch/qr
-
 # Keep all public pages and demos reachable at the same path relative to site root.
 cp index.html 404.html manifest.webmanifest dist/
-cp -R assets anteprima crea demo menu menus paga dist/
+cp -R assets anteprima crea demo menu menus paga casi-studio dist/
 cp blanch/index.html dist/blanch/index.html
 cp blanch/assets/* dist/blanch/assets/
 cp blanch/data/menu.json dist/blanch/data/menu.json
@@ -41,6 +40,7 @@ cat > dist/sitemap.xml <<'EOF'
 <urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">
   <url><loc>https://renmenu.pages.dev/</loc></url>
   <url><loc>https://renmenu.pages.dev/anteprima/</loc></url>
+  <url><loc>https://renmenu.pages.dev/casi-studio/trattoria-blanch/</loc></url>
 </urlset>
 EOF
 
