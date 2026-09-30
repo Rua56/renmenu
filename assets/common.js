@@ -1,10 +1,11 @@
 /* RenMenu — common helpers */
+const renmenuAssetBase = document.currentScript?.src || location.href;
 window.RENMENU = {
   brand: 'RenMenu',
   tagline: 'Il menù digitale del tuo locale, pronto in 10 minuti.',
   contattoWhatsApp: '393515924327',
   contattoEmail: 'iuran56@gmail.com',
-  logo: '<svg viewBox="0 0 32 32" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="3" width="26" height="26" rx="7"/><path d="M10 11h12M10 16h12M10 21h7"/><circle cx="21.5" cy="21" r="1.2" fill="currentColor" stroke="none"/></svg>',
+  logoUrl: new URL('renmenu-mark.png', renmenuAssetBase).href,
   allergeni: {
     '1': { it: 'Glutine', en: 'Gluten' }, '2': { it: 'Crostacei', en: 'Crustaceans' }, '3': { it: 'Uova', en: 'Eggs' },
     '4': { it: 'Pesce', en: 'Fish' }, '5': { it: 'Arachidi', en: 'Peanuts' }, '6': { it: 'Soia', en: 'Soy' },
@@ -42,7 +43,9 @@ window.RENMENU = {
     document.querySelectorAll('[data-theme-toggle]').forEach(t => t.addEventListener('click', () => {
       d = d === 'dark' ? 'light' : 'dark'; r.setAttribute('data-theme', d); paint();
     }));
-    document.querySelectorAll('[data-logo]').forEach(el => { el.innerHTML = window.RENMENU.logo; });
+    document.querySelectorAll('[data-logo]').forEach(el => {
+      el.innerHTML = `<img class="brand__mark" src="${window.RENMENU.logoUrl}" width="28" height="28" alt="">`;
+    });
     document.querySelectorAll('[data-brand-name]').forEach(el => { el.textContent = window.RENMENU.brand; });
   });
 })();
