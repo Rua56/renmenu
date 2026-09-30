@@ -2,6 +2,8 @@
 
 Il menù pubblico si trova in `blanch/index.html`; l'URL stabile è `https://rua56.github.io/renmenu/blanch/`. Il QR punta a quell'URL, **non al file JSON**. Per aggiornare prezzi o disponibilità si modifica il contenuto e si pubblica il commit: il QR già stampato resta valido.
 
+I QR stampabili si trovano in `qr/trattoria-blanch-qr.png` (1080 × 1080 px) e `qr/trattoria-blanch-qr.svg` (vettoriale). Entrambi codificano lo stesso URL stabile; la versione SVG ha un fondo bianco per conservare il contrasto anche su superfici colorate.
+
 ## Fonti e responsabilità
 
 Le voci della cucina, i prezzi, il coperto e l'avviso allergie provengono dalle fotografie del cliente `IMG_9187`–`IMG_9203`. Il biglietto `IMG_9207` conferma nome, indirizzo, telefono e chiusure. Il logo e le fotografie di contesto provengono dal sito ufficiale della trattoria. Le foto originali del menù non sono pubblicate nel repository. Traduzioni EN/DE sono state rese più naturali rispetto alla carta stampata, senza introdurre ingredienti non attestati. La carta vini cartacea non indica annate né volumi delle bottiglie.
