@@ -10,6 +10,7 @@ Richiesta esplicita: un menù su misura per una trattoria storica di Mossa, chia
 - **Layout:** apertura con gallo e foto autentica del locale; titolo in serif editoriale; scelta netta tra cucina e carta vini; sezioni su righe sottili, non card seriali.
 - **Elemento firma:** la linea da menù stampato, numerazione/etichette sobrie, microtesto «Dal 1904 · Mossa» e fotografie originali del locale. Il logo non è ridisegnato.
 - **Interazione:** lingue IT/EN/DE persistenti, ricerca chiara, scorciatoie alle sezioni, vista vini distinta, pulsante Chiama e indicazioni. Nessun account e nessun carrello.
+- **Uso da QR:** su telefoni l’apertura è volutamente compatta; la carta arriva prima delle fotografie narrative, le categorie restano a portata di mano e la lingua è selezionabile già nell’intestazione. L’URL del QR resta invariato.
 - **Animazione:** transizioni minime nel cambio di scheda e del focus; rispetto di `prefers-reduced-motion`.
 - **Tipografia:** un serif elegante per testate e nomi, sans leggibile per prezzi, allergeni e interfaccia; niente corpo minuscolo.
 - **Voce:** ospitale, sobria, concreta; non inventare descrizioni, ingredienti o annate. Testi storici dal sito ufficiale; voci e prezzi soltanto dal materiale fotografico del cliente.

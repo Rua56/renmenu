@@ -5,9 +5,16 @@
     en: {eyebrow:'FOUR GENERATIONS · ONE TABLE',hero:'Our kitchen,<br>our story.',lead:'Since 1904, a family kitchen guided by the seasons and the traditions of the Collio.',readMenu:'Browse the menu <span aria-hidden="true">↗</span>',readWine:'Wine list',place:'Mossa, in the heart of the Collio',inscription:'a story to share',eyebrowMenu:'AT THE TABLE',menuTitle:'The menu',menuIntro:'Our food and wines, prepared and selected with the care we have always shared.',food:'Food',wine:'Wines',searchLabel:'Search the menu',searchPlaceholder:'Find a dish or a wine…',heritageEyebrow:'OUR STORY',heritageTitle:'A home, a family, a kitchen.',heritageBody:'The Blanch family has welcomed guests to Mossa since 1904. Four generations, traditional dishes and ingredients that reflect the season.',visitEyebrow:'VISIT US',visitTitle:'See you in Mossa.',call:'Call: +39 0481 80020',directions:'Directions ↗',closed:'Closed Monday and Tuesday evenings, and all day Wednesday.',loading:'Loading the menu…',empty:'No results. Try another search.',failed:'The menu could not be loaded. Please try again or call the restaurant.'},
     de: {eyebrow:'VIER GENERATIONEN · EIN TISCH',hero:'Unsere Küche,<br>unsere Geschichte.',lead:'Seit 1904: eine Familienküche, geprägt von den Jahreszeiten und den Traditionen des Collio.',readMenu:'Speisekarte ansehen <span aria-hidden="true">↗</span>',readWine:'Weinkarte',place:'Mossa, im Herzen des Collio',inscription:'eine Geschichte zum Teilen',eyebrowMenu:'BEI TISCH',menuTitle:'Die Speisekarte',menuIntro:'Unsere Gerichte und Weine – mit der Sorgfalt, die uns seit jeher auszeichnet.',food:'Speisen',wine:'Weine',searchLabel:'Speisekarte durchsuchen',searchPlaceholder:'Gericht oder Wein suchen…',heritageEyebrow:'UNSERE GESCHICHTE',heritageTitle:'Ein Haus, eine Familie, eine Küche.',heritageBody:'Seit 1904 begrüßt die Familie Blanch ihre Gäste in Mossa. Vier Generationen, traditionelle Gerichte und Zutaten der Saison.',visitEyebrow:'WIR FREUEN UNS AUF SIE',visitTitle:'Bis bald in Mossa.',call:'Anrufen: +39 0481 80020',directions:'Wegbeschreibung ↗',closed:'Montag- und Dienstagabend sowie mittwochs ganztägig geschlossen.',loading:'Speisekarte wird geladen…',empty:'Keine Einträge gefunden. Versuchen Sie eine andere Suche.',failed:'Die Speisekarte konnte nicht geladen werden. Bitte versuchen Sie es erneut oder rufen Sie das Restaurant an.'}
   };
+  const detailUi = {
+    it: {skip:'Vai al menù',safetyPrompt:'Allergie o intolleranze? Chiedi al personale prima di ordinare.',footerSince:'Trattoria Blanch · dal 1904',footerBy:'Menù digitale curato da ',wineSearch:'Cerca un vino o un produttore…',priceHint:'Chiedi al personale',back:'Trattoria Blanch — torna all’inizio'},
+    en: {skip:'Skip to the menu',safetyPrompt:'Allergies or intolerances? Ask our staff before ordering.',footerSince:'Trattoria Blanch · since 1904',footerBy:'Digital menu by ',wineSearch:'Find a wine or winery…',priceHint:'Ask our staff',back:'Trattoria Blanch — back to the top'},
+    de: {skip:'Zur Speisekarte springen',safetyPrompt:'Allergien oder Unverträglichkeiten? Bitte vor der Bestellung unser Personal fragen.',footerSince:'Trattoria Blanch · seit 1904',footerBy:'Digitale Speisekarte von ',wineSearch:'Wein oder Weingut suchen…',priceHint:'Personal fragen',back:'Trattoria Blanch — zurück zum Anfang'}
+  };
   const allowedLanguages = ['it','en','de'];
   const params = new URLSearchParams(location.search);
-  let language = allowedLanguages.includes(params.get('lang')) ? params.get('lang') : 'it';
+  const requestedLanguage = (params.get('lang') || '').toLowerCase();
+  const deviceLanguage = ((navigator.languages && navigator.languages[0]) || navigator.language || 'it').split('-')[0].toLowerCase();
+  let language = allowedLanguages.includes(requestedLanguage) ? requestedLanguage : (allowedLanguages.includes(deviceLanguage) ? deviceLanguage : 'it');
   let view = params.get('view') === 'wine' ? 'wine' : 'food';
   let data = null;
   const results = document.getElementById('menu-results');
@@ -21,24 +28,27 @@
   const sectionId = (index) => `sezione-${view}-${index}`;
   const updateUrl = () => {
     const url = new URL(location.href);
-    if (language === 'it') url.searchParams.delete('lang'); else url.searchParams.set('lang', language);
+    url.searchParams.set('lang', language);
     if (view === 'food') url.searchParams.delete('view'); else url.searchParams.set('view', view);
-    history.replaceState(null, '', url);
+    if (url.href !== location.href) history.replaceState(null, '', url);
   };
   function applyLanguage() {
     document.documentElement.lang = language;
     document.querySelectorAll('[data-i18n]').forEach(el => {
-      const value = ui[language][el.dataset.i18n];
+      const value = ui[language][el.dataset.i18n] ?? detailUi[language][el.dataset.i18n];
       if (value !== undefined) {
         if (el.dataset.i18n === 'hero' || el.dataset.i18n === 'readMenu') el.innerHTML = value;
         else el.textContent = value;
       }
     });
-    queryInput.placeholder = ui[language].searchPlaceholder;
+    queryInput.placeholder = view === 'wine' ? detailUi[language].wineSearch : ui[language].searchPlaceholder;
     document.querySelectorAll('[data-lang]').forEach(button => button.setAttribute('aria-pressed', String(button.dataset.lang === language)));
     document.querySelectorAll('[data-view]').forEach(button => button.setAttribute('aria-pressed', String(button.dataset.view === view)));
     document.querySelector('.menu-switch').setAttribute('aria-label', language === 'it' ? 'Scegli la carta' : language === 'en' ? 'Choose a menu' : 'Speisekarte wählen');
-    document.querySelector('.language-switch').setAttribute('aria-label', language === 'it' ? 'Seleziona lingua' : language === 'en' ? 'Choose language' : 'Sprache wählen');
+    document.querySelectorAll('.language-switch').forEach(group => group.setAttribute('aria-label', language === 'it' ? 'Seleziona lingua' : language === 'en' ? 'Choose language' : 'Sprache wählen'));
+    document.querySelector('.identity').setAttribute('aria-label', detailUi[language].back);
+    const loading = results.querySelector('.loading');
+    if (loading) loading.textContent = ui[language].loading;
     categories.setAttribute('aria-label', language === 'it' ? 'Categorie del menù' : language === 'en' ? 'Menu categories' : 'Speisekartenrubriken');
     document.title = (language === 'de' ? 'Trattoria Blanch · Speisekarte' : language === 'en' ? 'Trattoria Blanch · Menu' : 'Trattoria Blanch · Menù');
   }
@@ -52,7 +62,7 @@
     const info = [translate(item.detail), item.producer, item.vintage, item.volume].filter(Boolean).join(' · ');
     const prices = String(item.price || '').split(' / ');
     const price = !item.price ? '' : prices.length === 2
-      ? `<div class="menu-item__price menu-item__price--double"><span>${esc(prices[0])}</span><span>/ ${esc(prices[1].startsWith('€') ? prices[1] : '€ ' + prices[1])}</span></div>`
+      ? `<div class="menu-item__price menu-item__price--double"><span>${esc(prices[0])}</span><span>/ ${esc(prices[1].startsWith('€') ? prices[1] : '€ ' + prices[1])}</span><span class="menu-item__hint">${esc(detailUi[language].priceHint)}</span></div>`
       : `<div class="menu-item__price">${esc(item.price)}</div>`;
     const variants = (item.variants || []).length ? `<ul class="menu-item__variants">${item.variants.map(v => `<li><span>${esc(translate(v.label))}</span><b>${esc(v.price)}</b></li>`).join('')}</ul>` : '';
     return `<article class="menu-item"><div><h4 class="menu-item__name">${esc(translate(item.name))}</h4>${desc ? `<p class="menu-item__desc">${esc(desc)}</p>` : ''}${info ? `<p class="menu-item__meta">${esc(info)}</p>` : ''}${variants}</div>${price}</article>`;

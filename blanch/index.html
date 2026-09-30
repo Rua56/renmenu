@@ -20,14 +20,17 @@
   <script src="assets/blanch.js" defer></script>
 </head>
 <body>
-  <a class="skip-link" href="#carta">Vai al menù</a>
+  <a class="skip-link" href="#carta" data-i18n="skip">Vai al menù</a>
   <header class="site-head">
     <a class="identity" href="#inizio" aria-label="Trattoria Blanch — torna all’inizio">
       <span class="identity__small">Trattoria</span>
       <span class="identity__name">Blanch<span class="identity__dot">.</span></span>
       <span class="identity__date">Mossa · dal 1904</span>
     </a>
-    <div class="head-meta"><span class="head-meta__rule"></span><span>Via Blanchis 35<br>34070 Mossa · GO</span></div>
+    <div class="header-actions">
+      <div class="language-switch language-switch--header" role="group" aria-label="Seleziona lingua"><button type="button" data-lang="it" aria-pressed="true" lang="it">IT</button><button type="button" data-lang="en" aria-pressed="false" lang="en">EN</button><button type="button" data-lang="de" aria-pressed="false" lang="de">DE</button></div>
+      <div class="head-meta"><span class="head-meta__rule"></span><span>Via Blanchis 35<br>34070 Mossa · GO</span></div>
+    </div>
   </header>
 
   <main id="inizio">
@@ -45,7 +48,7 @@
     <div class="inscription"><span>1904</span><span class="inscription__ornament" aria-hidden="true">✦</span><span data-i18n="inscription">una storia da condividere</span></div>
 
     <section class="menu-area" id="carta" aria-labelledby="menu-title">
-      <div class="menu-area__intro"><div><div class="eyebrow eyebrow--forest" data-i18n="eyebrowMenu">IN TAVOLA</div><h2 id="menu-title" data-i18n="menuTitle">Il menù</h2></div><p data-i18n="menuIntro">I piatti della nostra cucina e i vini da scoprire, con la cura di sempre.</p></div>
+      <div class="menu-area__intro"><div><div class="eyebrow eyebrow--forest" data-i18n="eyebrowMenu">IN TAVOLA</div><h2 id="menu-title" data-i18n="menuTitle">Il menù</h2></div><div class="menu-area__intro-copy"><p data-i18n="menuIntro">I piatti della nostra cucina e i vini da scoprire, con la cura di sempre.</p><p class="safety-prompt" data-i18n="safetyPrompt">Allergie o intolleranze? Chiedi al personale prima di ordinare.</p></div></div>
       <div class="menu-tools" id="tools">
         <div class="menu-switch" role="group" aria-label="Scegli la carta"><button type="button" data-view="food" aria-pressed="true" data-i18n="food">La cucina</button><button type="button" data-view="wine" aria-pressed="false" data-i18n="wine">I vini</button></div>
         <div class="language-switch" role="group" aria-label="Seleziona lingua"><button type="button" data-lang="it" aria-pressed="true" lang="it">IT</button><button type="button" data-lang="en" aria-pressed="false" lang="en">EN</button><button type="button" data-lang="de" aria-pressed="false" lang="de">DE</button></div>
@@ -61,7 +64,7 @@
 
     <section class="visit" aria-labelledby="visit-title"><div><span class="eyebrow eyebrow--forest" data-i18n="visitEyebrow">TI ASPETTIAMO</span><h2 id="visit-title" data-i18n="visitTitle">Ci vediamo a Mossa.</h2><address>Via Blanchis 35<br>34070 Mossa (GO)</address></div><div class="visit__actions"><a class="button button--dark" href="tel:+39048180020" data-i18n="call">Chiama: 0481 80020</a><a class="button button--line" href="https://www.google.com/maps/search/?api=1&amp;query=Trattoria+Blanch+Via+Blanchis+35+Mossa" target="_blank" rel="noopener noreferrer" data-i18n="directions">Indicazioni ↗</a><a class="visit__web" href="https://trattoriablanch.it/" target="_blank" rel="noopener noreferrer">trattoriablanch.it ↗</a><p data-i18n="closed">Chiuso lunedì e martedì sera; mercoledì tutto il giorno.</p></div></section>
   </main>
-  <footer class="site-footer"><span>Trattoria Blanch · dal 1904</span><span>Menù digitale curato da <a href="../">RenMenu</a></span></footer>
+  <footer class="site-footer"><span data-i18n="footerSince">Trattoria Blanch · dal 1904</span><span><span data-i18n="footerBy">Menù digitale curato da </span><a href="../">RenMenu</a></span></footer>
   <noscript><p class="no-script">Per leggere la carta digitale abilita JavaScript. Per informazioni chiama la Trattoria Blanch al <a href="tel:+39048180020">0481 80020</a>.</p></noscript>
 </body>
 </html>
