@@ -1,0 +1,67 @@
+<!doctype html>
+<html lang="it">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <meta name="theme-color" content="#35483b">
+  <meta name="description" content="Il menù della Trattoria Blanch a Mossa: la cucina di famiglia dal 1904 e i vini del territorio. Disponibile in italiano, inglese e tedesco.">
+  <meta name="robots" content="noindex,follow">
+  <meta property="og:type" content="website">
+  <meta property="og:title" content="Trattoria Blanch · Menù e carta dei vini">
+  <meta property="og:description" content="La cucina della famiglia Blanch, dal 1904 a Mossa.">
+  <meta property="og:image" content="https://rua56.github.io/renmenu/blanch/assets/esterno.webp">
+  <link rel="canonical" href="https://rua56.github.io/renmenu/blanch/">
+  <link rel="icon" href="assets/favicon.png" type="image/png">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=Libre+Caslon+Display&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="assets/blanch.css">
+  <title>Trattoria Blanch · Menù</title>
+  <script src="assets/blanch.js" defer></script>
+</head>
+<body>
+  <a class="skip-link" href="#carta">Vai al menù</a>
+  <header class="site-head">
+    <a class="identity" href="#inizio" aria-label="Trattoria Blanch — torna all’inizio">
+      <span class="identity__small">Trattoria</span>
+      <span class="identity__name">Blanch<span class="identity__dot">.</span></span>
+      <span class="identity__date">Mossa · dal 1904</span>
+    </a>
+    <div class="head-meta"><span class="head-meta__rule"></span><span>Via Blanchis 35<br>34070 Mossa · GO</span></div>
+  </header>
+
+  <main id="inizio">
+    <section class="opening" aria-labelledby="opening-title">
+      <div class="opening__copy">
+        <div class="eyebrow" data-i18n="eyebrow">QUATTRO GENERAZIONI · UNA TAVOLA</div>
+        <img class="opening__mark" src="assets/marchio.png" alt="Gallo e marchio originale Blanch" width="445" height="477">
+        <h1 id="opening-title" data-i18n="hero">La nostra cucina,<br>la nostra storia.</h1>
+        <p class="opening__text" data-i18n="lead">Dal 1904, una cucina di famiglia che segue le stagioni e le tradizioni del Collio.</p>
+        <div class="opening__links"><a class="button button--dark" href="#carta" data-i18n="readMenu">Sfoglia il menù <span aria-hidden="true">↗</span></a><a class="button button--line" href="#carta" data-action="wine" data-i18n="readWine">Carta dei vini</a></div>
+      </div>
+      <figure class="opening__figure"><img src="assets/esterno.webp" width="900" height="600" alt="La Trattoria Blanch immersa nel verde a Mossa"><figcaption data-i18n="place">Mossa, nel cuore del Collio</figcaption></figure>
+    </section>
+
+    <div class="inscription"><span>1904</span><span class="inscription__ornament" aria-hidden="true">✦</span><span data-i18n="inscription">una storia da condividere</span></div>
+
+    <section class="menu-area" id="carta" aria-labelledby="menu-title">
+      <div class="menu-area__intro"><div><div class="eyebrow eyebrow--forest" data-i18n="eyebrowMenu">IN TAVOLA</div><h2 id="menu-title" data-i18n="menuTitle">Il menù</h2></div><p data-i18n="menuIntro">I piatti della nostra cucina e i vini da scoprire, con la cura di sempre.</p></div>
+      <div class="menu-tools" id="tools">
+        <div class="menu-switch" role="group" aria-label="Scegli la carta"><button type="button" data-view="food" aria-pressed="true" data-i18n="food">La cucina</button><button type="button" data-view="wine" aria-pressed="false" data-i18n="wine">I vini</button></div>
+        <div class="language-switch" role="group" aria-label="Seleziona lingua"><button type="button" data-lang="it" aria-pressed="true" lang="it">IT</button><button type="button" data-lang="en" aria-pressed="false" lang="en">EN</button><button type="button" data-lang="de" aria-pressed="false" lang="de">DE</button></div>
+      </div>
+      <div class="menu-search"><label class="sr-only" for="menu-query" data-i18n="searchLabel">Cerca nel menù</label><span aria-hidden="true">⌕</span><input id="menu-query" type="search" autocomplete="off" placeholder="Cerca un piatto o un vino…" aria-controls="menu-results"></div>
+      <nav class="category-nav" id="category-nav" aria-label="Categorie del menù"></nav>
+      <p class="sr-only" id="menu-status" role="status"></p>
+      <div class="menu-results" id="menu-results"><p class="loading">Caricamento della carta…</p></div>
+      <div class="menu-note" id="menu-note"></div>
+    </section>
+
+    <aside class="heritage" aria-labelledby="heritage-title"><div class="heritage__text"><span class="eyebrow eyebrow--light" data-i18n="heritageEyebrow">LA NOSTRA STORIA</span><h2 id="heritage-title" data-i18n="heritageTitle">Una casa, una famiglia, una cucina.</h2><p data-i18n="heritageBody">Dal 1904 la famiglia Blanch accoglie i suoi ospiti a Mossa. Quattro generazioni, piatti della tradizione e ingredienti che raccontano la stagione.</p><span class="heritage__signature">Trattoria Blanch · 1904—oggi</span></div><img src="assets/sala.webp" width="902" height="649" loading="lazy" alt="La sala della Trattoria Blanch"></aside>
+
+    <section class="visit" aria-labelledby="visit-title"><div><span class="eyebrow eyebrow--forest" data-i18n="visitEyebrow">TI ASPETTIAMO</span><h2 id="visit-title" data-i18n="visitTitle">Ci vediamo a Mossa.</h2><address>Via Blanchis 35<br>34070 Mossa (GO)</address></div><div class="visit__actions"><a class="button button--dark" href="tel:+39048180020" data-i18n="call">Chiama: 0481 80020</a><a class="button button--line" href="https://www.google.com/maps/search/?api=1&amp;query=Trattoria+Blanch+Via+Blanchis+35+Mossa" target="_blank" rel="noopener noreferrer" data-i18n="directions">Indicazioni ↗</a><a class="visit__web" href="https://trattoriablanch.it/" target="_blank" rel="noopener noreferrer">trattoriablanch.it ↗</a><p data-i18n="closed">Chiuso lunedì e martedì sera; mercoledì tutto il giorno.</p></div></section>
+  </main>
+  <footer class="site-footer"><span>Trattoria Blanch · dal 1904</span><span>Menù digitale curato da <a href="../">RenMenu</a></span></footer>
+  <noscript><p class="no-script">Per leggere la carta digitale abilita JavaScript. Per informazioni chiama la Trattoria Blanch al <a href="tel:+39048180020">0481 80020</a>.</p></noscript>
+</body>
+</html>

@@ -1,0 +1,112 @@
+{
+  "food": [
+    {
+      "title": {"it":"Antipasti","en":"Starters","de":"Vorspeisen"},
+      "items": [
+        {"name":{"it":"Prosciutto di San Daniele al coltello","en":"Hand-sliced San Daniele prosciutto","de":"San-Daniele-Rohschinken, von Hand geschnitten"},"price":"€ 12,00","source":"IMG_9190"},
+        {"name":{"it":"Salame nostrano","en":"Local salami","de":"Salami aus der Region"},"price":"€ 10,00","source":"IMG_9190"},
+        {"name":{"it":"Formaggi: Montasio 60 gg, Parmigiano, Gorgonzola","en":"Cheese selection: Montasio aged 60 days, Parmigiano, Gorgonzola","de":"Käseauswahl: Montasio (60 Tage), Parmigiano, Gorgonzola"},"price":"€ 10,00","source":"IMG_9190"},
+        {"name":{"it":"Prosciutto cotto con kren","en":"Cooked ham with horseradish","de":"Kochschinken mit Meerrettich"},"price":"€ 10,00","source":"IMG_9190"},
+        {"name":{"it":"Antipasto misto","en":"Mixed starter","de":"Gemischte Vorspeise"},"price":"€ 12,00","source":"IMG_9190"}
+      ]
+    },
+    {
+      "title": {"it":"Primi piatti","en":"First courses","de":"Erste Gänge"},
+      "caption": {"it":"Mezza porzione: € 2,00 in meno rispetto alla porzione intera.","en":"Half portion: € 2.00 less than a full portion.","de":"Halbe Portion: € 2,00 weniger als eine ganze Portion."},
+      "items": [
+        {"name":{"it":"Blecs cul gial","en":"Blecs cul gial · handmade pasta with rooster ragù","de":"Blecs cul gial · hausgemachte Pasta mit Hahnragout"},"description":{"it":"Maltagliati con sugo di gallo","en":"Handmade pasta with rooster sauce","de":"Hausgemachte Blecs mit Hahnsauce"},"price":"€ 10,00","source":"IMG_9191"},
+        {"name":{"it":"Blecs con funghi misti di bosco","en":"Blecs with mixed forest mushrooms","de":"Blecs mit gemischten Waldpilzen"},"price":"€ 13,00","source":"IMG_9191"},
+        {"name":{"it":"Gnocchi di patate","en":"Potato gnocchi","de":"Kartoffelgnocchi"},"description":{"it":"Con sugo d’arrosto, sugo di gallo, ragù di carne o salsa di pomodoro","en":"With roast sauce, rooster sauce, meat ragù or tomato sauce","de":"Mit Bratensauce, Hahnsauce, Fleischragout oder Tomatensauce"},"price":"€ 10,00","source":"IMG_9191"},
+        {"name":{"it":"Gnocchi di patate con funghi misti di bosco","en":"Potato gnocchi with mixed forest mushrooms","de":"Kartoffelgnocchi mit gemischten Waldpilzen"},"price":"€ 13,00","source":"IMG_9191","editorial_note":"La voce 'Funghi misti di bosco' è impaginata sotto 'Gnocchi di patate con:': lettura contestuale della variante."},
+        {"name":{"it":"Ravioli fatti in casa con verdure di stagione","en":"Homemade ravioli with seasonal vegetables","de":"Hausgemachte Ravioli mit Gemüse der Saison"},"price":"€ 10,00 / 13,00","source":"IMG_9191","editorial_note":"Italiano parzialmente coperto da adesivo; traduzione inglese leggibile e parte superiore delle parole italiane visibile. Confermare formulazione e applicazione dei due prezzi."},
+        {"name":{"it":"Lasagne con ragù di carne","en":"Lasagne with meat ragù","de":"Lasagne mit Fleischragout"},"price":"€ 10,00","source":"IMG_9191"},
+        {"name":{"it":"Crespelle con verdure di stagione","en":"Crêpes with seasonal vegetables","de":"Crêpes mit Gemüse der Saison"},"price":"€ 10,00 / 13,00","source":"IMG_9191","editorial_note":"Due importi stampati senza dettaglio su quando si applicano."},
+        {"name":{"it":"Minestre o zuppe","en":"Soups","de":"Suppen"},"price":"€ 10,00 / 13,00","source":"IMG_9191","editorial_note":"Due importi stampati senza dettaglio su quando si applicano."},
+        {"name":{"it":"Gnocchi di ricotta con spinaci o zucca gialla","en":"Ricotta gnocchi with spinach or yellow pumpkin","de":"Ricotta-Gnocchi mit Spinat oder gelbem Kürbis"},"description":{"it":"Con burro fuso e ricotta affumicata","en":"With melted butter and smoked ricotta","de":"Mit geschmolzener Butter und geräuchertem Ricotta"},"price":"€ 10,00","source":"IMG_9191","editorial_note":"Opzione italiana coperta da adesivo; EN e DE stampati confermano zucca gialla."}
+      ]
+    },
+    {
+      "title":{"it":"Secondi piatti","en":"Main courses","de":"Hauptgerichte"},
+      "caption":{"it":"Mezza porzione: € 3,00 in meno rispetto alla porzione intera.","en":"Half portion: € 3.00 less than a full portion.","de":"Halbe Portion: € 3,00 weniger als eine ganze Portion."},
+      "items":[
+        {"name":{"it":"Arrosto di vitello al forno","en":"Oven-roasted veal","de":"Kalbsbraten aus dem Ofen"},"price":"€ 13,00","source":"IMG_9192"},
+        {"name":{"it":"Stinco di vitello servito a fette","en":"Sliced veal shank","de":"Kalbshaxe in Scheiben"},"price":"€ 15,00","source":"IMG_9192"},
+        {"name":{"it":"Brasato di manzo al vino rosso","en":"Beef braised in red wine","de":"Rinderschmorbraten in Rotwein"},"price":"€ 13,00","source":"IMG_9192"},
+        {"name":{"it":"Fegato di vitello alla veneziana","en":"Venetian-style veal liver with onions","de":"Kalbsleber venezianischer Art mit Zwiebeln"},"price":"€ 13,00","source":"IMG_9192"},
+        {"name":{"it":"Cinghiale o capriolo in umido con polenta","en":"Stewed wild boar or roe deer with polenta","de":"Geschmortes Wildschwein oder Reh mit Polenta"},"price":"€ 15,00","source":"IMG_9192"},
+        {"name":{"it":"Funghi trifolati misti con polenta","en":"Sautéed mixed mushrooms with polenta","de":"Gemischte sautierte Pilze mit Polenta"},"price":"€ 15,00","source":"IMG_9192"},
+        {"name":{"it":"Filetto di manzo o braciola di vitello alla piastra","en":"Grilled beef fillet or veal chop","de":"Rinderfilet oder Kalbskotelett vom Grill"},"price":"€ 21,00","source":"IMG_9192","editorial_note":"Il prezzo è allineato al titolo carni alla piastra e precede queste due scelte; associazione per impaginazione."},
+        {"name":{"it":"Roastbeef, braciola di maiale, scaloppina di vitello o petto di pollo","en":"Roast beef, pork chop, veal escalope or chicken breast","de":"Roastbeef, Schweinekotelett, Kalbsschnitzel oder Hähnchenbrust"},"price":"€ 13,00 / 15,00","source":"IMG_9192","editorial_note":"La carta non associa ciascuno dei due prezzi alle singole carni."}
+      ]
+    },
+    {
+      "title":{"it":"Contorni","en":"Side dishes","de":"Beilagen"},
+      "caption":{"it":"Mezza porzione: € 1,00 in meno rispetto alla porzione intera.","en":"Half portion: € 1.00 less than a full portion.","de":"Halbe Portion: € 1,00 weniger als eine ganze Portion."},
+      "items":[
+        {"name":{"it":"Patate al tegame","en":"Potatoes with onions and bacon","de":"Kartoffeln mit Zwiebeln und Speck"},"price":"€ 5,00","source":"IMG_9193"},
+        {"name":{"it":"Spinaci al burro","en":"Buttered spinach","de":"Spinat mit Butter"},"price":"€ 5,00","source":"IMG_9193"},
+        {"name":{"it":"Peperonata","en":"Stewed peppers with onions and tomatoes","de":"Geschmorte Paprika mit Zwiebeln und Tomaten"},"price":"€ 5,00","source":"IMG_9193"},
+        {"name":{"it":"Funghi trifolati misti di bosco con polenta","en":"Sautéed mixed forest mushrooms with polenta","de":"Gemischte sautierte Waldpilze mit Polenta"},"price":"€ 8,00","source":"IMG_9193"},
+        {"name":{"it":"Insalata mista","en":"Mixed salad","de":"Gemischter Salat"},"price":"€ 5,00","source":"IMG_9193"},
+        {"name":{"it":"Verdura lessa","en":"Boiled vegetables","de":"Gekochtes Gemüse"},"price":"€ 5,00","source":"IMG_9193"}
+      ]
+    },
+    {
+      "title":{"it":"Dolci","en":"Desserts","de":"Desserts"},
+      "caption":{"it":"Mezza porzione: € 2,00 in meno rispetto alla porzione intera.","en":"Half portion: € 2.00 less than a full portion.","de":"Halbe Portion: € 2,00 weniger als eine ganze Portion."},
+      "items":[
+        {"name":{"it":"Sfogliatine alla crema","en":"Mille-feuille with cream","de":"Cremeschnitten"},"price":"€ 6,00","source":"IMG_9194"},
+        {"name":{"it":"Strudel di mele","en":"Apple strudel","de":"Apfelstrudel"},"price":"€ 6,00","source":"IMG_9194"},
+        {"name":{"it":"Semifreddo al torrone","en":"Nougat semifreddo","de":"Torrone-Halbgefrorenes"},"price":"€ 6,00","source":"IMG_9194"},
+        {"name":{"it":"Crème brûlée","en":"Crème brûlée","de":"Crème brûlée"},"price":"€ 6,00","source":"IMG_9194"},
+        {"name":{"it":"Tortino al cioccolato con cuore morbido","en":"Warm chocolate cake with a soft centre","de":"Schokoladenküchlein mit flüssigem Kern"},"price":"€ 6,00","source":"IMG_9194"},
+        {"name":{"it":"Sorbetto al limone, mela verde o mandarino","en":"Lemon, green apple or mandarin sorbet","de":"Sorbet mit Zitrone, grünem Apfel oder Mandarine"},"price":"€ 4,00","source":"IMG_9194"}
+      ]
+    },
+    {
+      "title":{"it":"Vini al calice e sfusi","en":"Wine by the glass and carafe","de":"Wein im Glas und in der Karaffe"},
+      "caption":{"it":"Az. Ag. Scolaris","en":"Scolaris winery","de":"Weingut Scolaris"},
+      "items":[
+        {"name":{"it":"Friulano · Az. Ag. Scolaris","en":"Friulano · Scolaris","de":"Friulano · Scolaris"},"variants":[{"label":{"it":"Calice","en":"Glass","de":"Glas"},"price":"€ 1,50"},{"label":{"it":"1/4 litro","en":"1/4 litre","de":"1/4 Liter"},"price":"€ 3,00"},{"label":{"it":"1/2 litro","en":"1/2 litre","de":"1/2 Liter"},"price":"€ 6,00"},{"label":{"it":"1 litro","en":"1 litre","de":"1 Liter"},"price":"€ 12,00"}],"source":"IMG_9195"},
+        {"name":{"it":"Merlot · Az. Ag. Scolaris","en":"Merlot · Scolaris","de":"Merlot · Scolaris"},"variants":[{"label":{"it":"Calice","en":"Glass","de":"Glas"},"price":"€ 1,50"},{"label":{"it":"1/4 litro","en":"1/4 litre","de":"1/4 Liter"},"price":"€ 3,00"},{"label":{"it":"1/2 litro","en":"1/2 litre","de":"1/2 Liter"},"price":"€ 6,00"},{"label":{"it":"1 litro","en":"1 litre","de":"1 Liter"},"price":"€ 12,00"}],"source":"IMG_9195"},
+        {"name":{"it":"Vino bianco frizzante · Az. Ag. Scolaris","en":"Sparkling white wine · Scolaris","de":"Perlender Weißwein · Scolaris"},"variants":[{"label":{"it":"Calice","en":"Glass","de":"Glas"},"price":"€ 1,50"},{"label":{"it":"1/4 litro","en":"1/4 litre","de":"1/4 Liter"},"price":"€ 3,00"},{"label":{"it":"1/2 litro","en":"1/2 litre","de":"1/2 Liter"},"price":"€ 6,00"},{"label":{"it":"1 litro","en":"1 litre","de":"1 Liter"},"price":"€ 12,00"}],"source":"IMG_9195"}
+      ]
+    },
+    {
+      "title":{"it":"Bevande e birra","en":"Soft drinks and beer","de":"Alkoholfreie Getränke und Bier"},
+      "items":[
+        {"name":{"it":"Acqua gassata","en":"Sparkling water","de":"Mineralwasser mit Kohlensäure"},"variants":[{"label":{"it":"1/2 litro","en":"1/2 litre","de":"1/2 Liter"},"price":"€ 2,00"},{"label":{"it":"1 litro","en":"1 litre","de":"1 Liter"},"price":"€ 3,00"}],"source":"IMG_9195"},
+        {"name":{"it":"Acqua naturale","en":"Still water","de":"Stilles Wasser"},"variants":[{"label":{"it":"1/2 litro","en":"1/2 litre","de":"1/2 Liter"},"price":"€ 2,00"},{"label":{"it":"1 litro","en":"1 litre","de":"1 Liter"},"price":"€ 3,00"}],"source":"IMG_9195"},
+        {"name":{"it":"Coca-Cola","en":"Coca-Cola","de":"Coca-Cola"},"price":"€ 3,00","source":"IMG_9195"},
+        {"name":{"it":"Coca-Cola Zero","en":"Coca-Cola Zero","de":"Coca-Cola Zero"},"price":"€ 3,00","source":"IMG_9195"},
+        {"name":{"it":"Fanta","en":"Fanta","de":"Fanta"},"price":"€ 3,00","source":"IMG_9195"},
+        {"name":{"it":"Birra Paulaner · bottiglia 0,5","en":"Paulaner beer · 0.5 bottle","de":"Paulaner Bier · Flasche 0,5"},"price":"€ 3,00","source":"IMG_9195","editorial_note":"Unità di misura per 0,5 non stampata: non specificare litri."},
+        {"name":{"it":"Succhi di frutta","en":"Fruit juices","de":"Fruchtsäfte"},"price":"€ 2,50","source":"IMG_9195"}
+      ]
+    },
+    {
+      "title":{"it":"Aperitivi, caffetteria e digestivi","en":"Aperitifs, coffee and digestifs","de":"Aperitifs, Kaffee und Digestifs"},
+      "items":[
+        {"name":{"it":"Gingerino","en":"Gingerino","de":"Gingerino"},"price":"€ 2,00","source":"IMG_9195"},
+        {"name":{"it":"Aperol Spritz","en":"Aperol Spritz","de":"Aperol Spritz"},"price":"€ 3,00","source":"IMG_9195"},
+        {"name":{"it":"Caffè","en":"Espresso","de":"Espresso"},"price":"€ 1,50","source":"IMG_9195"},
+        {"name":{"it":"Cappuccino","en":"Cappuccino","de":"Cappuccino"},"price":"€ 2,00","source":"IMG_9195"},
+        {"name":{"it":"Tè","en":"Tea","de":"Tee"},"price":"€ 2,00","source":"IMG_9195"},
+        {"name":{"it":"Amari","en":"Italian bitters","de":"Italienische Kräuterliköre"},"price":"€ 3,00","source":"IMG_9195"},
+        {"name":{"it":"Grappe","en":"Grappa","de":"Grappa"},"price":"€ 4,00","source":"IMG_9195"}
+      ]
+    }
+  ],
+  "notes": {
+    "food": {
+      "it":"Coperto € 3,00. Per intolleranze o allergie e informazioni riguardo agli ingredienti presenti negli alimenti e nelle bevande servite, vi invitiamo a richiedere informazioni al nostro personale prima dell’ordine. Grazie.",
+      "en":"Cover charge € 3.00. In case of intolerances or allergies, or for information about ingredients in the food and drinks served, please ask our staff before ordering. Thank you.",
+      "de":"Gedeck € 3,00. Bei Unverträglichkeiten oder Allergien sowie Fragen zu Inhaltsstoffen der Speisen und Getränke bitten wir Sie, sich vor der Bestellung an unser Personal zu wenden. Vielen Dank."
+    },
+    "wine": {
+      "it":"Le bottiglie non vengono servite a calice. Per i vini al calice, consultare la sezione La cucina → Vini al calice e sfusi.",
+      "en":"Bottles are not served by the glass. For wines by the glass, see Food → Wine by the glass and carafe.",
+      "de":"Die Flaschenweine werden nicht glasweise ausgeschenkt. Weine im Glas finden Sie unter Speisen → Wein im Glas und in der Karaffe."
+    }
+  }
+}
