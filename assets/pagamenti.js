@@ -39,10 +39,10 @@ window.RENMENU.pagamenti = {
      Se cambi un prezzo qui, ricordati di cambiarlo anche nel listino di index.html. */
   piani: {
     mensile:  { nome: 'Standard',  prezzo: 25,  unita: '/ mese', prova: true,
-                descr: 'Menù online in 24 ore, QR, IT + EN, aggiornamenti illimitati. Primo mese gratis, disdici quando vuoi.' },
+                descr: 'Menù online in 24 ore, QR, IT + EN, aggiornamenti illimitati. 30 giorni gratis sul piano Standard mensile; la carta viene addebitata al termine della prova, salvo disdetta prima della scadenza.' },
     annuale:  { nome: 'Annuale',   prezzo: 249, unita: '/ anno',
                 descr: 'Tutto il mensile, una lingua extra, QR con il tuo logo, fattura unica. Due mesi gratis rispetto al mensile.' },
     sumisura: { nome: 'Premium',   prezzo: 490, unita: 'acconto', mensile: 39,
-                descr: 'Grafica disegnata sul tuo locale, fino a 4 lingue, tema giorno/notte. Il preventivo definitivo lo concordiamo su WhatsApp; qui versi l\'acconto per partire.' }
+                descr: 'Progetto su preventivo. Il costo complessivo viene concordato prima dell’acconto iniziale di 490 €, scalato dal totale. Gestione 39 € al mese dalla pubblicazione del menù, su accordo separato.' }
   }
 };

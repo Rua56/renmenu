@@ -44,8 +44,8 @@
 <script>
   const R = window.RENMENU, piano = new URLSearchParams(location.search).get('piano') || '';
   const nomi = { mensile: 'Standard mensile', annuale: 'Annuale', sumisura: 'Premium su misura (acconto)', sumisura_mensile: 'Premium, gestione mensile' };
-  if (piano === 'mensile') document.getElementById('msg').textContent = 'Abbonamento attivato. Il primo mese è gratis: la carta verrà addebitata solo tra 30 giorni. Ti abbiamo inviato la conferma via email.';
-  if (piano === 'sumisura') document.getElementById('msg').textContent = 'Acconto ricevuto. Ti contattiamo entro oggi per iniziare il progetto del tuo menù su misura.';
+  if (piano === 'mensile') document.getElementById('msg').textContent = 'Piano Standard mensile attivato. Hai 30 giorni gratis: la carta verrà addebitata al termine della prova, salvo disdetta prima della scadenza. Ti abbiamo inviato la conferma via email.';
+  if (piano === 'sumisura') document.getElementById('msg').textContent = 'Acconto ricevuto. Il progetto e il costo complessivo sono stati concordati: ti contattiamo entro oggi per iniziare il tuo menù su misura.';
   const msg = `Ciao! Ho appena attivato RenMenu${nomi[piano] ? ' (' + nomi[piano] + ')' : ''}. Ecco il menù del mio locale:`;
   document.getElementById('wa').href = R.contattoWhatsApp ? `https://wa.me/${R.contattoWhatsApp}?text=${encodeURIComponent(msg)}` : `mailto:${R.contattoEmail}`;
 </script>

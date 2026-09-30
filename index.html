@@ -42,7 +42,10 @@
   .hero h1 { font-size: var(--text-3xl); font-weight: 500; line-height: 1.02; letter-spacing: -0.02em; margin-top: var(--space-4); }
   .hero h1 em { font-style: italic; color: var(--color-primary); font-variation-settings: 'opsz' 144; }
   .hero__lead { margin-top: var(--space-5); font-size: var(--text-lg); color: var(--color-text-muted); max-width: 34ch; line-height: 1.45; }
-  .hero__cta { display: flex; flex-wrap: wrap; gap: var(--space-3); margin-top: var(--space-8); }
+  .hero__cta { display: flex; flex-wrap: wrap; align-items: center; gap: var(--space-3); margin-top: var(--space-8); }
+  .hero__contact { display: inline-flex; align-items: center; min-height: 44px; padding: var(--space-2) var(--space-1); color: var(--color-primary); font-size: var(--text-sm); font-weight: 600; text-decoration-thickness: 1px; text-underline-offset: 3px; }
+  .hero__contact:hover { color: var(--color-primary-hover); }
+  @media (max-width: 559px) { .hero__cta { display: grid; max-width: 320px; } .hero__cta .btn { width: 100%; } .hero__contact { justify-content: center; } }
   .hero__note { margin-top: var(--space-4); font-size: var(--text-xs); color: var(--color-text-faint); }
   @media (min-width: 900px) { .hero { grid-template-columns: 1.1fr 0.9fr; } }
 
@@ -135,7 +138,7 @@
     </nav>
     <div class="nav__right">
       <button class="theme-toggle" data-theme-toggle type="button"></button>
-      <a class="btn btn--primary btn--sm" href="demo/index.html">Vedi un esempio</a>
+      <a class="btn btn--primary btn--sm" href="anteprima/index.html">Prova il tuo menù</a>
     </div>
   </div>
 </header>
@@ -147,9 +150,9 @@
       <h1>Il menù del tuo locale, <em>sul telefono</em> dei tuoi clienti.</h1>
       <p class="hero__lead">Un QR sul tavolo. Il menù si apre subito, senza app, in più lingue. Cambi un prezzo? Ci scrivi su WhatsApp ed è aggiornato. Ovunque sia il tuo locale.</p>
       <div class="hero__cta">
-        <a class="btn btn--primary" href="demo/index.html">Guarda il menù di Al Bakaro</a>
-        <a class="btn btn--ghost" href="anteprima/index.html">Prova il tuo menù</a>
-        <a class="btn btn--ghost" data-contact href="#prezzi">Scrivici su WhatsApp</a>
+        <a class="btn btn--primary" href="anteprima/index.html">Prova il tuo menù</a>
+        <a class="btn btn--ghost" href="demo/index.html">Guarda un esempio reale</a>
+        <a class="hero__contact" data-contact href="#prezzi">Scrivici su WhatsApp</a>
       </div>
       <p class="hero__note">Pronto in 24 ore · Da 25 € al mese · Tutto via WhatsApp, in tutta Italia</p>
     </div>
@@ -235,6 +238,7 @@
         <div class="plan__name">Standard · mensile</div>
         <div class="plan__price">25 € <small>/ mese</small></div>
         <ul role="list">
+          <li>30 giorni gratis sul piano Standard mensile</li>
           <li>Menù online entro 24 ore</li>
           <li>QR da stampare per tavoli e vetrina</li>
           <li>Italiano + inglese</li>
@@ -242,7 +246,7 @@
           <li>Allergeni e piatto del giorno</li>
           <li>Disdici quando vuoi</li>
         </ul>
-        <div class="plan__cta"><a class="btn btn--primary" href="paga/index.html?piano=mensile">Attiva il mensile</a><a class="btn btn--ghost" data-contact href="#">Prima una domanda</a></div>
+        <div class="plan__cta"><a class="btn btn--primary" href="paga/index.html?piano=mensile">Inizia i 30 giorni gratis</a><a class="btn btn--ghost" data-contact href="#">Prima una domanda</a></div>
       </div>
       <div class="plan plan--hi">
         <div class="plan__name">Annuale · 2 mesi gratis</div>
@@ -257,9 +261,10 @@
         <div class="plan__cta"><a class="btn btn--primary" href="paga/index.html?piano=annuale">Attiva l'annuale</a><a class="btn btn--ghost" data-contact href="#">Prima una domanda</a></div>
       </div>
       <div class="plan">
-        <div class="plan__name">Premium · su misura</div>
-        <div class="plan__price">da 490 €</div><div class="plan__sub">una tantum + 39 € / mese di gestione</div>
+        <div class="plan__name">Premium · progetto su preventivo</div>
+        <div class="plan__price">Progetto su preventivo</div><div class="plan__sub">Acconto iniziale: 490 €, scalato dal totale concordato.<br>Gestione: 39 € / mese dalla pubblicazione del menù.</div>
         <ul role="list">
+          <li>Costo complessivo concordato prima dell'acconto</li>
           <li>Grafica e colori disegnati sul tuo locale</li>
           <li>Fino a 4 lingue (es. IT, EN, DE, SL)</li>
           <li>Tema giorno/notte, foto e storytelling</li>
@@ -267,10 +272,10 @@
           <li>Aggiornamenti illimitati via WhatsApp</li>
           <li>Come il menù di Al Bakaro</li>
         </ul>
-        <div class="plan__cta"><a class="btn btn--primary" data-contact href="#">Chiedi un preventivo</a><a class="btn btn--ghost" href="paga/index.html?piano=sumisura">Versa l'acconto</a></div>
+        <div class="plan__cta"><a class="btn btn--primary" data-contact href="#">Chiedi un preventivo</a><a class="btn btn--ghost" href="paga/index.html?piano=sumisura">Versa l'acconto dopo il preventivo</a></div>
       </div>
     </div>
-    <div class="promo"><b>Il primo mese è gratis, per tutti.</b>Ti pubblichiamo il menù, lo usi un mese intero e la carta viene addebitata solo dopo 30 giorni: decidi con calma se continuare. Sei fuori regione? Funziona uguale: tutto passa da WhatsApp, non serve che veniamo di persona.</div>
+    <div class="promo"><b>30 giorni gratis sul piano Standard mensile.</b>La carta viene addebitata al termine dei 30 giorni di prova, salvo disdetta prima della scadenza. Annuale e Premium non includono questa prova. Sei fuori regione? Funziona uguale: tutto passa da WhatsApp, non serve che veniamo di persona.</div>
   </section>
 
   <section class="container" style="padding-top:0">
@@ -288,7 +293,7 @@
     <div class="faq">
       <details>
         <summary>Come si paga?</summary>
-        <p>Con carta (addebito mensile automatico, disdici quando vuoi) o con bonifico, dalla pagina <a href="paga/index.html">Attiva RenMenu</a>. Ricevi sempre la fattura elettronica. Il primo mese del piano mensile è gratis: la carta viene addebitata solo dopo 30 giorni.</p>
+        <p>Con carta (addebito mensile automatico, disdici quando vuoi) o con bonifico, dalla pagina <a href="paga/index.html">Attiva RenMenu</a>. Ricevi sempre la fattura elettronica. Sul piano Standard mensile hai 30 giorni gratis: la carta viene addebitata al termine della prova, salvo disdetta prima della scadenza.</p>
       </details>
       <details><summary>Il cliente deve scaricare un'app?</summary><p>No. Inquadra il QR con la fotocamera e il menù si apre nel browser, come una pagina web. Funziona su qualsiasi telefono.</p></details>
       <details><summary>Chi aggiorna il menù?</summary><p>Noi, gratis e senza limiti. Ci mandi un messaggio WhatsApp con la modifica e in genere è online entro un'ora, sempre entro la giornata.</p></details>
@@ -303,7 +308,7 @@
   <section class="container" style="padding-top:0">
     <div class="cta">
       <h2>Mandaci una foto del tuo menù.</h2>
-      <p>Domani hai il QR sul tavolo. Il primo mese lo offriamo noi.</p>
+      <p>Inizia con 30 giorni gratis sul piano Standard mensile.</p>
       <a class="btn btn--light" data-contact href="#">Scrivici su WhatsApp</a>
     </div>
   </section>
