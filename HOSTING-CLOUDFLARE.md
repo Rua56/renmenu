@@ -1,24 +1,20 @@
 # RenMenu su Cloudflare Pages
 
-Questo hosting statico è indipendente da GitHub Pages: GitHub resta il repository del codice e può alimentare la build Cloudflare. Il vecchio sito GitHub Pages deve restare attivo finché esistono QR e messaggi che puntano ai suoi URL.
+**Origine ufficiale del sito RenMenu:** https://renmenu.pages.dev/. Il codice resta nel repository `Rua56/renmenu`, branch `main`; il progetto Cloudflare Pages `renmenu` lo distribuisce automaticamente. GitHub Pages resta online per i QR e i messaggi già distribuiti, ma i canonical delle pagine puntano alla nuova origine.
 
-## Configurazione consigliata
+## Build e pagine
 
-- Provider: Cloudflare Pages, progetto `renmenu`, URL assegnato `https://renmenu.pages.dev/`, produzione dal branch `main` del repository `Rua56/renmenu`.
-- Build command: `sh scripts/build-cloudflare.sh`.
-- Build output directory: `dist`.
-- Root directory: root del repository.
-- Il comando compila solo i file pubblici; non invia `.git`, documenti commerciali, foto grezze, `blanch/data/food.json`, `blanch/data/wines.tsv` o script di manutenzione. La pagina `crea/` è già pubblica su GitHub Pages ed è inclusa per parità funzionale, benché non sia una console privata.
-- Per verificare in locale: `sh scripts/build-cloudflare.sh`; poi servire `dist` con un server statico e controllare `/`, `/anteprima/`, `/menu/?m=bakaro`, `/demo/`, `/paga/` e `/blanch/`.
+- Build command: `sh scripts/build-cloudflare.sh`; output directory: `dist`; root: radice del repository.
+- Il build copia solo i file pubblici: home, anteprima, demo, menù, pagamento, asset, dati JSON pubblicati e menù Blanch. Non invia `.git`, documenti commerciali, foto grezze, `blanch/data/food.json`, `blanch/data/wines.tsv` o script di manutenzione.
+- `crea/` è già una pagina pubblica, non un pannello riservato: ora propone `https://renmenu.pages.dev/` per i nuovi QR, ma il campo URL può essere cambiato per un menù legacy.
+- L'output Pages contiene `robots.txt` e `sitemap.xml` con **solo home e anteprima**. Demo incorporata, pagamenti, generatore interno e menù cliente restano `noindex` e fuori sitemap. L'elenco va aggiornato quando si creano pagine di marketing con contenuti autonomi.
+- Il menù Blanch non viene reindirizzato né spostato: il QR già stampato punta a `https://rua56.github.io/renmenu/blanch/`, che deve rimanere raggiungibile. Il menù esiste anche su Pages.
+- In Cloudflare esiste separatamente un Worker chiamato `renmenu`: non è il progetto Pages e non serve al sito qui documentato.
 
-## Transizione degli indirizzi
+## Search Console
 
-Cloudflare ha assegnato al progetto Pages `https://renmenu.pages.dev/`. Il primo deployment di produzione è riuscito e sono state verificate le pagine principali, i menu JSON, gli asset, la pagina di pagamento e la pagina 404. In questa fase il sito Cloudflare è un **mirror funzionante**, non ancora la destinazione ufficiale: i canonical e gli OG URL esistenti puntano ancora a GitHub Pages. Non sostituire i link stampati, i canonical o l'eventuale URL di ritorno Stripe finché il nuovo dominio pubblico non è stato scelto e verificato.
+Usare una proprietà **Prefisso URL** con `https://renmenu.pages.dev/` (lo slash finale incluso). Verificare la proprietà con il metodo Google disponibile al proprietario, poi inviare `https://renmenu.pages.dev/sitemap.xml` nella sezione Sitemap. Un sitemap pubblicato non equivale alla sua registrazione in Search Console e non garantisce l'indicizzazione.
 
-Nel pannello Cloudflare esiste anche un **Worker** chiamato `renmenu`, creato separatamente: non è il progetto Pages descritto qui. Questa build Pages non usa `npx wrangler deploy` e non richiede un Worker.
+## Aggiornamenti e controllo
 
-Per rendere Pages la sede ufficiale dopo la scelta definitiva del dominio: collegare il dominio, controllare HTTPS e tutte le pagine, aggiornare metadati/canonical/OG, verificare gli URL di ritorno Stripe e solo allora diffondere i nuovi link. Lasciare online gli indirizzi precedenti o predisporre redirect equivalenti prima di spegnerli: **il QR della Trattoria Blanch punta a `https://rua56.github.io/renmenu/blanch/`**.
-
-## Aggiornare il menù Blanch
-
-Modificare `blanch/data/food.json` oppure `blanch/data/wines.tsv`, ricompilare `python3 blanch/tools/build_menu.py`, revisionare `blanch/data/menu.json`, poi fare commit e push. Cloudflare Pages ricostruisce il sito se l'integrazione GitHub è attiva. Controllare il contenuto online prima di confermare l'aggiornamento al ristorante.
+Per un aggiornamento del menù Blanch modificare `blanch/data/food.json` o `blanch/data/wines.tsv`, eseguire `python3 blanch/tools/build_menu.py`, revisionare `blanch/data/menu.json`, poi commit e push. Dopo il deployment verificare home, anteprima, `blanch/data/menu.json`, sitemap e gli URL GitHub Pages dei QR prima di confermare al cliente. JSON e HTML mantengono cache breve per riflettere correzioni senza ristampare il QR.

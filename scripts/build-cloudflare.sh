@@ -28,6 +28,23 @@ cat > dist/_headers <<'EOF'
   Cache-Control: public, max-age=0, must-revalidate
 EOF
 
+# Search Console: only marketing pages with substantial HTML are submitted.
+# Keep transactional pages, embedded demos and customer menus out of the sitemap.
+cat > dist/robots.txt <<'EOF'
+User-agent: *
+Allow: /
+Sitemap: https://renmenu.pages.dev/sitemap.xml
+EOF
+
+cat > dist/sitemap.xml <<'EOF'
+<?xml version="1.0" encoding="UTF-8"?>
+<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">
+  <url><loc>https://renmenu.pages.dev/</loc></url>
+  <url><loc>https://renmenu.pages.dev/anteprima/</loc></url>
+</urlset>
+EOF
+
 [ -s dist/index.html ]
 [ -s dist/blanch/data/menu.json ]
+[ -s dist/sitemap.xml ]
 printf 'Built Cloudflare Pages output: %s files\n' "$(find dist -type f | wc -l | tr -d ' ')"

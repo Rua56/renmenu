@@ -14,7 +14,7 @@
 <meta name="format-detection" content="telephone=yes">
 <link rel="apple-touch-icon" href="../assets/apple-touch-icon.png">
 <link rel="manifest" href="../manifest.webmanifest">
-<link rel="canonical" href="https://rua56.github.io/renmenu/crea/index.html">
+<link rel="canonical" href="https://renmenu.pages.dev/crea/">
 <link rel="icon" href="../assets/favicon.svg" type="image/svg+xml">
 <script src="https://cdn.jsdelivr.net/npm/qrcode-generator@1.4.4/qrcode.min.js"></script>
 <style>
@@ -126,7 +126,7 @@
         <ol class="steps-help">
           <li>Scarica il file <code>.json</code> qui a lato.</li>
           <li>Su GitHub apri la cartella <code>menus/</code> del sito e carica il file (Add file → Upload). Il nome deve essere <code>identificativo.json</code>.</li>
-          <li>Dopo un minuto il menù è online al link indicato e il QR funziona. Per aggiornare, ricarica lo stesso file.</li>
+          <li>Quando il deploy di Cloudflare Pages è completato, il menù è online al link indicato. Per aggiornarlo, ricarica lo stesso file senza cambiare QR.</li>
         </ol>
       </div>
     </div>
@@ -134,7 +134,7 @@
     <aside class="side">
       <div class="card">
         <h2>Link e QR</h2>
-        <label class="f"><span>Indirizzo del sito pubblicato</span><input type="url" id="baseUrl" placeholder="https://rua56.github.io/renmenu/" autocapitalize="off"></label>
+        <label class="f"><span>Indirizzo del sito pubblicato</span><input type="url" id="baseUrl" placeholder="https://renmenu.pages.dev/" autocapitalize="off"></label>
         <div class="qr" style="margin-top:var(--space-4)"><img id="qrImg" alt="QR code del menù" width="220" height="220"></div>
         <div class="url" id="urlOut"></div>
         <label class="f" style="margin-top:var(--space-3)"><span>Link di pagamento per questo locale</span></label>
@@ -172,8 +172,8 @@
   const get = (o, p) => p.split('.').reduce((a, k) => a?.[k], o);
   const set = (o, p, v) => { const ks = p.split('.'); let c = o; ks.slice(0, -1).forEach(k => { if (typeof c[k] !== 'object' || c[k] === null) c[k] = {}; c = c[k]; }); c[ks.at(-1)] = v; };
 
-  // ---- default base URL: current site root
-  const root = location.href.replace(/crea\/.*$/, '');
+  // Nuovi menù su Pages; il campo resta modificabile per i QR legacy GitHub Pages.
+  const root = 'https://renmenu.pages.dev/';
   $('#baseUrl').value = root;
 
   function clean() {
