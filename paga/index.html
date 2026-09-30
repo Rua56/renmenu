@@ -93,9 +93,10 @@
         <div class="method" id="m-card">
           <h3>💳 Carta di credito o debito</h3>
           <p id="card-p">Pagamento sicuro con Stripe. Per il mensile l'addebito è automatico ogni mese e si disdice con un clic.</p>
+          <a class="btn btn--primary" id="premium-quote" href="#" hidden>Chiedi il preventivo su WhatsApp</a>
           <a class="btn btn--primary" id="card-btn" href="#" rel="noopener">Paga con carta</a>
           <a class="btn btn--ghost" id="card-btn2" href="#" rel="noopener" hidden>Attiva la gestione mensile · 39 € / mese</a>
-          <p id="card-note2" hidden style="margin-top:var(--space-2)">La gestione mensile si attiva quando il menù su misura è online: aggiornamenti illimitati e assistenza.</p>
+          <p id="card-note2" hidden style="margin-top:var(--space-2)">La gestione di 39 € al mese parte dalla pubblicazione del menù, solo dopo accordo separato: non si attiva automaticamente.</p>
           <div id="card-soon" hidden>
             <p><span class="soon">In attivazione</span></p>
             <p>Il pagamento con carta sarà disponibile tra pochi giorni. Nel frattempo puoi pagare con bonifico o chiederci il link su WhatsApp.</p>
@@ -138,7 +139,7 @@
 
   <div class="fine">
     <p>Ricevi sempre la fattura elettronica. I prezzi sono IVA inclusa, nessun costo di attivazione.</p>
-    <p>Standard mensile: il primo mese è gratis, la carta viene addebitata solo dopo 30 giorni; disdetta libera in qualsiasi momento dal portale clienti Stripe. Annuale: fattura unica, rinnovo annuale automatico, disdici quando vuoi. Premium su misura: l'acconto di 490 € viene scalato dal preventivo finale; la gestione mensile (39 €) parte quando il menù è online.</p>
+    <p>Standard mensile: 30 giorni gratis; la carta viene addebitata al termine della prova, salvo disdetta prima della scadenza dal portale clienti Stripe. Annuale: fattura unica, rinnovo annuale automatico, disdici quando vuoi. Premium su misura: il costo complessivo viene concordato prima dell’acconto; l’acconto iniziale di 490 € viene scalato dal totale e la gestione di 39 € al mese parte dalla pubblicazione solo dopo accordo separato.</p>
     <p>Pagamenti con carta gestiti da Stripe: RenMenu non vede né conserva i dati della tua carta.</p>
   </div>
 </main>
@@ -196,10 +197,13 @@
 
   function render() {
     const p = P.piani[piano];
+    const premium = piano === 'sumisura';
     seg.querySelectorAll('button').forEach(b => b.setAttribute('aria-pressed', String(b.dataset.k === piano)));
-    $('#price').innerHTML = `${p.prezzo} € <small>${p.unita}${p.mensile ? ` · poi ${p.mensile} € / mese` : ''}</small>`;
-    $('#badge').textContent = p.prova ? '✓ Primo mese gratis' : (piano === 'annuale' ? '✓ 2 mesi gratis' : '✓ Preventivo su misura');
+    $('#price').innerHTML = premium ? `Progetto su preventivo <small>· acconto iniziale ${p.prezzo} €</small>` : `${p.prezzo} € <small>${p.unita}</small>`;
+    $('#badge').textContent = p.prova ? '✓ 30 giorni gratis' : (piano === 'annuale' ? '✓ 2 mesi gratis' : '✓ Preventivo su misura');
     $('#descr').textContent = p.descr;
+    $('#premium-quote').hidden = !premium;
+    if (premium) $('#premium-quote').href = wa(`Ciao! Vorrei un preventivo per un menù RenMenu Premium su misura per ${locale()}. Prima di versare l’acconto vorrei concordare progetto, costo complessivo e tempi.`);
 
     // Carta (Stripe)
     const link = P.stripe && isStripe(P.stripe[piano]) ? P.stripe[piano] : '';
@@ -207,19 +211,20 @@
     if (link) {
       $('#card-btn').hidden = false; $('#card-p').hidden = false; $('#card-soon').hidden = true;
       $('#card-btn').href = link + (link.includes('?') ? '&' : '?') + 'client_reference_id=' + ref;
-      $('#card-btn').textContent = piano === 'mensile' ? `Paga con carta · ${p.prezzo} € / mese` : (piano === 'sumisura' ? `Versa l'acconto con carta · ${p.prezzo} €` : `Paga con carta · ${p.prezzo} €`);
+      $('#card-btn').classList.toggle('btn--primary', !premium); $('#card-btn').classList.toggle('btn--ghost', premium);
+      $('#card-btn').textContent = piano === 'mensile' ? `Inizia la prova con carta · ${p.prezzo} € / mese` : (premium ? `Versa l'acconto dopo il preventivo · ${p.prezzo} €` : `Paga con carta · ${p.prezzo} €`);
+      $('#card-p').textContent = piano === 'mensile' ? 'Pagamento sicuro con Stripe. Hai 30 giorni gratis: la carta viene addebitata al termine della prova, salvo disdetta prima della scadenza.' : (premium ? 'L’acconto di 490 € viene versato solo dopo aver concordato il preventivo e viene scalato dal totale del progetto.' : 'Pagamento sicuro con Stripe. L’annuale non include la prova gratuita del piano Standard mensile.');
     } else {
       $('#card-btn').hidden = true; $('#card-p').hidden = true; $('#card-soon').hidden = false;
       $('#card-wa').href = wa(`Ciao! Vorrei pagare con carta il piano ${p.nome} di RenMenu per ${locale()}. Mi mandi il link?`);
     }
 
-    const link2 = piano === 'sumisura' && isStripe(P.stripe.sumisura_mensile) ? P.stripe.sumisura_mensile : '';
-    $('#card-btn2').hidden = !link2; $('#card-note2').hidden = !link2;
-    if (link2) $('#card-btn2').href = link2 + (link2.includes('?') ? '&' : '?') + 'client_reference_id=' + ref;
+    $('#card-btn2').hidden = true;
+    $('#card-note2').hidden = !premium;
 
     // Bonifico
     const hasBank = ibanOk(P.iban) && P.intestatario;
-    $('#m-bank').hidden = !hasBank;
+    $('#m-bank').hidden = !hasBank || premium;
     if (hasBank) {
       $('#b-name').textContent = P.intestatario;
       $('#b-iban').textContent = P.iban.replace(/\s+/g, '').replace(/(.{4})/g, '$1 ').trim();
@@ -234,7 +239,8 @@
     $('#m-satispay').hidden = !P.satispay;
     if (P.satispay) $('#satispay-btn').href = P.satispay;
 
-    $('#talk-wa').href = wa(`Ciao! Vorrei attivare RenMenu (piano ${p.nome}) per ${locale()}. Come procediamo?`);
+    $('#talk-wa').textContent = premium ? 'Parliamo del preventivo su WhatsApp' : 'Scrivi su WhatsApp';
+    $('#talk-wa').href = wa(premium ? `Ciao! Vorrei un preventivo per un menù RenMenu Premium su misura per ${locale()}. Come procediamo?` : `Ciao! Vorrei attivare RenMenu (piano ${p.nome}) per ${locale()}. Come procediamo?`);
   }
 
   $('#locale').addEventListener('input', render);
