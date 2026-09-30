@@ -4,7 +4,7 @@ Questo hosting statico è indipendente da GitHub Pages: GitHub resta il reposito
 
 ## Configurazione consigliata
 
-- Provider: Cloudflare Pages, progetto `renmenu`, produzione dal branch `main` del repository `Rua56/renmenu`.
+- Provider: Cloudflare Pages, progetto `renmenu`, URL assegnato `https://renmenu.pages.dev/`, produzione dal branch `main` del repository `Rua56/renmenu`.
 - Build command: `sh scripts/build-cloudflare.sh`.
 - Build output directory: `dist`.
 - Root directory: root del repository.
@@ -13,7 +13,9 @@ Questo hosting statico è indipendente da GitHub Pages: GitHub resta il reposito
 
 ## Transizione degli indirizzi
 
-Il primo deploy crea un URL `*.pages.dev`; non presumere che sia `renmenu.pages.dev` fino alla risposta effettiva di Cloudflare. In questa fase il sito Cloudflare è un **mirror funzionante**, non ancora la destinazione ufficiale: i canonical e gli OG URL esistenti puntano ancora a GitHub Pages. Non sostituire i link stampati, i canonical o l'eventuale URL di ritorno Stripe finché il nuovo dominio pubblico non è stato scelto e verificato.
+Cloudflare ha assegnato al progetto Pages `https://renmenu.pages.dev/`. In questa fase il sito Cloudflare è un **mirror in preparazione**, non ancora la destinazione ufficiale: i canonical e gli OG URL esistenti puntano ancora a GitHub Pages. Non sostituire i link stampati, i canonical o l'eventuale URL di ritorno Stripe finché il nuovo dominio pubblico non è stato scelto e verificato.
+
+Nel pannello Cloudflare esiste anche un **Worker** chiamato `renmenu`, creato separatamente: non è il progetto Pages descritto qui. Questa build Pages non usa `npx wrangler deploy` e non richiede un Worker.
 
 Per rendere Pages la sede ufficiale dopo la scelta definitiva del dominio: collegare il dominio, controllare HTTPS e tutte le pagine, aggiornare metadati/canonical/OG, verificare gli URL di ritorno Stripe e solo allora diffondere i nuovi link. Lasciare online gli indirizzi precedenti o predisporre redirect equivalenti prima di spegnerli: **il QR della Trattoria Blanch punta a `https://rua56.github.io/renmenu/blanch/`**.
 
