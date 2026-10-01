@@ -56,6 +56,7 @@ let voiceProposal = null;
 let materialPreview = null;
 let pdfPreviewController = null;
 let aiPreview = null;
+let aiBusy = false;
 const reviewEvidenceCache = new Map();
 const DEMO_PDF_ID = '5eae22bc-7a50-4bd2-8b8a-000000000403';
 
@@ -522,7 +523,7 @@ function renderAiPanel() {
   const current = aiPreview?.requestId === request.id && aiPreview.requestRevision === request.revision ? aiPreview : null;
   const result = current?.result;
   const title = current?.type === 'aiExtractMenu' ? 'Proposta di menù da revisionare' : 'Classificazione da revisionare';
-  return `<section class="panel spaced-top" id="ai-advisory"><div class="panel-heading"><div><p class="eyebrow">AI · SOLO BOZZA</p><h2>Analisi assistita della pratica</h2></div><span class="capsule">nessuna pubblicazione</span></div><p class="notice warning"><strong>Invio esterno esplicito:</strong> questi pulsanti inviano a OpenAI il testo della pratica e, per l’estrazione, le trascrizioni private già registrate. Non inviano il PDF originale o le immagini. Per ora usa soltanto dati fittizi autorizzati; non attivare su materiale cliente reale. La risposta resta una proposta in memoria, con traccia dell’operazione nell’audit: nessun campo, bozza, PR o messaggio viene salvato automaticamente.</p><div class="button-row spaced-top"><button class="button secondary" type="button" data-action="ai-classify" ${String(request.sourceText || '').trim() ? '' : 'disabled'}>Classifica richiesta (bozza)</button><button class="button secondary" type="button" data-action="ai-extract">Analizza menù (bozza)</button></div>${result ? `<div class="spaced-top" role="status"><h3>${title}</h3><p class="muted small">Provider: ${escapeHtml(current.provider)} · revisione pratica ${escapeHtml(request.revision)}. Confronta ogni campo e riferimento con la fonte originale; eventuali errori bloccanti restano da correggere.</p><pre class="json-editor private-material-text">${escapeHtml(JSON.stringify(result, null, 2))}</pre></div>` : '<p class="muted small spaced-top">Nessuna analisi AI eseguita in questa sessione.</p>'}</section>`;
+  return `<section class="panel spaced-top" id="ai-advisory"><div class="panel-heading"><div><p class="eyebrow">AI · SOLO BOZZA</p><h2>Analisi assistita della pratica</h2></div><span class="capsule">nessuna pubblicazione</span></div><p class="notice warning"><strong>Invio esterno esplicito:</strong> questi pulsanti inviano a OpenAI il testo della pratica e, per l’estrazione, le trascrizioni private già registrate. Non inviano il PDF originale o le immagini. Per ora usa soltanto dati fittizi autorizzati; non attivare su materiale cliente reale. Una risposta riuscita resta una proposta in memoria con traccia nell’audit: nessun campo, bozza, PR o messaggio viene salvato automaticamente.</p><div class="button-row spaced-top"><button class="button secondary" type="button" data-action="ai-classify" ${!aiBusy && String(request.sourceText || '').trim() ? '' : 'disabled'}>Classifica richiesta (bozza)</button><button class="button secondary" type="button" data-action="ai-extract" ${aiBusy ? 'disabled' : ''}>Analizza menù (bozza)</button></div>${aiBusy ? '<p class="muted small spaced-top" role="status">Analisi AI in corso; attendi l’esito prima di riprovare.</p>' : current?.error ? `<p class="notice danger spaced-top" role="alert">Analisi non completata: ${escapeHtml(current.error)}</p>` : result ? `<div class="spaced-top" role="status"><h3>${title}</h3><p class="muted small">Provider: ${escapeHtml(current.provider)} · revisione pratica ${escapeHtml(request.revision)}. Confronta ogni campo e riferimento con la fonte originale; eventuali errori bloccanti restano da correggere.</p><pre class="json-editor private-material-text">${escapeHtml(JSON.stringify(result, null, 2))}</pre></div>` : '<p class="muted small spaced-top">Nessuna analisi AI eseguita in questa sessione.</p>'}</section>`;
 }
 function renderView() {
   const renderers = { command: renderCommand, richieste: renderRequests, clienti: renderClients, materiali: renderMaterials, builder: renderBuilder, revisione: renderReview, anteprima: renderPreview, approvazioni: renderApprovals, notifiche: renderNotifications, registro: renderAudit, voce: renderVoice };
@@ -611,21 +612,20 @@ async function handleClick(event) {
   event.preventDefault();
   if (action === 'ai-classify' || action === 'ai-extract') {
     if (isDemoMode) throw new Error('La demo locale non invia richieste al provider AI.');
+    if (aiBusy) throw new Error('Un’analisi è già in corso; attendi il risultato.');
     const request = requestById();
     if (!request) throw new Error('Seleziona una pratica prima di avviare l’analisi.');
     const type = action === 'ai-classify' ? 'aiClassifyRequest' : 'aiExtractMenu';
-    if (!window.confirm(`Inviare a OpenAI il testo della pratica “${request.subject}”${type === 'aiExtractMenu' ? ' e le trascrizioni private già registrate' : ''}? Questo staging consente al server soltanto la pratica di test fittizia autorizzata. Non procedere con materiali reali dei clienti. L’esito è solo una bozza da verificare, senza salvataggio del menù, invii o pubblicazione.`)) return;
-    trigger.disabled = true;
-    try {
-      const response = await performAction(type, { requestId: request.id, requestRevision: request.revision });
-      const result = response?.result ?? response;
-      await refresh();
-      aiPreview = { requestId: request.id, requestRevision: request.revision, type,
-        provider: result.provider, result: type === 'aiClassifyRequest' ? result.classification :
-          { menu: result.menu, validation: result.validation, extraction: result.extraction } };
-      render();
-      toast('Proposta AI ricevuta: verifica la fonte prima di ogni utilizzo.');
-    } finally { trigger.disabled = false; }
+    openConfirmation({ title: 'Analisi AI della sola pratica fittizia',
+      copy: `Pratica: ${request.subject} (${request.id}).\nA OpenAI verrà inviato il testo della pratica${type === 'aiExtractMenu' ? ' e il testo delle trascrizioni private registrate' : ''}; non il binario del PDF o immagini. Questo staging blocca lato server gli ID diversi dalla fixture autorizzata. Non usare dati reali di clienti. Esito: solo proposta da revisionare, senza menù salvato, PR, messaggi o pubblicazione.`,
+      phrase: 'CONFERMO INVIO AI TEST', button: 'Analizza solo la pratica fittizia', type,
+      payload: { requestId: request.id, requestRevision: request.revision, confirmation: 'CONFERMO INVIO AI TEST' },
+      resultToast: (result) => {
+        aiPreview = { requestId: request.id, requestRevision: request.revision, type,
+          provider: result.provider, result: type === 'aiClassifyRequest' ? result.classification :
+            { menu: result.menu, validation: result.validation, extraction: result.extraction } };
+        return { message: 'Proposta AI ricevuta: verifica la fonte prima di ogni utilizzo.' };
+      } });
     return;
   }
   if (action === 'preview-material') {
@@ -889,6 +889,8 @@ dialog.addEventListener('close', () => {
   const configuration = pendingConfirm;
   pendingConfirm = null;
   if (dialog.returnValue !== 'confirm' || !configuration) return;
+  const isAi = ['aiClassifyRequest', 'aiExtractMenu'].includes(configuration.type);
+  if (isAi) { aiBusy = true; aiPreview = null; render(); }
   doAction(configuration.type, configuration.payload, configuration.success)
     .then((result) => {
       if (!configuration.resultToast) return;
@@ -896,10 +898,14 @@ dialog.addEventListener('close', () => {
       toast(outcome.message, outcome.type);
     })
     .catch((error) => {
+      if (isAi) {
+        aiPreview = { requestId: configuration.payload.requestId, requestRevision: configuration.payload.requestRevision,
+          type: configuration.type, error: error.message || 'Errore del provider AI.' };
+      }
       if (configuration.type === 'sendOwnerEmail') {
         toast(`Email al proprietario non inviata: verifica Cloudflare Access e la configurazione Resend. ${error.message || ''}`.trim(), 'error');
       } else toast(error.message || 'Operazione non riuscita.', 'error');
-    });
+    }).finally(() => { if (isAi) { aiBusy = false; render(); } });
 });
 dialog.addEventListener('cancel', () => { pendingConfirm = null; });
 materialViewer?.addEventListener('close', releaseMaterialPreview);
