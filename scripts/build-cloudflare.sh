@@ -7,7 +7,7 @@ rm -rf dist
 mkdir -p dist/blanch/assets dist/blanch/data dist/blanch/qr
 # Keep all public pages and demos reachable at the same path relative to site root.
 cp index.html 404.html manifest.webmanifest dist/
-cp -R assets anteprima crea demo menu menus paga casi-studio dist/
+cp -R assets anteprima crea demo menu menus paga casi-studio richard dist/
 cp blanch/index.html dist/blanch/index.html
 cp blanch/assets/* dist/blanch/assets/
 cp blanch/data/menu.json dist/blanch/data/menu.json
