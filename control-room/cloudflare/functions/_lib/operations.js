@@ -82,17 +82,49 @@ async function hashBytes(value) {
 
 function aiAdapter(env) {
   const provider = String(env?.AI_PROVIDER || 'mock').trim();
-  assert(['mock', 'openai_compatible'].includes(provider),
-    'AI disabilitata: impostare esplicitamente AI_PROVIDER=mock o openai_compatible.', 501);
+  assert(['mock', 'openai_compatible', 'cloudflare_workers_ai'].includes(provider),
+    'AI disabilitata: impostare esplicitamente un provider AI supportato.', 501);
   return createAiLiveAdapter({ ...env, AI_PROVIDER: provider }, { fetch: env?.AI_FETCH || env?.fetch });
 }
 
-function requireAiRequestScope(env, adapter, requestId) {
-  if (adapter.mode !== 'openai_compatible') return;
-  // Fail closed: staging may only send the one synthetic fixture to an external
-  // provider. Real-client processing requires a separate, explicit policy change.
-  assert(env?.AI_TEST_REQUEST_ID === requestId,
-    'Analisi AI live limitata alla pratica fittizia autorizzata.', 403);
+async function requireAiRequestScope(env, adapter, request) {
+  if (adapter.mode === 'mock') return;
+  // A client may edit ordinary request fields but cannot set these DB columns.
+  assert(env?.ENVIRONMENT === 'protected-staging' && String(env?.STAGING_PROTECTED).toLowerCase() === 'true' &&
+    env?.AI_TEST_REQUEST_ID === request.id && Number(request.is_ai_test_fixture) === 1 &&
+    /^[a-f0-9]{64}$/i.test(request.ai_test_source_sha256 || ''),
+  'Analisi AI live limitata alla fixture marcata nello staging privato.', 403);
+  const metadata = { subject: request.subject, text: request.source_text,
+    channel: request.source_channel, venue: request.client_name };
+  assert(await hashString(JSON.stringify(metadata)) === request.ai_test_source_sha256.toLowerCase(),
+    'Dati della fixture modificati: analisi AI bloccata.', 403);
+  adapter.assertReady();
+}
+
+function requireAiTestConfirmation(adapter, confirmation) {
+  if (adapter.mode !== 'mock')
+    assert(confirmation === 'CONFERMO INVIO AI TEST', 'Conferma esatta dell’analisi AI di test mancante.', 403);
+}
+
+async function reserveAiAttempt(context, request, action) {
+  if (context.env?.AI_PROVIDER === 'mock' || !context.env?.AI_PROVIDER) return null;
+  const id = context.uid(), stamp = context.now(), day = stamp.slice(0, 10);
+  const reservation = await context.db.prepare(`INSERT OR IGNORE INTO ai_inference_attempts
+    (id,request_id,action,request_revision,day_utc,slot,status,created_at)
+    SELECT ?,?,?,?, ?, COALESCE((SELECT MAX(slot)+1 FROM ai_inference_attempts WHERE request_id=? AND action=? AND day_utc=?),1), 'started',?
+    WHERE EXISTS (SELECT 1 FROM requests WHERE id=? AND revision=? AND is_ai_test_fixture=1)
+      AND (SELECT COUNT(*) FROM ai_inference_attempts WHERE request_id=? AND action=? AND day_utc=?) < 3
+      AND NOT EXISTS (SELECT 1 FROM ai_inference_attempts WHERE request_id=? AND action=? AND day_utc=? AND status='started')`)
+    .bind(id, request.id, action, request.revision, day, request.id, action, day, stamp,
+      request.id, request.revision, request.id, action, day, request.id, action, day).run();
+  assert(reservation?.meta?.changes === 1,
+    'Analisi già in corso oppure quota prudenziale esaurita (massimo tre tentativi al giorno).', 429);
+  return id;
+}
+
+async function finishAiAttempt(context, id, status) {
+  if (id) await context.db.prepare('UPDATE ai_inference_attempts SET status=?,completed_at=? WHERE id=?')
+    .bind(status, context.now(), id).run();
 }
 
 function requireGitHubLive(env) {
@@ -227,10 +259,19 @@ async function classifyRequest(context, p) {
   const revision = requestRevision(p.requestRevision, request.revision);
   assert(!CLOSED_REQUESTS.has(request.status), 'Pratica chiusa: classificazione non disponibile.', 409);
   const adapter = aiAdapter(context.env);
-  requireAiRequestScope(context.env, adapter, requestId);
-  const classification = await adapter.classifyEmail({
-    subject: request.subject, text: request.source_text, channel: request.source_channel
-  });
+  await requireAiRequestScope(context.env, adapter, request);
+  requireAiTestConfirmation(adapter, p.confirmation);
+  assert(request.source_text?.trim(), 'La richiesta non contiene testo analizzabile.');
+  const attemptId = await reserveAiAttempt(context, request, 'classify');
+  let classification;
+  try {
+    classification = await adapter.classifyEmail({ subject: request.subject, text: request.source_text, channel: request.source_channel });
+  } catch (error) {
+    // AI.run may continue after our timeout; keep 'started' to block retries today.
+    if (error?.code !== 'AI_TIMEOUT') await finishAiAttempt(context, attemptId, 'failed');
+    throw error;
+  }
+  await finishAiAttempt(context, attemptId, 'completed');
   // This deliberately records only that an advisory classification was shown:
   // no kind, status, contact, plan, menu id, or other critical field is changed.
   await auditOnly({ ...context, requestId, revision, event: 'ai.classify.advisory',
@@ -244,9 +285,23 @@ async function extractMenuPreview(context, p) {
   const revision = requestRevision(p.requestRevision, request.revision);
   assert(!CLOSED_REQUESTS.has(request.status), 'Pratica chiusa: estrazione non disponibile.', 409);
   const adapter = aiAdapter(context.env);
-  requireAiRequestScope(context.env, adapter, requestId);
+  await requireAiRequestScope(context.env, adapter, request);
+  requireAiTestConfirmation(adapter, p.confirmation);
   const transcripts = await validatedTranscriptSources({ ...context, requestId });
-  const extraction = await adapter.extractMenu({ text: extractionInput(request, transcripts), venueName: request.client_name });
+  const sourceText = extractionInput(request, transcripts);
+  if (adapter.mode !== 'mock') {
+    assert(/^[a-f0-9]{64}$/i.test(request.ai_test_extraction_sha256 || '') &&
+      await hashString(JSON.stringify({ text: sourceText, venue_hint: request.client_name })) === request.ai_test_extraction_sha256.toLowerCase(),
+    'Testo o trascrizioni della fixture modificati: analisi AI bloccata.', 403);
+  }
+  const attemptId = await reserveAiAttempt(context, request, 'extract');
+  let extraction;
+  try { extraction = await adapter.extractMenu({ text: sourceText, venueName: request.client_name }); }
+  catch (error) {
+    if (error?.code !== 'AI_TIMEOUT') await finishAiAttempt(context, attemptId, 'failed');
+    throw error;
+  }
+  await finishAiAttempt(context, attemptId, 'completed');
   const slug = request.menu_id || (request.kind !== 'nuovo' ? request.client_menu_id : null) || slugify(request.client_name);
   assert(SLUG.test(slug), 'Menu ID non valido: correggilo prima di creare una bozza.', 422);
   const menu = menuFromExtraction(extraction, request.client_name, slug);
@@ -307,7 +362,9 @@ async function suggestTranslations(context, p) {
   const revision = requestRevision(p.requestRevision, request.revision);
   assert(!CLOSED_REQUESTS.has(request.status), 'Pratica chiusa: traduzioni non disponibili.', 409);
   const adapter = aiAdapter(context.env);
-  requireAiRequestScope(context.env, adapter, requestId);
+  // Unlike classification/extraction, the client supplies arbitrary strings.
+  // Keep the endpoint mock-only until inputs are derived from sealed sources.
+  assert(adapter.mode === 'mock', 'Traduzioni AI live sospese: input arbitrari non consentiti.', 403);
   const suggestions = await adapter.suggestTranslations({ targetLanguage: p.targetLanguage ?? p.target_language, items: p.items ?? p.entries });
   await auditOnly({ ...context, requestId, revision, event: 'ai.translation.advisory',
     message: 'Suggerimenti di traduzione mostrati senza approvazione né modifica del menu.' });

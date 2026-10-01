@@ -15,6 +15,7 @@ function database() {
   const sqlite = new DatabaseSync(':memory:');
   sqlite.exec(migration('0001_initial.sql'));
   sqlite.exec(migration('0002_integrations.sql'));
+  sqlite.exec(migration('0003_ai_free_scope.sql'));
   sqlite.exec(`INSERT INTO clients (id, name, plan, internal_notes, revision, created_at, updated_at)
     VALUES ('client-1', 'Cliente di test', 'da_definire', '', 1, '2026-01-15T09:00:00.000Z', '2026-01-15T09:00:00.000Z');
     INSERT INTO requests (id, client_id, subject, source_channel, source_text, kind, status, plan, internal_notes, revision, created_at, updated_at)

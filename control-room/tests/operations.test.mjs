@@ -8,6 +8,7 @@ function database() {
   const sqlite = new DatabaseSync(':memory:');
   sqlite.exec(readFileSync(new URL('../cloudflare/migrations/0001_initial.sql', import.meta.url), 'utf8'));
   sqlite.exec(readFileSync(new URL('../cloudflare/migrations/0002_integrations.sql', import.meta.url), 'utf8'));
+  sqlite.exec(readFileSync(new URL('../cloudflare/migrations/0003_ai_free_scope.sql', import.meta.url), 'utf8'));
   return {
     sqlite,
     prepare(sql) {
@@ -131,6 +132,14 @@ async function sha256(value) {
   return [...new Uint8Array(digest)].map((byte) => byte.toString(16).padStart(2, '0')).join('');
 }
 
+async function markAiFixture(db, requestId) {
+  const row = getOne(db, 'SELECT r.subject,r.source_text,r.source_channel,c.name AS client_name FROM requests r JOIN clients c ON c.id=r.client_id WHERE r.id=?', requestId);
+  const metadata = { subject: row.subject, text: row.source_text, channel: row.source_channel, venue: row.client_name };
+  const extraction = { text: `Richiesta originale:\n${row.source_text.trim()}`, venue_hint: row.client_name };
+  db.sqlite.prepare('UPDATE requests SET is_ai_test_fixture=1,ai_test_source_sha256=?,ai_test_extraction_sha256=? WHERE id=?')
+    .run(await sha256(JSON.stringify(metadata)), await sha256(JSON.stringify(extraction)), requestId);
+}
+
 function reorderedMenu() {
   const source = menu();
   return {
@@ -191,6 +200,138 @@ describe('private AI + GitHub operations (fakes only)', () => {
       }
       assert.equal(calls, 0);
       assert.equal(getOne(db, 'SELECT COUNT(*) AS n FROM audit_events').n, 0);
+    } finally { db.close(); }
+  });
+
+  it('applies the synthetic allowlist to Workers AI before reading private materials or running inference', async () => {
+    const db = database();
+    try {
+      const requestId = insertRequest(db);
+      let calls = 0;
+      const env = {
+        AI_PROVIDER: 'cloudflare_workers_ai', AI_MODEL: '@cf/meta/llama-3.3-70b-instruct-fp8-fast',
+        AI_TEST_REQUEST_ID: 'not-the-synthetic-record', AI_ALLOW_REAL_CLIENTS: 'true',
+        AI: { run: async () => { calls++; throw new Error('must not infer'); } },
+        BUCKET: { get: async () => { calls++; throw new Error('must not read R2'); } }
+      };
+      for (const type of ['aiClassifyRequest', 'aiExtractMenu']) {
+        await assert.rejects(() => runPrivateIntegrationAction(context(db, env), type, {
+          requestId, requestRevision: 1
+        }), (error) => error.status === 403);
+      }
+      assert.equal(calls, 0);
+      assert.equal(getOne(db, 'SELECT COUNT(*) AS n FROM audit_events').n, 0);
+    } finally { db.close(); }
+  });
+
+  it('requires a sealed fixture, staging flags and server confirmation; caps free inference at three attempts per action daily', async () => {
+    const db = database();
+    try {
+      const requestId = insertRequest(db);
+      let calls = 0;
+      const fixtureResult = {
+        request_type: 'nuovo', urgency: 'normale', locale_name: null, contact_name: null,
+        contact_channel: 'email', summary: 'Menù da verificare.', requested_action: 'Preparare bozza.',
+        missing_information: [], confidence: 0.7, requires_human_review: false
+      };
+      const env = {
+        AI_PROVIDER: 'cloudflare_workers_ai', AI_MODEL: '@cf/meta/llama-3.3-70b-instruct-fp8-fast',
+        AI_TEST_REQUEST_ID: requestId, ENVIRONMENT: 'protected-staging', STAGING_PROTECTED: 'true',
+        AI: { run: async () => { calls++; return { response: JSON.stringify(fixtureResult) }; } }
+      };
+      const payload = { requestId, requestRevision: 1, confirmation: 'CONFERMO INVIO AI TEST' };
+      await assert.rejects(runPrivateIntegrationAction(context(db, env), 'aiClassifyRequest', payload), (error) => error.status === 403);
+      await markAiFixture(db, requestId);
+      await assert.rejects(runPrivateIntegrationAction(context(db, { ...env, ENVIRONMENT: 'public' }), 'aiClassifyRequest', payload), (error) => error.status === 403);
+      await assert.rejects(runPrivateIntegrationAction(context(db, env), 'aiClassifyRequest', { ...payload, confirmation: '' }), (error) => error.status === 403);
+      await assert.rejects(runPrivateIntegrationAction(context(db, env), 'aiSuggestTranslations', {
+        ...payload, targetLanguage: 'en', items: [{ path: 'arbitrary', text: 'Messaggio cliente reale' }]
+      }), (error) => error.status === 403);
+      assert.equal(calls, 0);
+      for (let i = 0; i < 3; i++) {
+        const result = await runPrivateIntegrationAction(context(db, env), 'aiClassifyRequest', payload);
+        assert.equal(result.provider, 'cloudflare_workers_ai');
+        assert.equal(result.classification.requires_human_review, true);
+      }
+      await assert.rejects(runPrivateIntegrationAction(context(db, env), 'aiClassifyRequest', payload), (error) => error.status === 429);
+      assert.equal(calls, 3);
+      assert.equal(getOne(db, "SELECT COUNT(*) AS n FROM ai_inference_attempts WHERE action='classify'").n, 3);
+      db.sqlite.prepare('UPDATE requests SET source_text=? WHERE id=?').run('Testo cliente reale non autorizzato', requestId);
+      await assert.rejects(runPrivateIntegrationAction(context(db, env), 'aiExtractMenu', payload), (error) => error.status === 403);
+      db.sqlite.prepare('UPDATE requests SET source_text=?,subject=? WHERE id=?')
+        .run('## Primi\nGnocchi — 12,00', 'Oggetto cliente non autorizzato', requestId);
+      await assert.rejects(runPrivateIntegrationAction(context(db, env), 'aiClassifyRequest', payload), (error) => error.status === 403);
+      assert.equal(calls, 3);
+    } finally { db.close(); }
+  });
+
+  it('extracts a sealed synthetic text only; a changed extraction fingerprint never reaches Workers AI', async () => {
+    const db = database();
+    try {
+      const requestId = insertRequest(db);
+      await markAiFixture(db, requestId);
+      let calls = 0;
+      const result = {
+        locale_name: null, subtitle: null, languages_detected: ['it'],
+        sections: [{ name: 'Primi', source_reference: null, items: [{
+          name: 'Gnocchi', price: '12,00', description: null,
+          source_reference: 'text: Gnocchi — 12,00', confidence: 0.9
+        }] }],
+        contact_data: { phone: null, email: null, address: null }, hours: null,
+        source_references: ['text: Gnocchi — 12,00'], uncertain_fields: [], missing_fields: [], warnings: []
+      };
+      const env = {
+        ENVIRONMENT: 'protected-staging', STAGING_PROTECTED: 'true',
+        AI_PROVIDER: 'cloudflare_workers_ai', AI_MODEL: '@cf/meta/llama-3.3-70b-instruct-fp8-fast',
+        AI_TEST_REQUEST_ID: requestId,
+        AI: { run: async () => { calls++; return { response: JSON.stringify(result) }; } }
+      };
+      const payload = { requestId, requestRevision: 1, confirmation: 'CONFERMO INVIO AI TEST' };
+      db.sqlite.prepare('UPDATE requests SET ai_test_extraction_sha256=? WHERE id=?').run('0'.repeat(64), requestId);
+      await assert.rejects(runPrivateIntegrationAction(context(db, env), 'aiExtractMenu', payload), (error) => error.status === 403);
+      assert.equal(calls, 0);
+      await markAiFixture(db, requestId);
+      const preview = await runPrivateIntegrationAction(context(db, env), 'aiExtractMenu', payload);
+      assert.equal(preview.advisory, true);
+      assert.equal(preview.menu.sezioni[0].voci[0].prezzo, '12,00');
+      assert.equal(getOne(db, 'SELECT COUNT(*) AS n FROM ai_inference_attempts').n, 1);
+      assert.equal(calls, 1);
+      db.sqlite.prepare('UPDATE clients SET name=? WHERE id=?').run('Locale cliente reale non autorizzato', 'client-1');
+      await assert.rejects(runPrivateIntegrationAction(context(db, env), 'aiExtractMenu', payload), (error) => error.status === 403);
+      assert.equal(calls, 1);
+    } finally { db.close(); }
+  });
+
+  it('does not run two parallel Cloudflare inferences for the same fixture action', async () => {
+    const db = database();
+    try {
+      const requestId = insertRequest(db);
+      await markAiFixture(db, requestId);
+      let release, signalStarted, calls = 0;
+      const started = new Promise((resolve) => { signalStarted = resolve; });
+      const env = {
+        ENVIRONMENT: 'protected-staging', STAGING_PROTECTED: 'true',
+        AI_PROVIDER: 'cloudflare_workers_ai', AI_MODEL: '@cf/meta/llama-3.3-70b-instruct-fp8-fast',
+        AI_TEST_REQUEST_ID: requestId,
+        AI: { run: () => { calls++; signalStarted(); return new Promise((resolve) => { release = resolve; }); } }
+      };
+      const payload = { requestId, requestRevision: 1, confirmation: 'CONFERMO INVIO AI TEST' };
+      const first = runPrivateIntegrationAction(context(db, env), 'aiClassifyRequest', payload);
+      let timer;
+      try {
+        await Promise.race([started, first.then(() => { throw new Error('AI finished before start'); }),
+          new Promise((_, reject) => { timer = setTimeout(() => reject(new Error('AI did not start')), 2_000); })]);
+      } finally { clearTimeout(timer); }
+      assert.equal(typeof release, 'function');
+      await assert.rejects(runPrivateIntegrationAction(context(db, env), 'aiClassifyRequest', payload), (error) => error.status === 429);
+      assert.equal(calls, 1);
+      release({ response: JSON.stringify({
+        request_type: 'nuovo', urgency: 'normale', locale_name: null, contact_name: null,
+        contact_channel: 'email', summary: 'Menù in prova.', requested_action: 'Preparare bozza.',
+        missing_information: [], confidence: 0.7, requires_human_review: true
+      }) });
+      assert.equal((await first).provider, 'cloudflare_workers_ai');
+      assert.equal(getOne(db, 'SELECT status FROM ai_inference_attempts').status, 'completed');
     } finally { db.close(); }
   });
 

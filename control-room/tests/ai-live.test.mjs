@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import { describe, it } from 'node:test';
-import { AI_LIMITS, AiLiveError, createAiLiveAdapter } from '../cloudflare/functions/_lib/ai-live.js';
+import { AI_LIMITS, CLOUDFLARE_FREE_MODEL, AiLiveError, createAiLiveAdapter } from '../cloudflare/functions/_lib/ai-live.js';
 
 const liveEnv = {
   AI_PROVIDER: 'openai_compatible',
@@ -155,6 +155,60 @@ describe('ai-live adapter', () => {
     assert.equal(captured.init.body.get('language'), 'it');
     assert.equal(transcript.language, 'it');
     assert.equal(transcript.requires_human_review, true);
+  });
+
+  it('uses only the free Cloudflare AI binding for text drafts, never OpenAI fetch or unapproved media', async () => {
+    const runs = [];
+    const adapter = createAiLiveAdapter({
+      AI_PROVIDER: 'cloudflare_workers_ai', AI_MODEL: CLOUDFLARE_FREE_MODEL,
+      AI_API_BASE: 'https://api.openai.com/v1', AI_API_KEY: 'unused-openai-fixture',
+      AI: { run: async (model, payload) => {
+        runs.push({ model, payload });
+        return { response: JSON.stringify(runs.length === 1 ? classification : extraction), usage: { total_tokens: 120 } };
+      } }
+    }, { fetch: async () => { throw new Error('external HTTP must never be used'); } });
+    const classified = await adapter.classifyEmail({ text: 'Vorrei un nuovo menù.', channel: 'email' });
+    assert.equal(adapter.mode, 'cloudflare_workers_ai');
+    assert.equal(classified.requires_human_review, true);
+    assert.equal(runs[0].model, CLOUDFLARE_FREE_MODEL);
+    assert.equal(runs[0].payload.response_format.type, 'json_schema');
+    assert.equal(runs[0].payload.response_format.json_schema.type, 'object');
+    assert.equal(runs[0].payload.max_tokens, 1000);
+    const extracted = await adapter.extractMenu({ text: 'Pizza Margherita — 9,00 €' });
+    assert.equal(extracted.sections[0].items[0].price, '9,00');
+    assert.ok(extracted.warnings.some((warning) => /Allergens are not inferred/.test(warning)));
+    assert.equal(runs[1].payload.max_tokens, 2400);
+    await assert.rejects(adapter.extractMenu({ imageBytes: new Uint8Array([1]), imageMimeType: 'image/png' }), errorCode('AI_OCR_UNAVAILABLE'));
+    await assert.rejects(adapter.transcribeAudio({ bytes: new Uint8Array([1]), mimeType: 'audio/wav' }), errorCode('AI_TRANSCRIPTION_UNAVAILABLE'));
+    assert.equal(runs.length, 2);
+  });
+
+  it('repairs only literal Workers AI quotes without a prefix and rejects invented citations', async () => {
+    const bare = structuredClone(extraction);
+    bare.source_references = ['Pizza Margherita — 9,00 €'];
+    bare.sections[0].items[0].source_reference = bare.source_references[0];
+    const result = createAiLiveAdapter({
+      AI_PROVIDER: 'cloudflare_workers_ai', AI_MODEL: CLOUDFLARE_FREE_MODEL,
+      AI: { run: async () => ({ response: JSON.stringify(bare) }) }
+    });
+    const supported = await result.extractMenu({ text: 'Pizza Margherita — 9,00 €' });
+    assert.deepEqual(supported.source_references, ['text: Pizza Margherita — 9,00 €']);
+    assert.equal(supported.sections[0].items[0].source_reference, supported.source_references[0]);
+    bare.source_references = ['Pagina 9 non presente'];
+    bare.sections[0].items[0].source_reference = bare.source_references[0];
+    await assert.rejects(result.extractMenu({ text: 'Pizza Margherita — 9,00 €' }), errorCode('AI_INVALID_OUTPUT'));
+  });
+
+  it('fails closed without a Workers AI binding or when a different, possibly paid model is configured', async () => {
+    let runs = 0;
+    const ai = { run: async () => { runs++; throw new Error('provider text or client data must be sanitized'); } };
+    const base = { AI_PROVIDER: 'cloudflare_workers_ai', AI_MODEL: CLOUDFLARE_FREE_MODEL };
+    await assert.rejects(createAiLiveAdapter(base).classifyEmail('Menu'), errorCode('AI_NOT_CONFIGURED'));
+    await assert.rejects(createAiLiveAdapter({ ...base, AI_MODEL: '@cf/moonshotai/kimi-k2.6', AI: ai }).classifyEmail('Menu'), errorCode('AI_INVALID_CONFIGURATION'));
+    assert.equal(runs, 0);
+    await assert.rejects(createAiLiveAdapter({ ...base, AI: ai }).classifyEmail('Menu'), (error) =>
+      errorCode('AI_PROVIDER_ERROR')(error) && !error.message.includes('client data'));
+    assert.equal(runs, 1);
   });
 
   it('fails closed on unreadable PDFs, input size violations, and missing live secrets without calling a provider', async () => {
