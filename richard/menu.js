@@ -151,6 +151,39 @@
     if (!cart.size) event.preventDefault();
   });
 
+  const secretTrigger = document.getElementById('richard-secret');
+  const easterEgg = document.getElementById('richard-easter-egg');
+  const closeEasterEgg = document.getElementById('close-easter-egg');
+  let secretClicks = 0;
+  let hideTimer;
+
+  function hidePhoto() {
+    if (easterEgg.hidden) return;
+    clearTimeout(hideTimer);
+    easterEgg.hidden = true;
+    document.body.classList.remove('easter-open');
+    secretTrigger.focus({ preventScroll: true });
+  }
+
+  secretTrigger.addEventListener('click', () => {
+    secretClicks += 1;
+    if (secretClicks < 5) return;
+    secretClicks = 0;
+    easterEgg.hidden = false;
+    document.body.classList.add('easter-open');
+    closeEasterEgg.focus();
+    hideTimer = setTimeout(hidePhoto, 5000);
+  });
+  closeEasterEgg.addEventListener('click', hidePhoto);
+  document.addEventListener('keydown', event => {
+    if (easterEgg.hidden) return;
+    if (event.key === 'Escape') hidePhoto();
+    if (event.key === 'Tab') {
+      event.preventDefault();
+      closeEasterEgg.focus();
+    }
+  });
+
   updateSelection();
   renderCart();
 })();
