@@ -13,10 +13,6 @@ cp blanch/assets/* dist/blanch/assets/
 cp blanch/data/menu.json dist/blanch/data/menu.json
 cp blanch/qr/trattoria-blanch-qr.png blanch/qr/trattoria-blanch-qr.svg dist/blanch/qr/
 
-# The existing GitHub Pages 404 links use /renmenu/ because it is a project site.
-# On Cloudflare Pages the same content is hosted from /; change only the build copy.
-sed -i 's#="/renmenu/#="/#g' dist/404.html
-
 # Revalidate mutable menu data and HTML so updates appear without a new QR.
 cat > dist/_headers <<'EOF'
 /*.html

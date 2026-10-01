@@ -17,4 +17,6 @@ Usare una proprietà **Prefisso URL** con `https://renmenu.pages.dev/` (lo slash
 
 ## Aggiornamenti e controllo
 
+Per ogni nuovo o aggiornato file in `menus/`, eseguire prima `python3 scripts/validate-menus.py`: il controllo è locale, non modifica i JSON e non sostituisce la conferma umana di prezzi, allergeni, disponibilità e lingue da parte del locale. Poi eseguire `sh scripts/build-cloudflare.sh` e provare il link e il QR dal telefono prima dell’approvazione del cliente.
+
 Per un aggiornamento del menù Blanch modificare `blanch/data/food.json` o `blanch/data/wines.tsv`, eseguire `python3 blanch/tools/build_menu.py`, revisionare `blanch/data/menu.json`, poi commit e push. Dopo il deployment verificare home, anteprima, caso studio, `blanch/data/menu.json`, sitemap e gli URL GitHub Pages dei QR prima di confermare al cliente. JSON e HTML mantengono cache breve per riflettere correzioni senza ristampare il QR.
