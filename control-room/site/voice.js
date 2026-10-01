@@ -53,19 +53,32 @@ export function listen({ onTranscript, onStatus }) {
   instance.onend = () => { if (recognition === instance) recognition = null; };
   instance.start();
 }
-export function interpretVoice(transcript, { requests = [], clients = [], messages = [], selectedRequestId = null, draft = null, client = null } = {}) {
-  const words = String(transcript || '').toLocaleLowerCase('it-IT');
-  const venue = client?.name || 'il locale selezionato';
+export function interpretVoice(transcript, {
+  requests = [], clients = [], messages = [], materials = [], audit = [], notifications = [],
+  selectedRequestId = null, draft = null, client = null, history = []
+} = {}) {
+  const words = String(transcript || '').toLocaleLowerCase('it-IT').replace(/\s+/g, ' ').trim();
+  const selectedRequest = requests.find((item) => item.id === selectedRequestId) || null;
+  const venue = client?.name || clients.find((item) => item.id === selectedRequest?.clientId)?.name || 'il locale selezionato';
   const items = draft?.menu?.sezioni?.reduce((count, section) => count + (section.voci?.length || 0), 0) || 0;
   const changes = draft?.versions?.[0]?.menu ? menuDiff(draft.versions[0].menu, draft.menu).changes.length : 0;
+  const activeRequests = requests.filter((item) => !['completata', 'archiviata', 'chiusa'].includes(item.status));
+  const requestMaterials = materials.filter((item) => item.requestId === selectedRequestId && !item.archivedAt);
+  const uncertain = (draft?.provenance || []).filter((item) => item.status !== 'confermato');
+  const unread = notifications.filter((item) => !item.readAt && (!item.requestId || item.requestId === selectedRequestId));
+  const lastUserTurn = [...history].reverse().find((turn) => turn?.role === 'user')?.text || '';
+
+  // This module is a deterministic browser-side readout/navigation aid, not an AI provider.
+  if (!words) return { reply: 'Scrivi o correggi una domanda prima di interpretarla. Nessuna azione è stata eseguita.', target: null };
   if (/non pubblicare|ferma/.test(words)) return { reply: 'Non ho pubblicato nulla. Tutte le operazioni esterne restano disattivate.', target: null };
   if (/promemoria|scadenz/.test(words)) return { reply: 'Ho aperto il centro notifiche. Registra il promemoria come avviso interno, non come messaggio esterno.', target: 'notifiche' };
+  if (/pubblic|manda|invia|chiama|merge|pag(a|o|hi)/.test(words)) {
+    return { reply: `Ho preparato soltanto la schermata di controllo per ${venue}. Include ${items} voci e ${changes} modifiche confrontabili tra bozze (non rispetto al menu live). Vuoi aprire la conferma sul telefono? Nessuna pubblicazione, invio o chiamata è partita.`, target: 'approvazioni' };
+  }
   if (/leggimi.*messagg/.test(words)) {
     const note = messages.find((item) => item.requestId === selectedRequestId);
     return { reply: note ? `Bozza non inviata: ${note.body.slice(0, 500)}` : 'Non c’è un messaggio preparato per la pratica selezionata.', target: 'notifiche' };
   }
-  if (/pubblic|manda|invia|chiama|merge|pag(a|o|hi)/.test(words))
-    return { reply: `Ho preparato soltanto la schermata di controllo per ${venue}. Include ${items} voci e ${changes} modifiche confrontabili tra bozze (non rispetto al menu live). Vuoi aprire la conferma sul telefono? Nessuna pubblicazione, invio o chiamata è partita.`, target: 'approvazioni' };
   const opened = words.match(/\bapri\s+(.+)/);
   if (opened) {
     const requested = opened[1].trim();
@@ -75,16 +88,35 @@ export function interpretVoice(transcript, { requests = [], clients = [], messag
     });
     if (matching) return { reply: `Ho individuato la pratica ${matching.subject}. L’ho selezionata senza modificarla.`, target: 'richieste', requestId: matching.id };
   }
+  if (/azioni|cosa hai fatto|ultima azione|registro/.test(words)) {
+    const last = audit.filter((item) => !selectedRequestId || item.requestId === selectedRequestId)[0];
+    return { reply: last ? `Ultima azione registrata: ${last.summary} È un registro informativo: non ho eseguito nuove azioni.` : 'Non ci sono ancora azioni registrate nel contesto selezionato.', target: 'registro' };
+  }
+  if (/quali.*(?:pratic|richiest)|(?:pratic|richiest).*aperte|elenca.*(?:pratic|richiest)/.test(words)) {
+    const labels = activeRequests.slice(0, 3).map((item) => item.subject).join('; ');
+    return { reply: activeRequests.length ? `Ci sono ${activeRequests.length} pratiche aperte: ${labels}${activeRequests.length > 3 ? '; e altre da vedere nell’elenco.' : '.'}` : 'Non ci sono pratiche aperte nel contesto corrente.', target: 'richieste' };
+  }
   if (/oggi|priorit|cosa devo fare/.test(words)) {
-    const next = requests.find((item) => !['completata', 'archiviata', 'chiusa'].includes(item.status));
+    const next = activeRequests[0];
     return { reply: next ? `La prossima priorità è ${next.subject}. Apri la pratica e verifica la fonte prima di procedere.` : 'Non ci sono pratiche aperte nel contesto corrente.', target: 'command' };
   }
   if (/nuove richieste|richiest/.test(words)) return { reply: `Ci sono ${requests.filter((item) => item.status === 'nuova').length} nuove richieste. Ho aperto l’elenco; non ho contattato i clienti.`, target: 'richieste' };
-  if (/riassum.*materiale/.test(words)) return { reply: `La pratica selezionata contiene ${requests.find((item) => item.id === selectedRequestId)?.sourceText?.split('\n').filter(Boolean).length || 0} righe di testo sorgente. Per immagini/PDF non c’è ancora OCR: trascrivi i dati leggibili prima di generare.`, target: 'builder' };
-  if (/allergen|dati mancan|materiale/.test(words)) return { reply: 'Ho aperto il Builder. Gli allergeni non vengono dedotti: confronta ogni voce con la fonte ufficiale del locale.', target: 'builder' };
+  if (/riassum.*materiale|materiali?|file|allegat/.test(words)) {
+    const sourceRows = selectedRequest?.sourceText?.split('\n').filter(Boolean).length || 0;
+    const filenames = requestMaterials.slice(0, 3).map((item) => item.filename).join(', ');
+    return { reply: selectedRequest ? `La pratica selezionata contiene ${requestMaterials.length} materiali attivi${filenames ? `: ${filenames}` : ''} e ${sourceRows} righe di testo sorgente. PDF e immagini restano fonti private: non c’è OCR automatico.` : 'Seleziona una pratica per riassumere materiali e testo sorgente.', target: 'materiali' };
+  }
+  if (/allergen|dubb|dati mancan|manca|incert/.test(words)) {
+    const warning = uncertain.length ? `${uncertain.length} campi sono da verificare nella provenienza.` : 'Non vedo campi marcati da verificare nella bozza corrente.';
+    const notices = unread.length ? ` Ci sono anche ${unread.length} avvisi non letti.` : '';
+    return { reply: `${warning}${notices} Gli allergeni non vengono dedotti: confronta ogni voce con la fonte ufficiale del locale.`, target: 'builder' };
+  }
   if (/bozz|prepara il men/.test(words)) return { reply: 'Ho aperto il Builder. Puoi generare una bozza prudente dal materiale, senza approvarla automaticamente.', target: 'builder' };
   if (/anteprima|qr/.test(words)) return { reply: 'Ho aperto l’anteprima privata. Il QR è provvisorio e non va condiviso.', target: 'anteprima' };
   if (/messagg|whatsapp|email/.test(words)) return { reply: 'Ho aperto le bozze messaggi. Nessun invio avviene senza revisione e consenso sullo schermo.', target: 'notifiche' };
   if (/prezzo|sezione|modifica|aggiungi/.test(words)) return { reply: 'Ho aperto l’editor. La modifica va scritta, confrontata con la fonte e salvata manualmente.', target: 'revisione' };
-  return { reply: 'Non ho eseguito azioni. Puoi aprire Richieste, Builder, Revisione, Anteprima o Notifiche, oppure specificare la tua domanda.', target: null };
+  if (/contesto|questa pratica|quale pratica|e i dettagli/.test(words) && selectedRequest) {
+    return { reply: `Stai lavorando su ${selectedRequest.subject} per ${venue}. Prossimo passo: ${selectedRequest.nextStep || 'da definire'}. La conversazione precedente resta solo come contesto testuale${lastUserTurn ? '; non interpreta o esegue comandi impliciti.' : '.'}`, target: 'richieste' };
+  }
+  return { reply: 'Posso leggere pratiche, materiali, dubbi e azioni registrate dal contesto attuale. Non sono un provider AI live e non eseguo azioni. Puoi specificare la tua domanda.', target: null };
 }

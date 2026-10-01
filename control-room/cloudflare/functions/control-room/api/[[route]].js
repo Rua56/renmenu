@@ -1,6 +1,7 @@
-import { isSameOriginWrite } from '../../_lib/auth.js';
+import { isSameOriginWrite, verifyOwner } from '../../_lib/auth.js';
 import { validateMenu } from '../../_lib/menu.js';
 import { integrations } from '../../_lib/integrations.js';
+import { reviewIssues } from '../../_lib/editorial.js';
 
 const headers = { 'Cache-Control': 'private, no-store', 'Content-Type': 'application/json; charset=utf-8' };
 const answer = (body, status = 200) => new Response(JSON.stringify(body), { status, headers });
@@ -226,13 +227,18 @@ async function action(db, type, input, env = {}) {
     assert(draft, 'Bozza non trovata.', 404);
     assert(revision === draft.revision, 'Revisione superata. Ricarica.', 409);
     assert(['bozza', 'revisione', 'pronta_pr'].includes(draft.status), 'Revisione chiusa.', 409);
-    const checks = p.checks;
-    assert(checks && typeof checks === 'object' && ['prices', 'allergens', 'languages', 'clientApproval'].every((key) => typeof checks[key] === 'boolean'), 'Conferme incomplete.');
-    if (checks.clientApproval) checks.clientApprovalEvidence = clean(p.approvalEvidence, 1000, 'Riferimento approvazione scritta');
-    else checks.clientApprovalEvidence = '';
+    const selections = p.checks;
+    assert(selections && typeof selections === 'object' && ['prices', 'allergens', 'languages', 'clientApproval'].every((key) => typeof selections[key] === 'boolean'), 'Conferme incomplete.');
+    const checks = Object.fromEntries(['prices', 'allergens', 'languages', 'clientApproval'].map((key) => [key, selections[key]]));
+    checks.clientApprovalEvidence = checks.clientApproval ? clean(p.approvalEvidence, 500, 'Riferimento approvazione scritta') : '';
+    checks.fieldEvidence = Object.fromEntries(['prices', 'allergens', 'languages'].map((key) => [key,
+      checks[key] ? clean(p.fieldEvidence?.[key], 500, `Fonte ${key}`) : '']));
+    checks.allergenOmissionConfirmed = checks.allergens && p.allergenOmissionConfirmed === true;
     const validation = validateMenu(JSON.parse(draft.menu_json));
     assert(!validation.errors.length, `Correggi il menù: ${validation.errors[0]}`);
     const ready = ['prices', 'allergens', 'languages', 'clientApproval'].every((key) => checks[key]);
+    if (ready) assert(!reviewIssues(JSON.parse(draft.menu_json), checks).issues.length,
+      reviewIssues(JSON.parse(draft.menu_json), checks).issues[0], 422);
     const request = await getOne(db, 'SELECT revision FROM requests WHERE id=?', draft.request_id);
     const stamp = now();
     const changed = await auditedBatch(db, [
@@ -251,9 +257,10 @@ async function action(db, type, input, env = {}) {
     assert(draft, 'Bozza non trovata.', 404);
     assert(draft.revision === revision && draft.status === 'pronta_pr', 'Bozza o revisione non pronta. Ricarica.', 409);
     const checks = JSON.parse(draft.checks_json);
-    assert(['prices', 'allergens', 'languages', 'clientApproval'].every((key) => checks[key] === true) && checks.clientApprovalEvidence, 'Conferme del cliente e del team mancanti.', 403);
     const validation = validateMenu(JSON.parse(draft.menu_json));
     assert(!validation.errors.length, 'Validazione menù fallita.');
+    assert(!reviewIssues(JSON.parse(draft.menu_json), checks).issues.length,
+      'Conferme o fonti editoriali mancanti: torna alla checklist.', 403);
     const digest = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(draft.menu_json));
     const snapshotSha = [...new Uint8Array(digest)].map((byte) => byte.toString(16).padStart(2, '0')).join('');
     const proposalId = uid();
@@ -441,7 +448,7 @@ async function uploadMaterial(context) {
 
 async function downloadMaterial(context, id) {
   assert(context.env.BUCKET?.get, 'Archivio privato non configurato.', 503);
-  const material = await getOne(context.env.DB, 'SELECT * FROM materials WHERE id=?', identifier(id));
+  const material = await getOne(context.env.DB, 'SELECT * FROM materials WHERE id=? AND archived_at IS NULL', identifier(id));
   assert(material, 'Materiale non trovato.', 404);
   const item = await context.env.BUCKET.get(material.r2_key);
   assert(item, 'Materiale non disponibile.', 404);
@@ -453,12 +460,13 @@ async function downloadMaterial(context, id) {
 
 export async function onRequest(context) {
   try {
+    if (!await verifyOwner(context.request, context.env)) return failure(403, 'Area riservata. Accesso negato.');
     assert(context.env.DB?.prepare, 'Database privato non configurato.', 503);
     const request = context.request, method = request.method;
     const route = context.params.route;
     const segments = Array.isArray(route) ? route : typeof route === 'string' ? route.split('/') : [];
     if (method === 'GET' && segments.join('/') === 'state') return answer(await state(context.env.DB));
-    if (method === 'GET' && segments[0] === 'material' && segments.length === 2) return downloadMaterial(context, segments[1]);
+    if (method === 'GET' && segments[0] === 'material' && segments.length === 2) return await downloadMaterial(context, segments[1]);
     if (method === 'POST') {
       assert(isSameOriginWrite(request), 'Origine non autorizzata.', 403);
       if (segments.join('/') === 'material') return uploadMaterial(context);

@@ -118,14 +118,16 @@ export function validateMenu(menu) {
       if (!nonEmptyText(item.nome)) add('error', `${itemPath}.nome`, 'Manca un nome della voce.');
       else essential.push([`${itemPath}.nome`, item.nome]);
       if ('prezzo' in item) price(item.prezzo, `${itemPath}.prezzo`);
+      else add('warning', `${itemPath}.prezzo`, 'PREZZO NON CONFERMATO DAL LOCALE: nessuna fonte esplicita.');
       if ('allergeni' in item) {
         if (!Array.isArray(item.allergeni)) add('error', `${itemPath}.allergeni`, 'Allergeni deve essere una lista da 1 a 14.');
         else {
           const normalized = item.allergeni.map(String);
+          if (!normalized.length) add('warning', `${itemPath}.allergeni`, 'ALLERGENI NON CONFERMATI DAL LOCALE: lista vuota; chiedere conferma dell’omissione.');
           normalized.forEach((allergen) => { if (!ALLOWED_ALLERGENS.has(allergen)) add('error', `${itemPath}.allergeni`, `Allergene '${allergen}' non ammesso.`); });
           if (new Set(normalized).size !== normalized.length) add('warning', `${itemPath}.allergeni`, 'Sono presenti allergeni duplicati.');
         }
-      }
+      } else add('warning', `${itemPath}.allergeni`, 'ALLERGENI NON CONFERMATI DAL LOCALE: chiedere conferma esplicita, non inferire.');
       if ('tag' in item) {
         if (!Array.isArray(item.tag)) add('error', `${itemPath}.tag`, 'Tag deve essere una lista.');
         else {

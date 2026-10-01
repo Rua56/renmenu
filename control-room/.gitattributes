@@ -1,0 +1,2 @@
+# Only the synthetic fixture is binary; no customer material belongs in Git.
+site/demo-assets/*.pdf binary

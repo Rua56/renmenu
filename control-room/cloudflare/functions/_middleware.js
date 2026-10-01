@@ -6,7 +6,7 @@ const privateHeaders = {
   'Referrer-Policy': 'no-referrer',
   'X-Content-Type-Options': 'nosniff',
   'Cross-Origin-Resource-Policy': 'same-origin',
-  'Content-Security-Policy': "default-src 'self'; base-uri 'self'; object-src 'none'; form-action 'self'; frame-ancestors 'none'; script-src 'self'; style-src 'self' https://fonts.googleapis.com; font-src 'self' https://fonts.gstatic.com; img-src 'self' data: blob:; connect-src 'self'; media-src 'self' blob:"
+  'Content-Security-Policy': "default-src 'self'; base-uri 'self'; object-src 'none'; frame-src blob:; form-action 'self'; frame-ancestors 'none'; script-src 'self'; style-src 'self' https://fonts.googleapis.com; font-src 'self' https://fonts.gstatic.com; img-src 'self' data: blob:; connect-src 'self'; media-src 'self' blob:"
 };
 
 export async function onRequest(context) {

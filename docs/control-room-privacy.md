@@ -5,7 +5,7 @@
 | Dato | Finalità | Dove si trova ora | Futuro previsto |
 | --- | --- | --- | --- |
 | Clienti, pratiche, note, messaggi, checklist | Gestire richieste e revisioni editoriali | Solo dati sintetici in `localStorage` di localhost | D1 dedicato, Access owner-only |
-| PDF/foto/audio caricati | Allegare materiali e preservare la fonte | Nel mock soltanto metadati e un estratto di file di testo; **non** binari | R2 privato con chiavi UUID e download autenticato |
+| PDF/foto/audio caricati | Allegare materiali e preservare la fonte | Nel mock soltanto metadati e un estratto di file di testo; **non** binari dei clienti. Una fixture PDF interamente inventata è inclusa nei sorgenti per provare il viewer | R2 privato con chiavi UUID e download autenticato |
 | Menù JSON e versioni | Preparare una bozza verificabile | Mock locale; nessun menù pubblico toccato | D1 privato; solo dopo altra approvazione una PR GitHub |
 | Audit | Ricostruire decisioni e modifiche | Stato demo locale o D1 dedicato se attivato | D1 senza logging di token/segreti |
 | Audio del microfono | Dettare un comando facoltativo | Non conservato da RenMenu; elaborazione browser potenzialmente remota | Da valutare con informativa e consenso specifici |
@@ -13,7 +13,7 @@
 ## Principi pratici
 
 - **Non usare materiali reali nella demo**: `localStorage` non equivale a un archivio aziendale protetto. Il pulsante «Ripristina demo» elimina le modifiche fittizie del mock. Chiudere il browser non le elimina automaticamente.
-- Se D1/R2 saranno attivati, nessun file avrà URL pubblico. Ogni download passa dal middleware Access e usa `Cache-Control: no-store`; nessuna credenziale è inviata al frontend. L'archiviazione attuale è **logica**: nasconde il materiale dalla lavorazione, ma non cancella il binario R2. La cancellazione definitiva con politica di retention/backups è una scelta futura non implementata.
+- Se D1/R2 saranno attivati, nessun file avrà URL pubblico. Ogni download passa dal middleware Access e dalla guardia Access nella route API e usa `Cache-Control: no-store`; nessuna credenziale è inviata al frontend. PDF.js self-hosted disegna i byte scaricati su canvas nel browser, senza inviarli a un servizio PDF esterno; un link Blob temporaneo può essere aperto nella scheda e viene revocato alla chiusura. L'archiviazione attuale è **logica**: nasconde il materiale dalla lavorazione, ma non cancella il binario R2. La cancellazione definitiva con politica di retention/backups è una scelta futura non implementata.
 - Lo stato pagamento in scheda è una **nota dichiarata e non verificata**; l'app non legge né modifica Stripe. QR/link visualizzati nella demo sono proposte non attive.
 - Gli adapter WhatsApp, chiamate, GitHub e AI funzionano **solo in mock**. L'account Gmail collegato alla precedente app Jarvis non viene consultato da questa Control Room. Ogni futura integrazione richiede riesame di destinatari, minimizzazione, scopi e tempi di conservazione.
 - La firma Cloudflare Access non sostituisce la corretta gestione organizzativa: limitare l'accesso all'email esatta del proprietario, mantenere segreti/binding solo in Cloudflare e configurare fail-closed anche in caso di errore/quota.

@@ -38,8 +38,20 @@ const ginestraMenu = {
   ]
 };
 
+const ginestraPublishedSnapshot = {
+  id: 'cucina-ginestra-demo', nome: { it: 'Cucina Ginestra — demo' }, lingue: ['it'],
+  sezioni: [{ nome: { it: 'Pranzo' }, voci: [
+    { nome: { it: 'Zuppa di stagione' }, prezzo: '7,50' },
+    { nome: { it: 'Riso alle verdure' }, prezzo: '9,00' },
+    { nome: { it: 'Insalata del giorno' }, prezzo: '7,00' }
+  ] }]
+};
+
 export function createDemoState() {
   return {
+    // Entirely synthetic fixture. Never infer from this that a menu exists online.
+    publicMenuSnapshots: { 'cucina-ginestra-demo': { source: 'snapshot pubblicato fittizio — NON GitHub',
+      capturedAt: '2026-09-15T10:00:00.000Z', menu: ginestraPublishedSnapshot } },
     clients: [
       { id: DEMO_IDS.clientAurora, name: 'Bottega Aurora — demo', phone: '+390000000001', plan: 'da_definire', internalNotes: 'Anagrafica interamente sintetica; numero non reale.', revision: 1, createdAt: '2026-09-28T09:10:00.000Z', updatedAt: '2026-09-28T09:10:00.000Z', tags: ['demo'] },
       { id: DEMO_IDS.clientGinestra, name: 'Cucina Ginestra — demo', menuId: 'cucina-ginestra-demo', plan: 'standard', internalNotes: 'Nessun contatto reale associato.', revision: 1, createdAt: '2026-09-29T11:30:00.000Z', updatedAt: '2026-09-29T11:30:00.000Z', tags: ['demo'] }

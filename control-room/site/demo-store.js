@@ -1,5 +1,6 @@
 import { cloneDemo } from './demo-data.js';
-import { extractMenuFromText, slugify, validateMenu } from './model.js';
+import { extractMenuFromText, menuDiff, slugify, validateMenu } from './model.js';
+import { reviewIssues } from './editorial.js';
 
 const STORE_KEY = 'renmenu-control-room-demo-v1';
 const MAX_FILE_SIZE = 10 * 1024 * 1024;
@@ -173,6 +174,7 @@ export async function performDemoAction(type, payload = {}) {
       draft.menu = clone(payload.menu);
       draft.menu.id = slug;
       draft.slug = slug;
+      draft.provenance = []; // Riferimenti automatici alla vecchia versione non attestano modifiche manuali.
       draft.revision += 1;
       draft.status = 'revisione';
       draft.checks = { prices: false, allergens: false, languages: false, clientApproval: false };
@@ -190,9 +192,16 @@ export async function performDemoAction(type, payload = {}) {
       const keys = ['prices', 'allergens', 'languages', 'clientApproval'];
       if (!keys.every((key) => typeof checks[key] === 'boolean')) throw actionError('Completa i quattro controlli con valori booleani.');
       if (!validateMenu(draft.menu).valid) throw actionError('Correggi gli errori del menù prima di registrare la checklist.');
-      draft.approvalEvidence = String(payload.approvalEvidence || '').trim();
-      if (checks.clientApproval && draft.approvalEvidence.length < 8) throw actionError('Annota il riferimento all’approvazione scritta del cliente.');
-      draft.checks = { ...Object.fromEntries(keys.map((key) => [key, checks[key]])), clientApprovalEvidence: checks.clientApproval ? draft.approvalEvidence : '' };
+      draft.approvalEvidence = String(payload.approvalEvidence || '').trim().slice(0, 500);
+      draft.checks = { ...Object.fromEntries(keys.map((key) => [key, checks[key]])),
+        fieldEvidence: Object.fromEntries(['prices', 'allergens', 'languages'].map((key) => [key,
+          checks[key] ? String(payload.fieldEvidence?.[key] || '').trim().slice(0, 500) : ''])),
+        allergenOmissionConfirmed: checks.allergens && payload.allergenOmissionConfirmed === true,
+        clientApprovalEvidence: checks.clientApproval ? draft.approvalEvidence : '' };
+      if (keys.every((key) => draft.checks[key])) {
+        const evaluation = reviewIssues(draft.menu, draft.checks);
+        if (evaluation.issues.length) throw actionError(evaluation.issues[0]);
+      }
       draft.revision += 1;
       draft.status = keys.every((key) => checks[key]) ? 'pronta_pr' : 'revisione';
       const request = find(state.requests, draft.requestId, 'Pratica');
@@ -206,8 +215,12 @@ export async function performDemoAction(type, payload = {}) {
       const draft = find(state.drafts, payload.id, 'Bozza');
       requireRevision(draft, payload.revision);
       if (payload.confirmation !== 'CONFERMO PR DI PROVA') throw actionError('Scrivi esattamente “CONFERMO PR DI PROVA”.');
-      if (draft.status !== 'pronta_pr' || !['prices', 'allergens', 'languages', 'clientApproval'].every((key) => draft.checks[key] === true) || !draft.checks.clientApprovalEvidence) throw actionError('Servono revisione e approvazione scritta prima della PR di prova.');
-      const proposal = { id: uid(), draftId: draft.id, requestId: draft.requestId, kind: 'pr_simulata', status: 'pronta', createdAt: now(), diff: { simulated: true } };
+      if (draft.status !== 'pronta_pr' || reviewIssues(draft.menu, draft.checks).issues.length)
+        throw actionError('Servono fonti, revisione e approvazione scritta prima della PR di prova.');
+      const snapshot = state.publicMenuSnapshots?.[draft.slug];
+      const proposal = { id: uid(), draftId: draft.id, requestId: draft.requestId, kind: 'pr_simulata',
+        status: 'pronta', createdAt: now(), diff: snapshot ? menuDiff(snapshot.menu, draft.menu) : null,
+        diffSource: snapshot?.source || 'nessun confronto con il menu live' };
       state.proposals.unshift(proposal);
       draft.status = 'pr_simulata';
       draft.revision += 1;

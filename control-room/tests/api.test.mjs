@@ -1,11 +1,29 @@
 import assert from 'node:assert/strict';
-import { describe, it } from 'node:test';
+import { after, describe, it } from 'node:test';
 import { readFileSync } from 'node:fs';
 import { DatabaseSync } from 'node:sqlite';
 import { onRequest } from '../cloudflare/functions/control-room/api/[[route]].js';
 import { extractMenuFromText, validateMenu } from '../cloudflare/functions/_lib/menu.js';
 import { validateMenu as validateEditor } from '../site/model.js';
 import { prepareMockGitHubProposal } from '../cloudflare/functions/_lib/github.js';
+
+const domain = 'https://team-api-test.cloudflareaccess.com';
+const accessEnv = { TEAM_DOMAIN: domain, POLICY_AUD: 'api-test-owner-only', OWNER_EMAIL: 'owner-api@example.test' };
+const keyPair = await crypto.subtle.generateKey({ name: 'RSASSA-PKCS1-v1_5', modulusLength: 2048,
+  publicExponent: new Uint8Array([1, 0, 1]), hash: 'SHA-256' }, true, ['sign', 'verify']);
+const jwk = { ...await crypto.subtle.exportKey('jwk', keyPair.publicKey), kid: 'api-test-key', use: 'sig', alg: 'RS256' };
+const previousFetch = globalThis.fetch;
+globalThis.fetch = async (url, options) => String(url) === `${domain}/cdn-cgi/access/certs`
+  ? Response.json({ keys: [jwk] }) : previousFetch(url, options);
+after(() => { globalThis.fetch = previousFetch; });
+const encode = (data) => Buffer.from(JSON.stringify(data)).toString('base64url');
+const head = encode({ alg: 'RS256', kid: jwk.kid });
+const body = encode({ iss: domain, aud: [accessEnv.POLICY_AUD], email: accessEnv.OWNER_EMAIL, type: 'app',
+  exp: Math.floor(Date.now() / 1000) + 3600 });
+const signature = await crypto.subtle.sign('RSASSA-PKCS1-v1_5', keyPair.privateKey, new TextEncoder().encode(`${head}.${body}`));
+const jwt = `${head}.${body}.${Buffer.from(signature).toString('base64url')}`;
+const credentials = { 'Cf-Access-Jwt-Assertion': jwt };
+const testEnv = (db, extra = {}) => ({ DB: db, ...accessEnv, ...extra });
 
 function database() {
   const sqlite = new DatabaseSync(':memory:');
@@ -31,15 +49,41 @@ const base = 'https://renmenu.pages.dev/control-room/api/';
 async function call(db, path, payload, extra = {}) {
   const method = payload === undefined ? 'GET' : 'POST';
   const request = new Request(`${base}${path}`, {
-    method, headers: method === 'POST' ? { Origin: 'https://renmenu.pages.dev', 'Content-Type': 'application/json' } : {},
+    method, headers: method === 'POST' ? { ...credentials, Origin: 'https://renmenu.pages.dev', 'Content-Type': 'application/json' } : credentials,
     body: method === 'POST' ? JSON.stringify(payload) : undefined
   });
-  const response = await onRequest({ request, env: { DB: db, ...extra }, params: { route: path.split('/') } });
+  const response = await onRequest({ request, env: testEnv(db, extra), params: { route: path.split('/') } });
   return { status: response.status, body: response.headers.get('content-type')?.includes('json') ? await response.json() : await response.text() };
 }
 const action = (db, type, payload) => call(db, 'actions', { type, payload });
+const documentedReview = {
+  fieldEvidence: {
+    prices: 'Listino di prova, due righe con prezzo 12,00 e 8,50.',
+    allergens: 'Email del locale fittizio: omissione dei numeri allergeni esplicitamente approvata.',
+    languages: 'Testo italiano originale nella richiesta demo verificato.'
+  },
+  allergenOmissionConfirmed: true
+};
 
 describe('Control Room API staging', () => {
+  it('rifiuta GET, POST e file senza JWT Access firmato anche se il middleware è assente', async () => {
+    const db = database();
+    try {
+      for (const route of ['state', 'material/file-di-test']) {
+        const path = route.split('/');
+        const unauthenticated = await onRequest({ request: new Request(`${base}${route}`),
+          env: testEnv(db, { BUCKET: { get: async () => { throw new Error('R2 non va interrogato'); } } }), params: { route: path } });
+        assert.equal(unauthenticated.status, 403);
+      }
+      const unauthenticatedPost = await onRequest({
+        request: new Request(`${base}actions`, { method: 'POST', headers: { Origin: 'https://renmenu.pages.dev', 'Content-Type': 'application/json' },
+          body: JSON.stringify({ type: 'addNotification', payload: { subject: 'niente', body: 'niente' } }) }),
+        env: testEnv(db), params: { route: ['actions'] }
+      });
+      assert.equal(unauthenticatedPost.status, 403);
+      assert.equal((await call(db, 'state', undefined, { POLICY_AUD: 'un-app-diversa' })).status, 403);
+    } finally { db.close(); }
+  });
   it('estrae solo piatti con prezzo attestato e non inventa allergeni o contatti', () => {
     const extraction = extractMenuFromText('Osteria di prova', '## Primi\nGnocchi — 12,00\nRisotto: 13,50\nAllergeni da chiedere al locale');
     assert.equal(extraction.extracted.length, 2);
@@ -81,7 +125,16 @@ describe('Control Room API staging', () => {
       const draft = extracted.body.state.drafts[0];
       const blocked = await action(db, 'preparePr', { id: draft.id, revision: draft.revision, confirmation: 'CONFERMO PR DI PROVA' });
       assert.equal(blocked.status, 409);
-      const review = await action(db, 'reviewDraft', { id: draft.id, revision: draft.revision, checks: { prices: true, allergens: true, languages: true, clientApproval: true }, approvalEvidence: 'Email conferma cliente del 01/10/2026' });
+      const checkboxesOnly = await action(db, 'reviewDraft', { id: draft.id, revision: draft.revision,
+        checks: { prices: true, allergens: true, languages: true, clientApproval: true },
+        approvalEvidence: 'Email di approvazione fittizia del locale' });
+      assert.equal(checkboxesOnly.status, 422);
+      const noAllergenEvidence = await action(db, 'reviewDraft', { id: draft.id, revision: draft.revision,
+        checks: { prices: true, allergens: true, languages: true, clientApproval: true },
+        approvalEvidence: 'Email di approvazione fittizia del locale',
+        fieldEvidence: documentedReview.fieldEvidence });
+      assert.equal(noAllergenEvidence.status, 422);
+      const review = await action(db, 'reviewDraft', { id: draft.id, revision: draft.revision, checks: { prices: true, allergens: true, languages: true, clientApproval: true }, approvalEvidence: 'Email conferma cliente del 01/10/2026', ...documentedReview });
       assert.equal(review.status, 200);
       assert.equal(review.body.result.ready, true);
       assert.equal(review.body.state.requests.find((item) => item.id === requestId).status, 'approvata');
@@ -117,8 +170,8 @@ describe('Control Room API staging', () => {
       assert.equal((await action(db, 'merge', { requestId })).status, 404);
       assert.equal((await action(db, 'sendWhatsapp', { requestId })).status, 404);
       const forged = await onRequest({
-        request: new Request(`${base}actions`, { method: 'POST', headers: { Origin: 'https://malicious.example', 'Content-Type': 'application/json' }, body: JSON.stringify({ type: 'addNotification', payload: { channel: 'email', subject: 'x', body: 'x' } }) }),
-        env: { DB: db }, params: { route: ['actions'] }
+        request: new Request(`${base}actions`, { method: 'POST', headers: { ...credentials, Origin: 'https://malicious.example', 'Content-Type': 'application/json' }, body: JSON.stringify({ type: 'addNotification', payload: { channel: 'email', subject: 'x', body: 'x' } }) }),
+        env: testEnv(db), params: { route: ['actions'] }
       });
       assert.equal(forged.status, 403);
     } finally { db.close(); }
@@ -136,14 +189,14 @@ describe('Control Room API staging', () => {
       assert.equal(draft.slug, 'qr-invariato');
       const changedSlug = structuredClone(draft.menu); changedSlug.id = 'qr-diverso';
       assert.equal((await action(db, 'saveDraft', { id: draft.id, revision: draft.revision, slug: changedSlug.id, menu: changedSlug })).status, 422);
-      const review = await action(db, 'reviewDraft', { id: draft.id, revision: draft.revision, checks: { prices: true, allergens: true, languages: true, clientApproval: true }, approvalEvidence: 'Email demo cliente: revisione approvata' });
+      const review = await action(db, 'reviewDraft', { id: draft.id, revision: draft.revision, checks: { prices: true, allergens: true, languages: true, clientApproval: true }, approvalEvidence: 'Email demo cliente: revisione approvata', ...documentedReview });
       assert.equal(review.body.state.drafts.find((item) => item.id === draft.id).status, 'pronta_pr');
       const form = new FormData();
       form.set('requestId', requestId);
       form.set('file', new File(['%PDF-1.4\naltro listino di prova'], 'aggiornamento-demo.pdf', { type: 'application/pdf' }));
       const response = await onRequest({
-        request: new Request(`${base}material`, { method: 'POST', headers: { Origin: 'https://renmenu.pages.dev' }, body: form }),
-        env: { DB: db, BUCKET }, params: { route: ['material'] }
+        request: new Request(`${base}material`, { method: 'POST', headers: { ...credentials, Origin: 'https://renmenu.pages.dev' }, body: form }),
+        env: testEnv(db, { BUCKET }), params: { route: ['material'] }
       });
       assert.equal(response.status, 200);
       const stateAfterUpload = (await response.json()).state;
@@ -212,20 +265,22 @@ describe('Control Room API staging', () => {
       form.set('requestId', requestId);
       form.set('file', new File(['%PDF-1.4\nfile demo'], 'menu-esempio.pdf', { type: 'application/pdf' }));
       const response = await onRequest({
-        request: new Request(`${base}material`, { method: 'POST', headers: { Origin: 'https://renmenu.pages.dev' }, body: form }),
-        env: { DB: db, BUCKET }, params: { route: ['material'] }
+        request: new Request(`${base}material`, { method: 'POST', headers: { ...credentials, Origin: 'https://renmenu.pages.dev' }, body: form }),
+        env: testEnv(db, { BUCKET }), params: { route: ['material'] }
       });
       assert.equal(response.status, 200);
       const body = await response.json();
       const id = body.result.id;
       assert.equal(body.state.materials[0].requestId, requestId);
       assert.equal(body.state.materials[0].r2_key, undefined);
+      const download = await onRequest({ request: new Request(`${base}material/${id}`, { headers: credentials }), env: testEnv(db, { BUCKET }), params: { route: ['material', id] } });
+      assert.equal(download.status, 200);
+      assert.equal((await download.text()).startsWith('%PDF-1.4'), true);
       const archived = await action(db, 'archiveMaterial', { id, confirmation: 'ARCHIVIA MATERIALE' });
       assert.equal(archived.status, 200);
       assert.ok(archived.body.state.materials[0].archivedAt);
-      const download = await onRequest({ request: new Request(`${base}material/${id}`), env: { DB: db, BUCKET }, params: { route: ['material', id] } });
-      assert.equal(download.status, 200);
-      assert.equal((await download.text()).startsWith('%PDF-1.4'), true);
+      const denied = await onRequest({ request: new Request(`${base}material/${id}`, { headers: credentials }), env: testEnv(db, { BUCKET }), params: { route: ['material', id] } });
+      assert.equal(denied.status, 404);
     } finally { db.close(); }
   });
 });

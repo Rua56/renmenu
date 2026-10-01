@@ -36,6 +36,16 @@
       <menu><button class="button secondary" value="cancel">Annulla</button><button class="button danger" id="confirm-submit" value="confirm">Conferma simulazione</button></menu>
     </form>
   </dialog>
+  <dialog id="material-viewer" class="material-viewer" aria-labelledby="material-viewer-title" aria-describedby="material-viewer-meta">
+    <section class="material-viewer-shell">
+      <header class="material-viewer-header"><div><p class="eyebrow">FONTE PRIVATA</p><h2 id="material-viewer-title">Materiale</h2><p id="material-viewer-meta" class="muted"></p></div><button id="material-viewer-close" class="icon-button" type="button" data-action="close-material-viewer" aria-label="Chiudi viewer privato">×</button></header>
+      <div class="material-compare-grid">
+        <div id="material-viewer-content" class="material-viewer-content" aria-live="polite"></div>
+        <aside id="material-viewer-comparison" class="material-viewer-comparison" aria-label="Bozza a confronto"></aside>
+      </div>
+      <footer class="material-viewer-actions"><div id="material-viewer-zoom" class="button-row" hidden><button class="button secondary small-button" type="button" data-action="material-zoom-out" aria-label="Riduci zoom immagine">−</button><output id="material-viewer-zoom-label">100%</output><button class="button secondary small-button" type="button" data-action="material-zoom-in" aria-label="Aumenta zoom immagine">+</button></div><div class="button-row"><a id="material-viewer-external" class="button secondary small-button" target="_blank" rel="noopener" hidden>Apri Blob in scheda</a><button class="button secondary small-button" type="button" data-action="close-material-viewer">Chiudi</button></div></footer>
+    </section>
+  </dialog>
   <noscript><p class="noscript">Per usare RenMenu Control Room occorre abilitare JavaScript.</p></noscript>
   <script type="module" src="./app.js"></script>
 </body>

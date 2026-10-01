@@ -22,4 +22,22 @@ describe('Voce originale RenMenu', () => {
     assert.match(interpretVoice('Cosa devo fare oggi?', context).reply, /Prezzo da controllare/);
     assert.equal(interpretVoice('Modifica il prezzo', context).target, 'revisione');
   });
+  it('risponde contestualmente su pratiche, materiali, dubbi e azioni senza eseguire operazioni', () => {
+    const context = {
+      selectedRequestId: 'r1',
+      clients: [{ id: 'c1', name: 'Locale sintetico' }],
+      requests: [{ id: 'r1', clientId: 'c1', subject: 'Listino da verificare', status: 'in_attesa', sourceText: 'Piatto — 9,00', nextStep: 'Verifica fonte' }],
+      materials: [{ requestId: 'r1', filename: 'listino.pdf', mime: 'application/pdf' }],
+      draft: { provenance: [{ path: 'sezioni.0.voci.1.prezzo', status: 'da_verificare' }], menu: { sezioni: [{ voci: [{ nome: 'Piatto', prezzo: '9,00' }] }] } },
+      audit: [{ requestId: 'r1', summary: 'Bozza salvata senza invio.' }],
+      notifications: []
+    };
+    assert.equal(interpretVoice('Quali pratiche aperte ci sono?', context).target, 'richieste');
+    assert.equal(interpretVoice('Riassumi i materiali', context).target, 'materiali');
+    assert.equal(interpretVoice('Quali dubbi mancano?', context).target, 'builder');
+    const action = interpretVoice('Qual è l’ultima azione?', context);
+    assert.equal(action.target, 'registro');
+    assert.match(action.reply, /non ho eseguito nuove azioni/i);
+  });
+
 });

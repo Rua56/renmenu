@@ -23,12 +23,12 @@ with sync_playwright() as playwright:
         dimensions = page.evaluate('({inner: window.innerWidth, scroll: document.documentElement.scrollWidth, body: document.body.scrollWidth})')
         assert dimensions['scroll'] <= width and dimensions['body'] <= width, f'overflow {width}: {dimensions}'
         assert not errors, f'JS error {width}: {errors}'
-        if width < 768:
+        if width <= 768:
             targets = page.locator('#bottom-nav > .nav-link').evaluate_all('(links) => links.map((item) => ({width: item.getBoundingClientRect().width, height: item.getBoundingClientRect().height}))')
             assert all(target['width'] >= 44 and target['height'] >= 44 for target in targets), f'touch target mobile {width}: {targets}'
         if width in (390, 1280):
             page.screenshot(path=str(OUT / ('mobile-390.png' if width == 390 else 'desktop-1280.png')), full_page=True)
-        nav = '#bottom-nav' if width < 768 else '#primary-nav'
+        nav = '#bottom-nav' if width <= 768 else '#primary-nav'
         page.locator(f'{nav} [href="#richieste"]').click()
         page.get_by_role('heading', name='Richieste', exact=True).wait_for()
         assert page.evaluate('document.documentElement.scrollWidth <= window.innerWidth'), f'overflow Richieste {width}'
