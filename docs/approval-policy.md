@@ -1,6 +1,6 @@
 # Policy di approvazione — RenMenu Control Room
 
-Jarvis è il copilota del **Team RenMenu**; Riccardo mantiene il controllo. La demo locale usa soltanto dati fittizi. Lo staging Pages separato è **distribuito e protetto da Access**, con D1/R2 dedicati e pratiche sintetiche; il solo canale email **verso il proprietario** è stato collaudato. L'AI OpenAI è configurata esclusivamente per un ID di pratica fittizia, ma anche dopo la sostituzione del Secret e un nuovo deploy il test live riceve HTTP 401: l'analisi non è ancora operativa. GitHub, Gmail relay, WhatsApp e chiamate live restano disattivati.
+Jarvis è il copilota del **Team RenMenu**; Riccardo mantiene il controllo. La demo locale usa soltanto dati fittizi. Lo staging Pages separato è **distribuito e protetto da Access**, con D1/R2 dedicati e pratiche sintetiche; il solo canale email **verso il proprietario** è stato collaudato. L'AI OpenAI è configurata esclusivamente per un ID di pratica fittizia, con chiave di progetto limitata a Chat Completions; il test ora riceve HTTP 429 e la dashboard mostra saldo API zero. L'analisi non è ancora operativa e nessun acquisto viene effettuato da Jarvis. GitHub, Gmail relay, WhatsApp e chiamate live restano disattivati.
 
 | Operazione | Automazione possibile | Condizione/effetto |
 | --- | --- | --- |
