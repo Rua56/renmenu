@@ -4,7 +4,7 @@ window.RENMENU = {
   brand: 'RenMenu',
   tagline: 'Il menù digitale del tuo locale, pronto in 10 minuti.',
   contattoWhatsApp: '393515924327',
-  contattoEmail: 'iuran56@gmail.com',
+  contattoEmail: 'renmenu1569@gmail.com',
   logoUrl: new URL('renmenu-mark.png', renmenuAssetBase).href,
   allergeni: {
     '1': { it: 'Glutine', en: 'Gluten' }, '2': { it: 'Crostacei', en: 'Crustaceans' }, '3': { it: 'Uova', en: 'Eggs' },
