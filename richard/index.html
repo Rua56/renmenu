@@ -26,7 +26,7 @@
     <section class="hero" aria-labelledby="page-title">
       <div class="hero-copy">
         <div class="hero-kicker"><span class="kicker-line"></span> Menu privato <span class="kicker-line"></span></div>
-        <h1 id="page-title">il corpo<br>di <em>Richard</em><span class="title-dot">.</span></h1>
+        <h1 id="page-title">il corpo<br>di <em><button id="richard-secret" class="secret-trigger" type="button">Richard</button></em><span class="title-dot">.</span></h1>
         <p class="hero-description">i migliori punti del corpo di Richard su cui banchettare</p>
         <a class="hero-link" href="#menu">Componi il tuo ordine <span aria-hidden="true">↘</span></a>
       </div>
@@ -64,6 +64,12 @@
       </aside>
     </div>
   </main>
+  <div id="richard-easter-egg" class="easter-egg" role="dialog" aria-modal="true" aria-label="Sorpresa di Richard" hidden>
+    <div class="easter-egg-content">
+      <button id="close-easter-egg" class="easter-egg-close" type="button" aria-label="Chiudi la foto">×</button>
+      <img src="./richard-easter-egg.jpg" width="1200" height="1600" alt="Una persona di spalle in cucina, accanto a un gatto.">
+    </div>
+  </div>
   <footer class="footer"><span>Preparato con un pizzico di ironia.</span><a href="../">Un menu creato con RenMenu</a></footer>
   <a class="mobile-cart" href="#carrello" aria-label="Vai al carrello">Vedi il carrello <span id="mobile-count">0</span> <span aria-hidden="true">↗</span></a>
 </body>
