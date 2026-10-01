@@ -1,6 +1,6 @@
 # Policy di approvazione — RenMenu Control Room
 
-Jarvis è il copilota del **Team RenMenu**; Riccardo mantiene il controllo. La demo locale usa soltanto dati fittizi. Lo staging Pages ha D1/R2 e Access predisposti ma, al 1 ottobre 2026, **non è ancora distribuito** e ha provider live spenti.
+Jarvis è il copilota del **Team RenMenu**; Riccardo mantiene il controllo. La demo locale usa soltanto dati fittizi. Lo staging Pages separato è **distribuito e protetto da Access**, con D1/R2 dedicati e una pratica sintetica; il solo canale email **verso il proprietario** è stato collaudato. AI, GitHub, Gmail relay, WhatsApp e chiamate live restano disattivati.
 
 | Operazione | Automazione possibile | Condizione/effetto |
 | --- | --- | --- |
@@ -11,7 +11,7 @@ Jarvis è il copilota del **Team RenMenu**; Riccardo mantiene il controllo. La d
 | Aprire **draft PR GitHub live** | Solo dopo Access, token ristretto, controllo SHA/versione/checklist, diff e conferma owner `CONFERMO APERTURA PR LIVE` | Branch e PR idempotenti; **nessun merge, pubblicazione o cambio a main** |
 | Verificare un menù realmente online | Letture GitHub/public allowlist, conferma `CONFERMO VERIFICA PUBBLICAZIONE` | Segna la pratica completata **solo se** PR merged, hash/branch/versione coerenti e menù pubblico identico alla bozza; non esegue merge/deploy |
 | Pulire il corpo di email importate in D1 | Conferma distinta `CONFERMO ELIMINAZIONE EMAIL PUBBLICATA` | Solo dopo PR merged e menù raggiungibile/identico; non elimina la mail originale in Gmail né allegati R2 |
-| Avviso email al proprietario | Solo previa visione di destinatario/oggetto/testo e conferma sullo schermo `CONFERMO EMAIL AL PROPRIETARIO` | Destinatario fisso `renmenu1569@gmail.com`, Resend dell'account business e mittente verificato, quiet hours, idempotenza. Provider disattivato inizialmente. Accettato dal provider ≠ consegnato. |
+| Avviso email al proprietario | Solo previa visione di destinatario/oggetto/testo e conferma sullo schermo `CONFERMO EMAIL AL PROPRIETARIO` | Destinatario fisso `renmenu1569@gmail.com`, Resend dell'account business, quiet hours e idempotenza. Una email **TEST INTERNO** è risultata Delivered nel registro Resend; questo non dimostra la lettura del destinatario. Nessuna email ai clienti. |
 | Messaggi ai clienti, WhatsApp, SMS o telefonate | Nessun invio automatico | WhatsApp/chiamate mock o stub fail-closed; nessuna chiamata/risposta cliente reale oggi |
 | Merge, deploy produzione, modifica QR/menù live | Nessuna API autonoma | Richiedono revisione e azione esplicita separata, non una frase vocale |
 | Stripe, IBAN, link pagamento, acquisti | Fuori ambito | Nessuna modifica o esecuzione |

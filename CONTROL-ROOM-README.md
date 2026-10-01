@@ -1,16 +1,16 @@
 # RenMenu Control Room · Jarvis operativo
 
-**Stato (1 ottobre 2026): branch/PR di sviluppo; nuova Control Room non ancora distribuita.** La vecchia app Jarvis su Manus è distinta ed è già online. La Control Room è il cockpit privato del Team RenMenu, non un portale clienti. Il sito commerciale `renmenu.pages.dev`, i menù e i QR esistenti rimangono invariati.
+**Stato (1 ottobre 2026): staging privato distribuito su Pages, PR #3 aperta e non unita.** La vecchia app Jarvis su Manus è distinta ed è già online. La Control Room è il cockpit privato del Team RenMenu, non un portale clienti. Il sito commerciale `renmenu.pages.dev`, i menù e i QR esistenti rimangono invariati. Lo staging contiene soltanto una scheda cliente e una pratica **fittizie** usate per un collaudo email al proprietario.
 
 ## Ambienti e accesso
 
 | Ambiente | Origine | Dati e azioni | Stato |
 | --- | --- | --- | --- |
 | Demo locale | `http://127.0.0.1:8765/control-room/site/?demo=1` | Dati sintetici nel solo localStorage; upload di nuovi file solo metadati; PR/pubblicazione simulate | Funzionante |
-| Staging privato | `https://renmenu-jarvis-stage.pages.dev/control-room/` | D1/R2 dedicati, JWT Cloudflare Access di `renmenu1569@gmail.com`; provider esterni disattivati inizialmente | Progetto e risorse creati, **nessun deploy** |
+| Staging privato | `https://renmenu-jarvis-stage.pages.dev/control-room/` | D1/R2 dedicati, JWT Cloudflare Access di `renmenu1569@gmail.com`; email owner-only collaudata, altri provider live spenti | **Distribuito e verificato; non è produzione RenMenu** |
 | RenMenu pubblico | `https://renmenu.pages.dev/` | Sito statico commerciale e menù esistenti | Invariato |
 
-La pagina di staging non è navigabile finché un deploy Wrangler non installa **insieme** frontend e Functions. Non presentare un progetto Pages vuoto come app online. Due app Access autorizzano esclusivamente `renmenu1569@gmail.com` per l'host stabile e per i deployment wildcard; il middleware e la route API verificano a loro volta firma RS256/JWKS, issuer, audience, scadenza, tipo di token ed email owner. Le scritture richiedono Origine same-origin. Mancanza di firma/configurazione = rifiuto. Prima di qualsiasi uso di dati reali, testare Access anche da sessione non autorizzata su HTML, JS, CSS, API, allegati e URL di deployment. Non esporre al pubblico file R2 o codice contenente segreti.
+Lo staging è stato distribuito **separatamente** tramite Dashboard Direct Upload di un archivio con frontend e Worker compilato. Due app Access autorizzano esclusivamente `renmenu1569@gmail.com` per l'host stabile e per i deployment wildcard; il middleware e la route API verificano a loro volta firma RS256/JWKS, issuer, audience, scadenza, tipo di token ed email owner. Le scritture richiedono Origine same-origin. Mancanza di firma/configurazione = rifiuto. È stato verificato il login owner e il redirect al login da sessione non autenticata sui due host; prima di usare dati veri, completare anche una verifica da un'identità non autorizzata di HTML, JS, CSS, API e allegati. Non esporre al pubblico file R2 o codice contenente segreti.
 
 ## Avvio locale e prove
 
@@ -36,29 +36,31 @@ Flusso demo: **Clienti → Richieste → Materiali → Builder → Revisione →
 | `control-room/cloudflare/functions/` | API privata Access, middleware asset statici, adapter AI/GitHub, webhook firmati, notifiche e retention |
 | `control-room/cloudflare/migrations/` | Schema D1 dedicato: pratiche, revisioni, audit, eventi esterni, operazioni PR e consegne |
 | `control-room/staging/build.sh` | Assembla `.staging/dist/` e `.staging/functions/` senza distribuire né toccare la build pubblica |
+| `control-room/staging/package-dashboard.sh` | Compila Functions in `_worker.js` e prepara uno ZIP per Direct Upload nel solo progetto Pages staging; non distribuisce |
 | `control-room/tests/` | Prove offline SQLite, JWT, adapter finti, idempotenza, Browser/QR/PDF |
 | `control-room/schemas/` | Contratti JSON per classificazione, estrazione, bozza e risposta |
 | `docs/approval-policy.md`, `docs/voice-persona.md`, `docs/control-room-privacy.md` | Regole approvazione, voce originale, dati/retention |
 
-Il database D1 **dedicato** ha già ricevuto `0001_initial.sql` e `0002_integrations.sql`, ed è vuoto di clienti. Il bucket R2 WEUR `renmenu-jarvis-stage-private` è privato. Entrambi sono associati al solo progetto Pages separato `renmenu-jarvis-stage` nelle configurazioni Preview e Production; il sito Pages RenMenu esistente non ha questi binding. Lo script pubblico `scripts/build-cloudflare.sh` copia soltanto pagine commerciali e menù; mai l'intera cartella Control Room. Per uno staging isolato:
+Il database D1 **dedicato** ha già ricevuto `0001_initial.sql` e `0002_integrations.sql`; contiene una scheda e una pratica di test esplicitamente fittizie, **non** dati cliente reali. Nel bucket R2 WEUR `renmenu-jarvis-stage-private` è stato caricato il PDF sintetico `menu-fittizio-demo.pdf` per collaudare upload D1/R2 e viewer privato a due pagine. Il PDF è un dato inventato, non un menù reale, e non è stato estratto dall'AI né approvato. D1 e R2 sono associati al solo progetto Pages separato `renmenu-jarvis-stage` nelle configurazioni Preview e Production; il sito Pages RenMenu esistente non ha questi binding. Lo script pubblico `scripts/build-cloudflare.sh` copia soltanto pagine commerciali e menù; mai l'intera cartella Control Room. Per ricostruire un archivio staging:
 
 ```sh
 sh control-room/staging/build.sh
 cd control-room/.staging
 wrangler pages functions build --outdir .wrangler/functions-check --compatibility-date 2026-10-01
 # Non scrivere l'output di verifica dentro dist/: il Worker bundle non è un asset statico.
-# Solo dopo autenticazione Wrangler + verifica Access/binding e consenso operativo:
-# wrangler pages deploy dist --project-name renmenu-jarvis-stage --branch staging
+cd ../..
+sh control-room/staging/package-dashboard.sh /tmp/renmenu-jarvis-stage-upload.zip
+# Poi caricare ZIP via Dashboard del SOLO progetto renmenu-jarvis-stage; la build non fa deploy.
 ```
 
-**Il comando di deploy è una guida e non è stato eseguito.** Verificare prima che `_routes.json` includa `/control-room`, `/control-room/*`, `/hooks/gmail` e `/hooks/whatsapp`, e che Pages sia **fail closed**; gli ultimi due percorsi richiedono HMAC provider/relay e rimangono spenti finché non esiste un metodo Access Service Token o una policy di bypass strettamente limitata alle route webhook. Non aprire bypass generici. Il deploy dello staging non crea una PR né modifica `renmenu.pages.dev`. Il branch di lavoro e la PR #3 non vanno uniti a `main` senza revisione separata: il repository è servito anche da GitHub Pages.
+**Il deployment staging è riuscito**, non quello pubblico. Prima di ogni aggiornamento verificare `_routes.json`, la presenza di `_worker.js` nell'archivio, Access e i binding; la giurisdizione API del bucket R2 WEUR è `default`, non `eu`. I webhook `/hooks/gmail` e `/hooks/whatsapp` richiedono HMAC provider/relay e rimangono spenti e dietro Access finché non esiste una policy/service token strettamente limitata a tali route. Non aprire bypass generici. Direct Upload non crea PR né modifica `renmenu.pages.dev`. Il branch di lavoro e la PR #3 non vanno uniti a `main` senza revisione separata: il repository è servito anche da GitHub Pages.
 
 ## Integrazioni e limiti reali
 
 - **AI:** `AI_PROVIDER=mock` è la configurazione presente. L'adapter `openai_compatible` è implementato, testato con risposte finte e separa prompt/JSON da dati certi. Prezzi/ingredienti/allergeni non verificati non vanno mai inventati. Per chiamate vere servono endpoint/modello/chiave segreta server-side, verifica privacy e test con materiale sintetico. Classificazione ed estrazione sono *proposte*; un umano salva la bozza e approva.
 - **GitHub:** `GITHUB_PROVIDER=mock` è spento per azioni live. L'adapter live legge SHA/menu, rifiuta slug esistenti per nuove pratiche, prepara branch e **draft PR** idempotenti solo dopo checklist e conferma esatta del proprietario. Nessun merge/deploy automatico. Serve un token limitato a `Rua56/renmenu` con permessi minimi, memorizzato solo come segreto Pages. La verifica del menu pubblicato è distinta dalla creazione PR; il testo Gmail non deve essere eliminato prima della corrispondenza tra PR merged e menu raggiungibile.
 - **Gmail:** il Trigger business già attivo manda nuove richieste al precedente Jarvis Manus, **non** a questa Control Room. Il webhook `/hooks/gmail` accetta soltanto eventi di `renmenu1569@gmail.com` con HMAC, scadenza 5 minuti e ID deduplicato; è disattivato. Prima del cutover creare un relay firmato che legge il messaggio completo dal solo account business, non lo snippet e non l'account personale; importare allegati solo se realmente acquisiti; verificare Access, poi disattivare l'uscita precedente per evitare duplicati. Le email restano conservate fino a quando il menu è online e disponibile, come richiesto dal proprietario; l'eliminazione del corpo richiede conferma esatta e verifica reale della versione pubblica.
-- **Email in uscita:** la scheda Notifiche propone avvisi **solo al proprietario `renmenu1569@gmail.com`**, con testo esatto e conferma on-screen. L'endpoint è spento (`EMAIL_LIVE_ENABLED` non attivo) finché non esiste una chiave Resend dell'account business. Senza dominio, `onboarding@resend.dev` è ammesso da Resend soltanto verso l'email associata a quell'account, previa verifica effettiva. Una risposta accettata dal provider **non** prova consegna in casella. Quiet hours Europa/Roma 21:00–08:00 salvo priorità urgente. Nessuna email ai clienti.
+- **Email in uscita:** la scheda Notifiche invia **solo al proprietario `renmenu1569@gmail.com`**, con testo esatto e conferma on-screen. La chiave Resend dell'account business è un Secret nel solo progetto Pages staging e `onboarding@resend.dev` è limitato all'email di tale account. Un avviso **TEST INTERNO** inviato il 1 ottobre 2026 è risultato **Delivered** nel registro Resend; ciò prova la consegna al provider destinatario, non la lettura dell'email da parte del proprietario. Non esiste invio automatico da richieste Gmail: quel Trigger resta sul vecchio Jarvis. Quiet hours Europa/Roma 21:00–08:00 salvo priorità urgente; l'ora silenziosa blocca, non accoda. Nessuna email ai clienti.
 - **WhatsApp:** webhook Meta con firma e deduplica/bozza; provider in uscita disattivato. Per avviare serviranno account Business, numero, token, finestra assistenza 24h, prova firma e conferma esatta del messaggio; nessun invio reale oggi.
 - **Telefonate e SMS:** adapter fail-closed, soltanto simulazioni. Nessun numero owner verificato o credenziale, e non si chiama nessuno in questa fase.
 - **Pagamenti/produzione:** nessuna integrazione Stripe, modifica ai Payment Link, merge, pubblicazione autonoma o cambi al sito RenMenu. Ogni azione esterna richiede un riepilogo materiale e conferma umana.
