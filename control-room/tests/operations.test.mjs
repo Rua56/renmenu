@@ -170,6 +170,30 @@ async function insertPublication(db, {
 }
 
 describe('private AI + GitHub operations (fakes only)', () => {
+  it('blocks live AI on requests outside the synthetic allowlist before contacting the provider', async () => {
+    const db = database();
+    try {
+      const requestId = insertRequest(db);
+      let calls = 0;
+      const env = {
+        AI_PROVIDER: 'openai_compatible', AI_API_BASE: 'https://api.example.test/v1',
+        AI_MODEL: 'fixture-model', AI_API_KEY: 'fixture-key', AI_TEST_REQUEST_ID: 'another-fixture',
+        AI_ALLOW_REAL_CLIENTS: 'true',
+        AI_FETCH: async () => { calls += 1; throw new Error('must not contact provider'); }
+      };
+      for (const [type, payload] of [
+        ['aiClassifyRequest', {}], ['aiExtractMenu', {}],
+        ['aiSuggestTranslations', { targetLanguage: 'en', items: [{ path: 'section', text: 'Primi' }] }]
+      ]) {
+        await assert.rejects(() => runPrivateIntegrationAction(context(db, env), type, {
+          requestId, requestRevision: 1, ...payload
+        }), (error) => error.status === 403);
+      }
+      assert.equal(calls, 0);
+      assert.equal(getOne(db, 'SELECT COUNT(*) AS n FROM audit_events').n, 0);
+    } finally { db.close(); }
+  });
+
   it('keeps mock AI offline, treats classification/extraction as advisory, and saves only a confirmed human-reviewed draft with CAS', async () => {
     const db = database();
     try {

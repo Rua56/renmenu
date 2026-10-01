@@ -55,6 +55,7 @@ let voiceHistory = [];
 let voiceProposal = null;
 let materialPreview = null;
 let pdfPreviewController = null;
+let aiPreview = null;
 const reviewEvidenceCache = new Map();
 const DEMO_PDF_ID = '5eae22bc-7a50-4bd2-8b8a-000000000403';
 
@@ -515,9 +516,17 @@ function renderVoice() {
   return `<div class="view-wrap">${header('11 / VOCE', 'Voce e comandi', 'Assistente testuale deterministico sullo stato corrente, non un provider AI live. Microfono facoltativo, trascrizione correggibile e nessun comando approva o pubblica.')}<div class="grid grid-2"><section class="panel"><div class="voice-box"><div class="voice-orb" aria-hidden="true">///</div><p class="eyebrow">VOICE DESK · ${settings.enabled ? 'ATTIVO SOLO SU RICHIESTA' : 'SPENTO'}</p><h2>Parla o scrivi</h2><p class="muted">Alcuni browser possono elaborare il riconoscimento audio tramite un proprio servizio remoto: autorizzalo soltanto se lo desideri. RenMenu non salva l’audio; il testo resta correggibile prima dell’invio.</p><div class="notice"><strong>Contesto corrente:</strong> ${escapeHtml(context?.subject || 'nessuna pratica selezionata')} · ${materialCount} materiali attivi · ${draft ? `bozza ${escapeHtml(draft.slug)}` : 'nessuna bozza'}.</div><label class="check-row voice-setting"><input id="voice-enabled" type="checkbox" ${settings.enabled ? 'checked' : ''}><span><strong>Abilita voce browser</strong><small>Disattiva in qualsiasi momento; il microfono non è mai sempre acceso.</small></span></label><div class="voice-controls"><button class="button secondary voice-mic" type="button" data-action="voice-mic" ${!settings.enabled || !speechAvailable ? 'disabled' : ''}>Microfono</button><button class="button secondary" type="button" data-action="voice-stop">Ferma ascolto</button><button class="button voice-speak" type="button" data-action="voice-speak" ${!settings.enabled || !synthesisAvailable || !lastVoiceReply ? 'disabled' : ''}>Ascolta Jarvis</button></div><p class="notice warning voice-status" id="voice-status" role="status">${escapeHtml(voiceStatus)}</p><form data-form="voice"><label class="field">Pratica facoltativa<select name="requestId">${requestOptions(selectedRequestId, true)}</select></label><label class="field spaced-top-tight">Trascrizione correggibile<textarea id="voice-input" name="transcript" required maxlength="500" placeholder="Es. Cosa devo fare oggi?">${escapeHtml(lastVoiceTranscript)}</textarea></label><p class="muted small">${speechAvailable ? 'Riconoscimento vocale disponibile, avviato solo con il tasto Microfono.' : 'SpeechRecognition non disponibile: usa il testo. La sintesi può funzionare separatamente.'}</p><div class="form-actions"><button class="button" type="submit">Interpreta senza eseguire</button></div></form>${renderVoiceProposal()}<section class="voice-replies" aria-labelledby="voice-history-title"><div class="panel-heading"><div><p class="eyebrow">CONVERSAZIONE</p><h3 id="voice-history-title">Cronologia contestuale</h3></div>${isDemoMode && voiceHistory.length ? '<button class="button secondary small-button" type="button" data-action="clear-voice-history">Cancella cronologia demo</button>' : ''}</div><p class="muted small">${historyNotice}</p>${renderVoiceHistory()}</section></div></section><aside class="panel"><p class="eyebrow">PREFERENZE</p><h2>Voce originale RenMenu</h2><label class="field voice-setting">Velocità <output id="voice-rate-output">${settings.rate.toFixed(1)}×</output><input id="voice-rate" type="range" min="0.6" max="1.4" step="0.1" value="${settings.rate}"></label><label class="field voice-setting">Volume <output id="voice-volume-output">${Math.round(settings.volume * 100)}%</output><input id="voice-volume" type="range" min="0" max="1" step="0.1" value="${settings.volume}"></label><label class="field">Motore voce<select id="voice-provider"><option value="browser">Sistema / browser</option><option value="provider" disabled>Provider TTS non configurato</option></select></label><div class="notice spaced-top"><strong>Guardrail:</strong> domande su pratiche, materiali, dubbi e azioni usano soltanto lo stato corrente. “Pubblica il menù” apre solo una richiesta di conferma a schermo.</div><div class="button-row spaced-top"><button class="button secondary" type="button" data-route="approvazioni">Apri conferme</button><button class="button secondary" type="button" data-route="registro">Vedi registro</button></div></aside></div></div>`;
 }
 
+function renderAiPanel() {
+  const request = requestById();
+  if (!request || isDemoMode) return '';
+  const current = aiPreview?.requestId === request.id && aiPreview.requestRevision === request.revision ? aiPreview : null;
+  const result = current?.result;
+  const title = current?.type === 'aiExtractMenu' ? 'Proposta di menù da revisionare' : 'Classificazione da revisionare';
+  return `<section class="panel spaced-top" id="ai-advisory"><div class="panel-heading"><div><p class="eyebrow">AI · SOLO BOZZA</p><h2>Analisi assistita della pratica</h2></div><span class="capsule">nessuna pubblicazione</span></div><p class="notice warning"><strong>Invio esterno esplicito:</strong> questi pulsanti inviano a OpenAI il testo della pratica e, per l’estrazione, le trascrizioni private già registrate. Non inviano il PDF originale o le immagini. Per ora usa soltanto dati fittizi autorizzati; non attivare su materiale cliente reale. La risposta resta una proposta in memoria, con traccia dell’operazione nell’audit: nessun campo, bozza, PR o messaggio viene salvato automaticamente.</p><div class="button-row spaced-top"><button class="button secondary" type="button" data-action="ai-classify" ${String(request.sourceText || '').trim() ? '' : 'disabled'}>Classifica richiesta (bozza)</button><button class="button secondary" type="button" data-action="ai-extract">Analizza menù (bozza)</button></div>${result ? `<div class="spaced-top" role="status"><h3>${title}</h3><p class="muted small">Provider: ${escapeHtml(current.provider)} · revisione pratica ${escapeHtml(request.revision)}. Confronta ogni campo e riferimento con la fonte originale; eventuali errori bloccanti restano da correggere.</p><pre class="json-editor private-material-text">${escapeHtml(JSON.stringify(result, null, 2))}</pre></div>` : '<p class="muted small spaced-top">Nessuna analisi AI eseguita in questa sessione.</p>'}</section>`;
+}
 function renderView() {
   const renderers = { command: renderCommand, richieste: renderRequests, clienti: renderClients, materiali: renderMaterials, builder: renderBuilder, revisione: renderReview, anteprima: renderPreview, approvazioni: renderApprovals, notifiche: renderNotifications, registro: renderAudit, voce: renderVoice };
-  view.innerHTML = renderers[activeView]();
+  view.innerHTML = renderers[activeView]() + (activeView === 'builder' ? renderAiPanel() : '');
   document.title = `${navItems.find(([id]) => id === activeView)?.[2] || 'Control Room'} · RenMenu`;
 }
 function render() {
@@ -600,6 +609,25 @@ async function handleClick(event) {
   const action = trigger.dataset.action;
   if (!action) return;
   event.preventDefault();
+  if (action === 'ai-classify' || action === 'ai-extract') {
+    if (isDemoMode) throw new Error('La demo locale non invia richieste al provider AI.');
+    const request = requestById();
+    if (!request) throw new Error('Seleziona una pratica prima di avviare l’analisi.');
+    const type = action === 'ai-classify' ? 'aiClassifyRequest' : 'aiExtractMenu';
+    if (!window.confirm(`Inviare a OpenAI il testo della pratica “${request.subject}”${type === 'aiExtractMenu' ? ' e le trascrizioni private già registrate' : ''}? Questo staging consente al server soltanto la pratica di test fittizia autorizzata. Non procedere con materiali reali dei clienti. L’esito è solo una bozza da verificare, senza salvataggio del menù, invii o pubblicazione.`)) return;
+    trigger.disabled = true;
+    try {
+      const response = await performAction(type, { requestId: request.id, requestRevision: request.revision });
+      const result = response?.result ?? response;
+      await refresh();
+      aiPreview = { requestId: request.id, requestRevision: request.revision, type,
+        provider: result.provider, result: type === 'aiClassifyRequest' ? result.classification :
+          { menu: result.menu, validation: result.validation, extraction: result.extraction } };
+      render();
+      toast('Proposta AI ricevuta: verifica la fonte prima di ogni utilizzo.');
+    } finally { trigger.disabled = false; }
+    return;
+  }
   if (action === 'preview-material') {
     const material = state.materials.find((entry) => entry.id === trigger.dataset.materialId);
     await openMaterialPreview(material); return;

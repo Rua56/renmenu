@@ -87,6 +87,14 @@ function aiAdapter(env) {
   return createAiLiveAdapter({ ...env, AI_PROVIDER: provider }, { fetch: env?.AI_FETCH || env?.fetch });
 }
 
+function requireAiRequestScope(env, adapter, requestId) {
+  if (adapter.mode !== 'openai_compatible') return;
+  // Fail closed: staging may only send the one synthetic fixture to an external
+  // provider. Real-client processing requires a separate, explicit policy change.
+  assert(env?.AI_TEST_REQUEST_ID === requestId,
+    'Analisi AI live limitata alla pratica fittizia autorizzata.', 403);
+}
+
 function requireGitHubLive(env) {
   const provider = String(env?.GITHUB_PROVIDER || 'mock').trim();
   assert(provider === 'live', 'GitHub live non è abilitato: la modalità predefinita è mock/off.', 501);
@@ -219,6 +227,7 @@ async function classifyRequest(context, p) {
   const revision = requestRevision(p.requestRevision, request.revision);
   assert(!CLOSED_REQUESTS.has(request.status), 'Pratica chiusa: classificazione non disponibile.', 409);
   const adapter = aiAdapter(context.env);
+  requireAiRequestScope(context.env, adapter, requestId);
   const classification = await adapter.classifyEmail({
     subject: request.subject, text: request.source_text, channel: request.source_channel
   });
@@ -234,8 +243,9 @@ async function extractMenuPreview(context, p) {
   const request = await loadRequest(context.db, context.getOne, requestId);
   const revision = requestRevision(p.requestRevision, request.revision);
   assert(!CLOSED_REQUESTS.has(request.status), 'Pratica chiusa: estrazione non disponibile.', 409);
-  const transcripts = await validatedTranscriptSources({ ...context, requestId });
   const adapter = aiAdapter(context.env);
+  requireAiRequestScope(context.env, adapter, requestId);
+  const transcripts = await validatedTranscriptSources({ ...context, requestId });
   const extraction = await adapter.extractMenu({ text: extractionInput(request, transcripts), venueName: request.client_name });
   const slug = request.menu_id || (request.kind !== 'nuovo' ? request.client_menu_id : null) || slugify(request.client_name);
   assert(SLUG.test(slug), 'Menu ID non valido: correggilo prima di creare una bozza.', 422);
@@ -297,6 +307,7 @@ async function suggestTranslations(context, p) {
   const revision = requestRevision(p.requestRevision, request.revision);
   assert(!CLOSED_REQUESTS.has(request.status), 'Pratica chiusa: traduzioni non disponibili.', 409);
   const adapter = aiAdapter(context.env);
+  requireAiRequestScope(context.env, adapter, requestId);
   const suggestions = await adapter.suggestTranslations({ targetLanguage: p.targetLanguage ?? p.target_language, items: p.items ?? p.entries });
   await auditOnly({ ...context, requestId, revision, event: 'ai.translation.advisory',
     message: 'Suggerimenti di traduzione mostrati senza approvazione né modifica del menu.' });
