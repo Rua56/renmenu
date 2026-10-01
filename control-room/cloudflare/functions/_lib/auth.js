@@ -29,7 +29,9 @@ async function signingKey(teamDomain, kid, fetcher) {
 
 export async function verifyOwner(request, env, fetcher = fetch) {
   const domain = configuredDomain(env?.TEAM_DOMAIN);
-  const audience = env?.POLICY_AUD;
+  const hostname = new URL(request.url).hostname;
+  const audience = env?.PREVIEW_AUD && hostname.endsWith('.renmenu-jarvis-stage.pages.dev')
+    ? env.PREVIEW_AUD : env?.POLICY_AUD;
   const email = env?.OWNER_EMAIL;
   if (!domain || typeof audience !== 'string' || !audience || typeof email !== 'string' ||
       !/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(email)) return false;

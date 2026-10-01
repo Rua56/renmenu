@@ -8,7 +8,7 @@ import { validateMenu as validateEditor } from '../site/model.js';
 import { prepareMockGitHubProposal } from '../cloudflare/functions/_lib/github.js';
 
 const domain = 'https://team-api-test.cloudflareaccess.com';
-const accessEnv = { TEAM_DOMAIN: domain, POLICY_AUD: 'api-test-owner-only', OWNER_EMAIL: 'owner-api@example.test' };
+const accessEnv = { TEAM_DOMAIN: domain, POLICY_AUD: 'api-test-owner-only', OWNER_EMAIL: 'renmenu1569@gmail.com' };
 const keyPair = await crypto.subtle.generateKey({ name: 'RSASSA-PKCS1-v1_5', modulusLength: 2048,
   publicExponent: new Uint8Array([1, 0, 1]), hash: 'SHA-256' }, true, ['sign', 'verify']);
 const jwk = { ...await crypto.subtle.exportKey('jwk', keyPair.publicKey), kid: 'api-test-key', use: 'sig', alg: 'RS256' };
@@ -28,6 +28,7 @@ const testEnv = (db, extra = {}) => ({ DB: db, ...accessEnv, ...extra });
 function database() {
   const sqlite = new DatabaseSync(':memory:');
   sqlite.exec(readFileSync(new URL('../cloudflare/migrations/0001_initial.sql', import.meta.url), 'utf8'));
+  sqlite.exec(readFileSync(new URL('../cloudflare/migrations/0002_integrations.sql', import.meta.url), 'utf8'));
   return {
     prepare(sql) {
       return { bind(...params) {
@@ -82,6 +83,46 @@ describe('Control Room API staging', () => {
       });
       assert.equal(unauthenticatedPost.status, 403);
       assert.equal((await call(db, 'state', undefined, { POLICY_AUD: 'un-app-diversa' })).status, 403);
+    } finally { db.close(); }
+  });
+  it('notifica solo il proprietario dopo conferma; se Resend non è configurato non chiama il provider', async () => {
+    const db = database();
+    try {
+      const client = await action(db, 'createClient', { name: 'Locale di test email' });
+      const request = await action(db, 'createRequest', { clientId: client.body.result.id,
+        subject: 'Richiesta fittizia', sourceChannel: 'manuale', kind: 'nuovo', sourceText: '' });
+      const requestId = request.body.result.id;
+      const payload = { requestId, subject: 'Revisione richiesta fittizia', text: 'La bozza privata attende verifica.', priority: 'urgente' };
+      assert.equal((await action(db, 'sendOwnerEmail', payload)).status, 403);
+      const disabled = await action(db, 'sendOwnerEmail', { ...payload, confirmation: 'CONFERMO EMAIL AL PROPRIETARIO' });
+      assert.equal(disabled.status, 200);
+      assert.equal(disabled.body.result.sent, false);
+      assert.equal(disabled.body.result.reason, 'EMAIL_LIVE_DISABLED');
+      assert.equal(disabled.body.state.ownerDeliveries.length, 0);
+      const fetchCalls = [];
+      const configured = {
+        EMAIL_LIVE_ENABLED: 'true', ENVIRONMENT: 'protected-staging', STAGING_PROTECTED: 'true',
+        RESEND_API_KEY: 'key-only-for-unit-test', EMAIL_FROM: 'onboarding@resend.dev',
+        EMAIL_FROM_VERIFIED: 'true', RESEND_ONBOARDING_SENDER_AUTHORIZED: 'true',
+        RESEND_FETCH: async (url, options) => {
+          fetchCalls.push({ url, body: JSON.parse(options.body) });
+          return Response.json({ id: 'fake-provider-receipt' }, { status: 200 });
+        }
+      };
+      const sent = await call(db, 'actions', { type: 'sendOwnerEmail', payload: {
+        ...payload, confirmation: 'CONFERMO EMAIL AL PROPRIETARIO', recipient: 'customer@example.test'
+      } }, configured);
+      assert.equal(sent.status, 200);
+      assert.equal(sent.body.result.sent, true);
+      assert.equal(sent.body.state.ownerDeliveries[0].recipient, 'renmenu1569@gmail.com');
+      assert.equal(fetchCalls.length, 1);
+      assert.deepEqual(fetchCalls[0].body.to, ['renmenu1569@gmail.com']);
+      const retry = await call(db, 'actions', { type: 'sendOwnerEmail', payload: {
+        ...payload, confirmation: 'CONFERMO EMAIL AL PROPRIETARIO'
+      } }, configured);
+      assert.equal(retry.body.result.duplicate, true);
+      assert.equal(fetchCalls.length, 1);
+      assert.equal(sent.body.state.ownerDeliveries[0].message_text, undefined);
     } finally { db.close(); }
   });
   it('estrae solo piatti con prezzo attestato e non inventa allergeni o contatti', () => {
@@ -281,6 +322,38 @@ describe('Control Room API staging', () => {
       assert.ok(archived.body.state.materials[0].archivedAt);
       const denied = await onRequest({ request: new Request(`${base}material/${id}`, { headers: credentials }), env: testEnv(db, { BUCKET }), params: { route: ['material', id] } });
       assert.equal(denied.status, 404);
+    } finally { db.close(); }
+  });
+  it('salva una trascrizione manuale solo con la revisione corrente e ne conserva la fonte R2', async () => {
+    const db = database();
+    const objects = new Map();
+    const BUCKET = { put: async (key, bytes) => objects.set(key, bytes), get: async (key) => objects.has(key)
+      ? { arrayBuffer: async () => objects.get(key).buffer.slice(objects.get(key).byteOffset,
+        objects.get(key).byteOffset + objects.get(key).byteLength) } : null,
+      delete: async (key) => objects.delete(key) };
+    try {
+      const clientId = (await action(db, 'createClient', { name: 'Osteria fittizia' })).body.result.id;
+      const requestId = (await action(db, 'createRequest', { clientId, subject: 'Fonte fotografica', sourceChannel: 'manuale', kind: 'nuovo', sourceText: '' })).body.result.id;
+      const form = new FormData();
+      form.set('requestId', requestId);
+      form.set('file', new File([new Uint8Array([137, 80, 78, 71, 13, 10, 26, 10, 0, 0, 0])], 'finto.png', { type: 'image/png' }));
+      const upload = await onRequest({ request: new Request(`${base}material`, { method: 'POST',
+        headers: { ...credentials, Origin: 'https://renmenu.pages.dev' }, body: form }),
+      env: testEnv(db, { BUCKET }), params: { route: ['material'] } });
+      assert.equal(upload.status, 200);
+      const data = await upload.json();
+      const materialId = data.result.id, revision = data.state.requests.find((item) => item.id === requestId).revision;
+      const transcript = await call(db, 'actions', { type: 'setMaterialTranscript', payload: {
+        materialId, requestRevision: revision, text: 'Pasta — 12,00, trascrizione manuale non verificata'
+      } }, { BUCKET });
+      assert.equal(transcript.status, 200);
+      assert.equal(transcript.body.state.analyses.length, 1);
+      assert.equal(transcript.body.state.analyses[0].status, 'needs_review');
+      assert.equal(transcript.body.state.analyses[0].sourceSha256.length, 64);
+      assert.equal(transcript.body.state.analyses[0].provenance[0].reviewed, false);
+      assert.equal((await call(db, 'actions', { type: 'setMaterialTranscript', payload: {
+        materialId, requestRevision: revision, text: 'Ripetuto senza rileggere la pratica'
+      } }, { BUCKET })).status, 409);
     } finally { db.close(); }
   });
 });

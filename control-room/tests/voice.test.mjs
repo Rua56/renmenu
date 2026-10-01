@@ -41,3 +41,42 @@ describe('Voce originale RenMenu', () => {
   });
 
 });
+
+describe('Proposte vocali verificabili', () => {
+  const context = {
+    selectedRequestId: 'r1',
+    clients: [{ id: 'c1', name: 'Trattoria di prova' }],
+    requests: [{ id: 'r1', clientId: 'c1', subject: 'Menu pranzo', status: 'in_revisione', sourceText: 'Primi\nPasta — 11,00', nextStep: 'Verificare listino', revision: 4 }],
+    materials: [{ id: 'm1', requestId: 'r1', filename: 'listino.pdf', mime: 'application/pdf' }],
+    analyses: [{ materialId: 'm1', requestId: 'r1', sourceSha256: 'a'.repeat(64), sourceText: 'Pasta — 11,00', status: 'needs_review' }],
+    draft: { menu: { sezioni: [{ nome: { it: 'Primi' }, voci: [{ nome: { it: 'Pasta' }, prezzo: '11,00' }] }] } }
+  };
+
+  it('prepara proposte correggibili per prezzo, sezione, voce e messaggio senza mutare lo stato', () => {
+    const price = interpretVoice('Modifica il prezzo della Pasta a 12,50', context);
+    assert.deepEqual({ target: price.target, kind: price.proposal?.kind, destination: price.proposal?.target }, { target: 'voce', kind: 'price', destination: 'revisione' });
+    assert.match(price.proposal.text, /Pasta.*12,50/);
+    assert.match(price.reply, /Non ho modificato, salvato, inviato, pubblicato o approvato nulla/);
+
+    const section = interpretVoice('Aggiungi sezione Dolci stagionali', context);
+    assert.equal(section.proposal?.kind, 'section');
+    assert.match(section.proposal.text, /dolci stagionali/i);
+
+    const item = interpretVoice('Aggiungi voce Tiramisù nella sezione Dolci a 6,00', context);
+    assert.equal(item.proposal?.kind, 'item');
+    assert.match(item.proposal.text, /tiramisù.*dolci.*6,00/i);
+
+    const message = interpretVoice('Prepara una bozza messaggio: puoi confermare il prezzo?', context);
+    assert.deepEqual({ target: message.target, kind: message.proposal?.kind, destination: message.proposal?.target }, { target: 'voce', kind: 'message', destination: 'notifiche' });
+    assert.match(message.reply, /Non ho modificato/);
+  });
+
+  it('riassume esclusivamente il contesto corrente indicando le fonti', () => {
+    const summary = interpretVoice('Riassumi la pratica e il contesto', context);
+    assert.equal(summary.target, 'richieste');
+    assert.match(summary.reply, /Menu pranzo/);
+    assert.match(summary.reply, /listino\.pdf/);
+    assert.match(summary.reply, /aaaaaaaaaaaa/);
+    assert.match(summary.reply, /non una convalida/i);
+  });
+});

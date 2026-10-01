@@ -1,80 +1,70 @@
 # RenMenu Control Room · Jarvis operativo
 
-**Stato: branch/PR di prova, non unita e non distribuita.** La Control Room è il cockpit privato del Team RenMenu, non un portale per i locali. È distinta dal sito commerciale e dall'app Jarvis precedentemente ospitata su Manus. In questa versione il **mock locale** è interattivo; un'API Cloudflare Pages Functions con D1/R2 e middleware Access è implementata e testata in locale, ma **non** ha un deployment, un database, un bucket o credenziali live. Nessun menu, QR, link pagamento o contatto pubblico è stato modificato.
+**Stato (1 ottobre 2026): branch/PR di sviluppo; nuova Control Room non ancora distribuita.** La vecchia app Jarvis su Manus è distinta ed è già online. La Control Room è il cockpit privato del Team RenMenu, non un portale clienti. Il sito commerciale `renmenu.pages.dev`, i menù e i QR esistenti rimangono invariati.
 
-## Avvio della demo locale (solo dati fittizi)
+## Ambienti e accesso
 
-Dalla root del repository, con Python 3:
+| Ambiente | Origine | Dati e azioni | Stato |
+| --- | --- | --- | --- |
+| Demo locale | `http://127.0.0.1:8765/control-room/site/?demo=1` | Dati sintetici nel solo localStorage; upload di nuovi file solo metadati; PR/pubblicazione simulate | Funzionante |
+| Staging privato | `https://renmenu-jarvis-stage.pages.dev/control-room/` | D1/R2 dedicati, JWT Cloudflare Access di `renmenu1569@gmail.com`; provider esterni disattivati inizialmente | Progetto e risorse creati, **nessun deploy** |
+| RenMenu pubblico | `https://renmenu.pages.dev/` | Sito statico commerciale e menù esistenti | Invariato |
 
-```sh
-python3 -m http.server 8765 --bind 127.0.0.1
-# In una scheda del browser sullo stesso computer:
-# http://127.0.0.1:8765/control-room/site/?demo=1
-```
+La pagina di staging non è navigabile finché un deploy Wrangler non installa **insieme** frontend e Functions. Non presentare un progetto Pages vuoto come app online. Due app Access autorizzano esclusivamente `renmenu1569@gmail.com` per l'host stabile e per i deployment wildcard; il middleware e la route API verificano a loro volta firma RS256/JWKS, issuer, audience, scadenza, tipo di token ed email owner. Le scritture richiedono Origine same-origin. Mancanza di firma/configurazione = rifiuto. Prima di qualsiasi uso di dati reali, testare Access anche da sessione non autorizzata su HTML, JS, CSS, API, allegati e URL di deployment. Non esporre al pubblico file R2 o codice contenente segreti.
 
-Il mock si attiva **solo** su `localhost`/`127.0.0.1` con `?demo=1`; i dati sintetici sono nel `localStorage` del browser, non in Cloudflare. «Ripristina demo» li azzera. In modalità locale ordinaria senza query la pagina cerca l'API privata e mostra l'errore, non converte automaticamente l'errore in demo. La demo non invia HTTP a Gmail, GitHub, WhatsApp, Twilio o Cloudflare. **Eccezione opzionale di privacy**: se Riccardo abilita e avvia il microfono, alcuni browser possono usare il proprio servizio remoto di riconoscimento; la UI lo spiega e chiede consenso prima di ogni ascolto. Non caricare file o dati di clienti reali nella demo: `localStorage` non è un archivio aziendale protetto.
-
-Per provare: **Clienti → Richieste → Builder → Revisione → Anteprima → Approvazioni**. La scheda demo contiene un locale fittizio, una pratica WhatsApp fittizia, un **PDF statico fittizio a due pagine**, una bozza da testo, un prezzo volutamente mancante e un avviso chiamata non avviata. Una richiesta nuova può iniziare senza testo; associare poi un materiale in **Materiali**. Il mock conserva solo metadati degli upload (e fino a 500 caratteri per il testo), non interpreta binari reali. Eccezione: il PDF inventato `control-room/site/demo-assets/menu-fittizio-demo.pdf` è una fixture locale versionata; lo script `python3 control-room/tests/make_demo_pdf.py` la rigenera con ReportLab. Non contiene dati cliente. Per generare un menu, trascrivere le righe verificabili in Builder, per esempio `## Primi` e `Gnocchi — 12,00`. Prezzi assenti, allergeni, contatti e traduzioni non vengono indovinati.
-
-Il Builder è **deterministico**, non un OCR né un LLM live. La Revisione mostra provenienza, validazione, editor JSON, sezioni e versioni. Nel viewer, il PDF fittizio a sinistra si confronta con la bozza a destra; in un futuro staging i PDF/immagini reali passerebbero solo dall'API autenticata via Blob, con revoca alla chiusura. L'Anteprima visualizza un renderer isolato con telefono/desktop e un **QR autentico scansionabile**, generato offline con `qrcode-generator` MIT e licenza nel repository. Il suo URL `/control-room/preview/?m=<slug>&draft=1` **non è attivo e non serve alcun menu**; è diverso dal QR pubblico distribuito e non va condiviso. Il diff usa per Ginestra uno **snapshot pubblicato interamente fittizio**, oppure una versione bozza, **mai** il menu GitHub live. La checklist richiede fonti scritte per prezzi, allergeni, lingue e approvazione del locale. Se mancano indicazioni allergeni, l'operatore deve confermare **separatamente** l'omissione autorizzata dal locale: non significa che il piatto non ne contenga. Prezzi mancanti e traduzioni dichiarate ma assenti bloccano la PR mock. Solo dopo è disponibile la prima conferma con frase `CONFERMO PR DI PROVA`; la seconda `CONFERMO PUBBLICAZIONE SIMULATA` produce solo un record mock. Non crea branch, PR, merge né deploy. Modifiche alla fonte o al JSON azzerano la checklist e la provenienza obsoleta; una pratica con PR mock già pronta non è più modificabile. Per nuovi dati creare una nuova pratica.
-
-In **Notifiche** si preparano bozze email/WhatsApp e avvisi interni con priorità/scadenza/lettura; i moduli simulano anche un WhatsApp entrante e una chiamata **non avviata**. In **Voce** il microfono browser è facoltativo, spento inizialmente; trascrizione correggibile, risposta testuale e lettura con `SpeechSynthesis` italiano generico se supportato, velocità/volume regolabili. Non esiste una voce di attore, né un comando che possa approvare o pubblicare. Si può usare sempre il testo.
-
-## Struttura e stato
-
-| Componente | Percorso | Stato |
-| --- | --- | --- |
-| UI responsive, adapter demo, voce, QR e PDF.js | `control-room/site/` | Demo funzionale, fuori dalla build pubblica; licenze MIT QR e Apache 2.0 PDF.js in `site/vendor/` |
-| API D1/R2 e adapter mock | `control-room/cloudflare/functions/` | Codice testato localmente, **non** nella directory Functions root |
-| Database D1 nuovo | `control-room/cloudflare/migrations/0001_initial.sql` | SQL additivo per database dedicato, **non applicato** a Cloudflare |
-| Routing Pages | `control-room/cloudflare/_routes.json.example` | Esempio inattivo, protegge statici e API private se installato correttamente |
-| Schemi JSON di output | `control-room/schemas/` | Contratti per futura AI; nessun modello live chiamato |
-| Sicurezza e flussi | `docs/approval-policy.md`, `docs/voice-persona.md`, `docs/control-room-privacy.md` | Documentazione operativa |
-| Test | `control-room/tests/` | Node/SQLite e browser locale opzionale |
-
-I menu standard seguono `menus/demo.json` e `scripts/validate-menus.py`. Il menu Blanch (`blanch/data/menu.json`) ha uno schema diverso ed è escluso dal Builder. Il viewer pubblico resta `menu/?m=<id>` con JSON `menus/<id>.json`; lo slug di un aggiornamento deve restare quello del QR esistente. Prima di una **futura PR reale** controllare inoltre che lo slug di un nuovo locale non esista già su GitHub. Nessuno di questi file pubblici è cambiato.
-
-## Sicurezza e separazione Cloudflare
-
-Il middleware Pages verifica **lato server** il JWT `Cf-Access-Jwt-Assertion` con JWKS/RS256, `iss`, `aud`, `exp`, `type=app` ed email proprietario esatta. Non si fida del solo header email o del client guard. Protegge anche HTML/CSS/JS dell'area, usa no-store/noindex/CSP e nega accesso se mancano configurazione o firma. Le scritture richiedono same-origin; l'API limita dimensioni, formati e firme di PDF/immagini/audio, conserva i binari in R2 privato e serve file solo tramite endpoint autenticato. D1 registra pratica, fonte, revisioni CAS, checklist, audit e doppia conferma; nessun token o dato cliente reale è nel repository. Gli adapter non-mock restituiscono `501` e nessun effetto esterno.
-
-**Non distribuire questa PR direttamente.** `scripts/build-cloudflare.sh` copia solo le risorse pubbliche già esistenti, **non** `control-room/`; non c'è `functions/` nella root né `_routes.json` attivo. La sola PR non espone il cockpit su Pages. GitHub Pages, essendo statico, **non può proteggere codice privato**: prima di qualsiasi merge futuro verificare che i sorgenti non vengano serviti pubblicamente, oppure separarli in un repository/deploy privato. Configurare Pages **Fail closed** quando si attivano Functions, anche in caso di quota/esecuzione errata. Il Worker `renmenu` eventualmente esistente è distinto e non va sovrascritto.
-
-## Test riproducibili
+## Avvio locale e prove
 
 ```sh
+python3 -m http.server 8765 --bind 127.0.0.1  # eseguire dalla root del repository
+# Aprire http://127.0.0.1:8765/control-room/site/?demo=1
 npm test --prefix control-room
 npm run check --prefix control-room
 python3 scripts/validate-menus.py
 sh scripts/build-cloudflare.sh
-# Verifica che dist/ non contenga control-room/ né Functions private.
+# Deve rimanere assente dist/control-room.
 ```
 
-I test Node (Node 22 con `node:sqlite` sperimentale) verificano token Access validi/falsi, route API protetta anche senza middleware, ACL asset statici, CSRF, D1 in memoria, CAS, QR invariato, evidenze per campo/omissioni, QR SVG offline, invalidazione checklist, doppia conferma, R2 mock, rifiuto di metadati privati nel JSON e **rollback D1 se l'audit fallisce**. Per gli screenshot e il flusso browser **facoltativo** installare Playwright Chromium in un ambiente di prova e avviare il server locale su `127.0.0.1:8765`:
+Per i collaudi browser opzionali installare Playwright Chromium e avviare il server HTTP localhost, poi eseguire `python3 control-room/tests/browser_smoke.py` (375, 390, 430, 768, 1280 px), `demo_flow.py` e `preview_flow.py` nella stessa cartella. `CONTROL_ROOM_SCREENSHOT_DIR` imposta una destinazione separata per gli screenshot. Il PDF fittizio a due pagine è rigenerabile con `python3 control-room/tests/make_demo_pdf.py` e non contiene dati cliente. Un vero PDF privato è renderizzato localmente da PDF.js; testo incorporato estraibile può essere proposto come fonte, mentre le scansioni/immagini richiedono OCR AI configurato e revisione.
+
+Flusso demo: **Clienti → Richieste → Materiali → Builder → Revisione → Anteprima → Approvazioni → PR mock → pubblicazione simulata**. La checklist richiede evidenza scritta per prezzi, allergeni, lingua e approvazione del locale; omissioni allergeni richiedono un consenso distinto e non equivalgono a dichiararne l'assenza. Fonte o JSON modificati azzerano la checklist. Il QR provvisorio punta solo alla preview privata, mai al link del menu pubblico. La voce browser è opzionale, richiede consenso, produce testo correggibile e non approva né pubblica. Il mock non invia email, WhatsApp, chiamate, pagamenti o modifiche GitHub. I file binari caricati durante la demo locale non sono conservati, salvo il PDF statico fittizio.
+
+## Architettura
+
+| Percorso | Responsabilità |
+| --- | --- |
+| `control-room/site/` | UI mobile-first, mock locale, voce browser, QR self-hosted e renderer PDF.js/preview |
+| `control-room/cloudflare/functions/` | API privata Access, middleware asset statici, adapter AI/GitHub, webhook firmati, notifiche e retention |
+| `control-room/cloudflare/migrations/` | Schema D1 dedicato: pratiche, revisioni, audit, eventi esterni, operazioni PR e consegne |
+| `control-room/staging/build.sh` | Assembla `.staging/dist/` e `.staging/functions/` senza distribuire né toccare la build pubblica |
+| `control-room/tests/` | Prove offline SQLite, JWT, adapter finti, idempotenza, Browser/QR/PDF |
+| `control-room/schemas/` | Contratti JSON per classificazione, estrazione, bozza e risposta |
+| `docs/approval-policy.md`, `docs/voice-persona.md`, `docs/control-room-privacy.md` | Regole approvazione, voce originale, dati/retention |
+
+Il database D1 **dedicato** ha già ricevuto `0001_initial.sql` e `0002_integrations.sql`, ed è vuoto di clienti. Il bucket R2 WEUR `renmenu-jarvis-stage-private` è privato. Entrambi sono associati al solo progetto Pages separato `renmenu-jarvis-stage` nelle configurazioni Preview e Production; il sito Pages RenMenu esistente non ha questi binding. Lo script pubblico `scripts/build-cloudflare.sh` copia soltanto pagine commerciali e menù; mai l'intera cartella Control Room. Per uno staging isolato:
 
 ```sh
-python3 -m playwright install chromium
-python3 control-room/tests/browser_smoke.py  # 375, 390, 430, 768, 1280 px
-python3 control-room/tests/demo_flow.py      # cliente → pratica → bozza → 2 conferme mock
-python3 control-room/tests/preview_flow.py   # PDF a due pagine, zoom, confronto, QR e revoca Blob
+sh control-room/staging/build.sh
+cd control-room/.staging
+wrangler pages functions build --outdir .wrangler/functions-check --compatibility-date 2026-10-01
+# Non scrivere l'output di verifica dentro dist/: il Worker bundle non è un asset statico.
+# Solo dopo autenticazione Wrangler + verifica Access/binding e consenso operativo:
+# wrangler pages deploy dist --project-name renmenu-jarvis-stage --branch staging
 ```
 
-Il test browser produce screenshot in una directory temporanea del sistema oppure nella cartella indicata da `CONTROL_ROOM_SCREENSHOT_DIR`; non li scrive nel repository. Lo script di build originale deve continuare a pubblicare solo il sito attuale; questa PR non cambia la landing, Stripe, Payment Link, IBAN, menu/QR, né URL GitHub Pages.
+**Il comando di deploy è una guida e non è stato eseguito.** Verificare prima che `_routes.json` includa `/control-room`, `/control-room/*`, `/hooks/gmail` e `/hooks/whatsapp`, e che Pages sia **fail closed**; gli ultimi due percorsi richiedono HMAC provider/relay e rimangono spenti finché non esiste un metodo Access Service Token o una policy di bypass strettamente limitata alle route webhook. Non aprire bypass generici. Il deploy dello staging non crea una PR né modifica `renmenu.pages.dev`. Il branch di lavoro e la PR #3 non vanno uniti a `main` senza revisione separata: il repository è servito anche da GitHub Pages.
 
-Asset di terze parti inclusi **solo** nel branch isolato: `qrcode-generator` 2.0.4 con [licenza MIT](control-room/site/vendor/LICENSE.qrcode-generator) e `pdfjs-dist` 5.4.624 con [licenza Apache 2.0](control-room/site/vendor/LICENSE.pdfjs-dist); soltanto `pdf.mjs` e `pdf.worker.mjs` minificati sono inclusi, senza CDN. La presenza nel repository non implica che i PDF clienti siano pubblici: l'unico PDF di prova è sintetico e il build pubblico attuale esclude l'intera directory.
+## Integrazioni e limiti reali
 
-## Attivazione futura — solo dopo approvazione separata
+- **AI:** `AI_PROVIDER=mock` è la configurazione presente. L'adapter `openai_compatible` è implementato, testato con risposte finte e separa prompt/JSON da dati certi. Prezzi/ingredienti/allergeni non verificati non vanno mai inventati. Per chiamate vere servono endpoint/modello/chiave segreta server-side, verifica privacy e test con materiale sintetico. Classificazione ed estrazione sono *proposte*; un umano salva la bozza e approva.
+- **GitHub:** `GITHUB_PROVIDER=mock` è spento per azioni live. L'adapter live legge SHA/menu, rifiuta slug esistenti per nuove pratiche, prepara branch e **draft PR** idempotenti solo dopo checklist e conferma esatta del proprietario. Nessun merge/deploy automatico. Serve un token limitato a `Rua56/renmenu` con permessi minimi, memorizzato solo come segreto Pages. La verifica del menu pubblicato è distinta dalla creazione PR; il testo Gmail non deve essere eliminato prima della corrispondenza tra PR merged e menu raggiungibile.
+- **Gmail:** il Trigger business già attivo manda nuove richieste al precedente Jarvis Manus, **non** a questa Control Room. Il webhook `/hooks/gmail` accetta soltanto eventi di `renmenu1569@gmail.com` con HMAC, scadenza 5 minuti e ID deduplicato; è disattivato. Prima del cutover creare un relay firmato che legge il messaggio completo dal solo account business, non lo snippet e non l'account personale; importare allegati solo se realmente acquisiti; verificare Access, poi disattivare l'uscita precedente per evitare duplicati. Le email restano conservate fino a quando il menu è online e disponibile, come richiesto dal proprietario; l'eliminazione del corpo richiede conferma esatta e verifica reale della versione pubblica.
+- **Email in uscita:** la scheda Notifiche propone avvisi **solo al proprietario `renmenu1569@gmail.com`**, con testo esatto e conferma on-screen. L'endpoint è spento (`EMAIL_LIVE_ENABLED` non attivo) finché non esiste una chiave Resend dell'account business. Senza dominio, `onboarding@resend.dev` è ammesso da Resend soltanto verso l'email associata a quell'account, previa verifica effettiva. Una risposta accettata dal provider **non** prova consegna in casella. Quiet hours Europa/Roma 21:00–08:00 salvo priorità urgente. Nessuna email ai clienti.
+- **WhatsApp:** webhook Meta con firma e deduplica/bozza; provider in uscita disattivato. Per avviare serviranno account Business, numero, token, finestra assistenza 24h, prova firma e conferma esatta del messaggio; nessun invio reale oggi.
+- **Telefonate e SMS:** adapter fail-closed, soltanto simulazioni. Nessun numero owner verificato o credenziale, e non si chiama nessuno in questa fase.
+- **Pagamenti/produzione:** nessuna integrazione Stripe, modifica ai Payment Link, merge, pubblicazione autonoma o cambi al sito RenMenu. Ogni azione esterna richiede un riepilogo materiale e conferma umana.
 
-Questi passaggi **non sono stati eseguiti**. Per preparare uno staging privato, Riccardo deve prima scegliere ambiente, email owner e policy/retention (vedi [privacy](docs/control-room-privacy.md)):
+## Variabili e binding server-side
 
-1. **Access.** In Cloudflare Zero Trust creare un'applicazione self-hosted per l'origin Pages e coprire **sia** `/control-room` **sia** `/control-room/*`, includendo solo l'email esatta del proprietario. Configurare `TEAM_DOMAIN`, `POLICY_AUD` (Application Audience tag) e `OWNER_EMAIL` nelle variabili **server-side Pages**, distinte tra Preview e Production. Verificare anche in incognito un utente non autorizzato, statici compresi; abilitare Pages **Fail closed**.
-2. **D1.** Creare un database **nuovo dedicato** alla Control Room; associare il binding Pages **`DB`**. Solo nel database nuovo eseguire `control-room/cloudflare/migrations/0001_initial.sql`; controllare schema, backup e ambiente prima dell'uso. Non applicare la migrazione a dati RenMenu esistenti.
-3. **R2.** Creare un bucket **nuovo privato**, senza custom/public domain; associare il binding Pages **`BUCKET`**. Provare PDF, MIME non valido, 10 MB, accesso negato e archiviazione; decidere una policy di cancellazione definitiva prima di usare dati reali. Preview/Production devono avere risorse separate.
-4. **Routing sicuro.** Su un **altro branch di attivazione**, dopo approvazione, copiare `control-room/site/` in `dist/control-room/` tramite una modifica esplicita alla build; copiare `control-room/cloudflare/functions/` nella directory root `functions/` e l'esempio `_routes.json` in `dist/_routes.json`, preservando la build pubblica. Il middleware root e il filtro route devono coprire tutti gli asset e `/control-room/api/*`. Verificare in staging Access, CSP, no-store/noindex, URL 403, database e bucket prima di considerare Production. Nessun semplice flag attiva questa PR.
-5. **GitHub futuro.** `GITHUB_OWNER=Rua56` e `GITHUB_REPO=renmenu` identificano il repository; un eventuale `GITHUB_TOKEN` va **solo nei segreti Cloudflare**, con permessi minimi per contenuti/PR e branch dedicato. Oggi l'adapter costruisce metadati mock ma non legge menu live, non crea branch/PR e non fa merge. Prima di un adapter live implementare lettura SHA/menu corrente, confronto, branch/PR idempotente, revisioni e due approvazioni separate; non esporre mai il token a Pages statico o ai log.
-6. **AI futura.** `AI_PROVIDER=mock` è l'unico provider supportato; qualunque altro valore restituisce `501`. Gli schemi `control-room/schemas/*.json` sono contratti per output strutturati da validare server-side. Per foto/PDF/audio serviranno OCR/trascrizione con consenso, provenienza per campo, gestione prompt injection, budget/retention e revisione umana; `AI_API_KEY` andrà solo nei segreti server. Mai dedurre prezzi/allergeni o inviare il materiale a un provider senza accordo privacy.
-7. **WhatsApp/chiamate future.** `WHATSAPP_PROVIDER=mock` e `CALL_PROVIDER=mock` non comunicano all'esterno. Per un webhook live serviranno verifica della firma del provider, numero aziendale, associazione senza ambiguità al cliente, gestione allegati e idempotenza; l'invio al cliente dovrà mostrare il testo esatto e richiedere conferma. Le chiamate saranno **solo verso Riccardo** con numero verificato, regola urgenza/quiet hours, consenso e conferma separata. Inserire `WHATSAPP_TOKEN`, `WHATSAPP_PHONE_NUMBER_ID`, `CALL_PROVIDER_TOKEN`, `OWNER_PHONE` soltanto in segreti server dopo aver implementato e testato questi flussi, non nell'esempio `.env` con valori veri.
+I valori reali vanno **solo** nei Secret/Environment Variables Pages, mai nell'HTML, in Git, nei log o nella chat. L'esempio con nomi è in [`control-room/.env.example`](control-room/.env.example). Binding `DB` → D1 dedicato; `BUCKET` → R2 privato; `TEAM_DOMAIN`, `POLICY_AUD`, `PREVIEW_AUD`, `OWNER_EMAIL` per Access. Per l'AI: `AI_PROVIDER`, `AI_API_BASE`, `AI_MODEL`, `AI_API_KEY`. Per GitHub: `GITHUB_PROVIDER`, `GITHUB_TOKEN`. Per Gmail relay: `GMAIL_RELAY_ENABLED`, `GMAIL_RELAY_SECRET`. Per l'email owner: `ENVIRONMENT`, `STAGING_PROTECTED`, `EMAIL_LIVE_ENABLED`, `RESEND_API_KEY`, `EMAIL_FROM`, `EMAIL_FROM_VERIFIED`, `RESEND_ONBOARDING_SENDER_AUTHORIZED`. Per WhatsApp: `WHATSAPP_WEBHOOK_ENABLED`, `WHATSAPP_APP_SECRET`, `WHATSAPP_VERIFY_TOKEN`; i segreti per outbound non sono configurati. Lasciare ogni flag live spento finché il relativo collaudo non è riuscito. Nessun materiale cliente deve essere caricato nel mock locale o prima del test Access nello staging.
 
-L'elenco completo dei nomi configurabili è in [`control-room/.env.example`](control-room/.env.example); i binding D1/R2 non sono stringhe segrete nel client. Per disabilitare provider esterni lasciare ogni `*_PROVIDER` a `mock`/`disabled` o non impostato: in questa versione nessun adapter live esiste. La casella Gmail collegata al **precedente Jarvis** non è importata automaticamente nella Control Room; servirà consenso/scope e un'integrazione distinta. Nessun pagamento Stripe è nel perimetro.
-
-Fonti: [middleware Pages](https://developers.cloudflare.com/pages/functions/middleware/), [binding D1/R2](https://developers.cloudflare.com/pages/functions/bindings/), [JWT Access](https://developers.cloudflare.com/cloudflare-one/access-controls/applications/http-apps/authorization-cookie/validating-json/). Policy: [approvazioni](docs/approval-policy.md). Persona: [voce](docs/voice-persona.md). Piano: [control-room/plan.md](control-room/plan.md).
+Licenze: `qrcode-generator` MIT e `pdfjs-dist` Apache 2.0 con file di licenza nella cartella `site/vendor/`. Il Blanch viewer (`blanch/data/menu.json`) usa uno schema diverso e resta escluso dal Builder; i menù standard sono `menus/<id>.json`, validati con `scripts/validate-menus.py`, e conservano lo slug dei QR esistenti.

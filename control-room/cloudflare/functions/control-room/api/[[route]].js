@@ -2,7 +2,9 @@ import { isSameOriginWrite, verifyOwner } from '../../_lib/auth.js';
 import { validateMenu } from '../../_lib/menu.js';
 import { integrations } from '../../_lib/integrations.js';
 import { reviewIssues } from '../../_lib/editorial.js';
-
+import { runPrivateIntegrationAction } from '../../_lib/operations.js';
+import { sendOwnerNotification, OWNER_NOTIFICATION_RECIPIENT } from '../../_lib/owner-notifications.js';
+import { purgePublishedEmail } from '../../_lib/email-retention.js';
 const headers = { 'Cache-Control': 'private, no-store', 'Content-Type': 'application/json; charset=utf-8' };
 const answer = (body, status = 200) => new Response(JSON.stringify(body), { status, headers });
 const failure = (status, message) => answer({ error: message }, status);
@@ -52,7 +54,7 @@ async function auditedBatch(db, writes, event, summary, requestId = null, guard 
 const checksDefault = () => ({ prices: false, allergens: false, languages: false, clientApproval: false });
 
 export async function state(db) {
-  const [clients, requests, materials, rawDrafts, versions, notifications, messages, audit, proposals] = await Promise.all([
+  const [clients, requests, materials, rawDrafts, versions, notifications, messages, audit, proposals, rawAnalyses, livePrs, ownerDeliveries] = await Promise.all([
     rows(db, 'SELECT id,name,email,phone,contact_name AS contactName,contact_role AS contactRole,plan,payment_status AS paymentStatus,menu_id AS menuId,menu_url AS menuUrl,internal_notes AS internalNotes,trial_ends_at AS trialEndsAt,renewal_at AS renewalAt,revision,created_at AS createdAt,updated_at AS updatedAt FROM clients ORDER BY created_at DESC LIMIT 300'),
     rows(db, 'SELECT id,client_id AS clientId,subject,source_channel AS sourceChannel,source_text AS sourceText,kind,status,plan,contact_name AS contactName,contact_role AS contactRole,contact_info AS contactInfo,internal_notes AS internalNotes,menu_id AS menuId,public_url AS publicUrl,next_step AS nextStep,follow_up_at AS followUpAt,last_action_at AS lastActionAt,revision,created_at AS createdAt,updated_at AS updatedAt FROM requests ORDER BY created_at DESC LIMIT 500'),
     rows(db, 'SELECT id,request_id AS requestId,filename,mime,size,source,processing_status AS processingStatus,text_preview AS textPreview,archived_at AS archivedAt,created_at AS createdAt FROM materials ORDER BY created_at DESC LIMIT 500'),
@@ -61,19 +63,29 @@ export async function state(db) {
     rows(db, 'SELECT id,request_id AS requestId,channel,subject,body,priority,due_at AS dueAt,read_at AS readAt,status,created_at AS createdAt FROM notifications ORDER BY created_at DESC LIMIT 300'),
     rows(db, 'SELECT id,request_id AS requestId,channel,body,status,created_at AS createdAt FROM messages ORDER BY created_at DESC LIMIT 300'),
     rows(db, 'SELECT id,request_id AS requestId,action,summary,actor,created_at AS createdAt FROM audit_events ORDER BY created_at DESC LIMIT 500'),
-    rows(db, 'SELECT id,draft_id AS draftId,revision,snapshot_sha AS snapshotSha,diff_json AS diffJson,branch_name AS branchName,file_path AS filePath,commit_message AS commitMessage,pr_body AS prBody,status,created_at AS createdAt FROM pr_proposals ORDER BY created_at DESC LIMIT 300')
+    rows(db, 'SELECT id,draft_id AS draftId,revision,snapshot_sha AS snapshotSha,diff_json AS diffJson,branch_name AS branchName,file_path AS filePath,commit_message AS commitMessage,pr_body AS prBody,status,created_at AS createdAt FROM pr_proposals ORDER BY created_at DESC LIMIT 300'),
+    rows(db, 'SELECT id,material_id AS materialId,request_id AS requestId,source_sha256 AS sourceSha256,source_text AS sourceText,provenance_json AS provenanceJson,warnings_json AS warningsJson,status,created_at AS createdAt FROM material_analyses ORDER BY created_at DESC LIMIT 500'),
+    rows(db, 'SELECT id,draft_id AS draftId,revision,snapshot_sha AS snapshotSha,base_sha AS baseSha,branch_name AS branchName,pr_number AS prNumber,pr_url AS prUrl,status,created_at AS createdAt,updated_at AS updatedAt FROM live_pr_operations ORDER BY created_at DESC LIMIT 300'),
+    rows(db, "SELECT id,request_id AS requestId,recipient,status,provider_id AS providerId,created_at AS createdAt,updated_at AS updatedAt FROM outbound_deliveries WHERE channel='email' AND recipient='renmenu1569@gmail.com' ORDER BY created_at DESC LIMIT 300")
   ]);
   return {
     clients, requests, materials,
     drafts: rawDrafts.map(({ menuJson, checksJson, ...draft }) => ({ ...draft, menu: JSON.parse(menuJson), checks: JSON.parse(checksJson),
       versions: versions.filter((version) => version.draftId === draft.id).map(({ menuJson: json, ...v }) => ({ ...v, menu: JSON.parse(json) })) })),
     notifications, messages, audit,
-    proposals: proposals.map(({ diffJson, ...p }) => ({ ...p, diff: JSON.parse(diffJson) }))
+    proposals: proposals.map(({ diffJson, ...p }) => ({ ...p, diff: JSON.parse(diffJson) })),
+    analyses: rawAnalyses.map(({ provenanceJson, warningsJson, ...entry }) => ({ ...entry,
+      provenance: JSON.parse(provenanceJson), warnings: JSON.parse(warningsJson) })),
+    livePrs, ownerDeliveries
   };
 }
 
 async function action(db, type, input, env = {}) {
   const p = input && typeof input === 'object' && !Array.isArray(input) ? input : {};
+  const privateResult = await runPrivateIntegrationAction({
+    db, env, auditedBatch, getOne, rows, now, uid
+  }, type, p);
+  if (privateResult !== null) return { state: await state(db), result: privateResult };
   let result = {};
   if (type === 'createClient') {
     const name = clean(p.name, 140, 'Nome cliente');
@@ -323,6 +335,41 @@ async function action(db, type, input, env = {}) {
       'call.mock', 'Chiamata simulata verso il proprietario: non è stato composto alcun numero.', requestId,
       { sql: 'SELECT 1 FROM notifications WHERE id=?', args: [id] });
     result = { id, simulated: true };
+  } else if (type === 'setMaterialTranscript') {
+    const materialId = identifier(p.materialId), revision = Number(p.requestRevision);
+    const sourceText = clean(p.text, 50_000, 'Trascrizione manuale');
+    assert(sourceText.length >= 5, 'Trascrizione troppo breve.');
+    const material = await getOne(db, 'SELECT * FROM materials WHERE id=? AND archived_at IS NULL', materialId);
+    assert(material, 'Materiale non trovato o archiviato.', 404);
+    const request = await getOne(db, 'SELECT id,revision,status FROM requests WHERE id=?', material.request_id);
+    assert(Number.isInteger(revision) && request?.revision === revision, 'Pratica modificata nel frattempo. Ricarica.', 409);
+    assert(!['completata', 'archiviata', 'chiusa'].includes(request.status), 'Pratica non modificabile.', 409);
+    const linkedDraft = await getOne(db, 'SELECT status FROM drafts WHERE request_id=?', request.id);
+    assert(!linkedDraft || !['pr_simulata', 'pubblicazione_simulata'].includes(linkedDraft.status), 'Fonte bloccata dopo la proposta.', 409);
+    assert(env.BUCKET?.get, 'Archivio privato non configurato.', 503);
+    const object = await env.BUCKET.get(material.r2_key);
+    assert(object?.arrayBuffer, 'File originale privato non disponibile.', 404);
+    const digest = await crypto.subtle.digest('SHA-256', await object.arrayBuffer());
+    const hash = [...new Uint8Array(digest)].map((byte) => byte.toString(16).padStart(2, '0')).join('');
+    const stamp = now(), id = uid();
+    const writes = [
+      db.prepare(`INSERT INTO material_analyses (id,material_id,request_id,source_sha256,source_text,provenance_json,warnings_json,status,created_at)
+        VALUES (?,?,?,?,?,?,?,?,?) ON CONFLICT(material_id) DO UPDATE SET id=excluded.id, source_sha256=excluded.source_sha256,
+        source_text=excluded.source_text, provenance_json=excluded.provenance_json, warnings_json=excluded.warnings_json,
+        status=excluded.status, created_at=excluded.created_at`)
+        .bind(id, materialId, request.id, hash, sourceText,
+          JSON.stringify([{ materialId, method: 'manual', reviewed: false }]),
+          JSON.stringify(['Trascrizione manuale: confrontare con il file originale; nessun OCR automatico.']), 'needs_review', stamp),
+      db.prepare("UPDATE requests SET status='in_revisione',revision=revision+1,updated_at=? WHERE id=? AND revision=? AND EXISTS (SELECT 1 FROM material_analyses WHERE material_id=? AND id=?)")
+        .bind(stamp, request.id, revision, materialId, id),
+      db.prepare("UPDATE drafts SET checks_json=?,status='revisione',revision=revision+1,updated_at=? WHERE request_id=? AND status IN ('bozza','revisione','pronta_pr') AND EXISTS (SELECT 1 FROM material_analyses WHERE material_id=? AND id=?)")
+        .bind(JSON.stringify(checksDefault()), stamp, request.id, materialId, id)
+    ];
+    const changed = await auditedBatch(db, writes, 'material.transcription.manual',
+      'Trascrizione manuale salvata; conferme editoriali invalidate.', request.id,
+      { sql: 'SELECT 1 FROM requests WHERE id=? AND revision=? AND updated_at=?', args: [request.id, revision + 1, stamp] });
+    assert(changed[1].meta.changes === 1, 'Pratica modificata nel frattempo. Ricarica.', 409);
+    result = { id, materialId, sourceSha256: hash, status: 'needs_review' };
   } else if (type === 'archiveMaterial') {
     const id = identifier(p.id);
     assert(p.confirmation === 'ARCHIVIA MATERIALE', 'Conferma archiviazione mancante.', 403);
@@ -345,6 +392,10 @@ async function action(db, type, input, env = {}) {
       { sql: 'SELECT 1 FROM materials WHERE id=? AND archived_at=?', args: [id, stamp] });
     assert(archived[0].meta.changes === 1 && archived[1].meta.changes === 1, 'Archiviazione concorrente. Ricarica.', 409);
     result = { id, archived: true };
+  } else if (type === 'purgePublishedEmail') {
+    result = await purgePublishedEmail({ db, input: p,
+      fetch: typeof env.PUBLIC_MENU_FETCH === 'function' ? env.PUBLIC_MENU_FETCH : globalThis.fetch,
+      now, uid });
   } else if (type === 'markNotificationRead') {
     const id = identifier(p.id);
     assert(typeof p.read === 'boolean', 'Stato letto non valido.');
@@ -354,6 +405,17 @@ async function action(db, type, input, env = {}) {
       'notification.read', p.read ? 'Notifica letta.' : 'Notifica da leggere.', notice.request_id,
       { sql: 'SELECT 1 FROM notifications WHERE id=?', args: [id] });
     result = { id };
+  } else if (type === 'sendOwnerEmail') {
+    assert(p.confirmation === 'CONFERMO EMAIL AL PROPRIETARIO', 'Conferma esplicita per l’email al proprietario mancante.', 403);
+    const requestId = identifier(p.requestId);
+    const request = await getOne(db, 'SELECT id FROM requests WHERE id=?', requestId);
+    assert(request, 'Pratica non trovata.', 404);
+    const subject = clean(p.subject, 180, 'Oggetto avviso');
+    const text = clean(p.text, 4_000, 'Testo avviso');
+    assert(['normale', 'importante', 'urgente'].includes(p.priority || 'normale'), 'Priorità non valida.');
+    const sent = await sendOwnerNotification({ db, env, requestId, subject, text,
+      priority: p.priority || 'normale', fetchImpl: typeof env.RESEND_FETCH === 'function' ? env.RESEND_FETCH : globalThis.fetch });
+    result = { ...sent, recipient: OWNER_NOTIFICATION_RECIPIENT };
   } else if (type === 'addNotification' || type === 'sendMessage') {
     const requestId = p.requestId ? identifier(p.requestId) : null;
     if (type === 'sendMessage') assert(requestId, 'Pratica obbligatoria per i messaggi.');

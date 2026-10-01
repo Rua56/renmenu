@@ -881,3 +881,46 @@ form { min-width: 0; }
   .material-viewer-actions > .button-row { width: 100%; }
   .material-viewer-actions .button { flex: 1 1 auto; }
 }
+
+/* Trascrizioni manuali e proposte Jarvis: restano sempre revisionabili prima di qualunque salvataggio manuale. */
+.material-analysis-list { display: grid; gap: .8rem; }
+.material-analysis {
+  display: grid;
+  min-width: 0;
+  gap: .75rem;
+  border: 1px solid var(--line);
+  border-radius: 11px;
+  padding: clamp(.8rem, 2vw, 1rem);
+  background: rgba(123, 208, 211, .025);
+}
+.material-analysis-heading { display: flex; min-width: 0; align-items: flex-start; justify-content: space-between; gap: .75rem; }
+.material-analysis-heading > div { min-width: 0; }
+.material-analysis-heading h3 { overflow-wrap: anywhere; }
+.material-analysis-meta { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: .5rem; }
+.material-analysis-meta span { min-width: 0; border: 1px solid var(--line); border-radius: 8px; padding: .55rem .6rem; color: var(--muted-strong); font-size: .75rem; overflow-wrap: anywhere; }
+.material-analysis-meta strong { display: block; margin-bottom: .14rem; color: var(--muted); font-size: .64rem; letter-spacing: .065em; text-transform: uppercase; }
+.material-analysis-meta code { display: block; color: var(--teal); overflow-wrap: anywhere; }
+.material-analysis-warning { margin: 0; }
+.voice-proposal { display: grid; gap: .68rem; margin-top: 1rem; border: 1px solid rgba(230, 166, 177, .4); border-radius: 11px; padding: .9rem; background: rgba(158, 53, 72, .06); }
+.voice-proposal > .eyebrow, .voice-proposal > h3, .voice-proposal > p { margin: 0; }
+.voice-proposal form { display: grid; gap: .12rem; }
+.voice-proposal .panel-heading { margin: 0; }
+
+@media (max-width: 768px) {
+  .material-analysis-meta { grid-template-columns: minmax(0, 1fr); }
+  .material-analysis-heading { align-items: flex-start; }
+}
+
+@media (max-width: 430px) {
+  .material-analysis { padding: .78rem; }
+  .material-analysis-heading { flex-direction: column; gap: .45rem; }
+  .voice-proposal { padding: .78rem; }
+  .voice-proposal .form-actions .button { flex-basis: 100%; }
+}
+
+/* Owner email is visually distinct from the neighbouring mock-only channel cards. */
+.owner-email-card { border-color: rgba(123, 208, 211, .34); }
+.owner-email-card fieldset { min-width: 0; margin: 0; border: 0; padding: 0; }
+.owner-email-card code { color: var(--teal-soft); }
+.owner-email-card .owner-email-disabled { margin-top: .85rem; }
+.owner-email-card fieldset:disabled { opacity: .62; }

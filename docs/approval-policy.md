@@ -1,26 +1,25 @@
 # Policy di approvazione — RenMenu Control Room
 
-La Control Room è uno strumento del **Team RenMenu**, non un pannello per i ristoratori. L'automazione può leggere fonti autorizzate, organizzare pratiche, preparare bozze e proporre cambiamenti. Il proprietario Riccardo resta responsabile delle decisioni. Tutti i dati di prova nella fase A sono fittizi.
+Jarvis è il copilota del **Team RenMenu**; Riccardo mantiene il controllo. La demo locale usa soltanto dati fittizi. Lo staging Pages ha D1/R2 e Access predisposti ma, al 1 ottobre 2026, **non è ancora distribuito** e ha provider live spenti.
 
-## Scala di autonomia
-
-| Operazione | Automazione ammessa | Uscita effettiva in fase A |
+| Operazione | Automazione possibile | Condizione/effetto |
 | --- | --- | --- |
-| Registrare pratica, collegare cliente e materiale | Sì, in area privata | Persistenza mock locale o D1 isolato dopo setup, con audit |
-| Estrarre piatti e prezzi dal testo | Sì, **solo da righe leggibili** | Bozza; righe incerte segnalate, non completate a fantasia |
-| Proporre traduzioni | Solo come suggerimenti da confermare | Non approvate automaticamente |
-| Salvare versioni/editare il JSON | Sì, dopo validazione | Versioni con revisione concorrente e audit |
-| Confermare prezzi, allergeni e lingue | Solo Riccardo con fonti del locale | Checklist manuale, nessuna deduzione dall'AI |
-| Registrare approvazione cliente | Solo dopo consenso scritto reale, annotando riferimento | Check esplicito e nota; demo non invia l'anteprima |
-| Preparare PR di menù cliente | Solo dopo revisione, conferma esplicita e diff | **Proposta mock**: nessuna PR reale e nessun push a `menus/` |
-| Pubblicare, unire branch, aggiornare QR | Mai automaticamente | **Simulazione distinta** con seconda conferma; nessun merge/deploy |
-| Messaggio email/WhatsApp/chiamata a cliente | Solo bozza approvata in futura fase autorizzata | Nessun invio: `mock` o `bozza_mock` nel registro |
-| Operazioni Stripe, fatture, acquisti | Fuori ambito | Nessun accesso né modifica |
+| Registrare pratica, allegati e cronologia | Sì, in area privata dopo Access | D1/R2 privati; audit, CAS e limiti MIME/dimensione |
+| Classificare/estrarre testo e menù | Proposta AI, se provider abilitato | Mai inventare prezzi, ingredienti, allergeni o attribuire traduzioni come confermate; bozza salvata solo dopo revisione umana |
+| Revisionare JSON e fonti | Sì, con operatore | Prezzi/allergeni/lingue devono avere prove scritte; modifiche invalidano la checklist |
+| Preparare PR mock | Dopo approvazione editoriale | Soltanto simulazione, frase `CONFERMO PR DI PROVA` |
+| Aprire **draft PR GitHub live** | Solo dopo Access, token ristretto, controllo SHA/versione/checklist, diff e conferma owner `CONFERMO APERTURA PR LIVE` | Branch e PR idempotenti; **nessun merge, pubblicazione o cambio a main** |
+| Verificare un menù realmente online | Letture GitHub/public allowlist, conferma `CONFERMO VERIFICA PUBBLICAZIONE` | Segna la pratica completata **solo se** PR merged, hash/branch/versione coerenti e menù pubblico identico alla bozza; non esegue merge/deploy |
+| Pulire il corpo di email importate in D1 | Conferma distinta `CONFERMO ELIMINAZIONE EMAIL PUBBLICATA` | Solo dopo PR merged e menù raggiungibile/identico; non elimina la mail originale in Gmail né allegati R2 |
+| Avviso email al proprietario | Solo previa visione di destinatario/oggetto/testo e conferma sullo schermo `CONFERMO EMAIL AL PROPRIETARIO` | Destinatario fisso `renmenu1569@gmail.com`, Resend dell'account business e mittente verificato, quiet hours, idempotenza. Provider disattivato inizialmente. Accettato dal provider ≠ consegnato. |
+| Messaggi ai clienti, WhatsApp, SMS o telefonate | Nessun invio automatico | WhatsApp/chiamate mock o stub fail-closed; nessuna chiamata/risposta cliente reale oggi |
+| Merge, deploy produzione, modifica QR/menù live | Nessuna API autonoma | Richiedono revisione e azione esplicita separata, non una frase vocale |
+| Stripe, IBAN, link pagamento, acquisti | Fuori ambito | Nessuna modifica o esecuzione |
 
-La validazione tecnica del JSON non attesta la verità di prezzo, allergene, ingrediente, disponibilità, coperto, contatto o lingua. Il validatore ufficiale è `scripts/validate-menus.py`; i warning richiedono lettura umana. Per aggiornamenti conservare lo stesso slug e lo stesso `menu/?m=<id>` per non invalidare QR; per nuovi locali lo slug va controllato contro quelli già pubblicati **prima** di qualunque futura PR reale. Il menù Blanch ha un formato distinto e non passa per questo builder standard.
+La validazione JSON **non certifica la veridicità** di prezzo, allergene, ingrediente, orario, disponibilità, contatto o traduzione. Il validatore pubblico è `scripts/validate-menus.py`. Le voci dello standard pubblico sono allowlistate lato server; note interne, chiavi R2, nomi file cliente e segreti non entrano nei JSON o nel testo PR. Per aggiornamenti preservare lo slug dei QR e leggere il SHA GitHub corrente; per nuovi locali verificare assenza dello slug prima di aprire la PR. Il menu Blanch ha formato distinto ed è escluso dal Builder standard.
 
-## Transizioni e blocchi
+**Evidenza editoriale:** non bastano quattro spunte; i controlli di prezzi, allergeni e lingua richiedono fonti scritte, e l'approvazione del locale deve essere documentata. Se i numeri allergeni sono omessi serve una conferma distinta di omissione autorizzata dal locale. Un array vuoto non dimostra assenza di allergeni. Prezzi mancanti, lingue dichiarate senza testo e fonti non verificabili bloccano la PR. L'AI non può approvare da sola.
 
-Una richiesta può creare una bozza, ma modificare la fonte, caricare un altro allegato o archiviare un materiale azzera le conferme. Ogni salvataggio richiede la revisione corrente (CAS), conserva una versione, annulla riferimenti di estrazione obsoleti e azzera la checklist. I campi potenzialmente pubblici sono ammessi da una **allow-list server-side** ricavata dallo schema reale `menus/`; riferimenti a R2, note editoriali e chiavi sconosciute sono vietati nel JSON della PR. Le mutazioni D1 e l'audit vengono eseguiti nella **stessa transazione**: un errore dell'audit annulla la scrittura di business. Per marcare il lavoro `pronta_pr` non bastano quattro spunte: servono riferimenti scritti alle fonti di prezzi, allergeni e lingue, più l'approvazione scritta del locale. Prezzi mancanti e lingue dichiarate ma non tradotte bloccano la PR mock. Se mancano numeri allergeni, una conferma **separata** della loro omissione da parte del locale è obbligatoria nel mock: non significa che il piatto sia privo di allergeni e va rivalutata legalmente prima di qualunque distribuzione reale. Il comando `preparePr` rivalida tutto, richiede frase `CONFERMO PR DI PROVA` e produce soltanto un record mock. `simulatePublish` richiede una proposta precedente e una **seconda** frase `CONFERMO PUBBLICAZIONE SIMULATA`. Nessun endpoint `merge`, `publish` reale, `send` o `pay` esiste. Riprocessamenti e conflitti devono essere mostrati invece di sovrascrivere in silenzio.
+**Transazioni:** upload/archiviazione materiali, salvataggi D1, versioni e audit usano CAS e batch. Una fonte modificata azzera la checklist; errori di audit annullano la scrittura di business. Una perdita della risposta GitHub non provoca retry di scrittura rischiosa: richiede riconciliazione leggendo la PR esistente. Le due conferme del mock (`CONFERMO PR DI PROVA`, `CONFERMO PUBBLICAZIONE SIMULATA`) **non** sono il consenso per una PR/pubblicazione live.
 
-I comandi vocali possono proporre una modifica o aprire una vista; **non valgono mai come consenso** per approvazione, PR, pubblicazione o invio. In futuro, abilitare provider solo con scope minimo, credenziali nel secret store, limiti di spesa/invio, consenso e test in ambiente di prova. In caso di dubbio prevale `non inferire / chiedere al locale`.
+La voce è una comodità di navigazione e proposta: **non vale mai come consenso** per PR, invio, cancellazione, pubblicazione o pagamento. L'azione sullo schermo deve mostrare prima cliente, menù, file/URL/diff e messaggio esatto quando pertinenti. In caso di dubbio: **non inferire; chiedere al locale e a Riccardo**.

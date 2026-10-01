@@ -4,7 +4,8 @@ const hostname = String(globalThis.location?.hostname || '').toLowerCase();
 const demoRequested = new URLSearchParams(globalThis.location?.search || '').get('demo') === '1';
 export const isDemoMode = (hostname === 'localhost' || hostname === '127.0.0.1') && demoRequested;
 export const isAuthorizedHost = hostname === 'localhost' || hostname === '127.0.0.1'
-  || hostname === 'renmenu.pages.dev' || hostname.endsWith('.renmenu.pages.dev');
+  || hostname === 'renmenu-jarvis-stage.pages.dev'
+  || /^[a-z0-9-]+\.renmenu-jarvis-stage\.pages\.dev$/.test(hostname);
 export const modeLabel = isDemoMode ? 'DEMO LOCALE' : 'API PRIVATA';
 
 function requireAuthorizedHost() {

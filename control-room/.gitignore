@@ -1,0 +1,5 @@
+.staging/
+.wrangler/
+.dev.vars
+.dev.vars.*
+*.local

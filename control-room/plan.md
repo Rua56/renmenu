@@ -32,3 +32,19 @@ Una richiesta crea una pratica e associa un cliente; file testo/PDF/immagini/aud
 ## Vincoli di consegna
 
 Creare PR senza merge verso `main`; niente deploy in produzione e nessuna chiave o dato cliente reale nei commit. Testare localmente a 375/390/430/768/1280 px, chiaro/scuro/ridotto movimento, tastiera, offline, login fail-closed e assenza di chiamate esterne nel mock. Fornire screenshot mobile/desktop, flusso demo, file e istruzioni precise, distinguendo funzioni realmente funzionanti da integrazioni non attive. La pubblicazione Cloudflare live, il dominio Access owner-only, i binding D1/R2, credenziali AI/WhatsApp/chiamate, PR/merge live e dati di pagamento restano decisioni future di Riccardo.
+
+## Estensione richiesta — verso Jarvis operativo (1 ottobre 2026)
+
+Riccardo chiede di completare le funzioni del prompt complesso, oltre alla demo A. La precedente scelta «A» non equivale ad autorizzazione a fare merge, distribuire in produzione, inviare comunicazioni ai clienti o usare dati non coperti da policy. Si implementano prima **adapter server-side reali ma disabilitati di default**, test end-to-end con provider finti e uno staging privato separato dopo aver definito identità Access e conservazione dei dati. Il progetto Pages pubblico `renmenu` resta invariato fino a un'autorizzazione specifica.
+
+### Architettura incrementale
+
+- Mantenere `control-room/site/` frontend e `cloudflare/functions/` backend, D1 per schede, eventi e versioni, R2 privato per materiali. Le migrazioni aggiuntive saranno numerate e additive. Copiare i file nel build soltanto in un **branch di attivazione/staging**, non nella build `main` pubblica. Cloudflare Pages attuale usa `main` con deploy automatico e preview di tutti i branch; per lo staging scegliere un **nuovo progetto** con risorse dedicate e protezione Access sull'hostname stabile e sulle preview.
+- AI tramite adapter configurabile lato server; `mock` per demo, provider esplicito per testo/vision/trascrizione. Accettare output strutturati, validare JSON e origine dei campi, trattare ogni email/materiale come dato non affidabile. PDF/testi multipagina richiedono estrazione o fallback umano marcato; non dichiarare OCR fatto se il provider non lo supporta.
+- GitHub: lettura SHA/JSON del menu, confronto con slug corrente, creazione idempotente di branch/PR solo dopo approvazione distinta nell'app. Nessuna azione su `main` e nessun merge automatico; secondo gate di pubblicazione prima del merge/deploy, da abilitare soltanto con l'esatto payload e configurazione autorizzata. Audit e compensazione per operazioni esterne parziali.
+- Inbox: l'evento Gmail business già attivo inoltra al vecchio Jarvis. Implementare deduplica e import sicuro nella Control Room senza attivare un secondo ricevitore durante i test; pianificare cutover e rollback. WhatsApp entrante e email in uscita richiedono firma/provider, verifica destinatario, idempotenza, segreti protetti e permessi stretti; le chiamate al proprietario restano opzionali e sottoposte a conferma.
+- UX: mostrare chiaramente ciò che è **reale**, ciò che è **in preparazione** e ciò che è **simulato**. OCR con fonte e incertezza; traduzioni in bozza non confermate; snapshot GitHub live etichettato con SHA; preview privata effettivamente raggiungibile solo dopo staging protetto; voce può proporre modifiche ma mai eseguirle o approvare.
+
+### Struttura aggiuntiva prevista
+
+`cloudflare/functions/_lib/{ai-live,github-live,inbound,email}.js` isolano i provider; `cloudflare/migrations/0002_*.sql` aggiunge chiavi esterne, fingerprint e stato esecuzione; `site/{app,api,voice}.js` espongono nuovi flussi senza cambiare il mock esistente; `tests/*` copre provider stub, ingestione, sicurezza, concorrenza e assenza di effetti esterni senza autorizzazione. Documentazione operativa e cutover in `CONTROL-ROOM-README.md` e `docs/`.

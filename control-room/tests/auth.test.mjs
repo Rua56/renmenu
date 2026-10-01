@@ -37,6 +37,17 @@ describe('Cloudflare Access owner-only', () => {
     assert.equal(await verifyOwner(request(), env, jwks), false);
     assert.equal(await verifyOwner(request(signed), { ...env, POLICY_AUD: '' }, jwks), false);
   });
+  it('separa la firma Access dello staging stabile da quella dei deployment hash', async () => {
+    const staging = { ...env, PREVIEW_AUD: 'solo-preview-control-room' };
+    const stableUrl = 'https://renmenu-jarvis-stage.pages.dev/control-room/';
+    const hashedUrl = 'https://abc123.renmenu-jarvis-stage.pages.dev/control-room/';
+    const stableToken = await token(claims());
+    const previewToken = await token(claims({ aud: [staging.PREVIEW_AUD] }));
+    assert.equal(await verifyOwner(request(stableToken, stableUrl), staging, jwks), true);
+    assert.equal(await verifyOwner(request(stableToken, hashedUrl), staging, jwks), false);
+    assert.equal(await verifyOwner(request(previewToken, stableUrl), staging, jwks), false);
+    assert.equal(await verifyOwner(request(previewToken, hashedUrl), staging, jwks), true);
+  });
   it('nega asset statici e API senza accesso ma non intercetta il sito pubblico esistente', async () => {
     for (const path of ['/control-room/', '/control-room/styles.css', '/control-room/api/state']) {
       let called = false;
