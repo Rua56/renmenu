@@ -1,0 +1,53 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://renmenu.pages.dev/control-room/schemas/menu_draft",
+  "title": "menu_draft",
+  "type": "object",
+  "required": ["id", "nome", "sezioni"],
+  "properties": {
+    "id": { "type": "string", "pattern": "^[a-z0-9]+(?:-[a-z0-9]+)*$" },
+    "nome": { "$ref": "#/$defs/text" },
+    "lingue": { "type": "array", "items": { "type": "string", "pattern": "^[a-z]{2}$" }, "minItems": 1, "uniqueItems": true },
+    "sottotitolo": { "$ref": "#/$defs/text" },
+    "indirizzo": { "type": "string" },
+    "telefono": { "type": "string" },
+    "instagram": { "type": "string" },
+    "maps": { "type": "string", "format": "uri" },
+    "orari": { "$ref": "#/$defs/text" },
+    "wifi": { "type": "string" },
+    "avviso": { "$ref": "#/$defs/text" },
+    "coperto": { "type": "string" },
+    "note": { "$ref": "#/$defs/text" },
+    "url": { "type": "string", "format": "uri" },
+    "sito": { "type": "string", "format": "uri" },
+    "website": { "type": "string", "format": "uri" },
+    "sezioni": {
+      "type": "array", "minItems": 1,
+      "items": {
+        "type": "object", "required": ["nome", "voci"], "additionalProperties": false,
+        "properties": {
+          "nome": { "$ref": "#/$defs/text" },
+          "descrizione": { "$ref": "#/$defs/text" },
+          "voci": {
+            "type": "array", "minItems": 1,
+            "items": {
+              "type": "object", "required": ["nome"], "additionalProperties": false,
+              "properties": {
+                "nome": { "$ref": "#/$defs/text" },
+                "descrizione": { "$ref": "#/$defs/text" },
+                "prezzo": { "oneOf": [{ "type": "number", "exclusiveMinimum": 0 }, { "type": "string", "pattern": "^$|^\\d+(?:[,.]\\d{1,2})?$" }] },
+                "allergeni": { "type": "array", "items": { "oneOf": [{ "type": "integer", "minimum": 1, "maximum": 14 }, { "type": "string", "pattern": "^(?:[1-9]|1[0-4])$" }] } },
+                "tag": { "type": "array", "items": { "enum": ["veg", "vegan", "spicy", "gf", "new", "top", "frozen"] } }
+              }
+            }
+          }
+        }
+      }
+    }
+  },
+  "additionalProperties": false,
+  "$defs": {
+    "text": { "oneOf": [{ "type": "string" }, { "$ref": "#/$defs/localized" }] },
+    "localized": { "type": "object", "patternProperties": { "^[a-z]{2}$": { "type": "string" } }, "additionalProperties": false }
+  }
+}

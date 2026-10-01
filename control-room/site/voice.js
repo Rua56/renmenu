@@ -1,0 +1,90 @@
+/* Browser-only speech option; no audio is sent to the RenMenu API. Some browsers
+ * use a remote speech-recognition service: ask before starting the microphone.
+ * The default state is OFF. No command can approve, send, merge or publish.
+ */
+import { menuDiff } from './model.js';
+const Recognition = globalThis.SpeechRecognition || globalThis.webkitSpeechRecognition;
+const Synth = globalThis.speechSynthesis;
+let recognition = null;
+let enabled = false;
+let rate = 1;
+let volume = .8;
+
+export const speechAvailable = Boolean(Recognition);
+export const synthesisAvailable = Boolean(Synth && globalThis.SpeechSynthesisUtterance);
+export const voiceSettings = () => ({ enabled, rate, volume, speechAvailable, synthesisAvailable, provider: 'browser' });
+export const configureVoice = (patch = {}) => {
+  if (typeof patch.enabled === 'boolean') {
+    enabled = patch.enabled;
+    if (!enabled) stopListening();
+    if (!enabled) Synth?.cancel();
+  }
+  if (Number.isFinite(Number(patch.rate))) rate = Math.max(.6, Math.min(1.4, Number(patch.rate)));
+  if (Number.isFinite(Number(patch.volume))) volume = Math.max(0, Math.min(1, Number(patch.volume)));
+  return voiceSettings();
+};
+export function speak(text) {
+  if (!enabled) throw new Error('Attiva prima la voce del browser.');
+  if (!synthesisAvailable) throw new Error('Sintesi vocale non supportata da questo browser.');
+  Synth.cancel();
+  const utterance = new SpeechSynthesisUtterance(String(text || '').slice(0, 900));
+  utterance.lang = 'it-IT'; utterance.rate = rate; utterance.volume = volume;
+  const italian = Synth.getVoices().find((candidate) => candidate.lang?.toLowerCase().startsWith('it'));
+  if (italian) utterance.voice = italian;
+  Synth.speak(utterance);
+}
+export function stopListening() {
+  if (recognition) { recognition.abort(); recognition = null; }
+}
+export function listen({ onTranscript, onStatus }) {
+  if (!enabled) throw new Error('Attiva prima la voce del browser.');
+  if (!speechAvailable) throw new Error('Microfono/browser SpeechRecognition non disponibile. Usa il testo.');
+  stopListening();
+  const instance = new Recognition();
+  recognition = instance;
+  instance.lang = 'it-IT'; instance.continuous = false; instance.interimResults = false; instance.maxAlternatives = 1;
+  instance.onstart = () => onStatus('In ascolto… correggi poi la trascrizione prima di inviarla.');
+  instance.onresult = (event) => {
+    const transcript = event.results?.[0]?.[0]?.transcript || '';
+    if (transcript) onTranscript(transcript);
+    onStatus('Trascrizione ricevuta. Modificala se necessario; non è ancora stata inviata.');
+  };
+  instance.onerror = (event) => onStatus(`Microfono non disponibile (${event.error || 'errore'}). Puoi scrivere il comando.`);
+  instance.onend = () => { if (recognition === instance) recognition = null; };
+  instance.start();
+}
+export function interpretVoice(transcript, { requests = [], clients = [], messages = [], selectedRequestId = null, draft = null, client = null } = {}) {
+  const words = String(transcript || '').toLocaleLowerCase('it-IT');
+  const venue = client?.name || 'il locale selezionato';
+  const items = draft?.menu?.sezioni?.reduce((count, section) => count + (section.voci?.length || 0), 0) || 0;
+  const changes = draft?.versions?.[0]?.menu ? menuDiff(draft.versions[0].menu, draft.menu).changes.length : 0;
+  if (/non pubblicare|ferma/.test(words)) return { reply: 'Non ho pubblicato nulla. Tutte le operazioni esterne restano disattivate.', target: null };
+  if (/promemoria|scadenz/.test(words)) return { reply: 'Ho aperto il centro notifiche. Registra il promemoria come avviso interno, non come messaggio esterno.', target: 'notifiche' };
+  if (/leggimi.*messagg/.test(words)) {
+    const note = messages.find((item) => item.requestId === selectedRequestId);
+    return { reply: note ? `Bozza non inviata: ${note.body.slice(0, 500)}` : 'Non c’è un messaggio preparato per la pratica selezionata.', target: 'notifiche' };
+  }
+  if (/pubblic|manda|invia|chiama|merge|pag(a|o|hi)/.test(words))
+    return { reply: `Ho preparato soltanto la schermata di controllo per ${venue}. Include ${items} voci e ${changes} modifiche confrontabili tra bozze (non rispetto al menu live). Vuoi aprire la conferma sul telefono? Nessuna pubblicazione, invio o chiamata è partita.`, target: 'approvazioni' };
+  const opened = words.match(/\bapri\s+(.+)/);
+  if (opened) {
+    const requested = opened[1].trim();
+    const matching = requests.find((request) => {
+      const name = clients.find((item) => item.id === request.clientId)?.name?.toLocaleLowerCase('it-IT').split(' — ')[0] || '';
+      return requested.includes(request.subject.toLocaleLowerCase('it-IT')) || (name.length >= 4 && requested.includes(name));
+    });
+    if (matching) return { reply: `Ho individuato la pratica ${matching.subject}. L’ho selezionata senza modificarla.`, target: 'richieste', requestId: matching.id };
+  }
+  if (/oggi|priorit|cosa devo fare/.test(words)) {
+    const next = requests.find((item) => !['completata', 'archiviata', 'chiusa'].includes(item.status));
+    return { reply: next ? `La prossima priorità è ${next.subject}. Apri la pratica e verifica la fonte prima di procedere.` : 'Non ci sono pratiche aperte nel contesto corrente.', target: 'command' };
+  }
+  if (/nuove richieste|richiest/.test(words)) return { reply: `Ci sono ${requests.filter((item) => item.status === 'nuova').length} nuove richieste. Ho aperto l’elenco; non ho contattato i clienti.`, target: 'richieste' };
+  if (/riassum.*materiale/.test(words)) return { reply: `La pratica selezionata contiene ${requests.find((item) => item.id === selectedRequestId)?.sourceText?.split('\n').filter(Boolean).length || 0} righe di testo sorgente. Per immagini/PDF non c’è ancora OCR: trascrivi i dati leggibili prima di generare.`, target: 'builder' };
+  if (/allergen|dati mancan|materiale/.test(words)) return { reply: 'Ho aperto il Builder. Gli allergeni non vengono dedotti: confronta ogni voce con la fonte ufficiale del locale.', target: 'builder' };
+  if (/bozz|prepara il men/.test(words)) return { reply: 'Ho aperto il Builder. Puoi generare una bozza prudente dal materiale, senza approvarla automaticamente.', target: 'builder' };
+  if (/anteprima|qr/.test(words)) return { reply: 'Ho aperto l’anteprima privata. Il QR è provvisorio e non va condiviso.', target: 'anteprima' };
+  if (/messagg|whatsapp|email/.test(words)) return { reply: 'Ho aperto le bozze messaggi. Nessun invio avviene senza revisione e consenso sullo schermo.', target: 'notifiche' };
+  if (/prezzo|sezione|modifica|aggiungi/.test(words)) return { reply: 'Ho aperto l’editor. La modifica va scritta, confrontata con la fonte e salvata manualmente.', target: 'revisione' };
+  return { reply: 'Non ho eseguito azioni. Puoi aprire Richieste, Builder, Revisione, Anteprima o Notifiche, oppure specificare la tua domanda.', target: null };
+}
