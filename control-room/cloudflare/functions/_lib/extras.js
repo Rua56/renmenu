@@ -39,6 +39,8 @@ export function detectExtra(sentence, menu) {
   // un solo importo nella frase, altrimenti decide Riccardo.
   const amounts = lower.match(/\d{1,4}(?:[,.]\d{1,2})?/g) || [];
   const cover = amounts.length === 1 && lower.match(/^(?:[a-zà-ÿ'’\s]{0,40}\s)?(?:il\s+)?coperto\b[^\d]*(\d{1,2})(?:[,.](\d{1,2}))?\s*(?:€|euro)?(?:\s+(?:a\s+persona|a\s+testa|per\s+persona))?\s*\.?$/);
+  // Importo insolito per un coperto (oltre 10 €): può essere un refuso, decide Riccardo.
+  if (cover && Number(`${cover[1]}.${cover[2] || 0}`) > 10) return { type: 'manuale', source: text, note: `coperto di ${Number(cover[1])},${(cover[2] || '').padEnd(2, '0')} €: importo insolito, confermalo tu` };
   if (cover) return { type: 'coperto', value: `${Number(cover[1])},${(cover[2] || '').padEnd(2, '0')}`, source: text };
   if (/\bcoperto\b/.test(lower)) return { type: 'manuale', source: text, note: 'Coperto citato senza un importo chiaro: inseriscilo a mano.' };
   // Solo dichiarazioni esplicite ("contiene", "allergeni: …"): mai dedurre dal nome del piatto.

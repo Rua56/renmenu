@@ -10,6 +10,7 @@ import { answerCallback, clearButtons, sendTelegram, telegramReady } from './tel
 export const PARTIAL_MARK = '[Testo parziale: leggi l’email completa in Gmail prima di decidere]';
 const ACTIVE = ['affidata', 'attesa_invio', 'attesa_cliente', 'attesa_si', 'pubblicazione', 'verifica'];
 // Modifiche che Jarvis applica da solo; gli allergeni restano sempre a Riccardo.
+const HARMLESS = /^(?!.*\d)(?!.*\b(?:ma|però|pero|tranne|cambi\w*|modific\w*|sbagliat\w*|manca\w*|togli\w*|aggiung\w*|non)\b).*\b(?:perfett\w*|benissimo|bene|ottim\w*|grazie|approv\w*|ok|confermo|tutto|bellissim\w*)\b/i;
 const AUTO_CHANGES = new Set(['prezzo', 'aggiungi', 'rimuovi', 'coperto']);
 const MAX_ROUNDS = 3;
 const MINUTE = 60_000;
@@ -183,8 +184,13 @@ export function createMissions(deps) {
     const reply = String(approval.reply_text || '');
     if (reply.startsWith(PARTIAL_MARK)) return stop(db, env, mission, 'la risposta del locale è lunga o con allegati: leggila tu in Gmail');
     const assessment = assessReply(reply);
-    const changes = proposeReplyChanges(reply, menu).filter((entry) => entry.type !== 'manuale');
+    const proposals = proposeReplyChanges(reply, menu);
+    const changes = proposals.filter((entry) => entry.type !== 'manuale');
+    // Frasi che Jarvis non sa tradurre in una modifica precisa: mai ignorarle in silenzio.
+    // Restano innocue solo le conferme di cortesia ("perfetto così", "va benissimo").
+    const doubts = proposals.filter((entry) => entry.type === 'manuale' && !HARMLESS.test(entry.source || ''));
     const quote = reply.trim().replace(/\s+/g, ' ').slice(0, 300);
+    if (doubts.length) return stop(db, env, mission, `nella risposta del locale c’è qualcosa che non so applicare da solo: «${String(doubts[0].source).slice(0, 200)}»${doubts[0].note ? ` (${doubts[0].note})` : ''}`);
     if (assessment.suggestion === 'approvazione' && !changes.length) {
       const request = await getOne(db, 'SELECT kind,plan FROM requests WHERE id=?', mission.request_id);
       const activation = request.kind === 'nuovo' ? `\nAttivo: ${PLAN_LABEL[request.plan]} da oggi (${romeDate()}).` : '';

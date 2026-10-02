@@ -79,3 +79,12 @@ describe('Risposta del locale: sezione indicata e coperto', () => {
     assert.equal(proposeReplyChanges('Coperto e pane 2 o 3 euro', menu)[0].type, 'manuale');
   });
 });
+
+describe('Risposta reale del pilota 10', () => {
+  const menu = { sezioni: [{ nome: { it: 'Antipasti' }, voci: [{ nome: { it: 'Richard fritto' }, prezzo: '10,00' }] }, { nome: { it: 'Secondi' }, voci: [{ nome: { it: 'Richard ustionato' }, prezzo: '30,00' }] }, { nome: { it: 'Dolci' }, voci: [{ nome: { it: 'Richard nature' }, prezzo: '25,00' }] }] };
+  it('righe separate, riempitivi tolti, coperto insolito lasciato a Riccardo', () => {
+    const out = proposeReplyChanges('vorrei aggiungere ai secondi questo piatto: Richard rompipalle 50 poi\nvorrei aggiungere nelle informazioni il coperto di 20 euro', menu);
+    assert.deepEqual(out.map((e) => [e.type, e.name || e.note]), [['aggiungi', 'Richard rompipalle'], ['manuale', 'coperto di 20,00 €: importo insolito, confermalo tu']]);
+    assert.equal(out[0].section, 1);
+  });
+});
