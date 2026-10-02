@@ -115,7 +115,12 @@ import { detectExtra } from './extras.js';
 const GREETING = /^(?:grazie|cordiali saluti|saluti|buongiorno|buonasera|ciao|a presto|un saluto)\b/i;
 
 export function proposeReplyChanges(text, menu) {
-  const reply = stripQuoted(text).replace(/\s+/g, ' ').trim();
+  // Ogni riga è una frase a sé ("… 50 poi⏎vorrei aggiungere il coperto"), come i punti.
+  // Una riga che inizia con una lettera è una frase nuova; "bottiglia⏎22,00" (a capo dell'email
+  // dentro la frase) o una riga dopo ":" / "," resta unita.
+  const reply = stripQuoted(text).split(/\r?\n/).map((line) => line.trim()).filter(Boolean)
+    .reduce((acc, line) => (!acc ? line : /[,:;]$/.test(acc) || !/^[A-Za-zÀ-ÿ]/.test(line) ? `${acc} ${line}` : `${acc.replace(/[.!?]$/, '')}. ${line}`), '')
+    .replace(/\s+/g, ' ').trim();
   const items = [];
   (menu?.sezioni || []).forEach((section, si) => (section?.voci || []).forEach((item, vi) => {
     const name = italianName(item?.nome);
@@ -125,8 +130,11 @@ export function proposeReplyChanges(text, menu) {
   const proposals = [];
   const add = (entry) => proposals.push({ id: `p${proposals.length + 1}`, ...entry });
   // "… a 35 euro e il coperto 2 euro": il coperto diventa una frase a parte.
-  for (const raw of reply.split(/\.(?=\s|$)|[!;]|,?\s+e\s+(?=(?:anche\s+)?(?:il\s+)?coperto\b)/i)) {
-    const sentence = raw.trim();
+  for (const raw of reply.split(/\.(?=\s|$)|[!;]|,?\s+e\s+(?=(?:anche\s+)?(?:il\s+)?coperto\b)|,?\s+(?:e\s+)?poi(?:\s*,)?\s+(?=[a-zà-ÿ])/i)) {
+    // Riempitivi che non fanno parte del nome: "questo piatto:", "nelle informazioni", "anche".
+    const sentence = raw.trim().replace(/\b(?:questo|questi|il|un|i|seguente|seguenti|nuovo|nuovi)\s+(?:nuovo\s+)?piatt[oi]\s*:?\s*/gi, '')
+      .replace(/\s*\b(?:nelle|nella|tra\s+le)\s+(?:informazioni|info|note)\b/gi, '').replace(/\s+/g, ' ').trim()
+      .replace(/^(?:poi|e)\s+/i, '').replace(/\s+(?:poi|e)$/i, '');
     if (!sentence || GREETING.test(sentence) || /^(?:approv\w*|ok|va bene|tutto ok)\W*$/i.test(sentence)) continue;
     const extra = detectExtra(sentence, menu);
     if (extra) { add(extra); continue; }
