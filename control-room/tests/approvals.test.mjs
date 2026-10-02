@@ -67,7 +67,7 @@ const documentedReview = {
   allergenOmissionConfirmed: true
 };
 import { approveByClient } from './helpers/client-approval.mjs';
-import { assessReply, previewEmail, previewUrl, stripQuoted, approvalState } from '../cloudflare/functions/_lib/approvals.js';
+import { assessReply, previewEmail, previewUrl, proposeReplyChanges, stripQuoted, approvalState } from '../cloudflare/functions/_lib/approvals.js';
 
 const setup = async (db, request = {}) => {
   const client = await action(db, 'createClient', { name: 'Osteria anteprima', email: 'osteria@example.com', plan: 'standard' });
@@ -190,6 +190,51 @@ describe('Percorso di approvazione nella API staging', () => {
       const again = await action(db, 'preparePreview', { draftId: draft.id, revision: changes.body.state.drafts[0].revision });
       assert.equal(again.status, 200);
       assert.notEqual(again.body.result.referenceCode, prepared.body.result.referenceCode, 'nuova anteprima, nuovo riferimento');
+    } finally { db.close(); }
+  });
+
+  it('legge le modifiche chieste dal locale come proposte, senza inventare', () => {
+    const menu = { sezioni: [
+      { nome: { it: 'Antipasti' }, voci: [{ nome: { it: 'Frico con polenta' }, prezzo: '11,50' }, { nome: { it: 'Tagliere di salumi' }, prezzo: '14,00' }] },
+      { nome: { it: 'Dolci' }, voci: [{ nome: { it: 'Gnocchi di susine' }, prezzo: '10,00' }] },
+      { nome: { it: 'Vini al calice' }, voci: [{ nome: { it: 'Ribolla Gialla' }, prezzo: '5,00' }] }] };
+    const pick = (text) => proposeReplyChanges(text, menu).map((p) => [p.type, p.name ?? null, p.after ?? p.price ?? null, p.section ?? null]);
+    assert.deepEqual(pick('Il frico costa 12,00. Aggiungete anche il Terrano: calice 5,00, bottiglia\n22,00.\n\n> rif. RM-AAAAAA'), [
+      ['prezzo', 'Frico con polenta', '12,00', null], ['aggiungi', 'Terrano (calice)', '5,00', 2], ['aggiungi', 'Terrano (bottiglia)', '22,00', 2]]);
+    assert.deepEqual(pick('Togliete il tagliere. Aggiungete la torta di mele a 5 euro'), [['rimuovi', 'Tagliere di salumi', null, null], ['aggiungi', 'Torta di mele', '5,00', 1]]);
+    assert.deepEqual(pick('Approvo.'), []);
+    assert.equal(pick('Cambiate la foto')[0][0], 'manuale', 'nessuna modifica precisa: a mano');
+    assert.equal(pick('Il frico costa 11,50')[0]?.[0], undefined, 'stesso prezzo: niente da proporre');
+  });
+
+  it('applica solo le modifiche scelte, ricalcolate dal testo salvato, con fonte e checklist azzerata', async () => {
+    const db = database();
+    try {
+      const { draft } = await setup(db, { sourceText: '## Primi\nGnocchi — 12,00\nBlecs — 10,00\n## Vini\nRibolla — 5,00' });
+      const prepared = await action(db, 'preparePreview', { draftId: draft.id, revision: draft.revision });
+      let approval = prepared.body.state.approvals[0];
+      await action(db, 'markPreviewSent', { id: approval.id, revision: approval.revision });
+      db.prepare("UPDATE publication_approvals SET status='risposta_ricevuta',reply_from='osteria@example.com',reply_text=?,reply_received_at='2026-10-02T10:00:00Z',revision=revision+1 WHERE id=?")
+        .bind('Togliete gli gnocchi. I blecs costano 11,00. Aggiungete il Terrano: calice 5,00, bottiglia 22,00.', approval.id).run();
+      approval = (await call(db, 'state')).body.approvals[0];
+      assert.equal(approval.replyAssessment.suggestion, 'modifiche');
+      const reopened = await action(db, 'decideClientReply', { id: approval.id, revision: approval.revision, decision: 'modifiche' });
+      const proposals = reopened.body.state.approvals[0].changeProposals;
+      assert.deepEqual(proposals.map((p) => p.type), ['rimuovi', 'prezzo', 'aggiungi', 'aggiungi']);
+      const current = reopened.body.state.drafts[0];
+      assert.equal((await action(db, 'applyReplyChanges', { draftId: current.id, revision: current.revision, accept: [] })).status, 422);
+      const accept = proposals.filter((p) => p.name !== 'Terrano (bottiglia)').map((p) => p.id);
+      const applied = await action(db, 'applyReplyChanges', { draftId: current.id, revision: current.revision, accept });
+      assert.equal(applied.status, 200, String(applied.body.error));
+      const saved = applied.body.state.drafts[0];
+      assert.deepEqual(saved.menu.sezioni.map((s) => s.voci.map((v) => `${v.nome.it ?? v.nome}=${v.prezzo}`)),
+        [['Blecs=11,00'], ['Ribolla=5,00', 'Terrano (calice)=5,00']]);
+      assert.equal(saved.checks.prices, false, 'contenuto cambiato: checklist da rifare');
+      const provenance = saved.provenance || [];
+      assert.ok(provenance.some((row) => row.path === 'sezioni.0.voci.0.prezzo' && row.value === '11,00' && /Risposta del locale/.test(row.source)));
+      assert.ok(provenance.some((row) => row.path === 'sezioni.0.voci.0.nome.it' && row.value === 'Blecs' && /riga/.test(row.source)), 'la fonte del piatto spostato resta');
+      assert.ok(provenance.some((row) => row.path === 'sezioni.1.voci.1.prezzo' && row.value === '5,00' && /Risposta del locale/.test(row.source)));
+      assert.ok(applied.body.state.audit.some((row) => row.action === 'draft.reply_changes' && /Blecs 10,00 → 11,00/.test(row.summary)));
     } finally { db.close(); }
   });
 });

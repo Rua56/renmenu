@@ -99,3 +99,69 @@ export function approvalState(approval, currentSha, requestKind) {
     activationMissing: requestKind === 'nuovo' && !approval.activation
   };
 }
+
+// Modifiche chieste dal locale nella risposta all'anteprima: Jarvis le legge e le PROPONE.
+// Riccardo sceglie quali applicare; nulla viene modificato senza la sua conferma.
+// Riconosce solo frasi esplicite: cambio prezzo di un piatto esistente, aggiunta di un
+// piatto con prezzo scritto, rimozione di un piatto. Tutto il resto resta "da gestire a mano".
+const STOP_WORDS = new Set(['con', 'del', 'della', 'dello', 'dei', 'degli', 'delle', 'al', 'alla', 'allo', 'ai', 'agli', 'alle',
+  'di', 'da', 'in', 'il', 'la', 'lo', 'le', 'gli', 'un', 'una', 'nel', 'nella', 'sul', 'sulla']);
+const plainWords = (value) => (String(value).toLocaleLowerCase('it-IT').normalize('NFD').replace(/[\u0300-\u036f]/g, '').match(/[a-z]+/g) || []);
+const keyWords = (name) => plainWords(name).filter((word) => word.length >= 3 && !STOP_WORDS.has(word));
+const PRICE_TOKEN = /(?<![\d,.])(\d{1,4})(?:[,.](\d{1,2}))?(?![\d,.]*\d)\s*(?:€|euro)?/gi;
+const money = (whole, cents = '') => `${Number(whole)},${String(cents).padEnd(2, '0')}`;
+const italianName = (value) => (typeof value === 'string' ? value : value?.it || '').trim();
+const GREETING = /^(?:grazie|cordiali saluti|saluti|buongiorno|buonasera|ciao|a presto|un saluto)\b/i;
+
+export function proposeReplyChanges(text, menu) {
+  const reply = stripQuoted(text).replace(/\s+/g, ' ').trim();
+  const items = [];
+  (menu?.sezioni || []).forEach((section, si) => (section?.voci || []).forEach((item, vi) => {
+    const name = italianName(item?.nome);
+    items.push({ si, vi, name, keys: keyWords(name), price: String(item?.prezzo ?? '') });
+  }));
+  const sections = (menu?.sezioni || []).map((section) => italianName(section?.nome));
+  const proposals = [];
+  const add = (entry) => proposals.push({ id: `p${proposals.length + 1}`, ...entry });
+  for (const raw of reply.split(/\.(?=\s|$)|[!;]/)) {
+    const sentence = raw.trim();
+    if (!sentence || GREETING.test(sentence) || /^(?:approv\w*|ok|va bene|tutto ok)\W*$/i.test(sentence)) continue;
+    const words = new Set(plainWords(sentence));
+    const prices = [...sentence.matchAll(PRICE_TOKEN)].map((match) => money(match[1], match[2]));
+    const matched = items.filter((item) => item.keys.length && words.has(item.keys[0]))
+      .map((item) => ({ ...item, score: item.keys.filter((key) => words.has(key)).length }));
+    const best = matched.length ? Math.max(...matched.map((item) => item.score)) : 0;
+    const candidates = matched.filter((item) => item.score === best);
+    const isAdd = /\b(?:aggiung\w*|inserit\w*|inserire)\b/i.test(sentence);
+    const isRemove = /\b(?:togli\w*|tolg\w*|rimuov\w*|elimin\w*|cancell\w*)\b/i.test(sentence);
+    if (isAdd) {
+      const match = sentence.match(/\b(?:aggiung\w*|inserit\w*|inserire)\s+(?:anche\s+)?(?:(?:il|lo|la|l['’]|i|gli|le|un|una|uno)\s+)?([^:,\d€—–-]+)(?::|,|-|—|–)?\s*((?:[^\d]*\d[\d,.]*\s*(?:€|euro)?[\s,e]*)+)$/i);
+      const base = match ? match[1].trim().replace(/\s+(?:a|al|da|costa|costano|prezzo)$/i, '').trim() : '';
+      const rest = match ? match[2] : '';
+      const pairs = [...rest.matchAll(/([A-Za-zÀ-ÿ][A-Za-zÀ-ÿ ]{1,30}?)?\s*(\d{1,4})(?:[,.](\d{1,2}))?\s*(?:€|euro)?/gi)]
+        .map((pair) => ({ label: (pair[1] || '').trim().replace(/^(?:e|ed)\s+/i, ''), price: money(pair[2], pair[3]) }));
+      if (base && pairs.length && pairs.length <= 4) {
+        const wine = /\b(?:calice|bottiglia|vino|vini|bicchiere)\b/i.test(sentence);
+        const target = wine ? sections.findIndex((name) => /\bvin/i.test(name)) : -1;
+        const food = sections.map((name, index) => (/\b(?:vin|bevand|bibit|drink)/i.test(name) ? -1 : index)).filter((index) => index >= 0);
+        const section = target >= 0 ? target : food.length ? food[food.length - 1] : Math.max(0, sections.length - 1);
+        const nameBase = base.charAt(0).toLocaleUpperCase('it-IT') + base.slice(1);
+        for (const pair of pairs) {
+          const name = pairs.length > 1 && pair.label ? `${nameBase} (${pair.label.toLocaleLowerCase('it-IT')})` : nameBase;
+          if (items.some((item) => item.name.toLocaleLowerCase('it-IT') === name.toLocaleLowerCase('it-IT'))) continue;
+          add({ type: 'aggiungi', name: name.slice(0, 120), price: pair.price, section, source: sentence });
+        }
+        continue;
+      }
+    } else if (isRemove && candidates.length === 1) {
+      add({ type: 'rimuovi', si: candidates[0].si, vi: candidates[0].vi, name: candidates[0].name, source: sentence });
+      continue;
+    } else if (candidates.length === 1 && prices.length === 1) {
+      const [item] = candidates;
+      if (item.price !== prices[0]) add({ type: 'prezzo', si: item.si, vi: item.vi, name: item.name, before: item.price, after: prices[0], source: sentence });
+      continue;
+    }
+    add({ type: 'manuale', source: sentence, note: candidates.length > 1 ? `Più piatti possibili: ${candidates.map((item) => item.name).join(', ')}.` : 'Jarvis non riconosce una modifica precisa: gestiscila a mano nel Builder.' });
+  }
+  return proposals;
+}
