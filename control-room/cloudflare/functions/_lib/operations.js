@@ -552,8 +552,10 @@ async function readPublishedMenu(context, slug) {
     response = await publicMenuFetch(context.env)(url, {
       method: 'GET',
       // Redirects must never turn a fixed allow-listed URL into an arbitrary
-      // upstream. The status/redirected checks below also cover test doubles.
-      redirect: 'error',
+      // upstream. I Worker Cloudflare non supportano redirect:'error' (la fetch
+      // fallisce sempre): con 'manual' un 3xx non viene seguito e il controllo
+      // "HTTP 200 diretto" qui sotto lo rifiuta.
+      redirect: 'manual',
       headers: { Accept: 'application/json' }
     });
   } catch {
