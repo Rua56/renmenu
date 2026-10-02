@@ -39,11 +39,14 @@ export async function transcribe(ai, bytes, { timeoutMs = 30_000 } = {}) {
 }
 
 function parseJson(text) {
+  if (text && typeof text === 'object') return text; // Workers AI restituisce già l'oggetto con json_schema
   const raw = String(text || '');
   const start = raw.indexOf('{'), end = raw.lastIndexOf('}');
   if (start < 0 || end <= start) return null;
   try { return JSON.parse(raw.slice(start, end + 1)); } catch { return null; }
 }
+
+const SCHEMA = { type: 'object', properties: { intent: { type: 'string', enum: [...INTENTS] }, locale: { type: 'string' }, risposta: { type: 'string' } }, required: ['intent', 'locale', 'risposta'] };
 
 /** Capisce il comando. `context` = testo del briefing + elenco dei locali (fonte unica per le risposte). */
 export async function understand(ai, utterance, context, { timeoutMs = 25_000 } = {}) {
@@ -64,11 +67,11 @@ export async function understand(ai, utterance, context, { timeoutMs = 25_000 } 
     const out = await withTimeout(Promise.resolve().then(() => ai.run(CLOUDFLARE_FREE_MODEL, { messages: [
       { role: 'system', content: system },
       { role: 'user', content: `DATI:\n${String(context || '').slice(0, 6000)}\n\nCOMANDO DI RICCARDO:\n${String(utterance).slice(0, 1500)}` }
-    ], temperature: 0.2, max_tokens: 400 })), timeoutMs);
+    ], temperature: 0.2, max_tokens: 400, response_format: { type: 'json_schema', json_schema: SCHEMA } })), timeoutMs);
     const parsed = parseJson(out?.response ?? out?.choices?.[0]?.message?.content);
-    if (!parsed || !INTENTS.has(parsed.intent)) return fallback;
+    if (!parsed || !INTENTS.has(parsed.intent)) return { ...fallback, why: parsed ? `intenzione «${String(parsed.intent).slice(0, 30)}»` : 'risposta non leggibile' };
     return { intent: parsed.intent, locale: String(parsed.locale || '').slice(0, 120), risposta: String(parsed.risposta || '').replace(/[*#•]/g, '').slice(0, 700) };
-  } catch { return fallback; }
+  } catch (error) { return { ...fallback, why: String(error?.message || 'errore').slice(0, 80) }; }
 }
 
 /** Locale citato a voce → cliente con menu online. Una sola corrispondenza, altrimenti nessuna. */

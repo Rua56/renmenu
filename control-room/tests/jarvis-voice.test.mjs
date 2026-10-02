@@ -108,6 +108,8 @@ describe('Comandi vocali di Jarvis', () => {
   it('intenzione fuori elenco o JSON rotto: non chiaro, nessuna azione', async () => {
     assert.equal((await understand({ run: async () => ({ response: '{"intent":"cancella_tutto"}' }) }, 'x', '')).intent, 'non_chiaro');
     assert.equal((await understand({ run: async () => ({ response: 'boh' }) }, 'x', '')).intent, 'non_chiaro');
+    const asObject = await understand({ run: async () => ({ response: { intent: 'risposta', locale: '', risposta: 'Tutto tranquillo.' } }) }, 'x', '');
+    assert.deepEqual([asObject.intent, asObject.risposta], ['risposta', 'Tutto tranquillo.'], 'oggetto già decodificato da Workers AI');
   });
   it('voce ElevenLabs maschile multilingue, tono calmo; senza chiave nessun audio', async () => {
     calls.length = 0;
