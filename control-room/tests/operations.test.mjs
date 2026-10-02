@@ -9,6 +9,7 @@ function database() {
   sqlite.exec(readFileSync(new URL('../cloudflare/migrations/0001_initial.sql', import.meta.url), 'utf8'));
   sqlite.exec(readFileSync(new URL('../cloudflare/migrations/0002_integrations.sql', import.meta.url), 'utf8'));
   sqlite.exec(readFileSync(new URL('../cloudflare/migrations/0003_ai_free_scope.sql', import.meta.url), 'utf8'));
+  sqlite.exec(readFileSync(new URL('../cloudflare/migrations/0006_publication_approvals.sql', import.meta.url), 'utf8'));
   return {
     sqlite,
     prepare(sql) {
@@ -151,6 +152,16 @@ function reorderedMenu() {
     nome: source.nome,
     id: source.id
   };
+}
+
+// Approvazione del cliente confermata e attivazione registrata (percorso di pubblicazione).
+async function approveSeeded(db, draftId, requestId) {
+  const row = db.sqlite.prepare('SELECT menu_json FROM drafts WHERE id=?').get(draftId);
+  db.sqlite.prepare(`INSERT INTO publication_approvals (id,draft_id,request_id,reference_code,snapshot_sha,status,recipient,preview_url,email_subject,email_body,
+    prepared_at,sent_at,reply_from,reply_text,reply_received_at,approved_at,approval_evidence,activation,activation_date,revision,created_at,updated_at)
+    VALUES (?,?,?,?,?,'approvata_cliente','locale@example.com','https://renmenu.pages.dev/menu/#data=x','Anteprima','Testo',?,?,'locale@example.com','Approvo',?,?,'Email del cliente: «Approvo»','prova_30_giorni','2026-10-01',1,?,?)`)
+    .run(`approval-${draftId}`, draftId, requestId, `RM-${draftId.replace(/[^A-Z2-9]/gi, '').toUpperCase().replace(/[IO01]/g, 'X').padEnd(6, 'X').slice(0, 6)}`,
+      await sha256(row.menu_json), now(), now(), now(), now(), now(), now());
 }
 
 async function insertPublication(db, {
@@ -410,6 +421,10 @@ describe('private AI + GitHub operations (fakes only)', () => {
         operationKey: 'operation-live-1', expectedBaseSha: 'main-commit-a', expectedFileSha: 'file-old'
       };
       await assert.rejects(() => runPrivateIntegrationAction(context(db), 'githubOpenPr', payload), (error) => error.status === 501);
+      await assert.rejects(() => runPrivateIntegrationAction(context(db, { GITHUB_PROVIDER: 'live', GITHUB_TOKEN: 'test-token', GITHUB_FETCH: githubFetch().fetch }), 'githubOpenPr', payload),
+        (error) => error.status === 403 && /approvazione del cliente/.test(error.message), 'senza risposta del cliente confermata nessuna PR live');
+      assert.equal(getOne(db, 'SELECT id FROM live_pr_operations WHERE draft_id=?', 'draft-pr'), null);
+      await approveSeeded(db, 'draft-pr', requestId);
       assert.equal(getOne(db, 'SELECT id FROM live_pr_operations WHERE draft_id=?', 'draft-pr'), null);
 
       const remote = githubFetch();
@@ -426,6 +441,7 @@ describe('private AI + GitHub operations (fakes only)', () => {
       const requestId2 = insertRequest(db, { id: 'request-uncertain', clientId: 'client-2', status: 'approvata', revision: 3 });
       db.sqlite.prepare('INSERT INTO drafts (id,request_id,slug,menu_json,status,checks_json,revision,created_at,updated_at) VALUES (?,?,?,?,?,?,?,?,?)')
         .run('draft-uncertain', requestId2, 'osteria-di-prova', JSON.stringify(menu()), 'pronta_pr', JSON.stringify(checks()), 2, now(), now());
+      await approveSeeded(db, 'draft-uncertain', requestId2);
       const uncertainPayload = { ...payload, draftId: 'draft-uncertain', revision: 2, requestRevision: 3, operationKey: 'operation-live-uncertain' };
       const uncertain = githubFetch({ uncertain: true });
       await assert.rejects(() => runPrivateIntegrationAction(context(db, { GITHUB_PROVIDER: 'live', GITHUB_TOKEN: 'test-token', GITHUB_FETCH: uncertain.fetch }), 'githubOpenPr', uncertainPayload));

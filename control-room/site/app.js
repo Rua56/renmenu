@@ -455,9 +455,9 @@ function checkRows(checks) {
     ['prices', 'Prezzi verificati', 'Ho confrontato ogni importo con una fonte leggibile del locale.'],
     ['allergens', 'Allergeni / omissione verificata', 'Non ho dedotto allergeni; per un’omissione serve conferma scritta esplicita del locale.'],
     ['languages', 'Lingue verificate', 'Ho verificato le lingue dichiarate e le traduzioni disponibili.'],
-    ['clientApproval', 'Consenso scritto cliente', 'Ho registrato l’approvazione scritta del contenuto.']
+    ['clientApproval', 'Consenso scritto cliente', 'Non si spunta a mano: arriva dalla risposta email del locale all’anteprima, confermata da te in Approvazioni.']
   ];
-  return rows.map(([name, title, note]) => `<label class="check-row"><input type="checkbox" name="${name}" ${checks?.[name] ? 'checked' : ''}><span><strong>${title}</strong><small>${note}</small></span></label>`).join('');
+  return rows.map(([name, title, note]) => `<label class="check-row"><input type="checkbox" name="${name}" ${checks?.[name] ? 'checked' : ''}${name === 'clientApproval' ? ' disabled' : ''}><span><strong>${title}</strong><small>${note}</small></span></label>`).join('');
 }
 
 function renderPreview() {
@@ -481,6 +481,54 @@ function renderPreview() {
     <div class="diff-list">${diff.changes.length ? diff.changes.map((change) => `<div class="diff-row"><strong>${escapeHtml(change.type.replaceAll('_', ' '))}</strong><span>${escapeHtml(change.label)}<br><code>${escapeHtml(change.before ?? '—')} → ${escapeHtml(change.after ?? '—')}</code></span></div>`).join('') : empty(previous ? 'Nessuna differenza rilevata rispetto al riferimento indicato.' : 'Salva una versione per poterla confrontare.')}</div></aside></div></div>`;
 }
 
+const ACTIVATION_LABELS = { prova_30_giorni: 'Standard: prova gratuita di 30 giorni avviata', annuale_pagato: 'Annuale: pagamento ricevuto', premium_acconto: 'Premium: acconto ricevuto' };
+const PLAN_ACTIVATION = { standard: 'prova_30_giorni', annuale: 'annuale_pagato', premium: 'premium_acconto' };
+function approvalForDraft(draft) { return (state.approvals || []).find((entry) => entry.draftId === draft?.id) || null; }
+function stepRow(number, title, done, detail, current = false) {
+  return `<div class="list-row"><div class="list-main"><strong>${number}. ${escapeHtml(title)}</strong><small>${escapeHtml(detail)}</small></div><span class="status ${done ? 'good' : current ? 'alert' : 'wait'}">${done ? 'fatto' : current ? 'da fare' : 'in attesa'}</span></div>`;
+}
+function approvalPathPanel(draft) {
+  const request = requestForDraft(draft);
+  const client = clientById(request?.clientId);
+  const approval = approvalForDraft(draft);
+  const internalDone = ['prices', 'allergens', 'languages'].every((key) => draft.checks?.[key]);
+  const usable = approval && !approval.stale && approval.status !== 'modifiche_richieste';
+  const previewDone = usable && approval.status !== 'anteprima_pronta';
+  const clientDone = Boolean(approval?.valid);
+  const isNew = request?.kind === 'nuovo';
+  const activationDone = !isNew || Boolean(approval?.activation);
+  const published = draft.status === 'pubblicazione_simulata';
+  const finalDone = ['pr_simulata', 'pubblicazione_simulata'].includes(draft.status);
+  let action = '';
+  if (!internalDone) action = `<p class="notice warning"><strong>Passaggio 1.</strong> Completa la revisione interna (prezzi, allergeni, lingue) e salvala.</p><div class="button-row spaced-top-small"><button class="button secondary" type="button" data-route="revisione">Vai alla revisione</button></div>`;
+  else if (!usable) {
+    const why = approval?.stale ? 'La bozza è cambiata dopo l’ultima anteprima: serve una nuova anteprima.' : approval?.status === 'modifiche_richieste' ? 'Il locale ha chiesto modifiche: correggi la bozza, poi prepara una nuova anteprima.' : 'Jarvis prepara il link di anteprima e il testo dell’email per il locale.';
+    action = `<p class="notice"><strong>Passaggio 2.</strong> ${escapeHtml(why)}</p><label class="field spaced-top-small">Email del locale<input id="preview-recipient" type="email" maxlength="254" value="${escapeHtml(approval?.recipient || client?.email || '')}" placeholder="email del locale"></label><div class="button-row spaced-top-small"><button class="button" type="button" data-action="prepare-preview" data-draft="${escapeHtml(draft.id)}" data-revision="${draft.revision}">Prepara anteprima ed email</button></div>`;
+  } else if (approval.status === 'anteprima_pronta') {
+    const gmail = `googlegmail://co?to=${encodeURIComponent(approval.recipient)}&subject=${encodeURIComponent(approval.emailSubject)}&body=${encodeURIComponent(approval.emailBody)}`;
+    const mail = `mailto:${encodeURIComponent(approval.recipient)}?subject=${encodeURIComponent(approval.emailSubject)}&body=${encodeURIComponent(approval.emailBody)}`;
+    action = `<p class="notice"><strong>Passaggio 2 · invia tu l’email.</strong> Usa l’account <code>renmenu1569@gmail.com</code>: la risposta del locale arriva lì e Jarvis la collega da solo grazie al riferimento <strong>${escapeHtml(approval.referenceCode)}</strong> nell’oggetto. Non modificare l’oggetto.</p><p class="muted small spaced-top-small">A: ${escapeHtml(approval.recipient)}<br>Oggetto: ${escapeHtml(approval.emailSubject)}</p><label class="field spaced-top-small">Testo dell’email<textarea readonly rows="9">${escapeHtml(approval.emailBody)}</textarea></label><div class="button-row spaced-top-small"><a class="button secondary" href="${escapeHtml(approval.previewUrl)}" target="_blank" rel="noopener">Apri anteprima</a><a class="button" href="${escapeHtml(gmail)}">Apri in Gmail</a><a class="button secondary" href="${escapeHtml(mail)}">Apri in Mail</a><button class="button secondary" type="button" data-action="copy-preview-email" data-id="${escapeHtml(approval.id)}">Copia testo</button></div><div class="button-row spaced-top-small"><button class="button" type="button" data-action="mark-preview-sent" data-id="${escapeHtml(approval.id)}" data-revision="${approval.revision}">Ho inviato l’email</button></div>`;
+  } else if (approval.status === 'anteprima_inviata') {
+    action = `<p class="notice"><strong>Passaggio 3 · in attesa del locale.</strong> Anteprima inviata a ${escapeHtml(approval.recipient)} il ${time(approval.sentAt)} (rif. ${escapeHtml(approval.referenceCode)}). Quando risponde, la risposta compare qui.</p><div class="button-row spaced-top-small"><a class="button secondary" href="${escapeHtml(approval.previewUrl)}" target="_blank" rel="noopener">Apri anteprima</a></div>`;
+  } else if (approval.status === 'risposta_ricevuta') {
+    const assessment = approval.replyAssessment || { suggestion: 'incerta', reply: approval.replyText, note: '' };
+    const tone = assessment.suggestion === 'approvazione' ? '' : 'warning';
+    action = `<p class="notice ${tone}"><strong>Passaggio 3 · risposta del locale.</strong> Da ${escapeHtml(approval.replyFrom)} · ${time(approval.replyReceivedAt)}</p><blockquote class="notice spaced-top-small">${escapeHtml(assessment.reply || '').replace(/\n/g, '<br>')}</blockquote><p class="muted small spaced-top-small">Jarvis: ${escapeHtml(assessment.note)}</p><div class="button-row spaced-top-small"><button class="button" type="button" data-action="client-reply-approve" data-id="${escapeHtml(approval.id)}" data-revision="${approval.revision}" data-suggestion="${escapeHtml(assessment.suggestion)}" ${assessment.suggestion === 'vuota' ? 'disabled' : ''}>È un’approvazione chiara</button><button class="button secondary" type="button" data-action="client-reply-changes" data-id="${escapeHtml(approval.id)}" data-revision="${approval.revision}">Chiede modifiche</button></div>`;
+  } else if (clientDone && !activationDone) {
+    const expected = PLAN_ACTIVATION[request?.plan];
+    action = expected ? `<form data-form="set-activation" class="spaced-top-small"><input type="hidden" name="id" value="${escapeHtml(approval.id)}"><input type="hidden" name="revision" value="${approval.revision}"><input type="hidden" name="activation" value="${expected}"><p class="notice"><strong>Passaggio 4 · attivazione.</strong> Menu nuovo: registra ${escapeHtml(ACTIVATION_LABELS[expected])}. Jarvis non legge Stripe: lo segni tu.</p><div class="form-grid spaced-top-small"><label class="field">Data<input type="date" name="date" required value="${new Date().toISOString().slice(0, 10)}"></label><label class="field">Nota (facoltativa)<input name="note" maxlength="300" placeholder="es. riferimento pagamento"></label></div><div class="form-actions"><button class="button" type="submit">Registra attivazione</button></div></form>` : `<p class="notice danger">Piano della pratica non definito: impostalo prima dell’attivazione.</p>`;
+  } else if (clientDone && !finalDone) action = `<p class="notice"><strong>Passaggio 5 · conferma finale.</strong> Tutto approvato: prepara la PR qui sotto.</p>`;
+  const steps = [
+    stepRow(1, 'Revisione interna', internalDone, 'Prezzi, allergeni e lingue con fonte.', !internalDone),
+    stepRow(2, 'Anteprima al locale', previewDone, approval && usable ? `Rif. ${approval.referenceCode} · ${approval.recipient}` : 'Link di anteprima ed email preparati da Jarvis, inviati da te.', internalDone && !previewDone),
+    stepRow(3, 'Approvazione del locale', clientDone, clientDone ? approval.approvalEvidence : approval?.stale && approval?.status === 'approvata_cliente' ? 'Scaduta: la bozza è cambiata dopo l’approvazione.' : 'Risposta email chiara, confermata da te.', previewDone && !clientDone),
+    isNew ? stepRow(4, 'Attivazione del servizio', activationDone, approval?.activation ? `${ACTIVATION_LABELS[approval.activation]} · ${approval.activationDate}` : 'Obbligatoria per i menu nuovi.', clientDone && !activationDone) : stepRow(4, 'Attivazione del servizio', true, 'Non richiesta: aggiornamento di un locale già attivo. Menu ID e QR restano invariati.'),
+    stepRow(5, 'Conferma finale e PR', finalDone, 'Riepilogo, frase di conferma, PR con il solo file del menu.', clientDone && activationDone && !finalDone),
+    stepRow(6, 'Pubblicazione e verifica', published, 'Ora simulata: la pubblicazione reale si abilita con il token GitHub.', draft.status === 'pr_simulata')
+  ].join('');
+  return `<section class="panel spaced-top"><p class="eyebrow">PERCORSO DI PUBBLICAZIONE</p><h2>Prima della pubblicazione reale</h2><div class="list">${steps}</div><div class="spaced-top">${action}</div></section>`;
+}
+
 function renderApprovals() {
   const draft = draftForRequest();
   if (!draft) return `<div class="view-wrap">${header('08 / CONFERME', 'Approvazioni', 'Checklist obbligatoria, PR di prova e pubblicazione simulata: nessun bypass.')}<section class="panel">${empty('Nessuna bozza selezionata.')}</section></div>`;
@@ -488,7 +536,7 @@ function renderApprovals() {
   const allChecks = reviewIssues(draft.menu, { ...draft.checks, fieldEvidence }, requestForDraft(draft)?.plan ?? null).issues.length === 0;
   const proposal = state.proposals.find((entry) => entry.draftId === draft.id);
   const readyForPublish = draft.status === 'pr_simulata' && proposal;
-  return `<div class="view-wrap">${header('08 / CONFERME', 'Approvazioni', 'La voce e i messaggi non possono saltare questi due passaggi di conferma esplicita.', `<label class="field">Pratica<select data-select-request>${requestOptions(selectedRequestId)}</select></label>`)}<div class="grid grid-2"><section class="panel"><p class="eyebrow">CHECKLIST OBBLIGATORIA</p><h2>Revisione contenuto</h2><div class="checklist">${checkRows(draft.checks)}</div>${criticalFields(draft.menu).allergensMissing.length ? `<p class="notice danger spaced-top-small"><strong>ALLERGENI NON CONFERMATI DAL LOCALE</strong><br>Nessun allergene viene inferito. L’omissione nel mock richiede conferma scritta distinta.</p>` : ""}<p class="notice ${allChecks ? '' : 'warning'} spaced-top"><strong>${allChecks ? 'Checklist ed evidenze complete.' : 'Checklist o evidenze incomplete.'}</strong> Checkbox e riferimenti controllabili per prezzi, allergeni e lingue sono tutti obbligatori.</p><div class="button-row spaced-top"><button class="button secondary" type="button" data-route="revisione">Torna alla checklist</button><button class="button" type="button" data-action="open-confirm" data-confirm-kind="pr" ${allChecks && draft.status === 'pronta_pr' ? '' : 'disabled'}>Prepara PR di prova</button></div></section><section class="panel"><p class="eyebrow">SECONDO PASSAGGIO</p><h2>Pubblicazione simulata</h2><div class="notice danger"><strong>Non pubblica nulla.</strong> Nessun menu, QR, repository o provider viene aggiornato da questa schermata.</div>${proposal ? `<div class="list-row spaced-top"><div class="list-main"><strong>PR di prova pronta</strong><small>${escapeHtml(proposal.branchName || `menu/${draft.slug}-demo`)} · ${escapeHtml(proposal.filePath || `menus/${draft.slug}.json`)}</small><small><span class="mono">${escapeHtml(proposal.id.slice(0, 8))}</span> · ${time(proposal.createdAt)}</small></div><span class="status info">mock</span></div>` : '<p class="muted">Prima completa la checklist e prepara una PR simulata.</p>'}<div class="button-row spaced-top"><button class="button danger" type="button" data-action="open-confirm" data-confirm-kind="publish" ${readyForPublish ? '' : 'disabled'}>Conferma pubblicazione simulata</button></div></section></div><section class="panel"><p class="eyebrow">STATO CORRENTE</p><h2>${escapeHtml(statusLabel(draft.status))}</h2>${draft.status === 'pubblicazione_simulata' ? '<p class="notice danger"><strong>Il menu NON è online.</strong> Questa è solo una simulazione registrata: nessun file su GitHub, nessun deploy, nessun QR reale e nessun messaggio al cliente. La pubblicazione reale non parte da qui e richiede la tua approvazione esplicita.</p>' : ''}${planWarnings(draft.menu, requestForDraft(draft)?.plan).map((warning) => `<p class="notice warning spaced-top-small"><strong>Avviso, non bloccante.</strong> ${escapeHtml(warning)}</p>`).join('')}<p class="muted">Cliente: ${escapeHtml(clientById(requestForDraft(draft)?.clientId)?.name || '—')} · File: <span class="mono">menus/${escapeHtml(draft.slug)}.json</span> · URL proposto: <span class="mono">/menu/?m=${escapeHtml(draft.slug)}</span> · nessuna pubblicazione reale.</p><p class="muted">Bozza <span class="mono">${escapeHtml(draft.slug)}</span> · revisione <span class="mono">${draft.revision}</span></p></section></div>`;
+  return `<div class="view-wrap">${header('08 / CONFERME', 'Approvazioni', 'Revisione, anteprima al locale, sua approvazione scritta, attivazione e conferma finale: nessun passaggio si salta.', `<label class="field">Pratica<select data-select-request>${requestOptions(selectedRequestId)}</select></label>`)}${approvalPathPanel(draft)}<div class="grid grid-2 spaced-top"><section class="panel"><p class="eyebrow">CHECKLIST OBBLIGATORIA</p><h2>Revisione contenuto</h2><div class="checklist">${checkRows(draft.checks)}</div>${criticalFields(draft.menu).allergensMissing.length ? `<p class="notice danger spaced-top-small"><strong>ALLERGENI NON CONFERMATI DAL LOCALE</strong><br>Nessun allergene viene inferito. L’omissione nel mock richiede conferma scritta distinta.</p>` : ""}<p class="notice ${allChecks ? '' : 'warning'} spaced-top"><strong>${allChecks ? 'Checklist ed evidenze complete.' : 'Checklist o evidenze incomplete.'}</strong> Checkbox e riferimenti controllabili per prezzi, allergeni e lingue sono tutti obbligatori.</p><div class="button-row spaced-top"><button class="button secondary" type="button" data-route="revisione">Torna alla checklist</button><button class="button" type="button" data-action="open-confirm" data-confirm-kind="pr" ${allChecks && draft.status === 'pronta_pr' ? '' : 'disabled'}>Prepara PR di prova</button></div></section><section class="panel"><p class="eyebrow">SECONDO PASSAGGIO</p><h2>Pubblicazione simulata</h2><div class="notice danger"><strong>Non pubblica nulla.</strong> Nessun menu, QR, repository o provider viene aggiornato da questa schermata.</div>${proposal ? `<div class="list-row spaced-top"><div class="list-main"><strong>PR di prova pronta</strong><small>${escapeHtml(proposal.branchName || `menu/${draft.slug}-demo`)} · ${escapeHtml(proposal.filePath || `menus/${draft.slug}.json`)}</small><small><span class="mono">${escapeHtml(proposal.id.slice(0, 8))}</span> · ${time(proposal.createdAt)}</small></div><span class="status info">mock</span></div>` : '<p class="muted">Prima completa la checklist e prepara una PR simulata.</p>'}<div class="button-row spaced-top"><button class="button danger" type="button" data-action="open-confirm" data-confirm-kind="publish" ${readyForPublish ? '' : 'disabled'}>Conferma pubblicazione simulata</button></div></section></div><section class="panel"><p class="eyebrow">STATO CORRENTE</p><h2>${escapeHtml(statusLabel(draft.status))}</h2>${draft.status === 'pubblicazione_simulata' ? '<p class="notice danger"><strong>Il menu NON è online.</strong> Questa è solo una simulazione registrata: nessun file su GitHub, nessun deploy, nessun QR reale e nessun messaggio al cliente. La pubblicazione reale non parte da qui e richiede la tua approvazione esplicita.</p>' : ''}${planWarnings(draft.menu, requestForDraft(draft)?.plan).map((warning) => `<p class="notice warning spaced-top-small"><strong>Avviso, non bloccante.</strong> ${escapeHtml(warning)}</p>`).join('')}<p class="muted">Cliente: ${escapeHtml(clientById(requestForDraft(draft)?.clientId)?.name || '—')} · File: <span class="mono">menus/${escapeHtml(draft.slug)}.json</span> · URL proposto: <span class="mono">/menu/?m=${escapeHtml(draft.slug)}</span> · nessuna pubblicazione reale.</p><p class="muted">Bozza <span class="mono">${escapeHtml(draft.slug)}</span> · revisione <span class="mono">${draft.revision}</span></p></section></div>`;
 }
 
 function ownerEmailCard() {
@@ -760,6 +808,38 @@ async function handleClick(event) {
     render();
     return;
   }
+  if (action === 'prepare-preview') {
+    const recipient = String($('#preview-recipient')?.value || '').trim();
+    await doAction('preparePreview', { draftId: trigger.dataset.draft, revision: Number(trigger.dataset.revision), ...(recipient ? { recipient } : {}) }, 'Anteprima ed email pronte: inviala da Gmail con l’account RenMenu.');
+    return;
+  }
+  if (action === 'copy-preview-email') {
+    const approval = (state.approvals || []).find((entry) => entry.id === trigger.dataset.id);
+    if (!approval) return;
+    try { await navigator.clipboard.writeText(`${approval.emailSubject}\n\n${approval.emailBody}`); toast('Oggetto e testo copiati.'); }
+    catch { toast('Copia non riuscita: seleziona il testo a mano.', 'error'); }
+    return;
+  }
+  if (action === 'mark-preview-sent') {
+    if (!window.confirm('Confermi di aver inviato l’email di anteprima al locale?')) return;
+    await doAction('markPreviewSent', { id: trigger.dataset.id, revision: Number(trigger.dataset.revision) }, 'Anteprima segnata come inviata: in attesa della risposta del locale.');
+    return;
+  }
+  if (action === 'client-reply-approve') {
+    const payload = { id: trigger.dataset.id, revision: Number(trigger.dataset.revision), decision: 'approva' };
+    if (trigger.dataset.suggestion === 'approvazione') {
+      if (!window.confirm('Registri questa risposta come approvazione scritta del locale? Vale solo per la versione attuale della bozza.')) return;
+      await doAction('decideClientReply', payload, 'Approvazione del locale registrata.');
+    } else {
+      openConfirmation({ title: 'Approvazione non esplicita', copy: 'Jarvis non riconosce un’approvazione chiara in questa risposta. Registrala solo se sei certo che il locale approva il menu così com’è; altrimenti chiedigli di rispondere «Approvo».', phrase: 'APPROVAZIONE CHIARA VERIFICATA', button: 'Registra approvazione', type: 'decideClientReply', payload: { ...payload, confirmation: 'APPROVAZIONE CHIARA VERIFICATA' }, success: 'Approvazione del locale registrata.' });
+    }
+    return;
+  }
+  if (action === 'client-reply-changes') {
+    if (!window.confirm('Il locale chiede modifiche? La bozza torna in revisione e servirà una nuova anteprima.')) return;
+    await doAction('decideClientReply', { id: trigger.dataset.id, revision: Number(trigger.dataset.revision), decision: 'modifiche' }, 'Bozza riaperta in revisione: correggi e prepara una nuova anteprima.');
+    return;
+  }
   if (action === 'translate-draft') {
     reviewEvidenceCache.delete(String(trigger.dataset.draft));
     trigger.disabled = true; trigger.textContent = 'Jarvis sta traducendo…';
@@ -809,6 +889,7 @@ async function handleSubmit(event) {
     return;
   }
   if (kind === 'update-request-meta') { await doAction('updateRequest', { id: data.get('id'), revision: Number(data.get('revision')), patch: { ...(data.get('status') ? { status: data.get('status') } : {}), plan: data.get('plan'), contactName: data.get('contactName'), contactRole: data.get('contactRole'), contactInfo: data.get('contactInfo'), menuId: data.get('menuId'), publicUrl: data.get('publicUrl'), nextStep: data.get('nextStep'), internalNotes: data.get('internalNotes') } }, 'Pratica aggiornata.'); return; }
+  if (kind === 'set-activation') { await doAction('setActivation', { id: data.get('id'), revision: Number(data.get('revision')), activation: data.get('activation'), date: data.get('date'), note: data.get('note') }, 'Attivazione registrata.'); return; }
   if (kind === 'upload-material') { const file = data.get('file'); await doUpload(selectedRequestId, file); return; }
   if (kind === 'set-material-transcript') {
     if (isDemoMode) throw new Error('La demo non salva trascrizioni o hash di materiali.');

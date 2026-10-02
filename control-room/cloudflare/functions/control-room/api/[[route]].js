@@ -7,6 +7,7 @@ import { sendOwnerNotification, OWNER_NOTIFICATION_RECIPIENT } from '../../_lib/
 import { purgePublishedEmail } from '../../_lib/email-retention.js';
 import { resolveCategory, draftBlocker, PLAN_RULES } from '../../_lib/service-rules.js';
 import { translateMenu, translationEntries, translationSummary } from '../../_lib/translate.js';
+import { ACTIVATIONS, approvalEvidence, approvalState, assessReply, previewEmail, previewUrl, referenceCode, sha256Hex } from '../../_lib/approvals.js';
 const headers = { 'Cache-Control': 'private, no-store', 'Content-Type': 'application/json; charset=utf-8' };
 const answer = (body, status = 200) => new Response(JSON.stringify(body), { status, headers });
 const failure = (status, message) => answer({ error: message }, status);
@@ -72,6 +73,20 @@ async function assertSlugFree(db, slug, requestId, clientId) {
   const owner = draft?.clientName || client?.name;
   assert(!owner, `Identificativo «${slug}» già usato da «${owner}»: un nuovo menu sovrascriverebbe quel locale. Imposta nella pratica un Menu ID diverso, poi salva e genera.`, 409);
 }
+// Fallback finché la migrazione 0006 non è applicata: nessuna approvazione registrata.
+async function approvalRows(db) {
+  try { return await rows(db, 'SELECT * FROM publication_approvals ORDER BY updated_at DESC LIMIT 500'); }
+  catch (error) { if (/no such table/i.test(String(error?.message))) return []; throw error; }
+}
+const INTERNAL_CHECKS = ['prices', 'allergens', 'languages'];
+// Revisione interna (passaggio 1): tutte le regole editoriali tranne il consenso del cliente,
+// che ha un percorso proprio (anteprima → risposta → conferma di Riccardo).
+const internalIssues = (menu, checks, plan) => reviewIssues(menu,
+  { ...checks, clientApproval: true, clientApprovalEvidence: 'Percorso di approvazione del cliente separato.' }, plan).issues;
+async function approvalFor(db, draft, requestKind) {
+  const approval = await getOne(db, 'SELECT * FROM publication_approvals WHERE draft_id=?', draft.id);
+  return { approval, ...approvalState(approval, await sha256Hex(draft.menu_json), requestKind) };
+}
 const autoTranslationReady = (env) => typeof env?.AI?.run === 'function' && String(env?.TRANSLATION_PROVIDER || 'workers_ai') !== 'disabled';
 const DRAFTS_SQL = 'SELECT id,request_id AS requestId,slug,menu_json AS menuJson,status,checks_json AS checksJson,revision,created_at AS createdAt,updated_at AS updatedAt FROM drafts ORDER BY created_at DESC LIMIT 500';
 // Fallback finche la migrazione 0005 (colonna provenance_json) non e applicata allo staging D1.
@@ -84,7 +99,7 @@ async function draftRows(db) {
 }
 const parseList = (json) => { try { const value = JSON.parse(json || '[]'); return Array.isArray(value) ? value : []; } catch { return []; } };
 export async function state(db) {
-  const [clients, requests, materials, rawDrafts, versions, notifications, messages, audit, proposals, rawAnalyses, livePrs, ownerDeliveries] = await Promise.all([
+  const [clients, requests, materials, rawDrafts, versions, notifications, messages, audit, proposals, rawAnalyses, livePrs, ownerDeliveries, rawApprovals] = await Promise.all([
     rows(db, 'SELECT id,name,email,phone,contact_name AS contactName,contact_role AS contactRole,plan,payment_status AS paymentStatus,menu_id AS menuId,menu_url AS menuUrl,internal_notes AS internalNotes,trial_ends_at AS trialEndsAt,renewal_at AS renewalAt,revision,created_at AS createdAt,updated_at AS updatedAt FROM clients ORDER BY created_at DESC LIMIT 300'),
     requestRows(db),
     rows(db, 'SELECT id,request_id AS requestId,filename,mime,size,source,processing_status AS processingStatus,text_preview AS textPreview,archived_at AS archivedAt,created_at AS createdAt FROM materials ORDER BY created_at DESC LIMIT 500'),
@@ -96,7 +111,8 @@ export async function state(db) {
     rows(db, 'SELECT id,draft_id AS draftId,revision,snapshot_sha AS snapshotSha,diff_json AS diffJson,branch_name AS branchName,file_path AS filePath,commit_message AS commitMessage,pr_body AS prBody,status,created_at AS createdAt FROM pr_proposals ORDER BY created_at DESC LIMIT 300'),
     rows(db, 'SELECT id,material_id AS materialId,request_id AS requestId,source_sha256 AS sourceSha256,source_text AS sourceText,provenance_json AS provenanceJson,warnings_json AS warningsJson,status,created_at AS createdAt FROM material_analyses ORDER BY created_at DESC LIMIT 500'),
     rows(db, 'SELECT id,draft_id AS draftId,revision,snapshot_sha AS snapshotSha,base_sha AS baseSha,branch_name AS branchName,pr_number AS prNumber,pr_url AS prUrl,status,created_at AS createdAt,updated_at AS updatedAt FROM live_pr_operations ORDER BY created_at DESC LIMIT 300'),
-    rows(db, "SELECT id,request_id AS requestId,recipient,status,provider_id AS providerId,created_at AS createdAt,updated_at AS updatedAt FROM outbound_deliveries WHERE channel='email' AND recipient='renmenu1569@gmail.com' ORDER BY created_at DESC LIMIT 300")
+    rows(db, "SELECT id,request_id AS requestId,recipient,status,provider_id AS providerId,created_at AS createdAt,updated_at AS updatedAt FROM outbound_deliveries WHERE channel='email' AND recipient='renmenu1569@gmail.com' ORDER BY created_at DESC LIMIT 300"),
+    approvalRows(db)
   ]);
   return {
     clients, requests, materials,
@@ -106,7 +122,21 @@ export async function state(db) {
     proposals: proposals.map(({ diffJson, ...p }) => ({ ...p, diff: JSON.parse(diffJson) })),
     analyses: rawAnalyses.map(({ provenanceJson, warningsJson, ...entry }) => ({ ...entry,
       provenance: JSON.parse(provenanceJson), warnings: JSON.parse(warningsJson) })),
-    livePrs, ownerDeliveries
+    livePrs, ownerDeliveries,
+    approvals: await Promise.all(rawApprovals.map(async (approval) => {
+      const draft = rawDrafts.find((entry) => entry.id === approval.draft_id);
+      const request = requests.find((entry) => entry.id === approval.request_id);
+      const current = draft ? await sha256Hex(draft.menuJson) : '';
+      const stateNow = approvalState(approval, current, request?.kind);
+      return { id: approval.id, draftId: approval.draft_id, requestId: approval.request_id, referenceCode: approval.reference_code,
+        status: approval.status, recipient: approval.recipient, previewUrl: approval.preview_url, emailSubject: approval.email_subject,
+        emailBody: approval.email_body, preparedAt: approval.prepared_at, sentAt: approval.sent_at, replyFrom: approval.reply_from,
+        replyText: approval.reply_text, replyReceivedAt: approval.reply_received_at, approvedAt: approval.approved_at,
+        approvalEvidence: approval.approval_evidence, activation: approval.activation, activationDate: approval.activation_date,
+        activationNote: approval.activation_note, revision: approval.revision, stale: stateNow.stale, valid: stateNow.valid,
+        activationMissing: stateNow.activationMissing,
+        replyAssessment: approval.reply_text ? assessReply(approval.reply_text) : null };
+    }))
   };
 }
 
@@ -268,6 +298,104 @@ async function action(db, type, input, env = {}) {
     ], 'draft.generate', `Bozza da ${extraction.extracted.length} voci attestate; ${extraction.uncertain.length} righe da verificare.`, requestId,
       { sql: 'SELECT 1 FROM drafts WHERE id=?', args: [id] });
     result = { id, extraction };
+  } else if (type === 'preparePreview') {
+    const draftId = identifier(p.draftId), revision = Number(p.revision);
+    const draft = await getOne(db, 'SELECT * FROM drafts WHERE id=?', draftId);
+    assert(draft, 'Bozza non trovata.', 404);
+    assert(revision === draft.revision, 'Bozza modificata da un’altra sessione. Ricarica.', 409);
+    assert(['bozza', 'revisione', 'pronta_pr'].includes(draft.status), 'Bozza già chiusa: apri una nuova pratica.', 409);
+    const checks = JSON.parse(draft.checks_json);
+    assert(INTERNAL_CHECKS.every((key) => checks[key]), 'Prima completa e registra la revisione interna: prezzi, allergeni e lingue.', 422);
+    const menu = JSON.parse(draft.menu_json);
+    const validation = validateMenu(menu);
+    assert(!validation.errors.length, `Correggi il menù: ${validation.errors[0]}`);
+    const planOf = (await getOne(db, 'SELECT plan FROM requests WHERE id=?', draft.request_id))?.plan ?? null;
+    const internal = internalIssues(menu, checks, planOf);
+    assert(!internal.length, internal[0], 422);
+    const request = await getOne(db, 'SELECT r.status,r.kind,c.email AS client_email FROM requests r JOIN clients c ON c.id=r.client_id WHERE r.id=?', draft.request_id);
+    assert(!['completata', 'archiviata', 'chiusa'].includes(request.status), 'Pratica chiusa.', 409);
+    const recipient = String(p.recipient || request.client_email || '').trim().toLowerCase();
+    assert(/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(recipient) && recipient.length <= 254, 'Indica l’email del locale (scheda cliente o campo destinatario).', 422);
+    assert(recipient !== OWNER_NOTIFICATION_RECIPIENT, 'Il destinatario non può essere la casella RenMenu: serve l’email del locale.', 422);
+    const sha = await sha256Hex(draft.menu_json);
+    const existing = await getOne(db, 'SELECT * FROM publication_approvals WHERE draft_id=?', draftId);
+    assert(!(existing?.status === 'approvata_cliente' && existing.snapshot_sha === sha), 'Il cliente ha già approvato questa versione: non serve una nuova anteprima.', 409);
+    const code = referenceCode(), url = previewUrl(menu, 'it'), email = previewEmail({ menu, code, url }), stamp = now();
+    const write = existing
+      ? db.prepare(`UPDATE publication_approvals SET reference_code=?,snapshot_sha=?,status='anteprima_pronta',recipient=?,preview_url=?,email_subject=?,email_body=?,prepared_at=?,
+          sent_at=NULL,reply_message_id=NULL,reply_from=NULL,reply_text=NULL,reply_received_at=NULL,approved_at=NULL,approval_evidence=NULL,revision=revision+1,updated_at=? WHERE id=? AND revision=?`)
+        .bind(code, sha, recipient, url, email.subject, email.body, stamp, stamp, existing.id, existing.revision)
+      : db.prepare(`INSERT INTO publication_approvals (id,draft_id,request_id,reference_code,snapshot_sha,status,recipient,preview_url,email_subject,email_body,prepared_at,revision,created_at,updated_at)
+          VALUES (?,?,?,?,?,'anteprima_pronta',?,?,?,?,?,1,?,?)`)
+        .bind(uid(), draftId, draft.request_id, code, sha, recipient, url, email.subject, email.body, stamp, stamp, stamp);
+    const saved = await auditedBatch(db, [write], 'approval.preview', `Anteprima per il cliente preparata (rif. ${code}); email da inviare da Gmail.`, draft.request_id,
+      { sql: 'SELECT 1 FROM publication_approvals WHERE reference_code=?', args: [code] });
+    assert(saved[0].meta.changes === 1, 'Approvazione modificata da un’altra sessione. Ricarica.', 409);
+    result = { referenceCode: code, previewUrl: url, subject: email.subject, body: email.body, recipient };
+  } else if (type === 'markPreviewSent') {
+    const id = identifier(p.id), revision = Number(p.revision);
+    const approval = await getOne(db, 'SELECT * FROM publication_approvals WHERE id=?', id);
+    assert(approval && approval.revision === revision, 'Anteprima modificata. Ricarica.', 409);
+    assert(approval.status === 'anteprima_pronta', 'Anteprima già segnata come inviata o superata.', 409);
+    const draft = await getOne(db, 'SELECT menu_json FROM drafts WHERE id=?', approval.draft_id);
+    assert(approval.snapshot_sha === await sha256Hex(draft.menu_json), 'La bozza è cambiata dopo l’anteprima: preparane una nuova prima di inviarla.', 409);
+    const stamp = now();
+    await auditedBatch(db, [db.prepare("UPDATE publication_approvals SET status='anteprima_inviata',sent_at=?,revision=revision+1,updated_at=? WHERE id=? AND revision=? AND status='anteprima_pronta'").bind(stamp, stamp, id, revision)],
+      'approval.sent', `Anteprima rif. ${approval.reference_code} inviata da Riccardo; in attesa della risposta del locale.`, approval.request_id,
+      { sql: "SELECT 1 FROM publication_approvals WHERE id=? AND status='anteprima_inviata'", args: [id] });
+    result = { id };
+  } else if (type === 'decideClientReply') {
+    const id = identifier(p.id), revision = Number(p.revision);
+    assert(['approva', 'modifiche'].includes(p.decision), 'Decisione non valida.');
+    const approval = await getOne(db, 'SELECT * FROM publication_approvals WHERE id=?', id);
+    assert(approval && approval.revision === revision, 'Approvazione modificata. Ricarica.', 409);
+    assert(approval.status === 'risposta_ricevuta', 'Nessuna risposta del cliente da valutare.', 409);
+    const draft = await getOne(db, 'SELECT * FROM drafts WHERE id=?', approval.draft_id);
+    const request = await getOne(db, 'SELECT revision,plan,kind FROM requests WHERE id=?', approval.request_id);
+    const checks = JSON.parse(draft.checks_json), stamp = now();
+    if (p.decision === 'approva') {
+      assert(approval.snapshot_sha === await sha256Hex(draft.menu_json), 'La bozza è cambiata dopo l’anteprima: l’approvazione non vale per questa versione.', 409);
+      const assessment = assessReply(approval.reply_text);
+      assert(assessment.suggestion !== 'vuota', assessment.note, 422);
+      if (assessment.suggestion !== 'approvazione')
+        assert(p.confirmation === 'APPROVAZIONE CHIARA VERIFICATA', 'La risposta non sembra un’approvazione esplicita: rileggila; se lo è davvero, conferma con la frase richiesta.', 403);
+      const evidence = approvalEvidence(approval);
+      const nextChecks = { ...checks, clientApproval: true, clientApprovalEvidence: evidence };
+      const ready = INTERNAL_CHECKS.every((key) => nextChecks[key]) && !reviewIssues(JSON.parse(draft.menu_json), nextChecks, request.plan).issues.length;
+      const changed = await auditedBatch(db, [
+        db.prepare("UPDATE publication_approvals SET status='approvata_cliente',approved_at=?,approval_evidence=?,revision=revision+1,updated_at=? WHERE id=? AND revision=? AND status='risposta_ricevuta'").bind(stamp, evidence, stamp, id, revision),
+        db.prepare('UPDATE drafts SET checks_json=?,status=?,revision=revision+1,updated_at=? WHERE id=? AND revision=?').bind(JSON.stringify(nextChecks), ready ? 'pronta_pr' : draft.status === 'pronta_pr' ? 'pronta_pr' : 'revisione', stamp, draft.id, draft.revision),
+        db.prepare('UPDATE requests SET status=?,revision=revision+1,updated_at=? WHERE id=? AND revision=?').bind(ready ? 'approvata' : 'in_revisione', stamp, approval.request_id, request.revision)
+      ], 'approval.client', `Approvazione del cliente registrata da Riccardo (rif. ${approval.reference_code}).`, approval.request_id,
+        { sql: "SELECT 1 FROM publication_approvals WHERE id=? AND status='approvata_cliente'", args: [id] });
+      assert(changed.every((entry) => entry.meta.changes === 1), 'Bozza o pratica modificata da un’altra sessione. Ricarica.', 409);
+      result = { id, ready };
+    } else {
+      const nextChecks = { ...checks, clientApproval: false, clientApprovalEvidence: '' };
+      const changed = await auditedBatch(db, [
+        db.prepare("UPDATE publication_approvals SET status='modifiche_richieste',revision=revision+1,updated_at=? WHERE id=? AND revision=? AND status='risposta_ricevuta'").bind(stamp, id, revision),
+        db.prepare("UPDATE drafts SET checks_json=?,status=CASE WHEN status='pronta_pr' THEN 'revisione' ELSE status END,revision=revision+1,updated_at=? WHERE id=? AND revision=?").bind(JSON.stringify(nextChecks), stamp, draft.id, draft.revision),
+        db.prepare("UPDATE requests SET status='in_revisione',revision=revision+1,updated_at=? WHERE id=? AND revision=?").bind(stamp, approval.request_id, request.revision)
+      ], 'approval.changes', `Il cliente chiede modifiche (rif. ${approval.reference_code}): bozza riaperta in revisione.`, approval.request_id,
+        { sql: "SELECT 1 FROM publication_approvals WHERE id=? AND status='modifiche_richieste'", args: [id] });
+      assert(changed.every((entry) => entry.meta.changes === 1), 'Bozza o pratica modificata da un’altra sessione. Ricarica.', 409);
+      result = { id, ready: false };
+    }
+  } else if (type === 'setActivation') {
+    const id = identifier(p.id), revision = Number(p.revision);
+    const approval = await getOne(db, 'SELECT * FROM publication_approvals WHERE id=?', id);
+    assert(approval && approval.revision === revision, 'Approvazione modificata. Ricarica.', 409);
+    const request = await getOne(db, 'SELECT plan FROM requests WHERE id=?', approval.request_id);
+    const expected = { standard: 'prova_30_giorni', annuale: 'annuale_pagato', premium: 'premium_acconto' }[request.plan];
+    assert(expected && p.activation === expected, `Attivazione non coerente con il piano della pratica (${request.plan}).`, 422);
+    const date = String(p.date || '');
+    assert(/^\d{4}-\d{2}-\d{2}$/.test(date) && Number.isFinite(Date.parse(date)), 'Data di attivazione non valida.', 422);
+    const note = optional(p.note, 300, 'Nota attivazione') || null, stamp = now();
+    await auditedBatch(db, [db.prepare('UPDATE publication_approvals SET activation=?,activation_date=?,activation_note=?,activation_at=?,revision=revision+1,updated_at=? WHERE id=? AND revision=?')
+      .bind(expected, date, note, stamp, stamp, id, revision)],
+      'approval.activation', `Attivazione registrata da Riccardo: ${ACTIVATIONS[expected]} (${date}).`, approval.request_id,
+      { sql: 'SELECT 1 FROM publication_approvals WHERE id=? AND activation=?', args: [id, expected] });
+    result = { id };
   } else if (type === 'translateDraft') {
     // Completa le voci ancora senza inglese. Non tocca prezzi/allergeni né i testi EN già presenti;
     // la checklist si azzera perché i contenuti cambiano.
@@ -335,7 +463,12 @@ async function action(db, type, input, env = {}) {
     const selections = p.checks;
     assert(selections && typeof selections === 'object' && ['prices', 'allergens', 'languages', 'clientApproval'].every((key) => typeof selections[key] === 'boolean'), 'Conferme incomplete.');
     const checks = Object.fromEntries(['prices', 'allergens', 'languages', 'clientApproval'].map((key) => [key, selections[key]]));
-    checks.clientApprovalEvidence = checks.clientApproval ? clean(p.approvalEvidence, 500, 'Riferimento approvazione scritta') : '';
+    // Il consenso del cliente non si spunta a mano: arriva solo dalla sua risposta email
+    // confermata da Riccardo (publication_approvals) e vale per il contenuto attuale.
+    const linkedKind = (await getOne(db, 'SELECT kind FROM requests WHERE id=?', draft.request_id))?.kind;
+    const clientGate = await approvalFor(db, draft, linkedKind);
+    checks.clientApproval = clientGate.valid;
+    checks.clientApprovalEvidence = clientGate.valid ? clientGate.approval.approval_evidence : '';
     checks.fieldEvidence = Object.fromEntries(['prices', 'allergens', 'languages'].map((key) => [key,
       checks[key] ? clean(p.fieldEvidence?.[key], 500, EVIDENCE_LABELS[key]) : '']));
     checks.allergenOmissionConfirmed = checks.allergens && p.allergenOmissionConfirmed === true;
@@ -345,6 +478,10 @@ async function action(db, type, input, env = {}) {
     const request = await getOne(db, 'SELECT revision,plan FROM requests WHERE id=?', draft.request_id);
     const validation = validateMenu(JSON.parse(draft.menu_json));
     assert(!validation.errors.length, `Correggi il menù: ${validation.errors[0]}`);
+    if (INTERNAL_CHECKS.every((key) => checks[key])) {
+      const internal = internalIssues(JSON.parse(draft.menu_json), checks, request.plan);
+      assert(!internal.length, internal[0], 422);
+    }
     const ready = ['prices', 'allergens', 'languages', 'clientApproval'].every((key) => checks[key]);
     if (ready) {
       const review = reviewIssues(JSON.parse(draft.menu_json), checks, request.plan);
@@ -372,6 +509,10 @@ async function action(db, type, input, env = {}) {
     const planRow = await getOne(db, 'SELECT plan FROM requests WHERE id=?', draft.request_id);
     assert(!reviewIssues(JSON.parse(draft.menu_json), checks, planRow?.plan ?? null).issues.length,
       'Conferme o fonti editoriali mancanti: torna alla checklist.', 403);
+    const prKind = (await getOne(db, 'SELECT kind FROM requests WHERE id=?', draft.request_id))?.kind;
+    const prGate = await approvalFor(db, draft, prKind);
+    assert(prGate.valid, prGate.stale ? 'La bozza è cambiata dopo l’approvazione del cliente: prepara e invia una nuova anteprima.' : 'Manca l’approvazione del cliente: invia l’anteprima e registra la sua risposta.', 403);
+    assert(!prGate.activationMissing, 'Menu nuovo: registra prima l’attivazione del servizio (prova, annuale o acconto Premium).', 403);
     const digest = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(draft.menu_json));
     const snapshotSha = [...new Uint8Array(digest)].map((byte) => byte.toString(16).padStart(2, '0')).join('');
     const proposalId = uid();

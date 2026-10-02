@@ -2,6 +2,7 @@ import assert from 'node:assert/strict';
 import { after, describe, it } from 'node:test';
 import { readFileSync } from 'node:fs';
 import { DatabaseSync } from 'node:sqlite';
+import { approveByClient } from './helpers/client-approval.mjs';
 import { onRequest } from '../cloudflare/functions/control-room/api/[[route]].js';
 import { extractMenuFromText, validateMenu } from '../cloudflare/functions/_lib/menu.js';
 import { validateMenu as validateEditor } from '../site/model.js';
@@ -32,6 +33,7 @@ function database() {
   sqlite.exec(readFileSync(new URL('../cloudflare/migrations/0003_ai_free_scope.sql', import.meta.url), 'utf8'));
   sqlite.exec(readFileSync(new URL('../cloudflare/migrations/0004_request_category.sql', import.meta.url), 'utf8'));
   sqlite.exec(readFileSync(new URL('../cloudflare/migrations/0005_draft_provenance.sql', import.meta.url), 'utf8'));
+  sqlite.exec(readFileSync(new URL('../cloudflare/migrations/0006_publication_approvals.sql', import.meta.url), 'utf8'));
   return {
     prepare(sql) {
       return { bind(...params) {
@@ -186,12 +188,19 @@ describe('Control Room API staging', () => {
       assert.equal(noAllergenEvidence.status, 422);
       const review = await action(db, 'reviewDraft', { id: draft.id, revision: draft.revision, checks: { prices: true, allergens: true, languages: true, clientApproval: true }, approvalEvidence: 'Email conferma cliente del 01/10/2026', ...documentedReview });
       assert.equal(review.status, 200);
-      assert.equal(review.body.result.ready, true);
-      assert.equal(review.body.state.requests.find((item) => item.id === requestId).status, 'approvata');
-      assert.equal((await action(db, 'updateRequest', { id: requestId, revision: review.body.state.requests.find((item) => item.id === requestId).revision, patch: { status: 'pronta_pubblicazione' } })).status, 409);
-      const missingPhrase = await action(db, 'preparePr', { id: draft.id, revision: review.body.state.drafts[0].revision });
+      // Il consenso del cliente non si spunta a mano: senza risposta registrata la bozza non è pronta.
+      assert.equal(review.body.result.ready, false);
+      assert.equal(review.body.state.drafts[0].checks.clientApproval, false);
+      const noApproval = await action(db, 'preparePr', { id: draft.id, revision: review.body.state.drafts[0].revision, confirmation: 'CONFERMO PR DI PROVA' });
+      assert.equal(noApproval.status, 409);
+      const approved = await approveByClient(action, db, draft.id);
+      assert.equal(approved.ready, true);
+      assert.match(approved.draft.checks.clientApprovalEvidence, /Approvo/);
+      assert.equal(approved.response.body.state.requests.find((item) => item.id === requestId).status, 'approvata');
+      assert.equal((await action(db, 'updateRequest', { id: requestId, revision: approved.response.body.state.requests.find((item) => item.id === requestId).revision, patch: { status: 'pronta_pubblicazione' } })).status, 409);
+      const missingPhrase = await action(db, 'preparePr', { id: draft.id, revision: approved.draft.revision });
       assert.equal(missingPhrase.status, 403);
-      const proposal = await action(db, 'preparePr', { id: draft.id, revision: review.body.state.drafts[0].revision, confirmation: 'CONFERMO PR DI PROVA' });
+      const proposal = await action(db, 'preparePr', { id: draft.id, revision: approved.draft.revision, confirmation: 'CONFERMO PR DI PROVA' });
       assert.equal(proposal.status, 200);
       assert.equal(proposal.body.result.simulated, true);
       assert.equal(proposal.body.state.proposals[0].status, 'mock');
@@ -240,7 +249,9 @@ describe('Control Room API staging', () => {
       const changedSlug = structuredClone(draft.menu); changedSlug.id = 'qr-diverso';
       assert.equal((await action(db, 'saveDraft', { id: draft.id, revision: draft.revision, slug: changedSlug.id, menu: changedSlug })).status, 422);
       const review = await action(db, 'reviewDraft', { id: draft.id, revision: draft.revision, checks: { prices: true, allergens: true, languages: true, clientApproval: true }, approvalEvidence: 'Email demo cliente: revisione approvata', ...documentedReview });
-      assert.equal(review.body.state.drafts.find((item) => item.id === draft.id).status, 'pronta_pr');
+      assert.equal(review.status, 200);
+      const approvedUpdate = await approveByClient(action, db, draft.id);
+      assert.equal(approvedUpdate.draft.status, 'pronta_pr');
       const form = new FormData();
       form.set('requestId', requestId);
       form.set('file', new File(['%PDF-1.4\naltro listino di prova'], 'aggiornamento-demo.pdf', { type: 'application/pdf' }));

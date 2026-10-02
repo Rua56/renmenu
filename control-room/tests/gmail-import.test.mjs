@@ -2,11 +2,12 @@ import assert from 'node:assert/strict';
 import { describe, it } from 'node:test';
 import { readFileSync } from 'node:fs';
 import { DatabaseSync } from 'node:sqlite';
-import { buildImportBatch, VERIFY_SQL, DATABASE_ID } from '../staging/gmail-import.mjs';
+import { buildImportBatch, buildReplyBatch, replyReference, APPROVAL_SQL, VERIFY_SQL, DATABASE_ID } from '../staging/gmail-import.mjs';
+import { assessReply } from '../cloudflare/functions/_lib/approvals.js';
 
 function database() {
   const sqlite = new DatabaseSync(':memory:');
-  for (const name of ['0001_initial.sql', '0002_integrations.sql', '0003_ai_free_scope.sql', '0004_request_category.sql', '0005_draft_provenance.sql'])
+  for (const name of ['0001_initial.sql', '0002_integrations.sql', '0003_ai_free_scope.sql', '0004_request_category.sql', '0005_draft_provenance.sql', '0006_publication_approvals.sql'])
     sqlite.exec(readFileSync(new URL(`../cloudflare/migrations/${name}`, import.meta.url), 'utf8'));
   return sqlite;
 }
@@ -47,5 +48,29 @@ describe('Import automatico Gmail → D1 staging', () => {
     assert.equal(buildImportBatch({ ...base, to: 'iuran56@gmail.com' }).error, 'NOT_BUSINESS_INBOX');
     assert.equal(buildImportBatch({ ...base, messageId: 'a b' }).error, 'INVALID_MESSAGE_ID');
     assert.equal(buildImportBatch({ ...base, relevant: 'si' }).error, 'INVALID_INPUT');
+  });
+  it('collega la risposta all’anteprima senza creare pratiche, solo dal destinatario giusto', () => {
+    const db = database();
+    run(db, buildImportBatch(base));
+    db.prepare(`INSERT INTO drafts (id,request_id,slug,menu_json,status,checks_json,revision,created_at,updated_at) VALUES ('d1','gmail-request-1a0fcabc123','osteria-prova','{}','revisione','{}',1,'x','x')`).run();
+    db.prepare(`INSERT INTO publication_approvals (id,draft_id,request_id,reference_code,snapshot_sha,status,recipient,preview_url,email_subject,email_body,prepared_at,revision,created_at,updated_at)
+      VALUES ('a1','d1','gmail-request-1a0fcabc123','RM-ABC234','sha','anteprima_inviata','cliente@example.com','u','s','b','x',1,'x','x')`).run();
+    const reply = { ...base, messageId: 'reply1', subject: 'Re: Anteprima del vostro menu digitale RenMenu · rif. RM-ABC234', text: 'Approvo, grazie.\n\nIl giorno 2 ott RenMenu ha scritto:\n> ...', relevant: false };
+    assert.equal(replyReference(reply), 'RM-ABC234');
+    const approval = db.prepare(APPROVAL_SQL).get('RM-ABC234');
+    assert.equal(buildReplyBatch({ ...reply, from: 'altro@example.com' }, approval).error, 'REPLY_SENDER_MISMATCH');
+    const plan = buildReplyBatch(reply, approval);
+    run(db, plan); run(db, buildReplyBatch(reply, approval));
+    assert.deepEqual({ ...db.prepare(VERIFY_SQL).get('gmail', 'reply1') }, { status: 'imported', request_id: 'gmail-request-1a0fcabc123' });
+    const row = db.prepare('SELECT status,reply_from,reply_text FROM publication_approvals').get();
+    assert.equal(row.status, 'risposta_ricevuta', 'resta da confermare a Riccardo');
+    assert.equal(row.reply_from, 'cliente@example.com');
+    assert.equal(assessReply(row.reply_text).suggestion, 'approvazione');
+    assert.equal(db.prepare('SELECT COUNT(*) AS n FROM requests').get().n, 1, 'nessuna nuova pratica');
+    const partial = buildReplyBatch({ ...reply, messageId: 'reply2', bodyComplete: false }, { ...approval, status: 'risposta_ricevuta' });
+    run(db, partial);
+    assert.equal(assessReply(db.prepare('SELECT reply_text FROM publication_approvals').get().reply_text).suggestion, 'incerta');
+    db.prepare("UPDATE publication_approvals SET status='approvata_cliente'").run();
+    assert.equal(buildReplyBatch({ ...reply, messageId: 'reply3' }, db.prepare(APPROVAL_SQL).get('RM-ABC234')).error, 'REPLY_NOT_EXPECTED');
   });
 });

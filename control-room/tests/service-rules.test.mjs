@@ -7,6 +7,7 @@ import * as serverRules from '../cloudflare/functions/_lib/service-rules.js';
 import * as siteRules from '../site/service-rules.js';
 import { reviewIssues as serverReview } from '../cloudflare/functions/_lib/editorial.js';
 import { reviewIssues as demoReview } from '../site/editorial.js';
+import { approveByClient } from './helpers/client-approval.mjs';
 
 const domain = 'https://team-api-test.cloudflareaccess.com';
 const accessEnv = { TEAM_DOMAIN: domain, POLICY_AUD: 'api-test-owner-only', OWNER_EMAIL: 'renmenu1569@gmail.com' };
@@ -33,6 +34,7 @@ function database({ withCategory = true } = {}) {
   sqlite.exec(readFileSync(new URL('../cloudflare/migrations/0003_ai_free_scope.sql', import.meta.url), 'utf8'));
   if (withCategory) sqlite.exec(readFileSync(new URL('../cloudflare/migrations/0004_request_category.sql', import.meta.url), 'utf8'));
   sqlite.exec(readFileSync(new URL('../cloudflare/migrations/0005_draft_provenance.sql', import.meta.url), 'utf8'));
+  sqlite.exec(readFileSync(new URL('../cloudflare/migrations/0006_publication_approvals.sql', import.meta.url), 'utf8'));
   return {
     prepare(sql) {
       return { bind(...params) {
@@ -169,8 +171,11 @@ describe('Regole di servizio nella API staging', () => {
       assert.match(missing.body.error, /approvazione creativa/);
       const approved = await action(db, 'reviewDraft', { ...base, creativeApproval: true, creativeApprovalEvidence: 'Proposta grafica v1 approvata da Riccardo.' });
       assert.equal(approved.status, 200);
-      assert.equal(approved.body.result.ready, true);
+      assert.equal(approved.body.result.ready, false, 'il consenso del cliente arriva solo dalla sua risposta');
       assert.equal(approved.body.state.drafts[0].checks.creativeApproval, true);
+      const client = await approveByClient(action, db, draft.id);
+      assert.equal(client.ready, true);
+      assert.equal(client.approval.activation, 'premium_acconto');
     } finally { db.close(); }
   });
   it('Standard: rifiuta una terza lingua alla revisione', async () => {
