@@ -108,10 +108,24 @@ export function validateMenu(menu) {
 
 // Riga esplicita "Locale: …" / "Ristorante: …" a inizio riga. Non deduce nomi dalla prosa.
 export const VENUE_LINE = /^(?:locale|ristorante)\s*:\s*(.{2,140}?)\s*$/i;
+// Come scrivono davvero i clienti: "Nome del locale: X", "Pizzeria: X", "Il locale si chiama X",
+// "Il nome del ristorante è X". Solo righe dedicate o frasi esplicite: mai un nome dedotto.
+const VENUE_KIND = '(?:locale|ristorante|pizzeria|trattoria|osteria|agriturismo|bar|caff[eè]|pub|bistrot|attivit[aà])';
+const VENUE_LABEL = new RegExp(`^(?:(?:il\\s+)?nome\\s+(?:del(?:l['’])?\\s*|della\\s+|dell['’]\\s*)?)?(?:nostr[oa]\\s+)?${VENUE_KIND}\\s*[:–—]\\s*(.{2,140}?)\\s*$`, 'i');
+const VENUE_SENTENCE = new RegExp(`(?:^|[.!;,]\\s*)(?:il\\s+|la\\s+)?(?:(?:nome\\s+(?:del(?:l['’])?\\s*|della\\s+)?(?:nostr[oa]\\s+)?${VENUE_KIND}\\s+(?:[eè]|sar[aà])\\s*:?)|(?:(?:nostr[oa]\\s+)?${VENUE_KIND}\\s+si\\s+chiama))\\s+[«"“]?([^«»"“”.!?;\\n]{2,80}?)[»"”]?\\s*(?:[.!?;]|$)`, 'i');
+const VENUE_QUOTED = new RegExp(`${VENUE_KIND}\\s+(?:si\\s+chiama|[eè])\\s+[«"“]([^«»"“”\\n]{2,80})[»"”]`, 'i');
+const venueOk = (value) => /\p{L}/u.test(value) && !/\d{1,4}(?:[,.]\d{1,2})?\s*€?$/.test(value);
 export function venueFromSource(source) {
-  for (const line of String(source || '').split(/\r?\n/)) {
-    const match = line.trim().match(VENUE_LINE);
-    if (match) return match[1].trim();
+  const rows = String(source || '').split(/\r?\n/).map((line) => line.trim().replace(/^[-•*]\s*/, ''));
+  for (const line of rows) {
+    const match = line.match(VENUE_LINE) || line.match(VENUE_LABEL);
+    if (match && venueOk(match[1])) return match[1].trim().replace(/[.!;,]+$/, '').replace(/^[«"“]|[»"”]$/g, '').trim();
+  }
+  for (const line of rows) {
+    const quoted = line.match(VENUE_QUOTED);
+    if (quoted && venueOk(quoted[1])) return quoted[1].trim();
+    const match = line.match(VENUE_SENTENCE);
+    if (match && venueOk(match[1])) return match[1].trim();
   }
   return '';
 }
