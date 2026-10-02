@@ -82,8 +82,10 @@ export function suggestedEvidence(draft, request) {
   if (draft?.provenance?.length && items.length && items.every((item) => !Array.isArray(item.allergeni) || !item.allergeni.length))
     result.allergens = `${origin}: il testo ricevuto non indica allergeni.`.slice(0, 500);
   const languages = Array.isArray(menu.lingue) && menu.lingue.length ? menu.lingue : ['it'];
+  const autoEnglish = (draft?.provenance || []).filter((entry) => String(entry.path).endsWith('.en')).length;
   result.languages = (languages.includes('en')
-    ? 'Testo ricevuto in italiano; inglese presente nella bozza: traduzione da far approvare al locale.'
+    ? (autoEnglish ? `Testo ricevuto in italiano; inglese preparato in automatico da Jarvis come bozza (${autoEnglish} testi), rivisto prima della conferma.`
+      : 'Testo ricevuto in italiano; inglese presente nella bozza: traduzione da far approvare al locale.')
     : 'Testo ricevuto in italiano. Inglese non fornito: traduzione da preparare come bozza.');
   return result;
 }

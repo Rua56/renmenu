@@ -172,6 +172,8 @@ export async function performDemoAction(type, payload = {}) {
       result = { draft: clone(draft), extraction };
       break;
     }
+    case 'translateDraft':
+      throw actionError('Traduzione automatica disponibile solo nello staging privato.', 501);
     case 'saveDraft': {
       const draft = find(state.drafts, payload.id, 'Bozza');
       requireRevision(draft, payload.revision);
