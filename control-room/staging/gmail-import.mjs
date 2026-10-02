@@ -134,6 +134,28 @@ function d1(sql, params) {
   return response.result?.[0];
 }
 
+// Testo per la notifica a Riccardo: cosa Jarvis ha capito e cosa preparerà all'apertura della
+// Control Room. Usa le stesse funzioni pure del server; se lo script gira da solo (senza il
+// resto del repository) la notifica resta quella standard.
+export async function jarvisNote(event, plan, row) {
+  try {
+    const lib = (path) => import(new URL(`../cloudflare/functions/_lib/${path}`, import.meta.url).href);
+    if (plan.kind === 'client_reply') {
+      const { assessReply } = await lib('approvals.js');
+      const verdict = assessReply(String(event.text || '')).suggestion;
+      return { jarvis: verdict === 'approvazione' ? 'Riccardo, il locale sembra approvare: conferma tu in Approvazioni.'
+        : verdict === 'modifiche' ? 'Riccardo, il locale chiede modifiche: ti preparo le correzioni in Approvazioni.'
+          : 'Riccardo, risposta del locale da leggere: decidi tu in Approvazioni.' };
+    }
+    if (row?.status !== 'imported' || !event.relevant) return {};
+    const { autopilotMessage, autopilotPreview } = await lib('autopilot.js');
+    const source = `Oggetto ricevuto: ${event.subject}\n\n${event.text}`;
+    const preview = autopilotPreview({ subject: event.subject, source_text: source });
+    const message = autopilotMessage(event.subject, preview);
+    return { jarvis: preview.action === 'bozza' ? message.replace('bozza pronta per', 'all’apertura della Control Room preparo la bozza per').replace(' Apri Revisione per controllarla.', '') : message };
+  } catch { return {}; }
+}
+
 async function main(file) {
   const event = JSON.parse(readFileSync(file, 'utf8'));
   // Una risposta a un'anteprima si collega all'approvazione solo se il riferimento esiste e il
@@ -149,7 +171,8 @@ async function main(file) {
   const ok = row?.status === plan.expectedStatus && (plan.ids.requestId === null || row?.request_id === plan.ids.requestId);
   // Un evento già registrato prima (stesso ID) è un duplicato: nessuna nuova pratica.
   console.log(JSON.stringify({ ok, messageId: event.messageId, requestId: row?.request_id || null, status: row?.status || 'unverified', expected: plan.expectedStatus,
-    kind: plan.kind || 'request', ...(reference ? { reference, replyLinked: plan.kind === 'client_reply', replyIssue: reply?.error || null } : {}) }));
+    kind: plan.kind || 'request', ...(reference ? { reference, replyLinked: plan.kind === 'client_reply', replyIssue: reply?.error || null } : {}),
+    ...(ok ? await jarvisNote(event, plan, row) : {}) }));
   process.exit(ok ? 0 : 1);
 }
 

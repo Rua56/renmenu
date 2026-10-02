@@ -1,0 +1,96 @@
+// Autopilota di Jarvis (2026-10-02): appena arriva una richiesta email, Jarvis la classifica
+// e, se il locale ha scritto in modo esplicito nome e piano di un nuovo menu, prepara da solo
+// la bozza (con l'inglese). Le regole restano quelle di docs/renmenu-service-rules.md:
+// la classificazione è una PROPOSTA con la riga di provenienza, Riccardo la conferma; nessun
+// messaggio al cliente, nessuna PR, nessuna pubblicazione.
+import { extractMenuFromText, venueFromSource } from './menu.js';
+import { proposeSourceExtras } from './extras.js';
+import { categoryByCode } from './service-rules.js';
+
+const plain = (value) => String(value || '').toLocaleLowerCase('it-IT').normalize('NFD').replace(/[\u0300-\u036f]/g, '');
+const RECEIVED_SUBJECT = /^Oggetto ricevuto:\s*/i;
+
+const PLAN_PATTERNS = [
+  ['standard', /\b(?:piano |menu |menù |formula )?standard\b/],
+  ['annuale', /\b(?:piano |formula |abbonamento )?annual[ei]\b/],
+  ['premium', /\bpremium\b|\bsu misura\b/]
+];
+const NEW_MENU = /\bnuovo menu\b|\bmenu nuovo\b|\bmenu digitale\b|\b(?:attivare|creare|fare|realizzare|vorrei|vorremmo)\b[^.\n]{0,40}\bmenu\b|\bprova gratuita\b/;
+const UPDATE_RULES = [
+  ['prezzo', /\b(?:cambi\w*|aggiorn\w*|modific\w*|alz\w*|abbass\w*)\b[^.\n]{0,40}\bprezz\w*|\bprezz\w*\b[^.\n]{0,30}\b(?:diventa|passa|ora|nuovo)\b/],
+  ['vini_cocktail', /\b(?:vin[io]|cocktail|carta dei vini|calice|bottiglia)\b[^.\n]{0,60}\b(?:aggiung\w*|togli\w*|rimuov\w*|cambi\w*|aggiorn\w*)|\b(?:aggiung\w*|togli\w*|rimuov\w*|cambi\w*|aggiorn\w*)\b[^.\n]{0,40}\b(?:vin[io]|cocktail|carta dei vini)\b/],
+  ['disponibilita', /\besaurit\w*|\bnon (?:e |è )?(?:piu )?disponibil\w*|\bpiatto del giorno\b|\bfuori menu\b/],
+  ['piatto', /\b(?:aggiung\w*|togli\w*|rimuov\w*|elimin\w*|inserit\w*)\b[^.\n]{0,40}\b(?:piatt\w*|menu|voce|antipast\w*|prim\w|second\w|dolc\w)/],
+  ['lingua', /\b(?:inglese|tedesco|francese|spagnolo|sloveno|traduzion\w*|lingu\w*)\b/],
+  ['qr_cartello', /\bqr\b|\bcartell\w*|\badesiv\w*|\bsegnaposto\b/],
+  ['commerciale', /\bquanto costa\b|\bpreventivo\b|\binformazioni sul servizio\b|\bprezz\w* del servizio\b/]
+];
+
+function lines(subject, text) {
+  const body = String(text || '').split(/\r?\n/).map((line, index) => ({ line: index + 1, text: line.trim() }))
+    .filter((row) => row.text && !RECEIVED_SUBJECT.test(row.text));
+  return [{ line: 0, text: String(subject || '').trim() }, ...body].filter((row) => row.text);
+}
+
+/** Proposta di categoria e piano, con le righe che la giustificano (riga 0 = oggetto). */
+export function classifyRequest(subject, text) {
+  const rows = lines(subject, text);
+  const plans = new Map();
+  for (const row of rows) for (const [plan, pattern] of PLAN_PATTERNS) if (pattern.test(plain(row.text)) && !plans.has(plan)) plans.set(plan, row);
+  const newMenu = rows.find((row) => NEW_MENU.test(plain(row.text)));
+  const venue = venueFromSource(text);
+  if (newMenu || (plans.size && venue)) {
+    const plan = plans.size === 1 ? [...plans.keys()][0] : null;
+    const reasons = [newMenu, ...plans.values()].filter(Boolean);
+    return {
+      category: plan ? `nuovo_${plan}` : null, kind: 'nuovo', plan, venue: venue || null,
+      explicitPlan: Boolean(plan), ambiguousPlan: plans.size > 1,
+      reasons: [...new Map(reasons.map((row) => [row.line, row])).values()]
+    };
+  }
+  for (const [code, pattern] of UPDATE_RULES) {
+    const row = rows.find((entry) => pattern.test(plain(entry.text)));
+    if (row) return { category: code, kind: categoryByCode(code).kind, plan: null, venue: venue || null, explicitPlan: false, ambiguousPlan: false, reasons: [row] };
+  }
+  return { category: null, kind: 'altro', plan: null, venue: venue || null, explicitPlan: false, ambiguousPlan: false, reasons: [] };
+}
+
+const where = (row) => (row.line === 0 ? 'oggetto' : `riga ${row.line}`);
+export const reasonText = (proposal) => proposal.reasons.map((row) => `${where(row)} «${row.text.slice(0, 60)}»`).join('; ');
+
+/** Cosa Jarvis può fare da solo su questa pratica: bozza, solo proposta, o niente. */
+export function autopilotPlan(request) {
+  const proposal = classifyRequest(request.subject, request.source_text ?? request.sourceText);
+  const entry = proposal.category ? categoryByCode(proposal.category) : null;
+  if (!entry && proposal.kind === 'nuovo') return { proposal, action: 'proponi', why: proposal.ambiguousPlan ? 'Il testo cita più piani: scegli tu.' : 'Il piano non è scritto nella richiesta: scegli tu Standard, Annuale o Premium.' };
+  if (!entry) return { proposal, action: 'chiedi', why: 'Richiesta non riconosciuta: decidi tu la categoria.' };
+  if (entry.kind !== 'nuovo') return { proposal, action: 'proponi', why: 'Per ora questo tipo di richiesta lo prepari tu.' };
+  if (!proposal.explicitPlan) return { proposal, action: 'proponi', why: proposal.ambiguousPlan ? 'Il testo cita più piani: scegli tu.' : 'Il piano non è scritto nella richiesta: scegli tu Standard, Annuale o Premium.' };
+  if (!proposal.venue) return { proposal, action: 'proponi', why: 'Manca una riga «Locale: …»: indica il nome del locale (Menu ID) e genera tu la bozza.' };
+  return { proposal, action: 'bozza', why: '' };
+}
+
+/** Anteprima pura di ciò che Jarvis troverà (usata anche dall'importatore per la notifica). */
+export function autopilotPreview(request) {
+  const plan = autopilotPlan(request);
+  const text = request.source_text ?? request.sourceText ?? '';
+  const extraction = extractMenuFromText(plan.proposal.venue || 'Locale', text, plan.proposal.venue || 'locale');
+  const extras = proposeSourceExtras(text, extraction.menu);
+  return {
+    action: plan.action, why: plan.why,
+    category: plan.proposal.category, kind: plan.proposal.kind,
+    categoryLabel: plan.proposal.category ? categoryByCode(plan.proposal.category).label : plan.proposal.kind === 'nuovo' ? 'Nuovo menu (piano da scegliere)' : null,
+    plan: plan.proposal.plan, venue: plan.proposal.venue, reasons: reasonText(plan.proposal),
+    items: extraction.extracted.length, uncertain: extraction.uncertain.length,
+    extras: extras.filter((entry) => entry.type !== 'manuale').map((entry) => (entry.type === 'coperto' ? `coperto ${entry.value}` : `allergeni ${entry.name}`))
+  };
+}
+
+/** Testo breve per Riccardo (notifica in app, email o push). Nessun dato personale del mittente. */
+export function autopilotMessage(subject, preview, outcome = preview.action) {
+  const head = String(subject || 'Nuova richiesta').slice(0, 70);
+  const facts = preview.kind !== 'nuovo' ? '' : `${preview.items} piatti letti${preview.uncertain ? `, ${preview.uncertain} righe da verificare` : ''}${preview.extras.length ? `, trovati ${preview.extras.join(' e ')}` : ''}`;
+  if (outcome === 'bozza') return `Riccardo, bozza pronta per «${preview.venue}» (${preview.categoryLabel}): ${facts}. Apri Revisione per controllarla.`;
+  if (outcome === 'proponi') return `Riccardo, nuova richiesta «${head}». Propongo: ${preview.categoryLabel}. ${preview.why}${facts ? ` ${facts}.` : ''}`;
+  return `Riccardo, nuova richiesta «${head}»: non l’ho riconosciuta. ${preview.why}`;
+}
