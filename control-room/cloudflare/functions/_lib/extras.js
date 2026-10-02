@@ -35,7 +35,10 @@ export const allergenLabel = (codes) => codes.map((code) => ALLERGENS.find(([id]
 export function detectExtra(sentence, menu) {
   const text = String(sentence || '').trim();
   const lower = plain(text);
-  const cover = lower.match(/^(?:il\s+)?coperto\b[^\d]*(\d{1,2})(?:[,.](\d{1,2}))?\s*(?:€|euro)?\s*\.?$/);
+  // "Il coperto è 2,50", "Aggiungete il coperto di 3 euro", "vorrei mettere anche il coperto a 2€":
+  // un solo importo nella frase, altrimenti decide Riccardo.
+  const amounts = lower.match(/\d{1,4}(?:[,.]\d{1,2})?/g) || [];
+  const cover = amounts.length === 1 && lower.match(/^(?:[a-zà-ÿ'’\s]{0,40}\s)?(?:il\s+)?coperto\b[^\d]*(\d{1,2})(?:[,.](\d{1,2}))?\s*(?:€|euro)?(?:\s+(?:a\s+persona|a\s+testa|per\s+persona))?\s*\.?$/);
   if (cover) return { type: 'coperto', value: `${Number(cover[1])},${(cover[2] || '').padEnd(2, '0')}`, source: text };
   if (/\bcoperto\b/.test(lower)) return { type: 'manuale', source: text, note: 'Coperto citato senza un importo chiaro: inseriscilo a mano.' };
   // Solo dichiarazioni esplicite ("contiene", "allergeni: …"): mai dedurre dal nome del piatto.

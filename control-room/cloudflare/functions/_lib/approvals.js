@@ -124,7 +124,8 @@ export function proposeReplyChanges(text, menu) {
   const sections = (menu?.sezioni || []).map((section) => italianName(section?.nome));
   const proposals = [];
   const add = (entry) => proposals.push({ id: `p${proposals.length + 1}`, ...entry });
-  for (const raw of reply.split(/\.(?=\s|$)|[!;]/)) {
+  // "… a 35 euro e il coperto 2 euro": il coperto diventa una frase a parte.
+  for (const raw of reply.split(/\.(?=\s|$)|[!;]|,?\s+e\s+(?=(?:anche\s+)?(?:il\s+)?coperto\b)/i)) {
     const sentence = raw.trim();
     if (!sentence || GREETING.test(sentence) || /^(?:approv\w*|ok|va bene|tutto ok)\W*$/i.test(sentence)) continue;
     const extra = detectExtra(sentence, menu);
@@ -138,7 +139,16 @@ export function proposeReplyChanges(text, menu) {
     const isAdd = /\b(?:aggiung\w*|inserit\w*|inserire)\b/i.test(sentence);
     const isRemove = /\b(?:togli\w*|tolg\w*|rimuov\w*|elimin\w*|cancell\w*)\b/i.test(sentence);
     if (isAdd) {
-      const match = sentence.match(/\b(?:aggiung\w*|inserit\w*|inserire)\s+(?:anche\s+)?(?:(?:il|lo|la|l['’]|i|gli|le|un|una|uno)\s+)?([^:,\d€—–-]+)(?::|,|-|—|–)?\s*((?:[^\d]*\d[\d,.]*\s*(?:€|euro)?[\s,e]*)+)$/i);
+      // Sezione indicata dal locale ("nei secondi", "tra i dolci", "nella sezione Pizze"): ha la
+      // precedenza sulla scelta automatica e viene tolta dal nome del piatto.
+      let named = -1, clean = sentence;
+      sections.forEach((title, index) => {
+        if (named >= 0 || !title) return;
+        const escaped = title.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+        const phrase = new RegExp(`\\s*\\b(?:nei|negli|nelle|nella|nel|tra\\s+(?:i|gli|le)|fra\\s+(?:i|gli|le)|ai|agli|alle|in|sezione|nella\\s+sezione)\\s+${escaped}\\b`, 'i');
+        if (phrase.test(clean)) { named = index; clean = clean.replace(phrase, ' ').replace(/\s+/g, ' ').trim(); }
+      });
+      const match = clean.match(/\b(?:aggiung\w*|inserit\w*|inserire)\s+(?:anche\s+)?(?:(?:il|lo|la|l['’]|i|gli|le|un|una|uno)\s+)?([^:,\d€—–-]+)(?::|,|-|—|–)?\s*((?:[^\d]*\d[\d,.]*\s*(?:€|euro)?[\s,e]*)+)$/i);
       const base = match ? match[1].trim().replace(/\s+(?:a|al|da|costa|costano|prezzo)$/i, '').trim() : '';
       const rest = match ? match[2] : '';
       const pairs = [...rest.matchAll(/([A-Za-zÀ-ÿ][A-Za-zÀ-ÿ ]{1,30}?)?\s*(\d{1,4})(?:[,.](\d{1,2}))?\s*(?:€|euro)?/gi)]
@@ -147,7 +157,7 @@ export function proposeReplyChanges(text, menu) {
         const wine = /\b(?:calice|bottiglia|vino|vini|bicchiere)\b/i.test(sentence);
         const target = wine ? sections.findIndex((name) => /\bvin/i.test(name)) : -1;
         const food = sections.map((name, index) => (/\b(?:vin|bevand|bibit|drink)/i.test(name) ? -1 : index)).filter((index) => index >= 0);
-        const section = target >= 0 ? target : food.length ? food[food.length - 1] : Math.max(0, sections.length - 1);
+        const section = named >= 0 ? named : target >= 0 ? target : food.length ? food[food.length - 1] : Math.max(0, sections.length - 1);
         const nameBase = base.charAt(0).toLocaleUpperCase('it-IT') + base.slice(1);
         for (const pair of pairs) {
           const name = pairs.length > 1 && pair.label ? `${nameBase} (${pair.label.toLocaleLowerCase('it-IT')})` : nameBase;
