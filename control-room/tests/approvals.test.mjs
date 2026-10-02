@@ -237,4 +237,22 @@ describe('Percorso di approvazione nella API staging', () => {
       assert.ok(applied.body.state.audit.some((row) => row.action === 'draft.reply_changes' && /Blecs 10,00 → 11,00/.test(row.summary)));
     } finally { db.close(); }
   });
+
+  it('inserisce coperto e allergeni scritti nella richiesta solo se scelti, con la riga come fonte', async () => {
+    const db = database();
+    try {
+      const { draft } = await setup(db, { sourceText: '## Primi\nGnocchi — 12,00\nCoperto 2,50 €\nGli gnocchi contengono glutine e uova.' });
+      const extras = draft.sourceExtras;
+      assert.deepEqual(extras.map((p) => p.type), ['coperto', 'allergeni']);
+      const applied = await action(db, 'applySourceExtras', { draftId: draft.id, revision: draft.revision, accept: extras.map((p) => p.id) });
+      assert.equal(applied.status, 200, String(applied.body.error));
+      const saved = applied.body.state.drafts[0];
+      assert.equal(saved.menu.coperto, '2,50');
+      assert.deepEqual(saved.menu.sezioni[0].voci[0].allergeni, ['1', '3']);
+      assert.equal(saved.checks.allergens, false);
+      assert.ok(saved.provenance.some((row) => row.path === 'sezioni.0.voci.0.allergeni' && row.source === 'riga 4'));
+      assert.deepEqual(saved.sourceExtras, [], 'già inseriti: nessuna nuova proposta');
+      assert.equal((await action(db, 'applySourceExtras', { draftId: saved.id, revision: saved.revision, accept: ['s1'] })).status, 422);
+    } finally { db.close(); }
+  });
 });

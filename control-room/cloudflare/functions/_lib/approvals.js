@@ -111,6 +111,7 @@ const keyWords = (name) => plainWords(name).filter((word) => word.length >= 3 &&
 const PRICE_TOKEN = /(?<![\d,.])(\d{1,4})(?:[,.](\d{1,2}))?(?![\d,.]*\d)\s*(?:€|euro)?/gi;
 const money = (whole, cents = '') => `${Number(whole)},${String(cents).padEnd(2, '0')}`;
 const italianName = (value) => (typeof value === 'string' ? value : value?.it || '').trim();
+import { detectExtra } from './extras.js';
 const GREETING = /^(?:grazie|cordiali saluti|saluti|buongiorno|buonasera|ciao|a presto|un saluto)\b/i;
 
 export function proposeReplyChanges(text, menu) {
@@ -126,6 +127,8 @@ export function proposeReplyChanges(text, menu) {
   for (const raw of reply.split(/\.(?=\s|$)|[!;]/)) {
     const sentence = raw.trim();
     if (!sentence || GREETING.test(sentence) || /^(?:approv\w*|ok|va bene|tutto ok)\W*$/i.test(sentence)) continue;
+    const extra = detectExtra(sentence, menu);
+    if (extra) { add(extra); continue; }
     const words = new Set(plainWords(sentence));
     const prices = [...sentence.matchAll(PRICE_TOKEN)].map((match) => money(match[1], match[2]));
     const matched = items.filter((item) => item.keys.length && words.has(item.keys[0]))

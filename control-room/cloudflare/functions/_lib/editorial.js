@@ -82,7 +82,22 @@ export function suggestedEvidence(draft, request) {
   } else if (priced.length) {
     result.notes.prices = 'Provenienza assente o non allineata alla bozza (modificata a mano?): verifica i prezzi sulla versione attuale.';
   }
-  if (draft?.provenance?.length && items.length && items.every((item) => !Array.isArray(item.allergeni) || !item.allergeni.length))
+  const withAllergens = (menu.sezioni || []).flatMap((section, si) => (section.voci || []).map((item, vi) => ({ item, path: `sezioni.${si}.voci.${vi}.allergeni` })))
+    .filter(({ item }) => Array.isArray(item.allergeni) && item.allergeni.length);
+  const allergenSources = (draft?.provenance || []).filter((entry) => entry.status === 'confermato' && /\.allergeni$/.test(entry.path));
+  const pending = (draft?.sourceExtras || []).filter((entry) => entry.type === 'allergeni');
+  const mentions = /\ballergen|\bcont(?:ien|eng)\w*\b[^.\n]*\b(?:glutine|uov|latte|lattosio|pesce|crostace|soia|arachid|frutta a guscio|noci|sedano|senape|sesamo|solfiti|lupini|molluschi)/i.test(String(request?.sourceText || ''));
+  if (pending.length) {
+    result.notes.allergens = 'Il locale ha scritto degli allergeni: inseriscili dal riquadro «Dati scritti dal locale» prima di confermare.';
+  } else if (withAllergens.length && withAllergens.every(({ item, path }) => allergenSources.some((entry) => entry.path === path && entry.value === item.allergeni.join(',')))) {
+    const rows = withAllergens.map(({ item, path }) => `${allergenSources.find((entry) => entry.path === path).source} ${textOf(item.nome)} ${item.allergeni.join(', ')}`);
+    const others = items.length - withAllergens.length;
+    result.allergens = `${origin}: allergeni dichiarati dal locale (codici UE): ${rows.join('; ')}.${others ? ` Per gli altri ${others} piatti il locale non ha indicato allergeni.` : ''}`.slice(0, 500);
+  } else if (withAllergens.length) {
+    result.notes.allergens = 'Alcuni allergeni non hanno una fonte registrata: verificali sul testo del locale.';
+  } else if (mentions) {
+    result.notes.allergens = 'Il testo del locale parla di allergeni: controllalo, Jarvis non ha trovato a quale piatto si riferiscono.';
+  } else if (draft?.provenance?.length && items.length)
     result.allergens = `${origin}: il testo ricevuto non indica allergeni.`.slice(0, 500);
   const languages = Array.isArray(menu.lingue) && menu.lingue.length ? menu.lingue : ['it'];
   const autoEnglish = (draft?.provenance || []).filter((entry) => String(entry.path).endsWith('.en')).length;
