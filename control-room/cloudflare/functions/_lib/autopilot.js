@@ -64,6 +64,13 @@ export function autopilotPlan(request) {
   const entry = proposal.category ? categoryByCode(proposal.category) : null;
   if (!entry && proposal.kind === 'nuovo') return { proposal, action: 'proponi', why: proposal.ambiguousPlan ? 'Il testo cita più piani: scegli tu.' : 'Il piano non è scritto nella richiesta: scegli tu Standard, Annuale o Premium.' };
   if (!entry) return { proposal, action: 'chiedi', why: 'Richiesta non riconosciuta: decidi tu la categoria.' };
+  if (['aggiornamento', 'prezzo'].includes(entry.kind)) {
+    // Il menu da aggiornare è quello collegato al cliente (o indicato da Riccardo nella pratica):
+    // Jarvis non lo deduce mai dal testo, per non toccare il menu di un altro locale.
+    const menuId = request.menu_id || request.menuId || request.client_menu_id || request.clientMenuId || null;
+    if (menuId) return { proposal, action: 'bozza', why: '', menuId };
+    return { proposal, action: 'proponi', why: 'Non so ancora quale menu online aggiornare: imposta il Menu ID nella scheda cliente (una volta sola) o nella pratica, poi genera la bozza.' };
+  }
   if (entry.kind !== 'nuovo') return { proposal, action: 'proponi', why: 'Per ora questo tipo di richiesta lo prepari tu.' };
   if (!proposal.explicitPlan) return { proposal, action: 'proponi', why: proposal.ambiguousPlan ? 'Il testo cita più piani: scegli tu.' : 'Il piano non è scritto nella richiesta: scegli tu Standard, Annuale o Premium.' };
   if (!proposal.venue) return { proposal, action: 'proponi', why: 'Manca una riga «Locale: …»: indica il nome del locale (Menu ID) e genera tu la bozza.' };
@@ -77,7 +84,7 @@ export function autopilotPreview(request) {
   const extraction = extractMenuFromText(plan.proposal.venue || 'Locale', text, plan.proposal.venue || 'locale');
   const extras = proposeSourceExtras(text, extraction.menu);
   return {
-    action: plan.action, why: plan.why,
+    action: plan.action, why: plan.why, menuId: plan.menuId || null,
     category: plan.proposal.category, kind: plan.proposal.kind,
     categoryLabel: plan.proposal.category ? categoryByCode(plan.proposal.category).label : plan.proposal.kind === 'nuovo' ? 'Nuovo menu (piano da scegliere)' : null,
     plan: plan.proposal.plan, venue: plan.proposal.venue, reasons: reasonText(plan.proposal),
@@ -90,6 +97,7 @@ export function autopilotPreview(request) {
 export function autopilotMessage(subject, preview, outcome = preview.action) {
   const head = String(subject || 'Nuova richiesta').slice(0, 70);
   const facts = preview.kind !== 'nuovo' ? '' : `${preview.items} piatti letti${preview.uncertain ? `, ${preview.uncertain} righe da verificare` : ''}${preview.extras.length ? `, trovati ${preview.extras.join(' e ')}` : ''}`;
+  if (outcome === 'bozza' && preview.menuId) return `Riccardo, aggiornamento pronto per il menu online «${preview.menuId}» (${preview.categoryLabel}): ho applicato solo le modifiche scritte nell’email, QR invariato. Apri Revisione per controllarle.`;
   if (outcome === 'bozza') return `Riccardo, bozza pronta per «${preview.venue}» (${preview.categoryLabel}): ${facts}. Apri Revisione per controllarla.`;
   if (outcome === 'proponi') return `Riccardo, nuova richiesta «${head}». Propongo: ${preview.categoryLabel}. ${preview.why}${facts ? ` ${facts}.` : ''}`;
   return `Riccardo, nuova richiesta «${head}»: non l’ho riconosciuta. ${preview.why}`;
