@@ -71,7 +71,11 @@ describe('Import automatico Gmail → D1 staging', () => {
     assert.equal(row.reply_from, 'cliente@example.com');
     assert.equal(assessReply(row.reply_text).suggestion, 'approvazione');
     assert.equal(db.prepare('SELECT COUNT(*) AS n FROM requests').get().n, 1, 'nessuna nuova pratica');
-    const partial = buildReplyBatch({ ...reply, messageId: 'reply2', bodyComplete: false }, { ...approval, status: 'risposta_ricevuta' });
+    const short = buildReplyBatch({ ...reply, messageId: 'reply2', text: 'approvo', bodyComplete: false }, { ...approval, status: 'risposta_ricevuta' });
+    run(db, short);
+    assert.equal(assessReply(db.prepare('SELECT reply_text FROM publication_approvals').get().reply_text).suggestion, 'approvazione', 'una risposta brevissima non è parziale');
+    const long = 'Approvo il menu. ' + 'Vi chiedo però di controllare con calma anche la sezione dei vini prima di pubblicare, grazie mille. '.repeat(2);
+    const partial = buildReplyBatch({ ...reply, messageId: 'reply4', text: long, bodyComplete: false }, { ...approval, status: 'risposta_ricevuta' });
     run(db, partial);
     assert.equal(assessReply(db.prepare('SELECT reply_text FROM publication_approvals').get().reply_text).suggestion, 'incerta');
     db.prepare("UPDATE publication_approvals SET status='approvata_cliente'").run();
