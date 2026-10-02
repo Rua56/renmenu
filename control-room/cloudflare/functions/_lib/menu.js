@@ -128,6 +128,7 @@ const LOOSE_ROW = /^(.{2,150}?[A-Za-zÀ-ÿ)'’.])\s+(€\s*)?(\d{1,4}(?:[,.]\d{
 // Restano alla lettura assistita, che prende solo nome e prezzo presenti nella riga.
 const LOOSE_STOP = /\b(?:costa|costano|costerebbe|viene|vengono|invece|scusa|prezzo|prezzi|facciamo|mettiamo|vendiamo|euro|eur|lo|la|le|li|gli|il)$|\b(?:costa|costano|viene|vengono|invece|scusa|prezzo|facciamo|mettiamo|vendiamo|euro|eur|alle|dalle|ore|apriamo|chiudiamo|aperti|chiusi|orario|orari|tel|telefono|cell|via|piazza|numero|tavoli|posti|persone)\b|€|,\s|\s(?:a|al|da)$/i;
 export function priceRow(row) {
+  if (row.startsWith('[da verificare]')) return null; // righe dubbie delle foto: mai un prezzo
   const strict = row.match(PRICE_ROW);
   if (strict) return { name: strict[1].trim(), amount: strict[2], loose: false };
   const loose = row.match(LOOSE_ROW);

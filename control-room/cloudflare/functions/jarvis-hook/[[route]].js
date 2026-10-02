@@ -2,7 +2,7 @@
 // - /jarvis-hook/telegram: aggiornamenti del bot (header segreto impostato con setWebhook);
 // - /jarvis-hook/tick: l'orologio (Worker con cron) con il segreto JARVIS_CLOCK_SECRET.
 // Nessun dato viene restituito: solo esiti sintetici.
-import { missions, runAutopilot } from '../control-room/api/[[route]].js';
+import { missions, readPendingMaterials, runAutopilot } from '../control-room/api/[[route]].js';
 import { sameSecret, sendTelegram, telegramReady } from '../_lib/telegram.js';
 
 const reply = (body, status = 200) => new Response(JSON.stringify(body), { status, headers: { 'Content-Type': 'application/json', 'Cache-Control': 'no-store' } });
@@ -22,6 +22,13 @@ export async function onRequest(context) {
     }
     if (path === '/jarvis-hook/tick') {
       if (!sameSecret(request.headers.get('X-Jarvis-Clock'), env.JARVIS_CLOCK_SECRET)) return reply({ ok: false }, 403);
+      const read = await readPendingMaterials(env.DB, env).catch(() => []);
+      for (const { material, request, outcome } of read) {
+        const head = `Ho letto «${material.filename}»${request?.subject ? ` (pratica «${String(request.subject).slice(0, 60)}»)` : ''}`;
+        const text = !outcome?.ok ? `Non sono riuscito a leggere «${material.filename}»: ${outcome?.reason || 'errore'}.`
+          : `${head}. ${outcome.warnings?.[0] || ''}${outcome.drafted ? ' Bozza pronta: controllala in Revisione, confrontando i prezzi con la foto.' : outcome.draftError ? ` Bozza non generata: ${outcome.draftError}` : ''}`;
+        await missions.notify(env.DB, env, material.request_id, outcome?.ok ? 'foto letta' : 'foto non leggibile', text);
+      }
       const drafted = await runAutopilot(env.DB, env);
       const chat = drafted.length ? await missions.setting(env.DB, 'telegram_chat_id') : null;
       if (chat && telegramReady(env)) for (const entry of drafted) await sendTelegram(env, chat, entry.message);

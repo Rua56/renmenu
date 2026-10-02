@@ -17,9 +17,11 @@ async function call(env, method, body, fetchImpl = globalThis.fetch) {
 }
 
 // Testo semplice (niente HTML/Markdown): nessun rischio di formattazione rotta dai nomi dei locali.
-export function sendTelegram(env, chatId, text, buttons = null, fetchImpl) {
+export function sendTelegram(env, chatId, text, buttons = null, fetchImpl, options = {}) {
   const body = { chat_id: chatId, text: String(text).slice(0, 3900), disable_web_page_preview: true };
-  if (buttons?.length) body.reply_markup = { inline_keyboard: [buttons.map(([label, data]) => ({ text: label, callback_data: String(data).slice(0, 64) }))] };
+  const button = ([label, data]) => ({ text: String(label).slice(0, 60), callback_data: String(data).slice(0, 64) });
+  // stacked: un pulsante per riga (elenchi di pratiche); altrimenti tutti sulla stessa riga.
+  if (buttons?.length) body.reply_markup = { inline_keyboard: options.stacked ? buttons.map((b) => [button(b)]) : [buttons.map(button)] };
   return call(env, 'sendMessage', body, fetchImpl);
 }
 export const answerCallback = (env, id, text, fetchImpl) => call(env, 'answerCallbackQuery', { callback_query_id: id, text: String(text || '').slice(0, 190) }, fetchImpl);
@@ -39,4 +41,16 @@ export function sameSecret(a, b) {
   let diff = 0;
   for (let i = 0; i < x.length; i += 1) diff |= x.charCodeAt(i) ^ y.charCodeAt(i);
   return diff === 0;
+}
+
+// File mandati da Riccardo al bot (foto dei menu): massimo 20 MB per le API dei bot, qui 10 MB.
+export async function downloadTelegramFile(env, fileId, fetchImpl = globalThis.fetch) {
+  const info = await call(env, 'getFile', { file_id: fileId }, fetchImpl);
+  const path = info?.result?.file_path;
+  if (!info?.ok || !path || Number(info.result.file_size || 0) > 10_000_000) return null;
+  try {
+    const response = await fetchImpl(`${API}/file/bot${String(env.TELEGRAM_BOT_TOKEN).trim()}/${path}`);
+    if (!response.ok) return null;
+    return { bytes: new Uint8Array(await response.arrayBuffer()), path };
+  } catch { return null; }
 }

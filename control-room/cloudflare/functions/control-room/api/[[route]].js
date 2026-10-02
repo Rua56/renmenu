@@ -1,6 +1,7 @@
 import { assistExtraction } from '../../_lib/assist.js';
 import { applyMenuChanges } from '../../_lib/changes.js';
 import { prepareUpdate } from '../../_lib/update.js';
+import { PHOTO_TYPES, readMenuPdf, readMenuPhoto } from '../../_lib/vision.js';
 import { readCurrentMenu } from '../../_lib/github-live.js';
 import { isSameOriginWrite, verifyOwner } from '../../_lib/auth.js';
 import { slugify, validateMenu, venueFromSource } from '../../_lib/menu.js';
@@ -122,11 +123,40 @@ const parseList = (json) => { try { const value = JSON.parse(json || '[]'); retu
 // dalle stesse operazioni dell'interfaccia (stessi controlli), con «jarvis» come autore nel registro.
 const AUTOPILOT_SQL = `SELECT r.*, c.menu_id AS client_menu_id FROM requests r JOIN clients c ON c.id=r.client_id WHERE r.source_channel='email' AND r.status='nuova' AND r.kind='altro'
   AND r.category IS NULL AND r.revision=1 AND NOT EXISTS (SELECT 1 FROM drafts d WHERE d.request_id=r.id)
-  AND NOT EXISTS (SELECT 1 FROM audit_events a WHERE a.request_id=r.id AND a.action LIKE 'autopilot.%') ORDER BY r.created_at ASC LIMIT 2`;
+  AND NOT EXISTS (SELECT 1 FROM audit_events a WHERE a.request_id=r.id AND a.action LIKE 'autopilot.%')
+  AND NOT EXISTS (SELECT 1 FROM materials m WHERE m.request_id=r.id AND m.processing_status='da_trascrivere' AND m.archived_at IS NULL AND (m.mime='application/pdf' OR m.mime IN ('image/jpeg','image/png','image/webp')))
+  ORDER BY r.created_at ASC LIMIT 2`;
 async function autopilotPending(db) {
   try { return await rows(db, AUTOPILOT_SQL); } catch (error) { if (/no such column/i.test(String(error?.message))) return []; throw error; }
 }
 const asJarvis = (db) => ({ prepare: (sql) => db.prepare(sql), batch: (statements) => db.batch(statements), actor: 'jarvis' });
+// Foto e PDF arrivati (email, Telegram o caricati da Riccardo): Jarvis li legge da solo, uno per
+// giro dell'orologio, e poi riprova l'autopilota sulla pratica.
+export async function readPendingMaterials(db, env = {}) {
+  let pending = [];
+  try { pending = await rows(db, "SELECT id,request_id,filename FROM materials WHERE processing_status='da_trascrivere' AND archived_at IS NULL AND (mime='application/pdf' OR mime IN ('image/jpeg','image/png','image/webp')) AND created_at>'2026-10-02T22:30' ORDER BY created_at ASC LIMIT 1"); }
+  catch { return []; }
+  const done = [];
+  for (const material of pending) {
+    const jarvis = asJarvis(db);
+    try {
+      const outcome = (await action(jarvis, 'readMaterial', { materialId: material.id }, env)).result;
+      // Pratica già classificata e senza bozza (es. foto aggiunta da Telegram): Jarvis prepara la bozza.
+      const request = await getOne(db, 'SELECT id,category,plan,kind,subject FROM requests WHERE id=?', material.request_id);
+      const hasDraft = await getOne(db, 'SELECT id FROM drafts WHERE request_id=?', material.request_id);
+      if (outcome.ok && request?.category && !hasDraft) {
+        try { await action(jarvis, 'generateDraft', { requestId: request.id }, env); outcome.drafted = true; }
+        catch (error) { outcome.draftError = String(error?.message || 'errore').slice(0, 240); }
+      }
+      done.push({ material, request, outcome });
+    }
+    catch (error) {
+      await db.prepare("UPDATE materials SET processing_status='non_leggibile' WHERE id=?").bind(material.id).run();
+      done.push({ material, outcome: { ok: false, reason: String(error?.message || 'errore').slice(0, 200) } });
+    }
+  }
+  return done;
+}
 export async function runAutopilot(db, env = {}) {
   const done = [];
   for (const request of await autopilotPending(db)) {
@@ -348,6 +378,24 @@ export async function action(db, type, input, env = {}) {
     const venue = sourceVenue || request.client_name;
     const desiredSlug = request.menu_id || (request.kind !== 'nuovo' ? request.client_menu_id : venue);
     if (request.kind === 'nuovo') await assertSlugFree(db, slugify(desiredSlug), requestId, request.client_id);
+    // Foto e PDF già letti (da Jarvis o trascritti a mano): si aggiungono in coda al testo della
+    // pratica; la provenienza indica il file e la riga, non la riga del testo combinato.
+    const analyses = await rows(db, "SELECT a.source_text AS text,a.provenance_json AS prov,m.filename FROM material_analyses a JOIN materials m ON m.id=a.material_id WHERE a.request_id=? AND m.archived_at IS NULL AND a.status IN ('needs_review','complete') AND length(a.source_text)>0 ORDER BY a.created_at", requestId);
+    let combinedSource = String(request.source_text || '');
+    const segments = [];
+    for (const analysis of analyses) {
+      const start = combinedSource.split(/\r?\n/).length + 1;
+      combinedSource += `\n${analysis.text}`;
+      const method = parseList(analysis.prov)[0]?.method || 'manual';
+      segments.push({ start, end: combinedSource.split(/\r?\n/).length, filename: analysis.filename, method });
+    }
+    const relabel = (rowsIn) => rowsIn.map((row) => {
+      const match = String(row.source || '').match(/^riga (\d+)(.*)$/);
+      const segment = match && segments.find((seg) => Number(match[1]) >= seg.start && Number(match[1]) <= seg.end);
+      if (!segment) return row;
+      const how = segment.method === 'jarvis_foto_doppia_lettura' ? 'letta da Jarvis due volte' : segment.method === 'jarvis_pdf_testo' ? 'testo del PDF' : segment.method === 'manual' ? 'trascrizione manuale' : 'letta da Jarvis una volta';
+      return { ...row, source: `file «${segment.filename}» riga ${Number(match[1]) - segment.start + 1} (${how})`, status: segment.method === 'jarvis_foto_lettura_singola' ? 'da_verificare' : row.status };
+    });
     let extraction;
     // Aggiornamento di un menu già online: si parte dal file pubblicato su main, mai da zero.
     const liveUpdate = ['aggiornamento', 'prezzo'].includes(request.kind) && String(env?.GITHUB_PROVIDER || 'mock').trim() === 'live';
@@ -357,7 +405,7 @@ export async function action(db, type, input, env = {}) {
       try { live = await readCurrentMenu(env, slug, typeof (env?.GITHUB_FETCH || env?.fetch) === 'function' ? { fetch: env.GITHUB_FETCH || env.fetch } : {}); }
       catch (error) { assert(false, `Non riesco a leggere il menu online «${slug}» da GitHub (${String(error?.message || 'errore').slice(0, 120)}). Riprova tra poco.`, 503); }
       assert(live.exists, `Il menu «${slug}» non è online: controlla il Menu ID nella pratica o nella scheda cliente.`, 422);
-      const update = prepareUpdate({ slug, current: live.menu, sha: live.sha, sourceText: request.source_text, subject: request.subject });
+      const update = prepareUpdate({ slug, current: live.menu, sha: live.sha, sourceText: combinedSource, subject: request.subject });
       assert(update.ok, update.reason, 422);
       extraction = update.extraction;
       if (extraction.added && (extraction.menu.lingue || []).includes('en') && autoTranslationReady(env)) {
@@ -368,11 +416,18 @@ export async function action(db, type, input, env = {}) {
         if (note) extraction.warnings.push(note);
       }
     } else {
-      extraction = integrations(env).ai.extract(venue, request.source_text, desiredSlug);
+      extraction = integrations(env).ai.extract(venue, combinedSource, desiredSlug);
       // Menu scritto a parole: lettura assistita, verificata riga per riga (nessun valore inventato).
-      if (autoTranslationReady(env) && extraction.uncertain.some((row) => /\d/.test(row))) {
-        extraction = await assistExtraction(env.AI, venue, request.source_text, desiredSlug, extraction);
+      // Le righe dubbie delle foto non passano dal modello: le controlla Riccardo sulla foto.
+      if (autoTranslationReady(env) && extraction.uncertain.some((row) => /\d/.test(row) && !row.startsWith('[da verificare]'))) {
+        extraction = await assistExtraction(env.AI, venue, combinedSource, desiredSlug, extraction);
       }
+    }
+    if (segments.length) {
+      extraction.provenance = relabel(extraction.provenance || []);
+      extraction.warnings.push(`Usati ${segments.length} file (foto/PDF): ${segments.map((seg) => `«${seg.filename}»`).join(', ')}. Confronta i prezzi con gli originali in Materiali.`);
+      const doubtful = extraction.uncertain.filter((row) => row.startsWith('[da verificare]')).length;
+      if (doubtful) extraction.warnings.push(`${doubtful} voci delle foto lette in modo diverso dalle due letture: le trovi tra le righe da verificare, inseriscile tu dopo aver guardato la foto.`);
     }
     if (sourceVenue) extraction.warnings.push(`Nome del locale letto dalla riga “Locale:” dell’email (“${sourceVenue}”): confermalo in revisione e aggiorna la scheda cliente.`);
     assert(extraction.extracted.length > 0 && extraction.menu.id, 'Nessun piatto con prezzo leggibile: aggiungi il materiale o trascrivi la fonte.', 422);
@@ -827,6 +882,39 @@ export async function action(db, type, input, env = {}) {
       { sql: 'SELECT 1 FROM requests WHERE id=? AND revision=? AND updated_at=?', args: [request.id, revision + 1, stamp] });
     assert(changed[1].meta.changes === 1, 'Pratica modificata nel frattempo. Ricarica.', 409);
     result = { id, materialId, sourceSha256: hash, status: 'needs_review' };
+  } else if (type === 'readMaterial') {
+    // Jarvis legge una foto (due modelli, solo voci concordi) o un PDF (testo incorporato).
+    // Il risultato è una FONTE da verificare, non il menu: entra nella bozza alla generazione.
+    const materialId = identifier(p.materialId);
+    const material = await getOne(db, 'SELECT * FROM materials WHERE id=? AND archived_at IS NULL', materialId);
+    assert(material, 'Materiale non trovato o archiviato.', 404);
+    assert(material.mime === 'application/pdf' || PHOTO_TYPES.has(material.mime), 'Jarvis legge solo foto (JPG, PNG, WebP) e PDF.', 422);
+    const request = await getOne(db, 'SELECT id,status FROM requests WHERE id=?', material.request_id);
+    assert(!['completata', 'archiviata', 'chiusa'].includes(request?.status), 'Pratica chiusa.', 409);
+    assert(env.BUCKET?.get, 'Archivio privato non configurato.', 503);
+    const object = await env.BUCKET.get(material.r2_key);
+    assert(object?.arrayBuffer, 'File originale privato non disponibile.', 404);
+    const bytes = new Uint8Array(await object.arrayBuffer());
+    const hash = [...new Uint8Array(await crypto.subtle.digest('SHA-256', bytes))].map((byte) => byte.toString(16).padStart(2, '0')).join('');
+    const read = material.mime === 'application/pdf' ? await readMenuPdf(env.AI, bytes, material.filename) : await readMenuPhoto(env.AI, bytes, material.mime);
+    const stamp = now();
+    if (!read.ok) {
+      await auditedBatch(db, [db.prepare("UPDATE materials SET processing_status='non_leggibile' WHERE id=?").bind(materialId)],
+        'material.read.failed', `Jarvis non è riuscito a leggere «${material.filename}»: ${read.reason}.`.slice(0, 600), request.id);
+      assert(db.actor === 'jarvis', `Non riesco a leggere il file: ${read.reason}.`, 422);
+      result = { ok: false, reason: read.reason };
+    } else {
+      const analysisId = uid();
+      await auditedBatch(db, [
+        db.prepare(`INSERT INTO material_analyses (id,material_id,request_id,source_sha256,source_text,provenance_json,warnings_json,status,created_at)
+          VALUES (?,?,?,?,?,?,?,?,?) ON CONFLICT(material_id) DO UPDATE SET id=excluded.id, source_sha256=excluded.source_sha256,
+          source_text=excluded.source_text, provenance_json=excluded.provenance_json, warnings_json=excluded.warnings_json,
+          status=excluded.status, created_at=excluded.created_at`)
+          .bind(analysisId, materialId, request.id, hash, read.text.slice(0, 50_000), JSON.stringify([{ materialId, method: read.method, reviewed: false }]), JSON.stringify(read.warnings), 'needs_review', stamp),
+        db.prepare("UPDATE materials SET processing_status='letto_da_jarvis',text_preview=? WHERE id=?").bind(read.text.slice(0, 2500), materialId)
+      ], 'material.read.jarvis', `Jarvis ha letto «${material.filename}»: ${read.warnings[0]}`.slice(0, 600), request.id);
+      result = { ok: true, agreed: read.agreed ?? null, doubts: read.doubts ?? 0, method: read.method, warnings: read.warnings };
+    }
   } else if (type === 'archiveMaterial') {
     const id = identifier(p.id);
     assert(p.confirmation === 'ARCHIVIA MATERIALE', 'Conferma archiviazione mancante.', 403);
