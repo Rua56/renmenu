@@ -78,6 +78,18 @@ async function approvalRows(db) {
   try { return await rows(db, 'SELECT * FROM publication_approvals ORDER BY updated_at DESC LIMIT 500'); }
   catch (error) { if (/no such table/i.test(String(error?.message))) return []; throw error; }
 }
+const valueAt = (menu, path) => String(path).split('.').reduce((node, key) => (node == null ? undefined : node[key]), menu);
+export function keepProvenance(entries, menu) {
+  const same = (entry) => entry && typeof entry.path === 'string' && valueAt(menu, entry.path) !== undefined
+    && String(valueAt(menu, entry.path)) === String(entry.value);
+  const kept = entries.filter(same);
+  // Un prezzo resta attestato solo se allo stesso posto c'è ancora lo stesso piatto:
+  // piatti spostati o rinominati perdono tutte le loro fonti.
+  const itemOf = (path) => /^(sezioni\.\d+\.voci\.\d+)\./.exec(path)?.[1];
+  const namedItems = new Set(entries.filter((entry) => /\.nome\.it$/.test(entry?.path || '') && itemOf(entry.path)).map((entry) => itemOf(entry.path)));
+  const keptNames = new Set(kept.filter((entry) => /\.nome\.it$/.test(entry.path) && itemOf(entry.path)).map((entry) => itemOf(entry.path)));
+  return kept.filter((entry) => { const item = itemOf(entry.path); return !item || !namedItems.has(item) || keptNames.has(item); });
+}
 const INTERNAL_CHECKS = ['prices', 'allergens', 'languages'];
 // Revisione interna (passaggio 1): tutte le regole editoriali tranne il consenso del cliente,
 // che ha un percorso proprio (anteprima → risposta → conferma di Riccardo).
@@ -443,9 +455,12 @@ async function action(db, type, input, env = {}) {
     const validation = validateMenu(menu);
     assert(!validation.errors.length, `Menù non valido: ${validation.errors.slice(0, 3).join(' ')}`);
     const menuJson = JSON.stringify(menu), timestamp = now();
+    // La provenienza resta solo per i valori identici a quelli attestati: un salvataggio
+    // senza modifiche non cancella le fonti, un valore cambiato perde la sua.
+    const keptProvenance = keepProvenance(parseList(draft.provenance_json), menu);
     const saved = await auditedBatch(db, [
-      db.prepare("UPDATE drafts SET slug=?,menu_json=?,checks_json=?,provenance_json='[]',status='revisione',revision=revision+1,updated_at=? WHERE id=? AND revision=? AND EXISTS (SELECT 1 FROM requests WHERE requests.id=? AND requests.revision=?)")
-        .bind(slug, menuJson, JSON.stringify(checksDefault()), timestamp, id, revision, draft.request_id, linkedRequest.revision),
+      db.prepare("UPDATE drafts SET slug=?,menu_json=?,checks_json=?,provenance_json=?,status='revisione',revision=revision+1,updated_at=? WHERE id=? AND revision=? AND EXISTS (SELECT 1 FROM requests WHERE requests.id=? AND requests.revision=?)")
+        .bind(slug, menuJson, JSON.stringify(checksDefault()), JSON.stringify(keptProvenance), timestamp, id, revision, draft.request_id, linkedRequest.revision),
       db.prepare('INSERT INTO draft_versions (id,draft_id,revision,menu_json,actor,created_at) SELECT ?,id,?,? ,?,? FROM drafts WHERE id=? AND revision=?')
         .bind(uid(), revision + 1, menuJson, 'owner', timestamp, id, revision + 1),
       db.prepare("UPDATE requests SET status='in_revisione',revision=revision+1,updated_at=? WHERE id=? AND revision=? AND EXISTS (SELECT 1 FROM drafts WHERE drafts.id=? AND drafts.revision=? AND drafts.status='revisione')")

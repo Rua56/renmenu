@@ -377,7 +377,7 @@ describe('Control Room API staging', () => {
     } finally { db.close(); }
   });
 
-  it('pilota Gmail: nome da riga Locale, provenienza registrata e azzerata al salvataggio', async () => {
+  it('pilota Gmail: nome da riga Locale, provenienza registrata e mantenuta solo per i valori invariati', async () => {
     const db = database();
     try {
       const client = await action(db, 'createClient', { name: 'Nuovo contatto email' });
@@ -396,7 +396,18 @@ describe('Control Room API staging', () => {
       assert.equal(draft.provenance.find((entry) => entry.path === 'sezioni.1.voci.0.prezzo').source, 'riga 10');
       const saved = await action(db, 'saveDraft', { id: draft.id, revision: draft.revision, menu: draft.menu, slug: draft.slug });
       assert.equal(saved.status, 200);
-      assert.deepEqual(saved.body.state.drafts[0].provenance, []);
+      // Salvataggio senza modifiche: le fonti restano.
+      assert.deepEqual(saved.body.state.drafts[0].provenance, draft.provenance);
+      const edited = structuredClone(draft.menu);
+      edited.sezioni[0].voci[0].prezzo = '13,00';
+      const resaved = await action(db, 'saveDraft', { id: draft.id, revision: saved.body.state.drafts[0].revision, menu: edited, slug: draft.slug });
+      const after = resaved.body.state.drafts[0].provenance;
+      assert.equal(after.some((entry) => entry.path === 'sezioni.0.voci.0.prezzo'), false, 'prezzo cambiato: fonte rimossa');
+      assert.equal(after.some((entry) => entry.path === 'sezioni.1.voci.0.prezzo'), true, 'prezzo invariato: fonte mantenuta');
+      const swapped = structuredClone(edited);
+      [swapped.sezioni[0], swapped.sezioni[1]] = [swapped.sezioni[1], swapped.sezioni[0]];
+      const moved = await action(db, 'saveDraft', { id: draft.id, revision: resaved.body.state.drafts[0].revision, menu: swapped, slug: draft.slug });
+      assert.equal(moved.body.state.drafts[0].provenance.some((entry) => /prezzo$/.test(entry.path)), false, 'piatti spostati: nessun prezzo attestato per posizione');
       // Un cliente con nome già registrato non viene sostituito dalla riga Locale.
       const named = await action(db, 'createClient', { name: 'Osteria Registrata' });
       const other = await action(db, 'createRequest', { clientId: named.body.result.id, subject: 'Altro', sourceChannel: 'email', category: 'nuovo_standard', sourceText });
