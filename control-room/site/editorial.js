@@ -49,3 +49,41 @@ export function reviewIssues(menu, checks, plan) {
   if (plan !== undefined) issues.push(...planIssues(menu, plan, checks));
   return { issues, missing };
 }
+
+// Proposte di Jarvis per le evidenze della checklist (2026-10-02). Usano SOLO fatti registrati:
+// provenienza della bozza, metadati della pratica, lingue del menu. Non attestano mai
+// l'autorizzazione del locale né l'approvazione scritta del cliente: quelle restano a Riccardo.
+const itemAt = (menu, path) => {
+  const match = /^sezioni\.(\d+)\.voci\.(\d+)\.prezzo$/.exec(path);
+  return match ? menu?.sezioni?.[Number(match[1])]?.voci?.[Number(match[2])] : null;
+};
+const textOf = (value) => (typeof value === 'string' ? value : value?.it || '');
+const dateIt = (value) => {
+  const date = new Date(value);
+  return Number.isFinite(date.getTime()) ? date.toISOString().slice(0, 10).split('-').reverse().join('/') : '';
+};
+export function suggestedEvidence(draft, request) {
+  const menu = draft?.menu || {};
+  const items = (menu.sezioni || []).flatMap((section) => section.voci || []);
+  const priced = items.filter((item) => String(item.prezzo ?? '').trim());
+  const prices = (draft?.provenance || []).filter((entry) => entry.status === 'confermato' && /\.prezzo$/.test(entry.path));
+  const matches = prices.every((entry) => { const item = itemAt(menu, entry.path); return item && String(item.prezzo) === String(entry.value); });
+  const subject = String(request?.subject || '').slice(0, 80);
+  const origin = request?.sourceChannel === 'email'
+    ? `Email${subject ? ` «${subject}»` : ''}${dateIt(request?.createdAt) ? ` del ${dateIt(request.createdAt)}` : ''}`
+    : `Testo della pratica${subject ? ` «${subject}»` : ''}`;
+  const result = { prices: '', allergens: '', languages: '', notes: {} };
+  if (prices.length && prices.length === priced.length && matches) {
+    const rows = prices.map((entry) => `${entry.source} ${textOf(itemAt(menu, entry.path).nome)} ${entry.value}`);
+    result.prices = `${origin}: ${rows.join('; ')}.`.slice(0, 500);
+  } else if (priced.length) {
+    result.notes.prices = 'Provenienza assente o non allineata alla bozza (modificata a mano?): verifica i prezzi sulla versione attuale.';
+  }
+  if (draft?.provenance?.length && items.length && items.every((item) => !Array.isArray(item.allergeni) || !item.allergeni.length))
+    result.allergens = `${origin}: il testo ricevuto non indica allergeni.`.slice(0, 500);
+  const languages = Array.isArray(menu.lingue) && menu.lingue.length ? menu.lingue : ['it'];
+  result.languages = (languages.includes('en')
+    ? 'Testo ricevuto in italiano; inglese presente nella bozza: traduzione da far approvare al locale.'
+    : 'Testo ricevuto in italiano. Inglese non fornito: traduzione da preparare come bozza.');
+  return result;
+}

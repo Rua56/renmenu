@@ -393,4 +393,14 @@ describe('Control Room API staging', () => {
       assert.equal(second.body.state.drafts.find((d) => d.requestId === other.body.result.id).slug, 'osteria-registrata');
     } finally { db.close(); }
   });
+  it('pratica importata senza categoria: chiede la categoria, non il Menu ID', async () => {
+    const db = database();
+    try {
+      const client = await action(db, 'createClient', { name: 'Nuovo contatto email' });
+      const created = await action(db, 'createRequest', { clientId: client.body.result.id, subject: 'Import', sourceChannel: 'email', kind: 'altro', plan: 'standard', sourceText: '# Primi\nGnocchi — 10,50' });
+      const blocked = await action(db, 'generateDraft', { requestId: created.body.result.id });
+      assert.equal(blocked.status, 422);
+      assert.match(blocked.body.error, /Scegli la categoria della pratica/);
+    } finally { db.close(); }
+  });
 });
