@@ -162,6 +162,12 @@ describe('Control Room API staging', () => {
       assert.equal(callMock.body.state.notifications.some((item) => item.channel === 'telefono'), true);
       const providerBlocked = await call(db, 'actions', { type: 'generateDraft', payload: { requestId } }, { AI_PROVIDER: 'live' });
       assert.equal(providerBlocked.status, 501);
+      for (const provider of ['cloudflare_workers_ai', 'openai_compatible']) {
+        const extra = await action(db, 'createRequest', { clientId, subject: `Pannello AI ${provider}`, sourceChannel: 'email', category: 'nuovo_standard', sourceText: '## Primi\nGnocchi — 12,00' });
+        const generated = await call(db, 'actions', { type: 'generateDraft', payload: { requestId: extra.body.result.id } }, { AI_PROVIDER: provider });
+        assert.equal(generated.status, 200, `il provider ${provider} del pannello AI non deve bloccare la bozza deterministica`);
+        assert.equal(generated.body.result.extraction.extracted.length, 1);
+      }
       const extracted = await action(db, 'generateDraft', { requestId });
       assert.equal(extracted.status, 200);
       assert.equal(extracted.body.result.extraction.extracted.length, 2);

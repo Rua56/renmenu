@@ -5,9 +5,14 @@ import { prepareMockGitHubProposal } from './github.js';
 const unsupported = (provider) => {
   throw Object.assign(new Error(`${provider}: modalità live non implementata. Nessuna azione esterna eseguita.`), { status: 501 });
 };
+// Provider AI gestiti dal pannello separato "AI · solo bozza" (_lib/ai-live.js). Non toccano
+// l'estrazione deterministica del Builder, che resta locale e senza chiamate esterne.
+const AI_PANEL_PROVIDERS = new Set(['openai_compatible', 'cloudflare_workers_ai']);
 export function integrations(env = {}) {
+  const allowed = { AI_PROVIDER: AI_PANEL_PROVIDERS };
   for (const [key, name] of [['AI_PROVIDER', 'AI'], ['WHATSAPP_PROVIDER', 'WhatsApp'], ['CALL_PROVIDER', 'Chiamate'], ['GITHUB_PROVIDER', 'GitHub']]) {
-    if (env[key] && env[key] !== 'mock' && env[key] !== 'disabled') unsupported(name);
+    const value = env[key];
+    if (value && value !== 'mock' && value !== 'disabled' && !allowed[key]?.has(value)) unsupported(name);
   }
   return {
     ai: { mode: 'mock', extract: (venue, source, slug) => extractMenuFromText(venue, source, slug), classify: classifyIntent },
