@@ -87,7 +87,10 @@ function githubError(response, payload) {
       retryAfter: retryAfter(response.headers)
     });
   }
-  return new GitHubLiveError('GITHUB_API_ERROR', 'GitHub ha rifiutato la richiesta.', { status: response.status });
+  // Il messaggio di GitHub (es. "Resource not accessible by personal access token") non
+  // contiene mai il token: mostrarlo permette di capire il problema dal telefono.
+  const detail = typeof payload?.message === 'string' ? payload.message.replace(/[^\x20-\x7E]/g, '').slice(0, 140) : '';
+  return new GitHubLiveError('GITHUB_API_ERROR', `GitHub ha rifiutato la richiesta (HTTP ${response.status}${detail ? `: ${detail}` : ''}).`, { status: response.status });
 }
 
 async function responsePayload(response) {
@@ -111,6 +114,8 @@ async function githubRequest(env, path, { method = 'GET', body, allowStatuses = 
         Accept: 'application/vnd.github+json',
         Authorization: `Bearer ${token}`,
         'X-GitHub-Api-Version': API_VERSION,
+        // GitHub rifiuta (403) le richieste API senza User-Agent; i Worker non lo aggiungono.
+        'User-Agent': 'RenMenu-Jarvis-Control-Room',
         ...(body === undefined ? {} : { 'Content-Type': 'application/json' })
       },
       ...(body === undefined ? {} : { body: JSON.stringify(body) })
