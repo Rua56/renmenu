@@ -54,3 +54,16 @@ export async function downloadTelegramFile(env, fileId, fetchImpl = globalThis.f
     return { bytes: new Uint8Array(await response.arrayBuffer()), path };
   } catch { return null; }
 }
+
+// Vocale di Jarvis (MP3): Telegram lo mostra come messaggio vocale.
+export async function sendVoice(env, chatId, bytes, caption = '', fetchImpl = globalThis.fetch) {
+  if (!telegramReady(env) || !bytes?.length) return { ok: false };
+  try {
+    const form = new FormData();
+    form.append('chat_id', String(chatId));
+    form.append('voice', new Blob([bytes], { type: 'audio/mpeg' }), 'jarvis.mp3');
+    if (caption) form.append('caption', String(caption).slice(0, 1000));
+    const response = await fetchImpl(`${API}/bot${String(env.TELEGRAM_BOT_TOKEN).trim()}/sendVoice`, { method: 'POST', body: form });
+    return await response.json().catch(() => ({ ok: false }));
+  } catch { return { ok: false }; }
+}

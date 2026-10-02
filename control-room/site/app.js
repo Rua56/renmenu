@@ -297,13 +297,24 @@ function renderAccessError(error) {
   view.innerHTML = `<div class="view-wrap">${header('AREA PRIVATA', 'Accesso da verificare', 'La Control Room richiede Cloudflare Access e API private.')}<section class="panel"><div class="notice danger"><strong>Stato non caricato.</strong> ${escapeHtml(error.message || 'Accesso non disponibile.')}</div><p class="muted">Non è stato mostrato alcun dato locale su questa origine.</p></section></div>`;
 }
 
+// Voce di Jarvis: servizio, voce e chiave (la chiave non viene mai mostrata, solo sostituita).
+const VOICES = {
+  elevenlabs: [['JBFqnCBsd6RMkjVDRZzb', 'George · caldo e calmo, stile Jarvis'], ['onwK4e9ZLuTAKqWW03F9', 'Daniel · profondo e autorevole'], ['nPczCjzI2devNBz1zQrb', 'Brian · profondo e rassicurante']],
+  openai: [['onyx', 'Onyx · profonda e calma'], ['ash', 'Ash · calda e pacata'], ['echo', 'Echo · chiara e misurata']]
+};
+function voiceForm() {
+  const v = state.voice || {};
+  const provider = v.provider || 'elevenlabs';
+  const options = (VOICES[provider] || VOICES.elevenlabs).map(([id, label]) => `<option value="${id}" ${v.voiceId === id ? 'selected' : ''}>${escapeHtml(label)}</option>`).join('');
+  return `<details class="spaced-top-small"><summary><strong>Voce di Jarvis</strong> · ${v.provider && v.hasKey ? `<span class="status good">attiva (${escapeHtml(v.provider)})</span>` : '<span class="status info">solo testo</span>'}</summary><form data-form="voice-settings" class="spaced-top-small"><label class="field">Servizio<select name="provider"><option value="elevenlabs" ${provider === 'elevenlabs' ? 'selected' : ''}>ElevenLabs (voce più naturale)</option><option value="openai" ${provider === 'openai' ? 'selected' : ''}>OpenAI</option><option value="nessuna">Nessuna voce (solo testo)</option></select></label><label class="field">Voce<select name="voiceId">${options}</select></label><label class="field">Chiave API ${v.hasKey ? '(salvata: lascia vuoto per tenerla)' : ''}<input name="apiKey" type="password" autocomplete="off" placeholder="${v.hasKey ? '••••••••' : 'incolla la chiave'}"></label><div class="button-row"><button class="button small-button" type="submit">Salva voce</button>${v.hasKey ? '<button class="button secondary small-button" type="button" data-action="voice-test">Prova voce</button>' : ''}</div><p class="muted small">Mandami un vocale su Telegram: ti rispondo a voce. Pubblicare richiede sempre il pulsante SÌ.</p></form></details>`;
+}
 // Ultimi messaggi dell'autopilota: cosa ha preparato Jarvis e cosa aspetta una decisione.
 function jarvisPanel() {
   const notes = state.notifications.filter((item) => /^Jarvis · /.test(item.subject || '') && !item.readAt).slice(0, 4);
   const tg = state.telegram || {};
   const telegram = isDemoMode ? '' : !tg.configured ? '' : !tg.linked
     ? `<div class="notice spaced-top-small">${telegramLinkUrl ? `Tocca il link e poi <strong>Avvia</strong> in Telegram (valido 15 minuti): <a href="${escapeHtml(telegramLinkUrl)}" target="_blank" rel="noopener">Apri Jarvis su Telegram</a>` : 'Collega Telegram: Jarvis ti scriverà lì e ti chiederà il SÌ prima di pubblicare.'}</div><div class="button-row spaced-top-small"><button class="button" type="button" data-action="telegram-link">${telegramLinkUrl ? 'Nuovo link' : 'Collega Telegram'}</button></div>`
-    : `<div class="button-row spaced-top-small"><span class="status good">Telegram collegato</span><button class="button secondary small-button" type="button" data-action="jarvis-briefing">Briefing ora</button><button class="button secondary small-button" type="button" data-action="telegram-test">Messaggio di prova</button></div>`;
+    : `<div class="button-row spaced-top-small"><span class="status good">Telegram collegato</span><button class="button secondary small-button" type="button" data-action="jarvis-briefing">Briefing ora</button><button class="button secondary small-button" type="button" data-action="telegram-test">Messaggio di prova</button></div>${voiceForm()}`;
   if (!notes.length && !autopilotRunning && !telegram) return '';
   const row = (item) => `<div class="list-row"><div class="list-main"><strong>${escapeHtml(item.subject)}</strong><small>${escapeHtml(item.body)}</small><small>${time(item.createdAt)}</small></div><div class="button-row"><button class="mini-button" type="button" data-select-request="${escapeHtml(item.requestId || '')}" data-route="${item.subject.includes('bozza pronta') ? 'revisione' : 'richieste'}">Apri</button><button class="mini-button" type="button" data-action="mark-notification" data-notification-id="${escapeHtml(item.id)}" data-read="true">Fatto</button></div></div>`;
   return `<section class="panel spaced-top-small"><p class="eyebrow">JARVIS</p>${autopilotRunning ? '<p class="notice">Jarvis sta preparando le nuove richieste…</p>' : ''}<div class="list">${notes.map(row).join('')}</div>${telegram}</section>`;
@@ -889,6 +900,10 @@ async function handleClick(event) {
     await doAction('jarvisBriefing', {}, 'Briefing inviato su Telegram e nel riquadro Jarvis.');
     return;
   }
+  if (action === 'voice-test') {
+    await doAction('testVoice', {}, 'Vocale di prova inviato su Telegram.');
+    return;
+  }
   if (action === 'telegram-test') {
     await doAction('telegramTest', {}, 'Messaggio di prova inviato su Telegram.');
     return;
@@ -1051,6 +1066,10 @@ async function handleSubmit(event) {
   if (kind === 'update-request-meta') { await doAction('updateRequest', { id: data.get('id'), revision: Number(data.get('revision')), patch: { ...(data.get('status') ? { status: data.get('status') } : {}), plan: data.get('plan'), contactName: data.get('contactName'), contactRole: data.get('contactRole'), contactInfo: data.get('contactInfo'), menuId: data.get('menuId'), publicUrl: data.get('publicUrl'), nextStep: data.get('nextStep'), internalNotes: data.get('internalNotes') } }, 'Pratica aggiornata.'); return; }
   if (kind === 'set-activation') { await doAction('setActivation', { id: data.get('id'), revision: Number(data.get('revision')), activation: data.get('activation'), date: data.get('date'), note: data.get('note') }, 'Attivazione registrata.'); return; }
   if (kind === 'upload-material') { const file = data.get('file'); await doUpload(selectedRequestId, file); return; }
+  if (kind === 'voice-settings') {
+    await doAction('setVoice', { provider: String(data.get('provider') || ''), voiceId: String(data.get('voiceId') || ''), apiKey: String(data.get('apiKey') || '') }, 'Voce di Jarvis salvata.');
+    return;
+  }
   if (kind === 'set-material-transcript') {
     if (isDemoMode) throw new Error('La demo non salva trascrizioni o hash di materiali.');
     const material = state.materials.find((item) => item.id === String(data.get('materialId') || ''));

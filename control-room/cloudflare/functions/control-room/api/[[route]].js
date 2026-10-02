@@ -3,6 +3,7 @@ import { applyMenuChanges } from '../../_lib/changes.js';
 import { prepareUpdate } from '../../_lib/update.js';
 import { PHOTO_TYPES, readMenuPdf, readMenuPhoto } from '../../_lib/vision.js';
 import { linkMailFiles, receiveMailFiles } from '../../_lib/mail-files.js';
+import { speak } from '../../_lib/voice.js';
 import { readCurrentMenu } from '../../_lib/github-live.js';
 import { isSameOriginWrite, verifyOwner } from '../../_lib/auth.js';
 import { slugify, validateMenu, venueFromSource } from '../../_lib/menu.js';
@@ -16,7 +17,7 @@ import { translateMenu, translationEntries, translationSummary } from '../../_li
 import { applyExtras, proposeSourceExtras } from '../../_lib/extras.js';
 import { autopilotMessage, autopilotPreview } from '../../_lib/autopilot.js';
 import { createMissions } from '../../_lib/missions.js';
-import { getMe, randomToken, sendTelegram, setWebhook, telegramReady } from '../../_lib/telegram.js';
+import { getMe, randomToken, sendTelegram, sendVoice, setWebhook, telegramReady } from '../../_lib/telegram.js';
 import { ACTIVATIONS, approvalEvidence, approvalState, assessReply, previewEmail, previewUrl, proposeReplyChanges, referenceCode, sha256Hex } from '../../_lib/approvals.js';
 const headers = { 'Cache-Control': 'private, no-store', 'Content-Type': 'application/json; charset=utf-8' };
 const answer = (body, status = 200) => new Response(JSON.stringify(body), { status, headers });
@@ -220,6 +221,7 @@ export async function state(db, env = {}) {
     notifications, messages, audit, autopilotPending: (await autopilotPending(db)).length,
     missions: await missionRows(db),
     telegram: { configured: telegramReady(env), linked: Boolean(await missions.setting(db, 'telegram_chat_id')) },
+    voice: { provider: (await missions.setting(db, 'voice_provider')) || '', voiceId: (await missions.setting(db, 'voice_id')) || '', hasKey: Boolean(await missions.setting(db, 'voice_api_key')) },
     proposals: proposals.map(({ diffJson, ...p }) => ({ ...p, diff: JSON.parse(diffJson) })),
     analyses: rawAnalyses.map(({ provenanceJson, warningsJson, ...entry }) => ({ ...entry,
       provenance: JSON.parse(provenanceJson), warnings: JSON.parse(warningsJson) })),
@@ -619,6 +621,32 @@ export async function action(db, type, input, env = {}) {
     result = { username: me.result.username, link: `https://t.me/${me.result.username}?start=${code}` };
   } else if (type === 'jarvisBriefing') {
     result = { text: await missions.briefing(db, env, { force: true }) };
+  } else if (type === 'setVoice') {
+    // Voce di Jarvis: la chiave resta solo nel database privato e non torna mai all'interfaccia.
+    const provider = String(p.provider || '');
+    assert(['elevenlabs', 'openai', 'nessuna'].includes(provider), 'Servizio voce non valido.');
+    const voiceId = String(p.voiceId || '').trim();
+    assert(!voiceId || /^[A-Za-z0-9_-]{2,40}$/.test(voiceId), 'Voce non valida.');
+    const apiKey = String(p.apiKey || '').trim();
+    assert(!apiKey || /^[A-Za-z0-9_\-.]{20,200}$/.test(apiKey), 'Chiave non valida: incollala senza spazi.');
+    if (provider === 'nessuna') { await missions.putSetting(db, 'voice_provider', ''); await missions.putSetting(db, 'voice_api_key', ''); }
+    else {
+      assert(apiKey || (await missions.setting(db, 'voice_api_key')), 'Incolla la chiave del servizio voce.');
+      await missions.putSetting(db, 'voice_provider', provider);
+      await missions.putSetting(db, 'voice_id', voiceId);
+      if (apiKey) await missions.putSetting(db, 'voice_api_key', apiKey);
+    }
+    await auditedBatch(db, [], 'jarvis.voice_settings', `Voce di Jarvis: ${provider}${voiceId ? ` (${voiceId})` : ''}.`, null);
+    result = { ok: true };
+  } else if (type === 'testVoice') {
+    const chat = await missions.setting(db, 'telegram_chat_id');
+    assert(chat && telegramReady(env), 'Telegram non ancora collegato.', 409);
+    const audio = await speak({ provider: await missions.setting(db, 'voice_provider'), apiKey: await missions.setting(db, 'voice_api_key'), voiceId: await missions.setting(db, 'voice_id') },
+      'Buonasera Riccardo. Sono Jarvis. Da adesso puoi parlarmi con un vocale: ti ascolto, preparo il lavoro e aspetto sempre il tuo sì prima di pubblicare.');
+    assert(audio, 'La voce non ha risposto: controlla servizio e chiave.', 502);
+    const sent = await sendVoice(env, chat, audio, 'Prova voce di Jarvis.');
+    assert(sent?.ok, 'Telegram non ha accettato il vocale.', 502);
+    result = { ok: true };
   } else if (type === 'telegramTest') {
     const chat = await missions.setting(db, 'telegram_chat_id');
     assert(chat && telegramReady(env), 'Telegram non ancora collegato.', 409);

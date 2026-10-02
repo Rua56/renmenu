@@ -5,7 +5,9 @@
 import { assessReply, proposeReplyChanges, sha256Hex } from './approvals.js';
 import { sendOwnerNotification } from './owner-notifications.js';
 import { briefingDue, buildBriefing, romeDay } from './briefing.js';
-import { answerCallback, clearButtons, downloadTelegramFile, sendTelegram, telegramReady } from './telegram.js';
+import { answerCallback, clearButtons, downloadTelegramFile, sendTelegram, sendVoice, telegramReady } from './telegram.js';
+import { matchVenue, speak, transcribe, understand } from './voice.js';
+import { classifyRequest } from './autopilot.js';
 
 export const PARTIAL_MARK = '[Testo parziale: leggi l’email completa in Gmail prima di decidere]';
 const ACTIVE = ['affidata', 'attesa_invio', 'attesa_cliente', 'attesa_si', 'pubblicazione', 'verifica'];
@@ -312,6 +314,7 @@ export function createMissions(deps) {
     }
     const message = update?.message;
     if (message?.chat?.id && String(message.chat.id) === chat && (message.photo || message.document)) { await receiveTelegramFile(db, env, chat, message); return; }
+    if (message?.chat?.id && String(message.chat.id) === chat && (message.voice || message.audio)) { await receiveVoice(db, env, chat, message); return; }
     if (!message?.chat?.id || typeof message.text !== 'string') return;
     const from = String(message.chat.id), text = message.text.trim();
     const start = /^\/start\s+([a-f0-9]{16,64})$/i.exec(text);
@@ -334,7 +337,71 @@ export function createMissions(deps) {
       await sendTelegram(env, chat, `${lines.length ? `Pratiche affidate a me:\n${lines.join('\n')}` : 'Nessuna pratica affidata in corso.'}\nRichieste aperte nella Control Room: ${pending}.`, null, deps.fetchImpl);
       return;
     }
-    await sendTelegram(env, chat, 'Capisco /stato, /briefing, i pulsanti SÌ / Non ancora e le foto o i PDF dei menu (mandameli qui e ti chiedo a quale pratica collegarli). Il resto lo gestisci dalla Control Room.', null, deps.fetchImpl);
+    if (/^\/aiuto\b|^\/help\b/i.test(text) || text.startsWith('/')) {
+      await sendTelegram(env, chat, 'Puoi scrivermi o mandarmi un vocale: «com’è la situazione?», «al Bakaro il frico ora costa 14», «pubblica il menu di …». Capisco anche /stato, /briefing, le foto e i PDF dei menu. Pubblicare richiede sempre il tuo SÌ col pulsante.', null, deps.fetchImpl);
+      return;
+    }
+    await converse(db, env, chat, text, false);
+  }
+
+  // ——— Conversazione (testo o voce) ———
+  async function voiceSettings(db) {
+    return { provider: await setting(db, 'voice_provider'), apiKey: await setting(db, 'voice_api_key'), voiceId: await setting(db, 'voice_id') };
+  }
+  async function reply(db, env, chat, text, spoken, buttons = null) {
+    const audio = spoken ? await speak(await voiceSettings(db), text, deps.fetchImpl) : null;
+    if (audio && !buttons) { const sent = await sendVoice(env, chat, audio, text, deps.fetchImpl); if (sent?.ok) return; }
+    if (audio && buttons) await sendVoice(env, chat, audio, '', deps.fetchImpl);
+    await sendTelegram(env, chat, text, buttons, deps.fetchImpl);
+  }
+  async function receiveVoice(db, env, chat, message) {
+    const media = message.voice || message.audio;
+    if (Number(media.duration || 0) > 180) { await sendTelegram(env, chat, 'Il vocale è troppo lungo: tienilo sotto i 3 minuti.', null, deps.fetchImpl); return; }
+    const file = await downloadTelegramFile(env, media.file_id, deps.fetchImpl);
+    if (!file?.bytes?.length) { await sendTelegram(env, chat, 'Non riesco a scaricare il vocale da Telegram: riprova.', null, deps.fetchImpl); return; }
+    const heard = await transcribe(env.AI, file.bytes);
+    if (!heard.ok) { await sendTelegram(env, chat, `Perdona Riccardo, ${heard.reason}. Puoi ripetere?`, null, deps.fetchImpl); return; }
+    await converse(db, env, chat, heard.text, true);
+  }
+  async function voiceContext(db, env) {
+    const brief = await buildBriefing(db, env, { fetchImpl: deps.fetchImpl }).catch(() => '');
+    const clients = await rows(db, "SELECT name,menu_id,plan,trial_ends_at,renewal_at FROM clients WHERE menu_id IS NOT NULL AND menu_id<>'' ORDER BY name LIMIT 60").catch(() => []);
+    const open = await rows(db, "SELECT subject,status FROM requests WHERE status NOT IN ('completata','archiviata','chiusa') ORDER BY updated_at DESC LIMIT 15").catch(() => []);
+    return `${brief}\n\nLocali con menu online: ${clients.map((c) => `${c.name} (menu ${c.menu_id}, piano ${c.plan}${c.trial_ends_at ? `, prova fino al ${String(c.trial_ends_at).slice(0, 10)}` : ''}${c.renewal_at ? `, rinnovo ${String(c.renewal_at).slice(0, 10)}` : ''})`).join('; ') || 'nessuno'}.\nPratiche aperte: ${open.map((r) => `${r.subject} [${r.status}]`).join('; ') || 'nessuna'}.`;
+  }
+  async function converse(db, env, chat, utterance, spoken) {
+    const said = spoken ? `«${utterance}»\n\n` : '';
+    const intent = await understand(env.AI, utterance, await voiceContext(db, env));
+    if (intent.intent === 'risposta' && intent.risposta) { await reply(db, env, chat, `${said}${intent.risposta}`, spoken); return; }
+    if (intent.intent === 'pubblica') {
+      const waiting = await rows(db, "SELECT m.id,d.menu_json,d.slug FROM jarvis_missions m JOIN drafts d ON d.id=m.draft_id WHERE m.status='attesa_si' ORDER BY m.updated_at DESC LIMIT 10");
+      const named = waiting.map((m) => { let name = m.slug; try { name = JSON.parse(m.menu_json).nome || name; } catch {} return { ...m, name, menu_id: m.slug }; });
+      const pick = intent.locale ? matchVenue(intent.locale, named).client : named.length === 1 ? named[0] : null;
+      if (!named.length) { await reply(db, env, chat, `${said}Al momento nessun menu aspetta il tuo SÌ, Riccardo.`, spoken); return; }
+      if (!pick) { await reply(db, env, chat, `${said}Aspettano il tuo SÌ: ${named.map((m) => m.name).join(', ')}. Quale pubblico?`, spoken); return; }
+      await reply(db, env, chat, `${said}«${pick.name}» è pronto. Per sicurezza la pubblicazione la confermi tu col pulsante.`, spoken, [['SÌ, pubblica', `pub:${pick.id}`], ['Non ancora', `no:${pick.id}`]]);
+      return;
+    }
+    if (intent.intent === 'aggiorna_menu') { await reply(db, env, chat, `${said}${await voiceUpdate(db, env, utterance, intent.locale)}`, spoken); return; }
+    await reply(db, env, chat, `${said}${intent.risposta || 'Non sono sicuro di aver capito, Riccardo. Puoi ripetere con altre parole?'}`, spoken);
+  }
+  // Modifica a voce di un menu già online: pratica + bozza dal menu su main, con le sole parole di Riccardo.
+  async function voiceUpdate(db, env, utterance, spokenVenue) {
+    const clients = await rows(db, "SELECT id,name,menu_id,plan FROM clients WHERE menu_id IS NOT NULL AND menu_id<>''");
+    const { client, candidates } = matchVenue(spokenVenue, clients);
+    if (!client) return candidates.length > 1 ? `Ho trovato più locali: ${candidates.map((c) => c.name).join(', ')}. Quale intendi?` : `Non trovo un locale con menu online che si chiami «${spokenVenue || '…'}». Dimmi il nome come nella scheda cliente.`;
+    const proposal = classifyRequest('Richiesta a voce', utterance);
+    const category = ['prezzo', 'piatto', 'vini_cocktail', 'disponibilita'].includes(proposal.category) ? proposal.category : 'piatto';
+    const jarvis = jarvisDb(db);
+    let requestId;
+    try {
+      requestId = (await action(jarvis, 'createRequest', { clientId: client.id, subject: `Richiesta a voce · ${client.name}`, sourceText: utterance, sourceChannel: 'altro', category })).result.id;
+      await action(jarvis, 'generateDraft', { requestId }, env);
+    } catch (error) {
+      return `Ho aperto la pratica per «${client.name}», ma non ho preparato la bozza: ${String(error?.message || 'errore').slice(0, 200)}`;
+    }
+    const done = await getOne(db, "SELECT summary FROM audit_events WHERE request_id=? AND action='draft.generate' ORDER BY created_at DESC LIMIT 1", requestId);
+    return `Fatto. Ho preparato l’aggiornamento di «${client.name}» partendo dal menu online. ${done?.summary || ''} Lo trovi in Revisione: niente va online senza il tuo SÌ.`;
   }
 
   // Foto o PDF mandati da Riccardo al bot: Jarvis chiede a quale pratica collegarli.
