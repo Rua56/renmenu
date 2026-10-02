@@ -95,3 +95,15 @@ export function planIssues(menu, plan, checks) {
   }
   return issues;
 }
+
+// Avvisi non bloccanti (decisione di Riccardo, 2026-10-02): lo Standard include IT + EN,
+// ma l'inglese mancante non blocca; la traduzione resta una bozza da far approvare.
+export function planWarnings(menu, plan) {
+  const rule = PLAN_RULES[plan];
+  if (!rule?.allowedLanguages) return [];
+  const languages = Array.isArray(menu?.lingue) && menu.lingue.length ? menu.lingue : ['it'];
+  const missing = rule.allowedLanguages.filter((lang) => !languages.includes(lang));
+  return missing.length
+    ? [`${rule.label}: il piano include ${rule.allowedLanguages.join(' + ').toUpperCase()}, ma il menu non ha ancora ${missing.join(', ').toUpperCase()}. Prepara la traduzione come bozza e falla approvare prima della pubblicazione reale.`]
+    : [];
+}

@@ -28,6 +28,8 @@ export function criticalFields(menu) {
   return { pricesMissing, allergensMissing, translationsMissing };
 }
 
+export const EVIDENCE_LABELS = Object.freeze({ prices: 'Evidenza prezzi', allergens: 'Evidenza allergeni', languages: 'Evidenza lingue' });
+
 // `plan` is optional for backward compatibility; every production caller passes it.
 export function reviewIssues(menu, checks, plan) {
   const issues = [];
@@ -40,7 +42,7 @@ export function reviewIssues(menu, checks, plan) {
     issues.push('ALLERGENI NON CONFERMATI DAL LOCALE: serve una conferma esplicita sull’omissione oppure la fonte per ogni voce.');
   for (const key of ['prices', 'allergens', 'languages']) {
     if (checks?.[key] && !description(checks?.fieldEvidence?.[key]))
-      issues.push(`${key}: inserisci il riferimento scritto e controllabile alla fonte (12–500 caratteri).`);
+      issues.push(`${EVIDENCE_LABELS[key]}: inserisci il riferimento scritto e controllabile alla fonte (12–500 caratteri).`);
   }
   if (checks?.clientApproval && !description(checks?.clientApprovalEvidence))
     issues.push('Riferimento all’approvazione scritta del locale mancante (12–500 caratteri).');

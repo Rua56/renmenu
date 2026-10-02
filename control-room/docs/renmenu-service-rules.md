@@ -83,3 +83,9 @@ Le regole sono applicate da `cloudflare/functions/_lib/service-rules.js`; `site/
 - Premium: senza approvazione creativa di Riccardo, con riferimento scritto, la PR resta bloccata.
 
 Ordine di distribuzione nello staging: prima applicare la migrazione 0004 al solo D1 privato della Control Room, poi distribuire il codice. Se la migrazione manca, la dashboard resta leggibile ma la creazione di pratiche con categoria fallisce.
+
+Lingue del piano Standard (decisione del 2026-10-02): lo Standard include IT + EN. Se il menu non ha ancora l'inglese, Jarvis mostra un avviso non bloccante nel Builder, nelle Approvazioni e nel riepilogo di conferma; la traduzione resta una bozza da far approvare.
+
+Provenienza delle bozze: la migrazione `0005_draft_provenance.sql` aggiunge `drafts.provenance_json`. La bozza generata registra la riga del testo ricevuto da cui viene ogni nome e prezzo; un salvataggio manuale la azzera. Applicare la 0005 al solo D1 privato prima del codice: senza la colonna la dashboard resta leggibile, ma la generazione di nuove bozze fallisce.
+
+Nome del locale da Gmail: se il cliente è ancora il segnaposto "Nuovo contatto email", la bozza di un menu nuovo usa soltanto una riga esplicita "Locale: …" o "Ristorante: …" del testo, con un avviso da confermare in revisione. La scheda cliente non viene modificata automaticamente.
