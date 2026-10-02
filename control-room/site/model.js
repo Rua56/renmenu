@@ -101,7 +101,9 @@ export function validateMenu(menu) {
     return { valid: false, errors, warnings };
   }
 
-  const essential = [['nome', menu.nome]];
+  // Il nome del locale è un nome proprio: nei menù pubblici è una stringa e non si traduce.
+  // Solo se è già un oggetto per lingua va controllato come gli altri testi essenziali.
+  const essential = isObject(menu.nome) ? [['nome', menu.nome]] : [];
   menu.sezioni.forEach((section, sectionIndex) => {
     const sectionPath = `sezioni.${sectionIndex}`;
     if (!isObject(section)) { add('error', sectionPath, 'La sezione deve essere un oggetto JSON.'); return; }
