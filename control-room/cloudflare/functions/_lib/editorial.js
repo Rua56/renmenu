@@ -24,7 +24,10 @@ export function criticalFields(menu) {
       if (!Array.isArray(item?.allergeni) || item.allergeni.length === 0) allergensMissing.push(`${path}.allergeni`);
     }
   }
-  for (const lang of languages) if (!localized(menu?.nome, lang, languages[0])) translationsMissing.push(`nome.${lang}`);
+  // Il nome del locale è un nome proprio e non si traduce (come nei menu pubblicati, es. "Al Bakaro"):
+  // una stringa semplice vale per tutte le lingue; se è un oggetto per lingua, servono tutte.
+  const venueNamed = typeof menu?.nome === 'string' && Boolean(menu.nome.trim());
+  for (const lang of languages) if (!venueNamed && !localized(menu?.nome, lang, languages[0])) translationsMissing.push(`nome.${lang}`);
   return { pricesMissing, allergensMissing, translationsMissing };
 }
 
