@@ -498,7 +498,7 @@ describe('private AI + GitHub operations (fakes only)', () => {
       const pages = publicFetch((url, init) => {
         assert.equal(url.href, 'https://renmenu.pages.dev/menus/osteria-di-prova.json');
         assert.equal(init.method, 'GET');
-        assert.equal(init.redirect, 'error');
+        assert.equal(init.redirect, 'manual', 'i Worker non supportano redirect:error');
         return response(reorderedMenu());
       });
       const env = {
@@ -597,7 +597,7 @@ describe('private AI + GitHub operations (fakes only)', () => {
       await assert.rejects(() => runPrivateIntegrationAction(context(db, {
         GITHUB_PROVIDER: 'live', GITHUB_TOKEN: 'test-token', GITHUB_FETCH: github.fetch, PUBLIC_FETCH: pages.fetch
       }), 'githubVerifyPublication', fixture.payload), (error) => error.status === 409);
-      assert.equal(pages.calls[0].init.redirect, 'error');
+      assert.equal(pages.calls[0].init.redirect, 'manual');
       assert.equal(getOne(db, 'SELECT status FROM live_pr_operations WHERE id=?', fixture.operationId).status, 'pr_open');
     } finally { db.close(); }
   });
