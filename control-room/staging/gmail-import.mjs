@@ -78,6 +78,41 @@ export function buildImportBatch(e, stamp = new Date().toISOString()) {
   return { batch, ids: { eventId, requestId }, expectedStatus: status };
 }
 
+// Risposta del locale a un'anteprima (oggetto con «rif. RM-XXXXXX»): non crea una nuova
+// pratica, collega il testo all'approvazione in attesa. L'approvazione resta da confermare
+// a Riccardo nella Control Room; qui non si decide nulla.
+export const REFERENCE = /\bRM-[A-HJ-NP-Z2-9]{6}\b/;
+export const PARTIAL_MARK = '[Testo parziale: leggi l’email completa in Gmail prima di decidere]';
+export const APPROVAL_SQL = "SELECT id,request_id,status,lower(recipient) AS recipient FROM publication_approvals WHERE reference_code=?";
+export function replyReference(e) {
+  const match = REFERENCE.exec(String(e?.subject || ''));
+  return match ? match[0] : null;
+}
+export function buildReplyBatch(e, approval, stamp = new Date().toISOString()) {
+  const error = validateEvent(e);
+  if (error) return { error };
+  const from = e.from.toLowerCase();
+  if (!approval || approval.recipient !== from) return { error: 'REPLY_SENDER_MISMATCH' };
+  if (!['anteprima_pronta', 'anteprima_inviata', 'risposta_ricevuta'].includes(approval.status)) return { error: 'REPLY_NOT_EXPECTED' };
+  const receivedAt = new Date(e.receivedAt).toISOString();
+  const raw = Buffer.from(String(e.text || ''), 'utf8').subarray(0, 3000).toString('utf8').replace(/\uFFFD$/, '').replace(/[\u0000-\u0008\u000b\u000c\u000e-\u001f\u007f]/g, ' ');
+  const partial = !e.bodyComplete || e.ambiguous || e.hasAttachments || Buffer.byteLength(String(e.text || ''), 'utf8') > 3000;
+  const text = partial ? `${PARTIAL_MARK}\n${raw}` : raw;
+  const eventId = `gmail-event-${e.messageId}`, auditId = `gmail-audit-${e.messageId}`;
+  const gate = "EXISTS (SELECT 1 FROM external_events WHERE id=? AND status='received')";
+  const batch = [
+    { sql: "INSERT INTO external_events (id,source,source_event_id,request_id,status,reason,received_at) VALUES (?,'gmail',?,NULL,'received',NULL,?) ON CONFLICT(source,source_event_id) DO NOTHING",
+      params: [eventId, e.messageId, receivedAt] },
+    { sql: `UPDATE publication_approvals SET status='risposta_ricevuta',reply_message_id=?,reply_from=?,reply_text=?,reply_received_at=?,revision=revision+1,updated_at=? WHERE id=? AND status IN ('anteprima_pronta','anteprima_inviata','risposta_ricevuta') AND ${gate}`,
+      params: [e.messageId, from, text, receivedAt, stamp, approval.id, eventId] },
+    { sql: `INSERT INTO audit_events (id,request_id,action,summary,actor,created_at) SELECT ?,?,'gmail.client_reply','Risposta del locale all’anteprima ricevuta: da valutare in Approvazioni.','gmail-connector',? WHERE ${gate} AND NOT EXISTS (SELECT 1 FROM audit_events WHERE id=?)`,
+      params: [auditId, approval.request_id, stamp, eventId, auditId] },
+    { sql: "UPDATE external_events SET request_id=?,status='imported',reason='client_reply' WHERE id=? AND status='received' AND EXISTS (SELECT 1 FROM publication_approvals WHERE id=? AND reply_message_id=?)",
+      params: [approval.request_id, eventId, approval.id, e.messageId] }
+  ];
+  return { batch, ids: { eventId, requestId: approval.request_id }, expectedStatus: 'imported', kind: 'client_reply' };
+}
+
 export const VERIFY_SQL = 'SELECT status,request_id FROM external_events WHERE source=? AND source_event_id=?';
 
 function d1(sql, params) {
@@ -92,14 +127,20 @@ function d1(sql, params) {
 
 async function main(file) {
   const event = JSON.parse(readFileSync(file, 'utf8'));
-  const plan = buildImportBatch(event);
+  // Una risposta a un'anteprima si collega all'approvazione solo se il riferimento esiste e il
+  // mittente coincide con il destinatario dell'anteprima; altrimenti segue l'import normale.
+  const reference = replyReference(event);
+  const approval = reference ? d1(APPROVAL_SQL, [reference])?.results?.[0] : null;
+  const reply = approval ? buildReplyBatch(event, approval) : null;
+  const plan = reply && !reply.error ? reply : buildImportBatch(event);
   if (plan.error) { console.log(JSON.stringify({ ok: false, reason: plan.error })); process.exit(2); }
   // Sequenziale e idempotente: un nuovo tentativo dopo un errore completa il record senza duplicarlo.
   for (const { sql, params } of plan.batch) d1(sql, params);
   const row = d1(VERIFY_SQL, ['gmail', event.messageId])?.results?.[0];
   const ok = row?.status === plan.expectedStatus && (plan.ids.requestId === null || row?.request_id === plan.ids.requestId);
   // Un evento già registrato prima (stesso ID) è un duplicato: nessuna nuova pratica.
-  console.log(JSON.stringify({ ok, messageId: event.messageId, requestId: row?.request_id || null, status: row?.status || 'unverified', expected: plan.expectedStatus }));
+  console.log(JSON.stringify({ ok, messageId: event.messageId, requestId: row?.request_id || null, status: row?.status || 'unverified', expected: plan.expectedStatus,
+    kind: plan.kind || 'request', ...(reference ? { reference, replyLinked: plan.kind === 'client_reply', replyIssue: reply?.error || null } : {}) }));
   process.exit(ok ? 0 : 1);
 }
 

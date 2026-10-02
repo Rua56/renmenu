@@ -1,4 +1,5 @@
 import { createAiLiveAdapter } from './ai-live.js';
+import { approvalState, sha256Hex } from './approvals.js';
 import { GitHubLiveError, getPrStatus, openApprovedMenuPr, readCurrentMenu } from './github-live.js';
 import { reviewIssues } from './editorial.js';
 import { slugify, validateMenu } from './menu.js';
@@ -407,6 +408,14 @@ async function loadPrContext(context, p) {
   try { checks = JSON.parse(draft.checks_json); } catch { fail('Checklist editoriale non leggibile.', 409); }
   const review = reviewIssues(menu, checks, draft.request_plan);
   assert(!review.issues.length, 'Conferme o fonti editoriali mancanti: torna alla checklist.', 403);
+  // Percorso di approvazione: risposta del cliente confermata da Riccardo sul contenuto attuale,
+  // e attivazione del servizio registrata per i menu nuovi.
+  let approval = null;
+  try { approval = await context.getOne(context.db, 'SELECT * FROM publication_approvals WHERE draft_id=?', draft.id); }
+  catch (error) { if (!/no such table/i.test(String(error?.message))) throw error; }
+  const gate = approvalState(approval, await sha256Hex(draft.menu_json), draft.request_kind);
+  assert(gate.valid, gate.stale ? 'La bozza è cambiata dopo l’approvazione del cliente: serve una nuova anteprima.' : 'Manca l’approvazione del cliente registrata.', 403);
+  assert(!gate.activationMissing, 'Menu nuovo: manca l’attivazione del servizio registrata.', 403);
   const operationKey = clean(p.operationKey, 128, 'Chiave operazione');
   assert(OPERATION_KEY.test(operationKey), 'Chiave operazione non valida.');
   const baseSha = clean(p.expectedBaseSha, 128, 'SHA base');
