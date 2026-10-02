@@ -78,7 +78,7 @@ async function requestRows(db) {
 // Un nuovo menu non può riusare l'identificativo (URL/QR) di un'altra bozza o di un altro cliente:
 // una pubblicazione reale sovrascriverebbe il menu di un altro locale.
 async function assertSlugFree(db, slug, requestId, clientId) {
-  const draft = await getOne(db, 'SELECT d.slug, c.name AS clientName FROM drafts d JOIN requests r ON r.id=d.request_id JOIN clients c ON c.id=r.client_id WHERE d.slug=? AND d.request_id<>? LIMIT 1', slug, requestId);
+  const draft = await getOne(db, 'SELECT d.slug, c.name AS clientName FROM drafts d JOIN requests r ON r.id=d.request_id JOIN clients c ON c.id=r.client_id WHERE d.slug=? AND d.request_id<>? AND r.status<>'archiviata' LIMIT 1', slug, requestId); // le prove archiviate (mai pubblicate) non bloccano il nome
   const client = await getOne(db, 'SELECT name FROM clients WHERE menu_id=? AND id<>? LIMIT 1', slug, clientId || '');
   const owner = draft?.clientName || client?.name;
   assert(!owner, `Identificativo «${slug}» già usato da «${owner}»: un nuovo menu sovrascriverebbe quel locale. Imposta nella pratica un Menu ID diverso, poi salva e genera.`, 409);
