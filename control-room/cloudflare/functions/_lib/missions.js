@@ -137,7 +137,8 @@ export function createMissions(deps) {
     const sent = await sendOwnerNotification({ db: jarvisDb(db), env, requestId: mission.request_id,
       subject: `${OUTBOX_SUBJECT} ${code}`,
       text: `Comando interno di Jarvis per l'automazione Gmail di renmenu1569: invia l'anteprima ${code} dalla coda di Jarvis. Tentativo ${attempt}. Nessun dato del cliente in questa email.`,
-      priority: 'normale', now: new Date(), fetchImpl: deps.fetchImpl });
+      // Comando tecnico, non un avviso per Riccardo: non rispetta le ore di silenzio (21–8).
+      priority: 'urgente', now: new Date(), fetchImpl: deps.fetchImpl });
     await db.prepare('UPDATE jarvis_outbox SET trigger_count=?,triggered_at=?,error=?,updated_at=? WHERE id=?')
       .bind(attempt, now(), sent?.ok ? null : String(sent?.reason || sent?.code || 'TRIGGER_FAILED').slice(0, 120), now(), outbox.id).run();
   }
@@ -154,6 +155,12 @@ export function createMissions(deps) {
       return next;
     }
     const waited = Date.now() - Date.parse(outbox.triggered_at || outbox.created_at);
+    if (outbox.status === 'in_coda' && outbox.error) {
+      // Il comando non è partito (es. Resend non raggiungibile): si riprova al minuto successivo.
+      if (outbox.trigger_count >= 5) return stop(db, env, mission, `non riesco a mandare il comando di invio (${outbox.error})`);
+      await trigger(db, env, mission, outbox.reference_code);
+      return mission;
+    }
     if (outbox.status === 'in_coda' && waited > 20 * MINUTE) {
       if (outbox.trigger_count >= 2) return stop(db, env, mission, `l’automazione Gmail non ha inviato l’anteprima ${outbox.reference_code} dopo 2 tentativi`);
       await trigger(db, env, mission, outbox.reference_code);
