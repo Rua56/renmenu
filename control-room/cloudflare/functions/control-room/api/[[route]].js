@@ -5,7 +5,8 @@ import { reviewIssues, EVIDENCE_LABELS } from '../../_lib/editorial.js';
 import { runPrivateIntegrationAction } from '../../_lib/operations.js';
 import { sendOwnerNotification, OWNER_NOTIFICATION_RECIPIENT } from '../../_lib/owner-notifications.js';
 import { purgePublishedEmail } from '../../_lib/email-retention.js';
-import { resolveCategory, draftBlocker } from '../../_lib/service-rules.js';
+import { resolveCategory, draftBlocker, PLAN_RULES } from '../../_lib/service-rules.js';
+import { translateMenu, translationEntries, translationSummary } from '../../_lib/translate.js';
 const headers = { 'Cache-Control': 'private, no-store', 'Content-Type': 'application/json; charset=utf-8' };
 const answer = (body, status = 200) => new Response(JSON.stringify(body), { status, headers });
 const failure = (status, message) => answer({ error: message }, status);
@@ -71,6 +72,7 @@ async function assertSlugFree(db, slug, requestId, clientId) {
   const owner = draft?.clientName || client?.name;
   assert(!owner, `Identificativo «${slug}» già usato da «${owner}»: un nuovo menu sovrascriverebbe quel locale. Imposta nella pratica un Menu ID diverso, poi salva e genera.`, 409);
 }
+const autoTranslationReady = (env) => typeof env?.AI?.run === 'function' && String(env?.TRANSLATION_PROVIDER || 'workers_ai') !== 'disabled';
 const DRAFTS_SQL = 'SELECT id,request_id AS requestId,slug,menu_json AS menuJson,status,checks_json AS checksJson,revision,created_at AS createdAt,updated_at AS updatedAt FROM drafts ORDER BY created_at DESC LIMIT 500';
 // Fallback finche la migrazione 0005 (colonna provenance_json) non e applicata allo staging D1.
 async function draftRows(db) {
@@ -246,6 +248,15 @@ async function action(db, type, input, env = {}) {
     const extraction = integrations(env).ai.extract(venue, request.source_text, desiredSlug);
     if (sourceVenue) extraction.warnings.push(`Nome del locale letto dalla riga “Locale:” dell’email (“${sourceVenue}”): confermalo in revisione e aggiorna la scheda cliente.`);
     assert(extraction.extracted.length > 0 && extraction.menu.id, 'Nessun piatto con prezzo leggibile: aggiungi il materiale o trascrivi la fonte.', 422);
+    // Tutti i piani includono l'inglese: Jarvis lo prepara subito come bozza da verificare.
+    if (PLAN_RULES[request.plan] && autoTranslationReady(env)) {
+      const translation = await translateMenu(env.AI, extraction.menu, { lang: 'en' });
+      extraction.menu = translation.menu;
+      extraction.provenance = [...(extraction.provenance || []), ...translation.provenance];
+      extraction.translation = { translated: translation.translated, total: translation.total, skipped: translation.skipped };
+      const note = translationSummary(translation);
+      if (note) extraction.warnings.push(note);
+    }
     const id = uid(), timestamp = now(), menuJson = JSON.stringify(extraction.menu);
     await auditedBatch(db, [
       db.prepare('INSERT INTO drafts (id,request_id,slug,menu_json,status,checks_json,provenance_json,revision,created_at,updated_at) SELECT ?,id,?,?,?,?,?,?,?,? FROM requests WHERE id=? AND revision=?')
@@ -257,6 +268,37 @@ async function action(db, type, input, env = {}) {
     ], 'draft.generate', `Bozza da ${extraction.extracted.length} voci attestate; ${extraction.uncertain.length} righe da verificare.`, requestId,
       { sql: 'SELECT 1 FROM drafts WHERE id=?', args: [id] });
     result = { id, extraction };
+  } else if (type === 'translateDraft') {
+    // Completa le voci ancora senza inglese. Non tocca prezzi/allergeni né i testi EN già presenti;
+    // la checklist si azzera perché i contenuti cambiano.
+    const id = identifier(p.id), revision = Number(p.revision);
+    const draft = await getOne(db, 'SELECT * FROM drafts WHERE id=?', id);
+    assert(draft, 'Bozza non trovata.', 404);
+    assert(Number.isInteger(revision) && revision === draft.revision, 'Bozza modificata da un’altra sessione. Ricarica.', 409);
+    assert(['bozza', 'revisione', 'pronta_pr'].includes(draft.status), 'Bozza già chiusa: apri una nuova pratica.', 409);
+    assert(autoTranslationReady(env), 'Traduzione automatica non disponibile in questo ambiente.', 503);
+    const menu = JSON.parse(draft.menu_json);
+    assert(translationEntries(menu, 'en').length, 'Tutti i testi hanno già l’inglese: niente da tradurre.', 422);
+    const linkedRequest = await getOne(db, 'SELECT revision FROM requests WHERE id=?', draft.request_id);
+    const translation = await translateMenu(env.AI, menu, { lang: 'en' });
+    assert(!translation.unavailable, 'Servizio di traduzione non disponibile in questo momento: riprova tra poco.', 502);
+    assert(translation.translated > 0, `Nessuna traduzione accettata: ${translationSummary(translation)}`, 422);
+    const validation = validateMenu(translation.menu);
+    assert(!validation.errors.length, `Menù non valido dopo la traduzione: ${validation.errors.slice(0, 3).join(' ')}`);
+    const previous = parseList(draft.provenance_json).filter((entry) => !String(entry.path).endsWith('.en'));
+    const provenance = [...previous, ...translation.provenance, ...parseList(draft.provenance_json).filter((entry) => String(entry.path).endsWith('.en'))];
+    const menuJson = JSON.stringify(translation.menu), timestamp = now();
+    const saved = await auditedBatch(db, [
+      db.prepare("UPDATE drafts SET menu_json=?,checks_json=?,provenance_json=?,status='revisione',revision=revision+1,updated_at=? WHERE id=? AND revision=? AND EXISTS (SELECT 1 FROM requests WHERE requests.id=? AND requests.revision=?)")
+        .bind(menuJson, JSON.stringify(checksDefault()), JSON.stringify(provenance), timestamp, id, revision, draft.request_id, linkedRequest.revision),
+      db.prepare('INSERT INTO draft_versions (id,draft_id,revision,menu_json,actor,created_at) SELECT ?,id,?,?,?,? FROM drafts WHERE id=? AND revision=?')
+        .bind(uid(), revision + 1, menuJson, 'traduzione_jarvis', timestamp, id, revision + 1),
+      db.prepare("UPDATE requests SET status='in_revisione',revision=revision+1,updated_at=? WHERE id=? AND revision=? AND EXISTS (SELECT 1 FROM drafts WHERE drafts.id=? AND drafts.revision=? AND drafts.status='revisione')")
+        .bind(timestamp, draft.request_id, linkedRequest.revision, id, revision + 1)
+    ], 'draft.translate', translationSummary(translation), draft.request_id,
+      { sql: 'SELECT 1 FROM draft_versions WHERE draft_id=? AND revision=?', args: [id, revision + 1] });
+    assert(saved.every((entry) => entry.meta.changes === 1), 'Bozza o pratica modificata da un’altra sessione. Ricarica.', 409);
+    result = { id, translation: { translated: translation.translated, total: translation.total, skipped: translation.skipped }, validation };
   } else if (type === 'saveDraft') {
     const id = identifier(p.id), revision = Number(p.revision);
     const draft = await getOne(db, 'SELECT * FROM drafts WHERE id=?', id);

@@ -436,4 +436,39 @@ describe('Control Room API staging', () => {
       assert.equal(stolen.status, 409);
     } finally { db.close(); }
   });
+  it('nuovo menu: Jarvis prepara subito l’inglese come bozza; “Traduci in inglese” completa le voci mancanti', async () => {
+    const db = database();
+    const ai = { async run(model, payload) {
+      const items = JSON.parse(payload.messages[1].content.split('\n').slice(1).join('\n'));
+      const dict = { Primi: 'First courses', 'Gnocchi al ragù': 'Gnocchi with meat sauce', Dolci: 'Desserts', Tiramisù: 'Tiramisù' };
+      return { response: { translations: items.filter(({ it }) => dict[it]).map(({ id, it }) => ({ id, en: dict[it] })) } };
+    } };
+    try {
+      const client = await action(db, 'createClient', { name: 'Osteria Inglese' });
+      const req = await action(db, 'createRequest', { clientId: client.body.result.id, subject: 'Menu', sourceChannel: 'email', category: 'nuovo_standard', sourceText: '# Primi\nGnocchi al ragù — 12,00\n# Dolci\nTiramisù — 6,00\nStrudel — 5,00' });
+      const generated = await call(db, 'actions', { type: 'generateDraft', payload: { requestId: req.body.result.id } }, { AI: ai });
+      assert.equal(generated.status, 200);
+      const draft = generated.body.state.drafts[0];
+      assert.deepEqual(draft.menu.lingue, ['it', 'en']);
+      assert.equal(draft.menu.sezioni[0].voci[0].nome.en, 'Gnocchi with meat sauce');
+      assert.equal(draft.menu.sezioni[0].voci[0].prezzo, '12,00');
+      assert.equal(draft.menu.sezioni[1].voci[1].nome.en, undefined, 'Strudel senza proposta: resta da completare');
+      assert.ok(generated.body.result.extraction.warnings.some((w) => /4 di 5 testi.*1 da completare/.test(w)));
+      assert.ok(draft.provenance.some((e) => e.path === 'sezioni.0.voci.0.prezzo'), 'provenienza prezzi conservata');
+      assert.ok(draft.provenance.some((e) => e.path === 'sezioni.0.voci.0.nome.en' && e.status === 'da_verificare'));
+      // Seconda passata: l’unica voce mancante viene completata, le altre restano invariate.
+      const ai2 = { async run(model, payload) { const items = JSON.parse(payload.messages[1].content.split('\n').slice(1).join('\n'));
+        assert.deepEqual(items.map((i) => i.it), ['Strudel']); return { response: { translations: [{ id: 0, en: 'Apple strudel' }] } }; } };
+      const done = await call(db, 'actions', { type: 'translateDraft', payload: { id: draft.id, revision: draft.revision } }, { AI: ai2 });
+      assert.equal(done.status, 200);
+      const updated = done.body.state.drafts[0];
+      assert.equal(updated.menu.sezioni[1].voci[1].nome.en, 'Apple strudel');
+      assert.equal(updated.revision, draft.revision + 1);
+      assert.equal(updated.checks.prices, false, 'contenuti cambiati: checklist azzerata');
+      const again = await call(db, 'actions', { type: 'translateDraft', payload: { id: draft.id, revision: updated.revision } }, { AI: ai2 });
+      assert.equal(again.status, 422);
+      const noAi = await action(db, 'translateDraft', { id: draft.id, revision: updated.revision });
+      assert.equal(noAi.status, 503);
+    } finally { db.close(); }
+  });
 });
