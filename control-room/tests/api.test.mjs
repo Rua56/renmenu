@@ -30,6 +30,7 @@ function database() {
   sqlite.exec(readFileSync(new URL('../cloudflare/migrations/0001_initial.sql', import.meta.url), 'utf8'));
   sqlite.exec(readFileSync(new URL('../cloudflare/migrations/0002_integrations.sql', import.meta.url), 'utf8'));
   sqlite.exec(readFileSync(new URL('../cloudflare/migrations/0003_ai_free_scope.sql', import.meta.url), 'utf8'));
+  sqlite.exec(readFileSync(new URL('../cloudflare/migrations/0004_request_category.sql', import.meta.url), 'utf8'));
   return {
     prepare(sql) {
       return { bind(...params) {
@@ -224,7 +225,7 @@ describe('Control Room API staging', () => {
     const BUCKET = { put: async (key, bytes) => objects.set(key, bytes), get: async () => null, delete: async (key) => objects.delete(key) };
     try {
       const clientId = (await action(db, 'createClient', { name: 'Locale simulato', menuId: 'qr-invariato' })).body.result.id;
-      const requestId = (await action(db, 'createRequest', { clientId, subject: 'Cambio prezzo', sourceChannel: 'manuale', kind: 'prezzo', sourceText: '## Piatti\nZuppa — 8,00' })).body.result.id;
+      const requestId = (await action(db, 'createRequest', { clientId, subject: 'Cambio prezzo', sourceChannel: 'manuale', plan: 'standard', kind: 'prezzo', sourceText: '## Piatti\nZuppa — 8,00' })).body.result.id;
       const extracted = await action(db, 'generateDraft', { requestId });
       assert.equal(extracted.status, 200);
       const draft = extracted.body.state.drafts.find((item) => item.requestId === requestId);
@@ -256,7 +257,7 @@ describe('Control Room API staging', () => {
     const db = database();
     try {
       const clientId = (await action(db, 'createClient', { name: 'Locale di prova' })).body.result.id;
-      const requestId = (await action(db, 'createRequest', { clientId, subject: 'Nuovo menu', sourceChannel: 'manuale', kind: 'nuovo', sourceText: '## Primi\nZuppa — 8,00' })).body.result.id;
+      const requestId = (await action(db, 'createRequest', { clientId, subject: 'Nuovo menu', sourceChannel: 'manuale', plan: 'standard', kind: 'nuovo', sourceText: '## Primi\nZuppa — 8,00' })).body.result.id;
       const draft = (await action(db, 'generateDraft', { requestId })).body.state.drafts[0];
       const unsafe = structuredClone(draft.menu);
       unsafe.source_references = ['private/requests/example/file.pdf'];
@@ -283,7 +284,7 @@ describe('Control Room API staging', () => {
       assert.equal((await call(db, 'state')).body.clients.length, 0);
       assert.equal((await call(db, 'state')).body.audit.length, 0);
       const clientId = (await action(db, 'createClient', { name: 'Locale di prova' })).body.result.id;
-      const requestId = (await action(db, 'createRequest', { clientId, subject: 'Menu', sourceChannel: 'manuale', kind: 'nuovo', sourceText: '## Piatti\nPasta — 9,00' })).body.result.id;
+      const requestId = (await action(db, 'createRequest', { clientId, subject: 'Menu', sourceChannel: 'manuale', plan: 'standard', kind: 'nuovo', sourceText: '## Piatti\nPasta — 9,00' })).body.result.id;
       const draft = (await action(db, 'generateDraft', { requestId })).body.state.drafts[0];
       const modified = structuredClone(draft.menu); modified.sezioni[0].voci[0].prezzo = '10,00';
       db.prepare = failAudit;

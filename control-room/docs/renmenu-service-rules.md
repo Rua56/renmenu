@@ -72,3 +72,14 @@ La classificazione e sempre una proposta: richiede revisione umana.
 ## 6. Confini
 
 Jarvis non ha accesso a Stripe e ai pagamenti, non modifica il sito pubblico commerciale e non pubblica in autonomia.
+
+## 7. Applicazione nel codice
+
+Le regole sono applicate da `cloudflare/functions/_lib/service-rules.js`; `site/service-rules.js` è una copia identica, verificata dai test.
+
+- Categoria: ogni pratica può avere una delle 11 categorie (colonna `requests.category`, migrazione `0004_request_category.sql`). Le categorie "Nuovo menu" fissano il piano; un piano incoerente viene rifiutato.
+- Bozza: non viene generata se il piano è "Da definire". Le richieste Gmail arrivano con piano da definire e attendono la scelta di Riccardo.
+- Lingue: Standard solo IT/EN; Annuale massimo 3; Premium massimo 4. Il controllo avviene in revisione, prima della PR simulata e della PR live.
+- Premium: senza approvazione creativa di Riccardo, con riferimento scritto, la PR resta bloccata.
+
+Ordine di distribuzione nello staging: prima applicare la migrazione 0004 al solo D1 privato della Control Room, poi distribuire il codice. Se la migrazione manca, la dashboard resta leggibile ma la creazione di pratiche con categoria fallisce.

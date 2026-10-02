@@ -5,6 +5,7 @@ import { reviewIssues } from '../../_lib/editorial.js';
 import { runPrivateIntegrationAction } from '../../_lib/operations.js';
 import { sendOwnerNotification, OWNER_NOTIFICATION_RECIPIENT } from '../../_lib/owner-notifications.js';
 import { purgePublishedEmail } from '../../_lib/email-retention.js';
+import { resolveCategory, draftBlocker } from '../../_lib/service-rules.js';
 const headers = { 'Cache-Control': 'private, no-store', 'Content-Type': 'application/json; charset=utf-8' };
 const answer = (body, status = 200) => new Response(JSON.stringify(body), { status, headers });
 const failure = (status, message) => answer({ error: message }, status);
@@ -53,10 +54,19 @@ async function auditedBatch(db, writes, event, summary, requestId = null, guard 
 }
 const checksDefault = () => ({ prices: false, allergens: false, languages: false, clientApproval: false });
 
+const REQUESTS_SQL = 'SELECT id,client_id AS clientId,subject,source_channel AS sourceChannel,source_text AS sourceText,kind,status,plan,contact_name AS contactName,contact_role AS contactRole,contact_info AS contactInfo,internal_notes AS internalNotes,menu_id AS menuId,public_url AS publicUrl,next_step AS nextStep,follow_up_at AS followUpAt,last_action_at AS lastActionAt,revision,created_at AS createdAt,updated_at AS updatedAt FROM requests ORDER BY created_at DESC LIMIT 500';
+// Fallback finche la migrazione 0004 (colonna category) non e applicata allo staging D1.
+async function requestRows(db) {
+  try { return await rows(db, REQUESTS_SQL.replace('kind,status,plan,', 'kind,category,status,plan,')); }
+  catch (error) {
+    if (!/no such column/i.test(String(error?.message))) throw error;
+    return (await rows(db, REQUESTS_SQL)).map((request) => ({ ...request, category: null }));
+  }
+}
 export async function state(db) {
   const [clients, requests, materials, rawDrafts, versions, notifications, messages, audit, proposals, rawAnalyses, livePrs, ownerDeliveries] = await Promise.all([
     rows(db, 'SELECT id,name,email,phone,contact_name AS contactName,contact_role AS contactRole,plan,payment_status AS paymentStatus,menu_id AS menuId,menu_url AS menuUrl,internal_notes AS internalNotes,trial_ends_at AS trialEndsAt,renewal_at AS renewalAt,revision,created_at AS createdAt,updated_at AS updatedAt FROM clients ORDER BY created_at DESC LIMIT 300'),
-    rows(db, 'SELECT id,client_id AS clientId,subject,source_channel AS sourceChannel,source_text AS sourceText,kind,status,plan,contact_name AS contactName,contact_role AS contactRole,contact_info AS contactInfo,internal_notes AS internalNotes,menu_id AS menuId,public_url AS publicUrl,next_step AS nextStep,follow_up_at AS followUpAt,last_action_at AS lastActionAt,revision,created_at AS createdAt,updated_at AS updatedAt FROM requests ORDER BY created_at DESC LIMIT 500'),
+    requestRows(db),
     rows(db, 'SELECT id,request_id AS requestId,filename,mime,size,source,processing_status AS processingStatus,text_preview AS textPreview,archived_at AS archivedAt,created_at AS createdAt FROM materials ORDER BY created_at DESC LIMIT 500'),
     rows(db, 'SELECT id,request_id AS requestId,slug,menu_json AS menuJson,status,checks_json AS checksJson,revision,created_at AS createdAt,updated_at AS updatedAt FROM drafts ORDER BY created_at DESC LIMIT 500'),
     rows(db, 'SELECT id,draft_id AS draftId,revision,menu_json AS menuJson,actor,created_at AS createdAt FROM draft_versions ORDER BY created_at DESC LIMIT 1000'),
@@ -135,16 +145,16 @@ async function action(db, type, input, env = {}) {
     const subject = clean(p.subject, 180, 'Oggetto');
     const sourceText = clean(p.sourceText ?? '', 50_000, 'Materiale', false);
     const sourceChannel = clean(p.sourceChannel, 30, 'Canale');
-    const kind = p.kind;
-    const plan = p.plan || 'da_definire';
+    const { category, kind, plan } = resolveCategory({ category: p.category, kind: p.kind, plan: p.plan || 'da_definire' });
     assert(kinds.has(kind), 'Tipo pratica non valido.');
     assert(channels.has(sourceChannel) && plans.has(plan), 'Canale o piano non valido.');
     const id = uid(), timestamp = now();
-    await auditedBatch(db, [db.prepare('INSERT INTO requests (id,client_id,subject,source_channel,source_text,kind,status,plan,contact_name,contact_role,contact_info,internal_notes,menu_id,public_url,next_step,follow_up_at,revision,created_at,updated_at) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)')
+    const categoryColumn = category ? ',category' : '', categoryMark = category ? ',?' : '';
+    await auditedBatch(db, [db.prepare(`INSERT INTO requests (id,client_id,subject,source_channel,source_text,kind,status,plan,contact_name,contact_role,contact_info,internal_notes,menu_id,public_url,next_step,follow_up_at,revision,created_at,updated_at${categoryColumn}) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?${categoryMark})`)
       .bind(id, clientId, subject, sourceChannel, sourceText, kind, 'nuova', plan, optional(p.contactName, 140, 'Referente'),
         optional(p.contactRole, 80, 'Ruolo'), optional(p.contactInfo, 254, 'Contatto'), optional(p.internalNotes, 3_000, 'Note') || '',
         optional(p.menuId, 64, 'Menu ID'), optionalMenuUrl(p.publicUrl), optional(p.nextStep, 240, 'Prossimo passo'), optionalDate(p.followUpAt),
-        1, timestamp, timestamp)], 'request.create', `Pratica ${kind}: ${subject}.`, id,
+        1, timestamp, timestamp, ...(category ? [category] : []))], 'request.create', `Pratica ${category || kind} (${plan}): ${subject}.`, id,
       { sql: 'SELECT 1 FROM requests WHERE id=?', args: [id] });
     result = { id };
   } else if (type === 'updateRequest') {
@@ -156,13 +166,19 @@ async function action(db, type, input, env = {}) {
     const linkedDraft = await getOne(db, 'SELECT status FROM drafts WHERE request_id=?', id);
     assert(!linkedDraft || !['pr_simulata', 'pubblicazione_simulata'].includes(linkedDraft.status), 'Proposta già preparata: crea una nuova pratica per modificare le fonti.', 409);
     const patch = p.patch && typeof p.patch === 'object' && !Array.isArray(p.patch) ? p.patch : {};
-    assert(Object.keys(patch).length > 0 && Object.keys(patch).every((key) => ['subject', 'sourceText', 'sourceChannel', 'kind', 'status', 'plan', 'contactName', 'contactRole', 'contactInfo', 'internalNotes', 'menuId', 'publicUrl', 'nextStep', 'followUpAt'].includes(key)), 'Campi non modificabili.');
+    assert(Object.keys(patch).length > 0 && Object.keys(patch).every((key) => ['subject', 'sourceText', 'sourceChannel', 'kind', 'status', 'plan', 'contactName', 'contactRole', 'contactInfo', 'internalNotes', 'menuId', 'publicUrl', 'nextStep', 'followUpAt', 'category'].includes(key)), 'Campi non modificabili.');
     const subject = 'subject' in patch ? clean(patch.subject, 180, 'Oggetto') : current.subject;
     const sourceText = 'sourceText' in patch ? clean(patch.sourceText, 50_000, 'Materiale', false) : current.source_text;
     const sourceChannel = 'sourceChannel' in patch ? clean(patch.sourceChannel, 30, 'Canale') : current.source_channel;
-    const kind = 'kind' in patch ? patch.kind : current.kind;
     const status = 'status' in patch ? patch.status : current.status;
-    const plan = 'plan' in patch ? patch.plan : current.plan;
+    let requestedCategory = 'category' in patch ? patch.category : (current.category ?? null);
+    const requestedPlan = 'plan' in patch ? patch.plan : current.plan;
+    // Se cambia solo il piano di un nuovo menu, la categoria segue il piano scelto.
+    if (!('category' in patch) && 'plan' in patch && typeof requestedCategory === 'string' && requestedCategory.startsWith('nuovo_'))
+      requestedCategory = plans.has(requestedPlan) && requestedPlan !== 'da_definire' ? `nuovo_${requestedPlan}` : requestedCategory;
+    const resolved = resolveCategory({ category: requestedCategory, kind: 'kind' in patch ? patch.kind : current.kind, plan: requestedPlan });
+    const kind = resolved.kind, plan = resolved.plan, category = resolved.category;
+    const writeCategory = 'category' in patch || category !== (current.category ?? null);
     assert(kinds.has(kind) && channels.has(sourceChannel) && plans.has(plan), 'Canale, tipo o piano non valido.');
     if ('status' in patch) {
       assert(!['approvata', 'pronta_pubblicazione'].includes(current.status), 'Stato approvato: per ricominciare modifica la fonte.', 409);
@@ -179,8 +195,8 @@ async function action(db, type, input, env = {}) {
     const changedSource = sourceText !== current.source_text;
     const nextStatus = changedSource ? 'in_revisione' : status;
     const stamp = now();
-    const writes = [db.prepare('UPDATE requests SET subject=?,source_text=?,source_channel=?,kind=?,status=?,plan=?,contact_name=?,contact_role=?,contact_info=?,internal_notes=?,menu_id=?,public_url=?,next_step=?,follow_up_at=?,revision=revision+1,updated_at=? WHERE id=? AND revision=?')
-      .bind(subject, sourceText, sourceChannel, kind, nextStatus, plan, contactName, contactRole, contactInfo, internalNotes, menuId, publicUrl, nextStep, followUpAt, stamp, id, revision)];
+    const writes = [db.prepare(`UPDATE requests SET subject=?,source_text=?,source_channel=?,kind=?,status=?,plan=?,contact_name=?,contact_role=?,contact_info=?,internal_notes=?,menu_id=?,public_url=?,next_step=?,follow_up_at=?,${writeCategory ? 'category=?,' : ''}revision=revision+1,updated_at=? WHERE id=? AND revision=?`)
+      .bind(subject, sourceText, sourceChannel, kind, nextStatus, plan, contactName, contactRole, contactInfo, internalNotes, menuId, publicUrl, nextStep, followUpAt, ...(writeCategory ? [category] : []), stamp, id, revision)];
     if (changedSource) writes.push(db.prepare("UPDATE drafts SET checks_json=?,status='revisione',revision=revision+1,updated_at=? WHERE request_id=? AND status IN ('bozza','revisione','pronta_pr') AND EXISTS (SELECT 1 FROM requests WHERE id=? AND revision=? AND updated_at=?)")
       .bind(JSON.stringify(checksDefault()), stamp, id, id, revision + 1, stamp));
     const [outcome] = await auditedBatch(db, writes, 'request.update', changedSource ? 'Fonte aggiornata: verifiche bozza azzerate.' : 'Dati pratica aggiornati.', id,
@@ -192,6 +208,8 @@ async function action(db, type, input, env = {}) {
     const request = await getOne(db, 'SELECT r.*, c.name AS client_name,c.menu_id AS client_menu_id FROM requests r JOIN clients c ON c.id=r.client_id WHERE r.id=?', requestId);
     assert(request, 'Pratica non trovata.', 404);
     assert(!await getOne(db, 'SELECT id FROM drafts WHERE request_id=?', requestId), 'Esiste già una bozza per questa pratica.', 409);
+    const planBlock = draftBlocker(request.plan);
+    assert(!planBlock, planBlock, 422);
     if (request.kind !== 'nuovo') assert(request.menu_id || request.client_menu_id, 'Aggiornamento: serve il Menu ID esistente per preservare il QR.', 422);
     const desiredSlug = request.menu_id || (request.kind !== 'nuovo' ? request.client_menu_id : request.client_name);
     const extraction = integrations(env).ai.extract(request.client_name, request.source_text, desiredSlug);
@@ -246,12 +264,17 @@ async function action(db, type, input, env = {}) {
     checks.fieldEvidence = Object.fromEntries(['prices', 'allergens', 'languages'].map((key) => [key,
       checks[key] ? clean(p.fieldEvidence?.[key], 500, `Fonte ${key}`) : '']));
     checks.allergenOmissionConfirmed = checks.allergens && p.allergenOmissionConfirmed === true;
+    // Approvazione creativa (obbligatoria solo per Premium): conferma di Riccardo, non del locale.
+    checks.creativeApproval = p.creativeApproval === true;
+    checks.creativeApprovalEvidence = checks.creativeApproval ? clean(p.creativeApprovalEvidence, 500, 'Riferimento approvazione creativa') : '';
+    const request = await getOne(db, 'SELECT revision,plan FROM requests WHERE id=?', draft.request_id);
     const validation = validateMenu(JSON.parse(draft.menu_json));
     assert(!validation.errors.length, `Correggi il menù: ${validation.errors[0]}`);
     const ready = ['prices', 'allergens', 'languages', 'clientApproval'].every((key) => checks[key]);
-    if (ready) assert(!reviewIssues(JSON.parse(draft.menu_json), checks).issues.length,
-      reviewIssues(JSON.parse(draft.menu_json), checks).issues[0], 422);
-    const request = await getOne(db, 'SELECT revision FROM requests WHERE id=?', draft.request_id);
+    if (ready) {
+      const review = reviewIssues(JSON.parse(draft.menu_json), checks, request.plan);
+      assert(!review.issues.length, review.issues[0], 422);
+    }
     const stamp = now();
     const changed = await auditedBatch(db, [
       db.prepare('UPDATE drafts SET checks_json=?,status=?,revision=revision+1,updated_at=? WHERE id=? AND revision=? AND EXISTS (SELECT 1 FROM requests WHERE requests.id=? AND requests.revision=?)')
@@ -271,7 +294,8 @@ async function action(db, type, input, env = {}) {
     const checks = JSON.parse(draft.checks_json);
     const validation = validateMenu(JSON.parse(draft.menu_json));
     assert(!validation.errors.length, 'Validazione menù fallita.');
-    assert(!reviewIssues(JSON.parse(draft.menu_json), checks).issues.length,
+    const planRow = await getOne(db, 'SELECT plan FROM requests WHERE id=?', draft.request_id);
+    assert(!reviewIssues(JSON.parse(draft.menu_json), checks, planRow?.plan ?? null).issues.length,
       'Conferme o fonti editoriali mancanti: torna alla checklist.', 403);
     const digest = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(draft.menu_json));
     const snapshotSha = [...new Uint8Array(digest)].map((byte) => byte.toString(16).padStart(2, '0')).join('');

@@ -392,7 +392,7 @@ async function readGitHubMenu(context, p) {
 
 async function loadPrContext(context, p) {
   const draftId = identifier(p.draftId);
-  const draft = await context.getOne(context.db, `SELECT d.*, r.kind AS request_kind,r.status AS request_status,
+  const draft = await context.getOne(context.db, `SELECT d.*, r.kind AS request_kind,r.plan AS request_plan,r.status AS request_status,
       r.revision AS request_revision,r.id AS request_id FROM drafts d JOIN requests r ON r.id=d.request_id WHERE d.id=?`, draftId);
   assert(draft, 'Bozza non trovata.', 404);
   const revision = draftRevision(p.revision, draft.revision);
@@ -405,7 +405,7 @@ async function loadPrContext(context, p) {
   assert(!validation.errors.length, 'Validazione menù fallita.');
   let checks;
   try { checks = JSON.parse(draft.checks_json); } catch { fail('Checklist editoriale non leggibile.', 409); }
-  const review = reviewIssues(menu, checks);
+  const review = reviewIssues(menu, checks, draft.request_plan);
   assert(!review.issues.length, 'Conferme o fonti editoriali mancanti: torna alla checklist.', 403);
   const operationKey = clean(p.operationKey, 128, 'Chiave operazione');
   assert(OPERATION_KEY.test(operationKey), 'Chiave operazione non valida.');

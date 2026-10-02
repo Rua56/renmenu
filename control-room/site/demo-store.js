@@ -1,6 +1,7 @@
 import { cloneDemo } from './demo-data.js';
 import { extractMenuFromText, menuDiff, slugify, validateMenu } from './model.js';
 import { reviewIssues } from './editorial.js';
+import { resolveCategory, draftBlocker } from './service-rules.js';
 
 const STORE_KEY = 'renmenu-control-room-demo-v1';
 const MAX_FILE_SIZE = 10 * 1024 * 1024;
@@ -93,11 +94,14 @@ export async function performDemoAction(type, payload = {}) {
       const sourceText = String(payload.sourceText || '').trim();
       if (!subject) throw actionError('L’oggetto è obbligatorio; puoi caricare un file anche senza testo.');
       const sourceChannel = SOURCE_CHANNELS.has(payload.sourceChannel) ? payload.sourceChannel : 'manuale';
-      const kind = REQUEST_KINDS.has(payload.kind) ? payload.kind : 'nuovo';
+      let resolved;
+      try { resolved = resolveCategory({ category: payload.category, kind: REQUEST_KINDS.has(payload.kind) ? payload.kind : 'nuovo', plan: PLANS.has(payload.plan) ? payload.plan : 'da_definire' }); }
+      catch (error) { throw actionError(error.message); }
+      const { kind, category } = resolved;
       const request = {
         id: uid(), clientId: client.id, subject, sourceText,
-        sourceChannel, kind, status: 'nuova', revision: 1,
-        plan: PLANS.has(payload.plan) ? payload.plan : 'da_definire', internalNotes: String(payload.internalNotes || '').trim(),
+        sourceChannel, kind, category, status: 'nuova', revision: 1,
+        plan: resolved.plan, internalNotes: String(payload.internalNotes || '').trim(),
         nextStep: String(payload.nextStep || 'Genera una bozza prudente.').trim(), followUpAt: String(payload.followUpAt || '').trim(),
         lastActionAt: now(), createdAt: now(), updatedAt: now()
       };
@@ -121,6 +125,12 @@ export async function performDemoAction(type, payload = {}) {
       ['subject', 'sourceText', 'sourceChannel', 'kind', 'status', 'plan', 'contactName', 'contactRole', 'contactInfo', 'internalNotes', 'menuId', 'publicUrl', 'nextStep', 'followUpAt'].forEach((key) => {
         if (key in patch && typeof patch[key] === 'string' && patch[key].trim()) request[key] = patch[key].trim();
       });
+      if ('category' in patch || request.category) {
+        const wanted = 'category' in patch ? patch.category
+          : (String(request.category).startsWith('nuovo_') && request.plan !== 'da_definire' ? `nuovo_${request.plan}` : request.category);
+        try { Object.assign(request, resolveCategory({ category: wanted, kind: request.kind, plan: request.plan })); }
+        catch (error) { throw actionError(error.message); }
+      }
       if (!SOURCE_CHANNELS.has(request.sourceChannel)) throw actionError('Canale sorgente non ammesso dal contratto.');
       if (!REQUEST_KINDS.has(request.kind)) throw actionError('Tipo pratica non ammesso dal contratto.');
       if (!PLANS.has(request.plan) || !REQUEST_STATUSES.has(request.status)) throw actionError('Piano o stato non valido.');
@@ -141,6 +151,8 @@ export async function performDemoAction(type, payload = {}) {
       const request = find(state.requests, payload.requestId, 'Pratica');
       const client = find(state.clients, request.clientId, 'Cliente');
       if (state.drafts.some((item) => item.requestId === request.id)) throw actionError('La bozza esiste già: usa Revisione.', 409);
+      const planBlock = draftBlocker(request.plan);
+      if (planBlock) throw actionError(planBlock);
       const slug = request.menuId || (request.kind !== 'nuovo' ? client.menuId : slugify(client.name));
       if (request.kind !== 'nuovo' && !request.menuId && !client.menuId) throw actionError('Per aggiornare un QR esistente serve l’ID menù già online.');
       const extraction = extractMenuFromText(request.sourceText, { name: client.name, slug });
@@ -197,9 +209,11 @@ export async function performDemoAction(type, payload = {}) {
         fieldEvidence: Object.fromEntries(['prices', 'allergens', 'languages'].map((key) => [key,
           checks[key] ? String(payload.fieldEvidence?.[key] || '').trim().slice(0, 500) : ''])),
         allergenOmissionConfirmed: checks.allergens && payload.allergenOmissionConfirmed === true,
-        clientApprovalEvidence: checks.clientApproval ? draft.approvalEvidence : '' };
+        clientApprovalEvidence: checks.clientApproval ? draft.approvalEvidence : '',
+        creativeApproval: payload.creativeApproval === true,
+        creativeApprovalEvidence: payload.creativeApproval === true ? String(payload.creativeApprovalEvidence || '').trim().slice(0, 500) : '' };
       if (keys.every((key) => draft.checks[key])) {
-        const evaluation = reviewIssues(draft.menu, draft.checks);
+        const evaluation = reviewIssues(draft.menu, draft.checks, find(state.requests, draft.requestId, 'Pratica').plan);
         if (evaluation.issues.length) throw actionError(evaluation.issues[0]);
       }
       draft.revision += 1;
@@ -215,7 +229,7 @@ export async function performDemoAction(type, payload = {}) {
       const draft = find(state.drafts, payload.id, 'Bozza');
       requireRevision(draft, payload.revision);
       if (payload.confirmation !== 'CONFERMO PR DI PROVA') throw actionError('Scrivi esattamente “CONFERMO PR DI PROVA”.');
-      if (draft.status !== 'pronta_pr' || reviewIssues(draft.menu, draft.checks).issues.length)
+      if (draft.status !== 'pronta_pr' || reviewIssues(draft.menu, draft.checks, find(state.requests, draft.requestId, 'Pratica').plan).issues.length)
         throw actionError('Servono fonti, revisione e approvazione scritta prima della PR di prova.');
       const snapshot = state.publicMenuSnapshots?.[draft.slug];
       const proposal = { id: uid(), draftId: draft.id, requestId: draft.requestId, kind: 'pr_simulata',
