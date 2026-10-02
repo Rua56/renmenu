@@ -162,7 +162,9 @@ export function extractMenuFromText(venue, source, requestedSlug) {
     const match = row.match(PRICE_ROW);
     if (match) {
       const name = match[1].trim();
-      const price = match[2].replace('.', ',');
+      // Solo formato: 12 -> 12,00 e 9,5 -> 9,50 (stesso valore, nessun prezzo inventato).
+      const [whole, cents = ''] = match[2].replace('.', ',').split(',');
+      const price = `${whole},${cents.padEnd(2, '0')}`;
       if (name && Number(price.replace(',', '.')) > 0) {
         const item = { nome: { it: name }, prezzo: price };
         section.voci.push(item);
