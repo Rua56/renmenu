@@ -62,7 +62,7 @@ function pr(number = 17, branch = 'control-room/menu-trattoria-test-retry') {
   return {
     number,
     state: 'open',
-    draft: true,
+    draft: false,
     merged_at: null,
     html_url: `https://github.example/Rua56/renmenu/pull/${number}`,
     head: { ref: branch, sha: 'head-commit-a' },
@@ -118,7 +118,7 @@ describe('GitHub live adapter (fake fetch only)', () => {
       (error) => error.code === 'SLUG_MISMATCH');
   });
 
-  it('crea branch dalla base approvata, scrive esclusivamente sul branch e apre una draft PR senza auto-merge', async () => {
+  it('crea branch dalla base approvata, scrive esclusivamente sul branch e apre una PR senza auto-merge', async () => {
     const remoteMenu = menu('9,00');
     let writeBody;
     let prBody;
@@ -145,7 +145,7 @@ describe('GitHub live adapter (fake fetch only)', () => {
       if (url.pathname.endsWith('/pulls') && init.method === 'POST') {
         prBody = JSON.parse(init.body);
         assert.equal(prBody.base, 'main');
-        assert.equal(prBody.draft, true);
+        assert.equal(prBody.draft, false, "PR pronta: il merge resta separato e con frase");
         assert.doesNotMatch(prBody.body, /token|operation|request|private/i);
         return json(pr(17, prBody.head), 201);
       }

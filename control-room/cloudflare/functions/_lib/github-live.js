@@ -264,7 +264,9 @@ async function createOrRecoverPr(env, prepared, branch, options) {
         head: branch,
         base: BASE_BRANCH,
         body: prepared.prBody,
-        draft: true
+        // La PR nasce solo dopo la conferma finale di Riccardo; il merge resta
+        // un passaggio separato con frase esplicita, quindi non serve una draft PR.
+        draft: false
       }
     });
     return { pr: result.data, reused: false };
@@ -495,6 +497,7 @@ export async function mergeApprovedMenuPr(env, {
   requireText(expectedBaseSha, 'MERGE_SHA_REQUIRED', 'È richiesto lo SHA base approvato.');
   const status = await getPrStatus(env, prNumber, options);
   if (status.state !== 'open' || status.merged) fail('PR_NOT_OPEN', 'La pull request non è aperta.', { status: 409 });
+  if (status.draft) fail('PR_IS_DRAFT', 'La pull request è ancora in bozza su GitHub.', { status: 409 });
   if (status.headSha !== expectedHeadSha || status.baseSha !== expectedBaseSha) {
     fail('MERGE_SHA_CONFLICT', 'La pull request è cambiata dopo l’approvazione.', { status: 409 });
   }
@@ -509,6 +512,19 @@ export async function mergeApprovedMenuPr(env, {
   });
   if (result.data?.merged !== true) fail('MERGE_NOT_COMPLETED', 'GitHub non ha completato il merge.', { status: 409 });
   return { merged: true, prNumber, revision: approvedRevision, sha: result.data.sha || null };
+}
+
+/** SHA attuale di main, usato come base attesa per aprire la PR. */
+export async function readBaseSha(env, options = {}) {
+  return refSha(await getRef(env, BASE_BRANCH, options));
+}
+
+/** Nomi dei file modificati da una PR Control Room (massimo 100). */
+export async function listPrFiles(env, prNumber, options = {}) {
+  if (!Number.isInteger(prNumber) || prNumber < 1) fail('INVALID_PR_NUMBER', 'Numero PR non valido.', { status: 422 });
+  const result = await githubRequest(env, `/pulls/${prNumber}/files?per_page=100`, options);
+  if (!Array.isArray(result.data)) fail('GITHUB_BAD_RESPONSE', 'GitHub non ha restituito l’elenco dei file della PR.');
+  return result.data.map((file) => ({ filename: String(file?.filename || ''), status: String(file?.status || '') }));
 }
 
 export const MANUAL_MERGE_CONFIRMATION = MERGE_CONFIRMATION;

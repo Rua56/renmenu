@@ -110,7 +110,7 @@ async function draftRows(db) {
   }
 }
 const parseList = (json) => { try { const value = JSON.parse(json || '[]'); return Array.isArray(value) ? value : []; } catch { return []; } };
-export async function state(db) {
+export async function state(db, env = {}) {
   const [clients, requests, materials, rawDrafts, versions, notifications, messages, audit, proposals, rawAnalyses, livePrs, ownerDeliveries, rawApprovals] = await Promise.all([
     rows(db, 'SELECT id,name,email,phone,contact_name AS contactName,contact_role AS contactRole,plan,payment_status AS paymentStatus,menu_id AS menuId,menu_url AS menuUrl,internal_notes AS internalNotes,trial_ends_at AS trialEndsAt,renewal_at AS renewalAt,revision,created_at AS createdAt,updated_at AS updatedAt FROM clients ORDER BY created_at DESC LIMIT 300'),
     requestRows(db),
@@ -127,6 +127,7 @@ export async function state(db) {
     approvalRows(db)
   ]);
   return {
+    githubMode: String(env?.GITHUB_PROVIDER || 'mock').trim() === 'live' ? 'live' : 'mock',
     clients, requests, materials,
     drafts: rawDrafts.map(({ menuJson, checksJson, provenanceJson, ...draft }) => ({ ...draft, menu: JSON.parse(menuJson), checks: JSON.parse(checksJson), provenance: parseList(provenanceJson),
       versions: versions.filter((version) => version.draftId === draft.id).map(({ menuJson: json, ...v }) => ({ ...v, menu: JSON.parse(json) })) })),
@@ -157,7 +158,7 @@ async function action(db, type, input, env = {}) {
   const privateResult = await runPrivateIntegrationAction({
     db, env, auditedBatch, getOne, rows, now, uid
   }, type, p);
-  if (privateResult !== null) return { state: await state(db), result: privateResult };
+  if (privateResult !== null) return { state: await state(db, env), result: privateResult };
   let result = {};
   if (type === 'createClient') {
     const name = clean(p.name, 140, 'Nome cliente');
@@ -513,6 +514,7 @@ async function action(db, type, input, env = {}) {
     assert(changed[0].meta.changes === 1 && changed[1].meta.changes === 1, 'Revisione superata. Ricarica.', 409);
     result = { id, ready, validation };
   } else if (type === 'preparePr') {
+    assert(String(env?.GITHUB_PROVIDER || 'mock').trim() !== 'live', 'GitHub reale attivo: usa Apri PR su GitHub e Pubblica.', 409);
     const id = identifier(p.id), revision = Number(p.revision);
     assert(p.confirmation === 'CONFERMO PR DI PROVA', 'Conferma esplicita mancante.', 403);
     const draft = await getOne(db, 'SELECT * FROM drafts WHERE id=?', id);
@@ -548,6 +550,7 @@ async function action(db, type, input, env = {}) {
     assert(prepared.every((entry) => entry.meta.changes === 1), 'Bozza o pratica modificata da un’altra sessione. Ricarica.', 409);
     result = { id: proposalId, simulated: true, snapshotSha };
   } else if (type === 'simulatePublish') {
+    assert(String(env?.GITHUB_PROVIDER || 'mock').trim() !== 'live', 'GitHub reale attivo: usa Apri PR su GitHub e Pubblica.', 409);
     const id = identifier(p.id), revision = Number(p.revision);
     assert(p.confirmation === 'CONFERMO PUBBLICAZIONE SIMULATA', 'Seconda conferma esplicita mancante.', 403);
     const draft = await getOne(db, 'SELECT * FROM drafts WHERE id=?', id);
@@ -579,7 +582,7 @@ async function action(db, type, input, env = {}) {
         .bind(messageId, requestId, 'whatsapp', body, 'bozza_mock', stamp)
     ], 'whatsapp.incoming.mock', `Messaggio in ingresso simulato; classificazione ${classified.request_type}.`, requestId,
       { sql: 'SELECT 1 FROM messages WHERE id=? AND request_id=?', args: [messageId, requestId] });
-    return { state: await state(db), result: { id: requestId, classification: classified, simulated: true } };
+    return { state: await state(db, env), result: { id: requestId, classification: classified, simulated: true } };
   } else if (type === 'mockCall') {
     const requestId = identifier(p.requestId);
     assert(await getOne(db, 'SELECT id FROM requests WHERE id=?', requestId), 'Pratica non trovata.', 404);
@@ -705,7 +708,7 @@ async function action(db, type, input, env = {}) {
   } else {
     throw Object.assign(new Error('Operazione non supportata: nessuna azione esterna disponibile.'), { status: 404 });
   }
-  return { state: await state(db), result };
+  return { state: await state(db, env), result };
 }
 
 const allowedTypes = new Set(['application/pdf', 'image/jpeg', 'image/png', 'image/webp', 'text/plain', 'audio/mpeg', 'audio/mp4', 'audio/webm']);
@@ -760,7 +763,7 @@ async function uploadMaterial(context) {
       { sql: 'SELECT 1 FROM materials WHERE id=?', args: [id] });
     assert(saved[0].meta.changes === 1 && saved[1].meta.changes === 1, 'Pratica modificata mentre caricavi: riprova.', 409);
   } catch (error) { await context.env.BUCKET.delete(key); throw error; }
-  return answer({ state: await state(context.env.DB), result: { id } });
+  return answer({ state: await state(context.env.DB, context.env), result: { id } });
 }
 
 async function downloadMaterial(context, id) {
@@ -782,7 +785,7 @@ export async function onRequest(context) {
     const request = context.request, method = request.method;
     const route = context.params.route;
     const segments = Array.isArray(route) ? route : typeof route === 'string' ? route.split('/') : [];
-    if (method === 'GET' && segments.join('/') === 'state') return answer(await state(context.env.DB));
+    if (method === 'GET' && segments.join('/') === 'state') return answer(await state(context.env.DB, context.env));
     if (method === 'GET' && segments[0] === 'material' && segments.length === 2) return await downloadMaterial(context, segments[1]);
     if (method === 'POST') {
       assert(isSameOriginWrite(request), 'Origine non autorizzata.', 403);
