@@ -923,8 +923,10 @@ async function handleClick(event) {
       const read = (await performAction('githubReadMenu', { slug: draft.slug }))?.result;
       if (!read?.baseSha) { toast('GitHub non ha restituito lo stato di main. Riprova tra poco.', 'error'); return; }
       if (request.kind === 'nuovo' && read.exists) { toast(`Esiste già un menu ${draft.slug} sul sito: usa un altro Menu ID oppure una pratica di aggiornamento.`, 'error'); return; }
+      // Chiave stabile per bozza e revisione: un nuovo tentativo dopo un errore noto riusa
+      // la stessa operazione invece di scontrarsi con quella già riservata.
       openConfirmation({ title: 'Apri la PR su GitHub', copy: `Menu ${draft.slug} · file menus/${draft.slug}.json · ${read.exists ? 'aggiornamento di un menu esistente' : 'menu nuovo'}. Viene aperta solo la proposta: niente va online.`, phrase: 'CONFERMO APERTURA PR LIVE', button: 'Apri PR', type: 'githubOpenPr',
-        payload: { draftId: draft.id, revision: draft.revision, requestRevision: request.revision, operationKey: crypto.randomUUID(), expectedBaseSha: read.baseSha, expectedFileSha: read.exists ? read.sha : null, confirmation: 'CONFERMO APERTURA PR LIVE' },
+        payload: { draftId: draft.id, revision: draft.revision, requestRevision: request.revision, operationKey: `${draft.id}.r${draft.revision}`, expectedBaseSha: read.baseSha, expectedFileSha: read.exists ? read.sha : null, confirmation: 'CONFERMO APERTURA PR LIVE' },
         success: 'PR aperta su GitHub: niente è ancora online.' });
       return;
     }
