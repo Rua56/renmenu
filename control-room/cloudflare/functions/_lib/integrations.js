@@ -9,7 +9,9 @@ const unsupported = (provider) => {
 // l'estrazione deterministica del Builder, che resta locale e senza chiamate esterne.
 const AI_PANEL_PROVIDERS = new Set(['openai_compatible', 'cloudflare_workers_ai']);
 export function integrations(env = {}) {
-  const allowed = { AI_PROVIDER: AI_PANEL_PROVIDERS };
+  // GitHub live è gestito solo dalle azioni private di _lib/operations.js (PR, merge con
+  // frase, verifica). Qui resta il solo adapter mock, che non scrive mai su GitHub.
+  const allowed = { AI_PROVIDER: AI_PANEL_PROVIDERS, GITHUB_PROVIDER: new Set(['live']) };
   for (const [key, name] of [['AI_PROVIDER', 'AI'], ['WHATSAPP_PROVIDER', 'WhatsApp'], ['CALL_PROVIDER', 'Chiamate'], ['GITHUB_PROVIDER', 'GitHub']]) {
     const value = env[key];
     if (value && value !== 'mock' && value !== 'disabled' && !allowed[key]?.has(value)) unsupported(name);
