@@ -1,0 +1,110 @@
+{
+  "id": "osteria-prova-isonzo",
+  "nome": "Osteria Prova Isonzo",
+  "lingue": [
+    "it",
+    "en"
+  ],
+  "sezioni": [
+    {
+      "nome": {
+        "it": "Antipasti",
+        "en": "Starters"
+      },
+      "voci": [
+        {
+          "nome": {
+            "it": "Prosciutto di San Daniele e melone",
+            "en": "San Daniele ham and melon"
+          },
+          "prezzo": "13,00"
+        },
+        {
+          "nome": {
+            "it": "Frittata con le erbe",
+            "en": "Herb omelette"
+          },
+          "prezzo": "9,50"
+        },
+        {
+          "nome": {
+            "it": "Polenta e schiz",
+            "en": "Polenta and schiz"
+          },
+          "prezzo": "10,00"
+        }
+      ]
+    },
+    {
+      "nome": {
+        "it": "Primi",
+        "en": "First courses"
+      },
+      "voci": [
+        {
+          "nome": {
+            "it": "Cjarsons dolci",
+            "en": "Cjarsons dolci"
+          },
+          "prezzo": "12,00"
+        },
+        {
+          "nome": {
+            "it": "Orzotto con zucca e speck",
+            "en": "Pumpkin and speck orzotto"
+          },
+          "prezzo": "11,00"
+        }
+      ]
+    },
+    {
+      "nome": {
+        "it": "Secondi",
+        "en": "Main courses"
+      },
+      "voci": [
+        {
+          "nome": {
+            "it": "Frico con patate",
+            "en": "Frico with potatoes"
+          },
+          "prezzo": "14,00"
+        },
+        {
+          "nome": {
+            "it": "Baccalà mantecato con polenta",
+            "en": "Creamed cod with polenta"
+          },
+          "prezzo": "14,50"
+        }
+      ]
+    },
+    {
+      "nome": {
+        "it": "Dolci",
+        "en": "Desserts"
+      },
+      "voci": [
+        {
+          "nome": {
+            "it": "Strucchi fritti",
+            "en": "Fried strucchi"
+          },
+          "prezzo": "5,00"
+        },
+        {
+          "nome": {
+            "it": "Tiramisù",
+            "en": "Tiramisù"
+          },
+          "prezzo": "5,50",
+          "allergeni": [
+            "3",
+            "7"
+          ]
+        }
+      ]
+    }
+  ],
+  "coperto": "2,00"
+}
