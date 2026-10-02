@@ -134,7 +134,9 @@ export function proposeReplyChanges(text, menu) {
     // Riempitivi che non fanno parte del nome: "questo piatto:", "nelle informazioni", "anche".
     const sentence = raw.trim().replace(/\b(?:questo|questi|il|un|i|seguente|seguenti|nuovo|nuovi)\s+(?:nuovo\s+)?piatt[oi]\s*:?\s*/gi, '')
       .replace(/\s*\b(?:nelle|nella|tra\s+le)\s+(?:informazioni|info|note)\b/gi, '').replace(/\s+/g, ' ').trim()
-      .replace(/^(?:poi|e)\s+/i, '').replace(/\s+(?:poi|e)$/i, '');
+      .replace(/^(?:poi|e)\s+/i, '').replace(/\s+(?:poi|e)$/i, '')
+      // "Buongiorno, lo spritz ora costa 5": il saluto in testa non nasconde la richiesta.
+      .replace(/^(?:buongiorno|buonasera|salve|ciao|gentile\s+riccardo|ciao\s+riccardo)\s*[,!:]\s*(?=\S)/i, '');
     if (!sentence || GREETING.test(sentence) || /^(?:approv\w*|ok|va bene|tutto ok)\W*$/i.test(sentence)) continue;
     const extra = detectExtra(sentence, menu);
     if (extra) { add(extra); continue; }

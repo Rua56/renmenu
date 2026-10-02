@@ -1,4 +1,7 @@
 import { assistExtraction } from '../../_lib/assist.js';
+import { applyMenuChanges } from '../../_lib/changes.js';
+import { prepareUpdate } from '../../_lib/update.js';
+import { readCurrentMenu } from '../../_lib/github-live.js';
 import { isSameOriginWrite, verifyOwner } from '../../_lib/auth.js';
 import { slugify, validateMenu, venueFromSource } from '../../_lib/menu.js';
 import { integrations } from '../../_lib/integrations.js';
@@ -117,7 +120,7 @@ async function draftRows(db) {
 const parseList = (json) => { try { const value = JSON.parse(json || '[]'); return Array.isArray(value) ? value : []; } catch { return []; } };
 // Autopilota: richieste email nuove, mai toccate da Riccardo né da Jarvis. Le azioni passano
 // dalle stesse operazioni dell'interfaccia (stessi controlli), con «jarvis» come autore nel registro.
-const AUTOPILOT_SQL = `SELECT r.* FROM requests r WHERE r.source_channel='email' AND r.status='nuova' AND r.kind='altro'
+const AUTOPILOT_SQL = `SELECT r.*, c.menu_id AS client_menu_id FROM requests r JOIN clients c ON c.id=r.client_id WHERE r.source_channel='email' AND r.status='nuova' AND r.kind='altro'
   AND r.category IS NULL AND r.revision=1 AND NOT EXISTS (SELECT 1 FROM drafts d WHERE d.request_id=r.id)
   AND NOT EXISTS (SELECT 1 FROM audit_events a WHERE a.request_id=r.id AND a.action LIKE 'autopilot.%') ORDER BY r.created_at ASC LIMIT 2`;
 async function autopilotPending(db) {
@@ -321,10 +324,14 @@ export async function action(db, type, input, env = {}) {
     result = { id };
   } else if (type === 'generateDraft') {
     const requestId = identifier(p.requestId);
-    const request = await getOne(db, 'SELECT r.*, c.name AS client_name,c.menu_id AS client_menu_id FROM requests r JOIN clients c ON c.id=r.client_id WHERE r.id=?', requestId);
+    const request = await getOne(db, 'SELECT r.*, c.name AS client_name,c.menu_id AS client_menu_id,c.plan AS client_plan FROM requests r JOIN clients c ON c.id=r.client_id WHERE r.id=?', requestId);
     assert(request, 'Pratica non trovata.', 404);
     assert(!await getOne(db, 'SELECT id FROM drafts WHERE request_id=?', requestId), 'Esiste già una bozza per questa pratica.', 409);
-    const planBlock = draftBlocker(request.plan);
+    // Aggiornamento di un menu attivo: il piano è quello del cliente (scheda cliente), non va riscelto.
+    const isUpdate = ['aggiornamento', 'prezzo'].includes(request.kind);
+    const inheritedPlan = isUpdate && !PLAN_RULES[request.plan] && PLAN_RULES[request.client_plan] ? request.client_plan : null;
+    if (inheritedPlan) request.plan = inheritedPlan;
+    const planBlock = isUpdate && !PLAN_RULES[request.plan] ? 'Piano del cliente non registrato: impostalo nella scheda cliente (Standard, Annuale o Premium), poi genera la bozza.' : draftBlocker(request.plan);
     assert(!planBlock, planBlock, 422);
     // Pratica importata e non classificata (kind 'altro', nessuna categoria): chiedere la categoria, non il Menu ID.
     assert(!(request.kind === 'altro' && !request.category), 'Scegli la categoria della pratica (per esempio “Nuovo menu Standard”) e salva prima di generare la bozza.', 422);
@@ -341,10 +348,31 @@ export async function action(db, type, input, env = {}) {
     const venue = sourceVenue || request.client_name;
     const desiredSlug = request.menu_id || (request.kind !== 'nuovo' ? request.client_menu_id : venue);
     if (request.kind === 'nuovo') await assertSlugFree(db, slugify(desiredSlug), requestId, request.client_id);
-    let extraction = integrations(env).ai.extract(venue, request.source_text, desiredSlug);
-    // Menu scritto a parole: lettura assistita, verificata riga per riga (nessun valore inventato).
-    if (autoTranslationReady(env) && extraction.uncertain.some((row) => /\d/.test(row))) {
-      extraction = await assistExtraction(env.AI, venue, request.source_text, desiredSlug, extraction);
+    let extraction;
+    // Aggiornamento di un menu già online: si parte dal file pubblicato su main, mai da zero.
+    const liveUpdate = ['aggiornamento', 'prezzo'].includes(request.kind) && String(env?.GITHUB_PROVIDER || 'mock').trim() === 'live';
+    if (liveUpdate) {
+      const slug = slugify(desiredSlug);
+      let live;
+      try { live = await readCurrentMenu(env, slug, typeof (env?.GITHUB_FETCH || env?.fetch) === 'function' ? { fetch: env.GITHUB_FETCH || env.fetch } : {}); }
+      catch (error) { assert(false, `Non riesco a leggere il menu online «${slug}» da GitHub (${String(error?.message || 'errore').slice(0, 120)}). Riprova tra poco.`, 503); }
+      assert(live.exists, `Il menu «${slug}» non è online: controlla il Menu ID nella pratica o nella scheda cliente.`, 422);
+      const update = prepareUpdate({ slug, current: live.menu, sha: live.sha, sourceText: request.source_text, subject: request.subject });
+      assert(update.ok, update.reason, 422);
+      extraction = update.extraction;
+      if (extraction.added && (extraction.menu.lingue || []).includes('en') && autoTranslationReady(env)) {
+        const translation = await translateMenu(env.AI, extraction.menu, { lang: 'en' });
+        extraction.menu = translation.menu;
+        extraction.provenance = [...extraction.provenance, ...translation.provenance];
+        const note = translationSummary(translation);
+        if (note) extraction.warnings.push(note);
+      }
+    } else {
+      extraction = integrations(env).ai.extract(venue, request.source_text, desiredSlug);
+      // Menu scritto a parole: lettura assistita, verificata riga per riga (nessun valore inventato).
+      if (autoTranslationReady(env) && extraction.uncertain.some((row) => /\d/.test(row))) {
+        extraction = await assistExtraction(env.AI, venue, request.source_text, desiredSlug, extraction);
+      }
     }
     if (sourceVenue) extraction.warnings.push(`Nome del locale letto dalla riga “Locale:” dell’email (“${sourceVenue}”): confermalo in revisione e aggiorna la scheda cliente.`);
     assert(extraction.extracted.length > 0 && extraction.menu.id, 'Nessun piatto con prezzo leggibile: aggiungi il materiale o trascrivi la fonte.', 422);
@@ -362,9 +390,9 @@ export async function action(db, type, input, env = {}) {
       db.prepare('INSERT INTO drafts (id,request_id,slug,menu_json,status,checks_json,provenance_json,revision,created_at,updated_at) SELECT ?,id,?,?,?,?,?,?,?,? FROM requests WHERE id=? AND revision=?')
         .bind(id, extraction.menu.id, menuJson, 'bozza', JSON.stringify(checksDefault()), JSON.stringify(extraction.provenance || []), 1, timestamp, timestamp, requestId, request.revision),
       db.prepare('INSERT INTO draft_versions (id,draft_id,revision,menu_json,actor,created_at) VALUES (?,?,?,?,?,?)')
-        .bind(uid(), id, 1, menuJson, 'estrazione_deterministica', timestamp),
-      db.prepare("UPDATE requests SET status='in_revisione',revision=revision+1,updated_at=? WHERE id=? AND revision=? AND EXISTS (SELECT 1 FROM drafts WHERE id=?)")
-        .bind(timestamp, requestId, request.revision, id)
+        .bind(uid(), id, 1, menuJson, extraction.mode === 'aggiornamento' || extraction.mode === 'sostituzione' ? `menu_online_${extraction.mode}` : 'estrazione_deterministica', timestamp),
+      db.prepare("UPDATE requests SET status='in_revisione',plan=COALESCE(?,plan),revision=revision+1,updated_at=? WHERE id=? AND revision=? AND EXISTS (SELECT 1 FROM drafts WHERE id=?)")
+        .bind(inheritedPlan, timestamp, requestId, request.revision, id)
     ], 'draft.generate', `Bozza da ${extraction.extracted.length} voci attestate; ${extraction.uncertain.length} righe da verificare.`, requestId,
       { sql: 'SELECT 1 FROM drafts WHERE id=?', args: [id] });
     result = { id, extraction };
@@ -581,41 +609,11 @@ export async function action(db, type, input, env = {}) {
     assert(selected.length, 'Seleziona almeno una modifica da applicare.');
     const sectionsChoice = p.sections && typeof p.sections === 'object' ? p.sections : {};
     const source = `Risposta del locale (rif. ${approval.reference_code})`;
-    const next = structuredClone(menu);
-    const added = [];
-    for (const entry of selected) if (entry.type === 'prezzo') next.sezioni[entry.si].voci[entry.vi].prezzo = entry.after;
-    // Coperto e allergeni scritti dal locale nella risposta (stessi indici del menu attuale).
-    const extras = applyExtras(next, selected.filter((entry) => ['coperto', 'allergeni'].includes(entry.type)), () => `Risposta del locale (rif. ${approval.reference_code})`);
-    Object.assign(next, extras.menu);
-    for (const entry of selected) if (entry.type === 'aggiungi') {
-      const si = Number.isInteger(Number(sectionsChoice[entry.id])) && next.sezioni[Number(sectionsChoice[entry.id])] ? Number(sectionsChoice[entry.id]) : entry.section;
-      next.sezioni[si].voci.push({ nome: { it: entry.name }, prezzo: entry.price });
-      added.push({ si, vi: next.sezioni[si].voci.length - 1, entry });
-    }
-    // Rimozioni per ultime, dall'indice più alto: le fonti dei piatti successivi seguono il piatto.
-    const removals = selected.filter((entry) => entry.type === 'rimuovi').sort((a, b) => b.si - a.si || b.vi - a.vi);
-    let provenance = [...parseList(draft.provenance_json).filter((row) => !extras.provenance.some((extra) => extra.path === row.path)), ...extras.provenance];
-    for (const entry of removals) {
-      next.sezioni[entry.si].voci.splice(entry.vi, 1);
-      const prefix = `sezioni.${entry.si}.voci.`;
-      provenance = provenance.filter((row) => !String(row.path).startsWith(`${prefix}${entry.vi}.`)).map((row) => {
-        const match = String(row.path).match(/^sezioni\.(\d+)\.voci\.(\d+)\.(.+)$/);
-        if (!match || Number(match[1]) !== entry.si || Number(match[2]) < entry.vi) return row;
-        return { ...row, path: `${prefix}${Number(match[2]) - 1}.${match[3]}` };
-      });
-      for (const item of added) if (item.si === entry.si && item.vi > entry.vi) item.vi -= 1;
-    }
-    const changedPrices = selected.filter((entry) => entry.type === 'prezzo').map((entry) => {
-      const shift = removals.filter((r) => r.si === entry.si && r.vi < entry.vi).length;
-      return { path: `sezioni.${entry.si}.voci.${entry.vi - shift}.prezzo`, value: entry.after };
-    });
+    const applied = applyMenuChanges(menu, parseList(draft.provenance_json), selected, { source, sections: sectionsChoice });
+    const { next, added } = applied;
+    let { provenance } = applied;
     let finalMenu = next, translationNote = '';
-    const newProvenance = [
-      ...changedPrices.map((row) => ({ ...row, source, status: 'confermato' })),
-      ...added.flatMap(({ si, vi, entry }) => [
-        { path: `sezioni.${si}.voci.${vi}.nome.it`, source, value: entry.name, status: 'confermato' },
-        { path: `sezioni.${si}.voci.${vi}.prezzo`, source, value: entry.price, status: 'confermato' }])
-    ];
+    const newProvenance = [...applied.newProvenance];
     if (added.length && (menu.lingue || []).includes('en') && autoTranslationReady(env)) {
       const translation = await translateMenu(env.AI, next, { lang: 'en' });
       if (translation.translated) { finalMenu = translation.menu; newProvenance.push(...translation.provenance); }
