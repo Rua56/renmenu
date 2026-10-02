@@ -1,3 +1,4 @@
+import { assistExtraction } from '../../_lib/assist.js';
 import { isSameOriginWrite, verifyOwner } from '../../_lib/auth.js';
 import { slugify, validateMenu, venueFromSource } from '../../_lib/menu.js';
 import { integrations } from '../../_lib/integrations.js';
@@ -340,7 +341,11 @@ export async function action(db, type, input, env = {}) {
     const venue = sourceVenue || request.client_name;
     const desiredSlug = request.menu_id || (request.kind !== 'nuovo' ? request.client_menu_id : venue);
     if (request.kind === 'nuovo') await assertSlugFree(db, slugify(desiredSlug), requestId, request.client_id);
-    const extraction = integrations(env).ai.extract(venue, request.source_text, desiredSlug);
+    let extraction = integrations(env).ai.extract(venue, request.source_text, desiredSlug);
+    // Menu scritto a parole: lettura assistita, verificata riga per riga (nessun valore inventato).
+    if (autoTranslationReady(env) && extraction.uncertain.some((row) => /\d/.test(row))) {
+      extraction = await assistExtraction(env.AI, venue, request.source_text, desiredSlug, extraction);
+    }
     if (sourceVenue) extraction.warnings.push(`Nome del locale letto dalla riga “Locale:” dell’email (“${sourceVenue}”): confermalo in revisione e aggiorna la scheda cliente.`);
     assert(extraction.extracted.length > 0 && extraction.menu.id, 'Nessun piatto con prezzo leggibile: aggiungi il materiale o trascrivi la fonte.', 422);
     // Tutti i piani includono l'inglese: Jarvis lo prepara subito come bozza da verificare.

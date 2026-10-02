@@ -120,13 +120,29 @@ export function venueFromSource(source) {
 // Regola fissa: riga breve, senza prezzo né punteggiatura da frase, non un saluto/frase,
 // e la riga non vuota successiva deve essere un piatto con prezzo.
 const PRICE_ROW = /^(.{2,150}?)\s*(?:[—–\-:\t]|\.{2,})\s*(?:€\s*)?(\d{1,4}(?:[,.]\d{1,2})?)\s*€?$/;
+// Formato libero "Fritto misto 10", "Fritto misto 10€", "Fritto misto € 10,50", "… 10 euro":
+// prezzo in fondo alla riga separato solo da uno spazio. Valori sotto 1 senza simbolo di valuta
+// (es. "Birra 0,4") sono quasi sempre quantità, non prezzi: restano da verificare.
+const LOOSE_ROW = /^(.{2,150}?[A-Za-zÀ-ÿ)'’.])\s+(€\s*)?(\d{1,4}(?:[,.]\d{1,2})?)\s*(€|euro|eur)?\.?$/i;
+// Frasi ("la margherita costa 7", "il fritto lo facciamo a 12"): non sono nomi di piatti.
+// Restano alla lettura assistita, che prende solo nome e prezzo presenti nella riga.
+const LOOSE_STOP = /\b(?:costa|costano|costerebbe|viene|vengono|invece|scusa|prezzo|prezzi|facciamo|mettiamo|vendiamo|euro|eur|lo|la|le|li|gli|il)$|\b(?:costa|costano|viene|vengono|invece|scusa|prezzo|facciamo|mettiamo|vendiamo|euro|eur|alle|dalle|ore|apriamo|chiudiamo|aperti|chiusi|orario|orari|tel|telefono|cell|via|piazza|numero|tavoli|posti|persone)\b|€|,\s|\s(?:a|al|da)$/i;
+export function priceRow(row) {
+  const strict = row.match(PRICE_ROW);
+  if (strict) return { name: strict[1].trim(), amount: strict[2], loose: false };
+  const loose = row.match(LOOSE_ROW);
+  if (!loose || !/[A-Za-zÀ-ÿ]{2}/.test(loose[1]) || SENTENCE_WORDS.test(loose[1]) || LOOSE_STOP.test(loose[1])) return null;
+  const currency = Boolean(loose[2] || loose[4]);
+  if (!currency && Number(loose[3].replace(',', '.')) < 1) return null;
+  return { name: loose[1].trim(), amount: loose[3], loose: !currency };
+}
 const SENTENCE_WORDS = /\b(?:ecco|vorrei|vorremmo|grazie|buongiorno|buonasera|salve|ciao|allego|allegato|allegati|cordiali|saluti|gentile|gentili|seguito|seguono|questo|questi|nostro|nostri|test|interno|cliente|attivare)\b/i;
 export function isPlainHeading(row, nextRow) {
   const title = row.replace(/:\s*$/, '').trim();
   if (title.length < 3 || title.length > 40 || title.split(/\s+/).length > 5) return false;
-  if (/[.?!,;@\d]|https?:/i.test(title) || PRICE_ROW.test(row) || SENTENCE_WORDS.test(title)) return false;
+  if (/[.?!,;@\d]|https?:/i.test(title) || priceRow(row) || SENTENCE_WORDS.test(title)) return false;
   if (!/^[A-Za-zÀ-ÿ]/.test(title)) return false;
-  return PRICE_ROW.test(String(nextRow || '').trim().replace(/^[-•*]\s*/, ''));
+  return Boolean(priceRow(String(nextRow || '').trim().replace(/^[-•*]\s*/, '')));
 }
 
 // Titoli scritti tutto in maiuscolo ("PRIMI", "VINI AL CALICE") -> "Primi", "Vini al calice",
@@ -159,16 +175,16 @@ export function extractMenuFromText(venue, source, requestedSlug) {
       }
       continue;
     }
-    const match = row.match(PRICE_ROW);
+    const match = priceRow(row);
     if (match) {
-      const name = match[1].trim();
+      const name = match.name.replace(/\s*[—–\-:]\s*$/, '').trim();
       // Solo formato: 12 -> 12,00 e 9,5 -> 9,50 (stesso valore, nessun prezzo inventato).
-      const [whole, cents = ''] = match[2].replace('.', ',').split(',');
+      const [whole, cents = ''] = match.amount.replace('.', ',').split(',');
       const price = `${whole},${cents.padEnd(2, '0')}`;
       if (name && Number(price.replace(',', '.')) > 0) {
         const item = { nome: { it: name }, prezzo: price };
         section.voci.push(item);
-        items.push({ name, price, sourceLine: row, line: lineNumber });
+        items.push({ name, price, sourceLine: row, line: lineNumber, loose: match.loose });
         continue;
       }
     }
@@ -188,6 +204,7 @@ export function extractMenuFromText(venue, source, requestedSlug) {
   const menu = { id: slug, nome: venue.trim(), lingue: ['it'], sezioni: kept.map(({ nome, voci }) => ({ nome, voci })) };
   return { menu, extracted: items, uncertain: unknown, provenance, warnings: [
     'Allergeni, ingredienti, coperto, contatti e traduzioni non sono stati dedotti.',
+    ...(items.some((i) => i.loose) ? [`${items.filter((i) => i.loose).length} prezzi scritti senza € (es. “Fritto misto 10”): controlla che siano davvero prezzi.`] : []),
     ...(unknown.length ? [`${unknown.length} righe senza prezzo o formato riconosciuto richiedono controllo.`] : [])
   ] };
 }
