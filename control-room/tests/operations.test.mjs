@@ -453,6 +453,41 @@ describe('private AI + GitHub operations (fakes only)', () => {
     } finally { db.close(); }
   });
 
+  it('merges the registered PR only with the exact phrase, a valid client approval, one menu file and the approved content', async () => {
+    const db = database();
+    try {
+      const fixture = await insertPublication(db);
+      const mergePayload = { ...fixture.payload, confirmation: 'CONFERMO MERGE MENU APPROVATO' };
+      const merges = [];
+      const makeEnv = ({ files = [{ filename: 'menus/osteria-di-prova.json', status: 'added' }], headMenu = menu() } = {}) => {
+        const base = githubFetch({ status: prStatus({ merged: false, headRef: fixture.branchName }) });
+        return {
+          GITHUB_PROVIDER: 'live', GITHUB_TOKEN: 'test-token',
+          GITHUB_FETCH: async (input, init = {}) => {
+            const url = new URL(String(input));
+            if (url.pathname.endsWith('/pulls/18/files')) return response(files);
+            if (url.pathname.endsWith('/contents/menus/osteria-di-prova.json') && url.searchParams.get('ref') === 'head-a')
+              return response({ type: 'file', sha: 'file-new', content: Buffer.from(JSON.stringify(headMenu)).toString('base64') });
+            if (url.pathname.endsWith('/pulls/18/merge') && init.method === 'PUT') { merges.push(JSON.parse(init.body)); return response({ merged: true, sha: 'merge-sha' }); }
+            return base.fetch(input, init);
+          }
+        };
+      };
+      await assert.rejects(runPrivateIntegrationAction(context(db, makeEnv()), 'githubMergePr', { ...mergePayload, confirmation: 'ok' }), (error) => error.status === 403);
+      await assert.rejects(runPrivateIntegrationAction(context(db, makeEnv()), 'githubMergePr', mergePayload), /approvazione del locale/);
+      await approveSeeded(db, fixture.draftId, fixture.requestId);
+      await assert.rejects(runPrivateIntegrationAction(context(db, makeEnv({ files: [{ filename: 'menus/osteria-di-prova.json' }, { filename: 'index.html' }] })), 'githubMergePr', mergePayload), /solo menus\/osteria-di-prova.json/);
+      const altered = menu(); altered.sezioni[0].voci[0].prezzo = '99,00';
+      await assert.rejects(runPrivateIntegrationAction(context(db, makeEnv({ headMenu: altered })), 'githubMergePr', mergePayload), /non coincide/);
+      assert.equal(merges.length, 0, 'nessun merge prima dei controlli');
+      const result = await runPrivateIntegrationAction(context(db, makeEnv()), 'githubMergePr', mergePayload);
+      assert.equal(result.merged, true);
+      assert.deepEqual(merges, [{ sha: 'head-a', merge_method: 'squash', commit_title: 'Merge approved menu PR #18' }]);
+      const actions = db.sqlite.prepare("SELECT action FROM audit_events WHERE request_id=? AND action LIKE 'github.pr.merge%' ORDER BY rowid").all(fixture.requestId).map((row) => row.action);
+      assert.deepEqual(actions, ['github.pr.merge.start', 'github.pr.merged']);
+    } finally { db.sqlite.close?.(); }
+  });
+
   it('verifies a merged reserved PR against the fixed public URL, ignores JSON key order, marks through audited CAS, and receipts retries', async () => {
     const db = database();
     try {

@@ -1,6 +1,6 @@
 import { createAiLiveAdapter } from './ai-live.js';
 import { approvalState, sha256Hex } from './approvals.js';
-import { GitHubLiveError, getPrStatus, openApprovedMenuPr, readCurrentMenu } from './github-live.js';
+import { GitHubLiveError, MANUAL_MERGE_CONFIRMATION, getPrStatus, listPrFiles, mergeApprovedMenuPr, openApprovedMenuPr, readBaseSha, readCurrentMenu } from './github-live.js';
 import { reviewIssues } from './editorial.js';
 import { slugify, validateMenu } from './menu.js';
 
@@ -18,7 +18,8 @@ export const PRIVATE_INTEGRATION_ACTIONS = new Set([
   'githubReadMenu',
   'githubOpenPr',
   'githubReconcilePr',
-  'githubVerifyPublication'
+  'githubVerifyPublication',
+  'githubMergePr'
 ]);
 
 const OPERATION_KEY = /^[A-Za-z0-9._:-]{1,128}$/;
@@ -377,6 +378,7 @@ async function readGitHubMenu(context, p) {
   const slug = clean(p.slug, 64, 'Slug');
   assert(SLUG.test(slug), 'Slug non valido.');
   const result = await readCurrentMenu(context.env, slug, githubOptions(context.env));
+  const baseSha = await readBaseSha(context.env, githubOptions(context.env));
   const validation = result.exists ? validateMenu(result.menu) : null;
   const requestId = p.requestId ? identifier(p.requestId) : null;
   let revision = null;
@@ -388,7 +390,7 @@ async function readGitHubMenu(context, p) {
   } else {
     await context.auditedBatch(context.db, [], 'github.menu.read', `Menu GitHub letto in sola lettura: ${slug}.`);
   }
-  return { ...result, validation, requestId, requestRevision: revision, readOnly: true };
+  return { ...result, baseSha, validation, requestId, requestRevision: revision, readOnly: true };
 }
 
 async function loadPrContext(context, p) {
@@ -610,6 +612,47 @@ async function loadPublicationContext(context, p) {
   };
 }
 
+// Merge reale su main: solo con la frase esatta, solo per la PR registrata della
+// bozza approvata, solo se la PR tocca esclusivamente menus/<slug>.json e il file
+// nella PR coincide byte per byte (semanticamente) con lo snapshot approvato.
+async function mergeLivePr(context, p) {
+  requireGitHubLive(context.env);
+  assert(p.confirmation === MANUAL_MERGE_CONFIRMATION, 'Conferma esatta di pubblicazione mancante.', 403);
+  const draftId = identifier(p.draftId);
+  const record = await context.getOne(context.db, `SELECT o.*,d.request_id,d.slug,d.status AS draft_status,
+      d.revision AS draft_revision,d.menu_json AS draft_menu_json,r.revision AS request_revision,r.status AS request_status,r.kind AS request_kind
+    FROM live_pr_operations o JOIN drafts d ON d.id=o.draft_id JOIN requests r ON r.id=d.request_id WHERE o.draft_id=?`, draftId);
+  assert(record, 'Nessuna PR registrata per questa bozza.', 404);
+  assert(record.status === 'pr_open', 'La PR non è in stato aperto: niente da pubblicare.', 409);
+  const revision = draftRevision(p.revision, record.draft_revision);
+  requestRevision(p.requestRevision, record.request_revision);
+  assert(Number(record.revision) === revision && record.draft_status === 'pronta_pr' && record.request_status === 'approvata',
+    'La bozza o la pratica sono cambiate dopo l’apertura della PR. Ricarica.', 409);
+  assert(await hashString(record.draft_menu_json) === record.snapshot_sha, 'Il menu è cambiato dopo l’apertura della PR.', 409);
+  const approvals = await context.rows(context.db, 'SELECT * FROM publication_approvals WHERE draft_id=? ORDER BY created_at DESC', draftId);
+  const gate = approvalState(approvals[0] || null, record.snapshot_sha, record.request_kind);
+  assert(gate.valid, 'Manca l’approvazione del locale valida per questa versione.', 409);
+  assert(!gate.activationMissing, 'Manca l’attivazione registrata del nuovo cliente.', 409);
+  const options = githubOptions(context.env);
+  const prNumber = Number(record.pr_number);
+  const status = await getPrStatus(context.env, prNumber, options);
+  assert(status.headRef === record.branch_name && status.htmlUrl === record.pr_url, 'La PR GitHub non corrisponde a quella registrata.', 409);
+  const filePath = `menus/${record.slug}.json`;
+  const files = await listPrFiles(context.env, prNumber, options);
+  assert(files.length === 1 && files[0].filename === filePath, `La PR deve modificare solo ${filePath}.`, 409);
+  const head = await readCurrentMenu(context.env, record.slug, { ...options, ref: status.headSha });
+  assert(head.exists && sameMenuSemantics(head.menu, JSON.parse(record.draft_menu_json)), 'Il file nella PR non coincide con il menu approvato.', 409);
+  await auditOnly({ ...context, requestId: record.request_id, revision: record.request_revision,
+    event: 'github.pr.merge.start', message: `Pubblicazione confermata da Riccardo: merge della PR #${prNumber} su main.` });
+  const merged = await mergeApprovedMenuPr(context.env, {
+    prNumber, confirmation: p.confirmation, approvedRevision: revision,
+    expectedHeadSha: status.headSha, expectedBaseSha: status.baseSha
+  }, options);
+  await auditOnly({ ...context, requestId: record.request_id, revision: record.request_revision,
+    event: 'github.pr.merged', message: `PR #${prNumber} unita a main (${String(merged.sha || '').slice(0, 12)}). Da verificare online.` });
+  return { merged: true, prNumber, prUrl: record.pr_url, sha: merged.sha, publicUrl: publicMenuUrl(record.slug) };
+}
+
 async function verifyGitHubPublication(context, p) {
   requireGitHubLive(context.env);
   assert(p.confirmation === 'CONFERMO VERIFICA PUBBLICAZIONE',
@@ -701,5 +744,6 @@ export async function runPrivateIntegrationAction(context, type, input) {
   if (type === 'githubReadMenu') return readGitHubMenu(dependencies, p);
   if (type === 'githubOpenPr') return openLivePr(dependencies, p);
   if (type === 'githubVerifyPublication') return verifyGitHubPublication(dependencies, p);
+  if (type === 'githubMergePr') return mergeLivePr(dependencies, p);
   return reconcileLivePr(dependencies, p);
 }
