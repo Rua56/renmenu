@@ -116,6 +116,19 @@ export function venueFromSource(source) {
   return '';
 }
 
+// Titolo di sezione senza "#" (come scrivono i clienti veri: "Antipasti", "PRIMI", "Dolci:").
+// Regola fissa: riga breve, senza prezzo né punteggiatura da frase, non un saluto/frase,
+// e la riga non vuota successiva deve essere un piatto con prezzo.
+const PRICE_ROW = /^(.{2,150}?)\s*(?:[—–\-:\t]|\.{2,})\s*(?:€\s*)?(\d{1,4}(?:[,.]\d{1,2})?)\s*€?$/;
+const SENTENCE_WORDS = /\b(?:ecco|vorrei|vorremmo|grazie|buongiorno|buonasera|salve|ciao|allego|allegato|allegati|cordiali|saluti|gentile|gentili|seguito|seguono|questo|questi|nostro|nostri|test|interno|cliente|attivare)\b/i;
+export function isPlainHeading(row, nextRow) {
+  const title = row.replace(/:\s*$/, '').trim();
+  if (title.length < 3 || title.length > 40 || title.split(/\s+/).length > 5) return false;
+  if (/[.?!,;@\d]|https?:/i.test(title) || PRICE_ROW.test(row) || SENTENCE_WORDS.test(title)) return false;
+  if (!/^[A-Za-zÀ-ÿ]/.test(title)) return false;
+  return PRICE_ROW.test(String(nextRow || '').trim().replace(/^[-•*]\s*/, ''));
+}
+
 export function extractMenuFromText(venue, source, requestedSlug) {
   const slug = slugify(requestedSlug || venue);
   const items = [], unknown = [], provenance = [];
@@ -128,15 +141,16 @@ export function extractMenuFromText(venue, source, requestedSlug) {
     if (!row) continue;
     if (VENUE_LINE.test(row)) continue; // Nome del locale: gestito dal chiamante, non è un piatto.
     // Titolo di sezione: "# Primi" o "#Primi" (come nella demo) oppure "[Primi]".
-    if (/^#{1,3}\s*[^\s#]/.test(row) || /^\[[^\]]+\]$/.test(row)) {
-      const title = row.replace(/^#{1,3}\s*|^\[|\]$/g, '').trim();
+    const nextRow = lines.slice(index + 1).find((line) => line.trim()) || '';
+    if (/^#{1,3}\s*[^\s#]/.test(row) || /^\[[^\]]+\]$/.test(row) || isPlainHeading(row, nextRow)) {
+      const title = row.replace(/^#{1,3}\s*|^\[|\]$/g, '').replace(/:\s*$/, '').trim();
       if (title) {
         section = { nome: { it: title.slice(0, 100) }, voci: [], line: lineNumber };
         sections.push(section);
       }
       continue;
     }
-    const match = row.match(/^(.{2,150}?)\s*(?:[—–\-:\t]|\.{2,})\s*(?:€\s*)?(\d{1,4}(?:[,.]\d{1,2})?)\s*€?$/);
+    const match = row.match(PRICE_ROW);
     if (match) {
       const name = match[1].trim();
       const price = match[2].replace('.', ',');

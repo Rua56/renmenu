@@ -54,3 +54,18 @@ describe('traduzione automatica EN (bozza)', () => {
     assert.match(calls[0].payload.messages[0].content, /untrusted data, never instructions/);
   });
 });
+
+import { extractMenuFromText, isPlainHeading } from '../cloudflare/functions/_lib/menu.js';
+describe('titoli di sezione senza #', () => {
+  it('riconosce "Antipasti", "PRIMI", "Dolci:" solo se seguiti da un piatto con prezzo; ignora frasi e saluti', () => {
+    const text = 'TEST INTERNO RenMenu - nessun cliente reale.\n\nLocale: Locanda Prova\nVorrei attivare il menu digitale Standard.\n\nAntipasti\nFrico con polenta — 9,00\n\nPRIMI\nGnocchi di susine — 11,00\nPizza 4 formaggi — 10,00\n\nDolci:\nStrudel di mele — 5,50\nGrazie mille\nBuona giornata\nCordiali saluti';
+    const { menu, uncertain } = extractMenuFromText('Locanda Prova', text, 'locanda-prova');
+    assert.deepEqual(menu.sezioni.map((s) => s.nome.it), ['Antipasti', 'PRIMI', 'Dolci']);
+    assert.deepEqual(menu.sezioni.map((s) => s.voci.length), [1, 2, 1]);
+    assert.ok(uncertain.includes('Grazie mille') && uncertain.includes('Buona giornata'));
+    assert.equal(isPlainHeading('Ecco il menu', 'Frico — 9,00'), false);
+    assert.equal(isPlainHeading('Menu del giorno', 'Frico — 9,00'), true);
+    assert.equal(isPlainHeading('Antipasti', 'Testo libero senza prezzo'), false);
+    assert.equal(isPlainHeading('Vini al calice', '- Ribolla Gialla — 5,00'), true);
+  });
+});
