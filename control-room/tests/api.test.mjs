@@ -164,7 +164,7 @@ describe('Control Room API staging', () => {
       const providerBlocked = await call(db, 'actions', { type: 'generateDraft', payload: { requestId } }, { AI_PROVIDER: 'live' });
       assert.equal(providerBlocked.status, 501);
       for (const provider of ['cloudflare_workers_ai', 'openai_compatible']) {
-        const extra = await action(db, 'createRequest', { clientId, subject: `Pannello AI ${provider}`, sourceChannel: 'email', category: 'nuovo_standard', sourceText: '## Primi\nGnocchi — 12,00' });
+        const extra = await action(db, 'createRequest', { clientId, subject: `Pannello AI ${provider}`, sourceChannel: 'email', category: 'nuovo_standard', menuId: `prova-${provider.replace(/_/g, '-')}`, sourceText: '## Primi\nGnocchi — 12,00' });
         const generated = await call(db, 'actions', { type: 'generateDraft', payload: { requestId: extra.body.result.id } }, { AI_PROVIDER: provider });
         assert.equal(generated.status, 200, `il provider ${provider} del pannello AI non deve bloccare la bozza deterministica`);
         assert.equal(generated.body.result.extraction.extracted.length, 1);
@@ -390,7 +390,8 @@ describe('Control Room API staging', () => {
       const named = await action(db, 'createClient', { name: 'Osteria Registrata' });
       const other = await action(db, 'createRequest', { clientId: named.body.result.id, subject: 'Altro', sourceChannel: 'email', category: 'nuovo_standard', sourceText });
       const second = await action(db, 'generateDraft', { requestId: other.body.result.id });
-      assert.equal(second.body.state.drafts.find((d) => d.requestId === other.body.result.id).slug, 'osteria-registrata');
+      assert.equal(second.status, 409, 'riga Locale diversa dal cliente registrato: decide Riccardo');
+      assert.match(second.body.error, /Trattoria Prova Gorizia.*Osteria Registrata/);
     } finally { db.close(); }
   });
   it('pratica importata senza categoria: chiede la categoria, non il Menu ID', async () => {
@@ -401,6 +402,38 @@ describe('Control Room API staging', () => {
       const blocked = await action(db, 'generateDraft', { requestId: created.body.result.id });
       assert.equal(blocked.status, 422);
       assert.match(blocked.body.error, /Scegli la categoria della pratica/);
+    } finally { db.close(); }
+  });
+  it('stesso mittente, altro locale: niente bozza finché Riccardo non sceglie il Menu ID; identificativi unici', async () => {
+    const db = database();
+    try {
+      const client = await action(db, 'createClient', { name: 'Trattoria Prova Gorizia' });
+      const clientId = client.body.result.id;
+      const first = await action(db, 'createRequest', { clientId, subject: 'Primo', sourceChannel: 'email', category: 'nuovo_standard', sourceText: '# Primi\nGnocchi — 10,50' });
+      assert.equal((await action(db, 'generateDraft', { requestId: first.body.result.id })).body.state.drafts[0].slug, 'trattoria-prova-gorizia');
+      const text = 'Locale: Bar Prova Isonzo\n# Colazione\nCappuccino — 1,80';
+      const other = await action(db, 'createRequest', { clientId, subject: 'Altro locale', sourceChannel: 'email', category: 'nuovo_standard', sourceText: text });
+      const otherId = other.body.result.id;
+      const mismatch = await action(db, 'generateDraft', { requestId: otherId });
+      assert.equal(mismatch.status, 409);
+      assert.match(mismatch.body.error, /Bar Prova Isonzo.*Trattoria Prova Gorizia.*bar-prova-isonzo/);
+      // Stesso cliente senza riga Locale: lo slug collide con la prima bozza.
+      const dup = await action(db, 'createRequest', { clientId, subject: 'Doppione', sourceChannel: 'email', category: 'nuovo_standard', sourceText: '# Primi\nZuppa — 8,00' });
+      const collision = await action(db, 'generateDraft', { requestId: dup.body.result.id });
+      assert.equal(collision.status, 409);
+      assert.match(collision.body.error, /già usato da «Trattoria Prova Gorizia»/);
+      // Riccardo sceglie il Menu ID: bozza con nome e slug del nuovo locale.
+      const current = (await call(db, 'state')).body.requests.find((r) => r.id === otherId);
+      assert.equal((await action(db, 'updateRequest', { id: otherId, revision: current.revision, patch: { menuId: 'bar-prova-isonzo' } })).status, 200);
+      const ok = await action(db, 'generateDraft', { requestId: otherId });
+      assert.equal(ok.status, 200);
+      const draft = ok.body.state.drafts.find((d) => d.requestId === otherId);
+      assert.equal(draft.slug, 'bar-prova-isonzo');
+      assert.equal(draft.menu.nome, 'Bar Prova Isonzo');
+      // Rinominare una bozza nuova sull'identificativo di un altro locale è bloccato.
+      const firstDraft = ok.body.state.drafts.find((d) => d.requestId === first.body.result.id);
+      const stolen = await action(db, 'saveDraft', { id: firstDraft.id, revision: firstDraft.revision, menu: { ...firstDraft.menu, id: 'bar-prova-isonzo' }, slug: 'bar-prova-isonzo' });
+      assert.equal(stolen.status, 409);
     } finally { db.close(); }
   });
 });
