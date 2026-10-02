@@ -8,6 +8,7 @@ import { purgePublishedEmail } from '../../_lib/email-retention.js';
 import { resolveCategory, draftBlocker, PLAN_RULES } from '../../_lib/service-rules.js';
 import { translateMenu, translationEntries, translationSummary } from '../../_lib/translate.js';
 import { applyExtras, proposeSourceExtras } from '../../_lib/extras.js';
+import { autopilotMessage, autopilotPreview } from '../../_lib/autopilot.js';
 import { ACTIVATIONS, approvalEvidence, approvalState, assessReply, previewEmail, previewUrl, proposeReplyChanges, referenceCode, sha256Hex } from '../../_lib/approvals.js';
 const headers = { 'Cache-Control': 'private, no-store', 'Content-Type': 'application/json; charset=utf-8' };
 const answer = (body, status = 200) => new Response(JSON.stringify(body), { status, headers });
@@ -47,7 +48,7 @@ async function auditedBatch(db, writes, event, summary, requestId = null, guard 
   const auditSql = guard
     ? `INSERT INTO audit_events (id,request_id,action,summary,actor,created_at) SELECT ?,?,?,?,?,? WHERE EXISTS (${guard.sql})`
     : 'INSERT INTO audit_events (id,request_id,action,summary,actor,created_at) VALUES (?,?,?,?,?,?)';
-  const audit = db.prepare(auditSql).bind(id, requestId, event, summary.slice(0, 240), 'owner', stamp, ...(guard?.args || []));
+  const audit = db.prepare(auditSql).bind(id, requestId, event, summary.slice(0, 240), db.actor || 'owner', stamp, ...(guard?.args || []));
   const statements = [...writes, audit];
   if (requestId) statements.push(db.prepare('UPDATE requests SET last_action_at=? WHERE id=? AND EXISTS (SELECT 1 FROM audit_events WHERE id=?)').bind(stamp, requestId, id));
   // D1.batch executes within one transaction: an audit failure rolls the business write back.
@@ -111,6 +112,42 @@ async function draftRows(db) {
   }
 }
 const parseList = (json) => { try { const value = JSON.parse(json || '[]'); return Array.isArray(value) ? value : []; } catch { return []; } };
+// Autopilota: richieste email nuove, mai toccate da Riccardo né da Jarvis. Le azioni passano
+// dalle stesse operazioni dell'interfaccia (stessi controlli), con «jarvis» come autore nel registro.
+const AUTOPILOT_SQL = `SELECT r.* FROM requests r WHERE r.source_channel='email' AND r.status='nuova' AND r.kind='altro'
+  AND r.category IS NULL AND r.revision=1 AND NOT EXISTS (SELECT 1 FROM drafts d WHERE d.request_id=r.id)
+  AND NOT EXISTS (SELECT 1 FROM audit_events a WHERE a.request_id=r.id AND a.action LIKE 'autopilot.%') ORDER BY r.created_at ASC LIMIT 2`;
+async function autopilotPending(db) {
+  try { return await rows(db, AUTOPILOT_SQL); } catch (error) { if (/no such column/i.test(String(error?.message))) return []; throw error; }
+}
+const asJarvis = (db) => ({ prepare: (sql) => db.prepare(sql), batch: (statements) => db.batch(statements), actor: 'jarvis' });
+export async function runAutopilot(db, env = {}) {
+  const done = [];
+  for (const request of await autopilotPending(db)) {
+    const preview = autopilotPreview(request);
+    const jarvis = asJarvis(db);
+    let outcome = preview.action, blocked = '';
+    try {
+      if (preview.category) {
+        const next = preview.action === 'bozza' ? 'Bozza preparata da Jarvis: controllala in Revisione.' : `Proposta di Jarvis: ${preview.categoryLabel}. Conferma o cambia la categoria.`;
+        await action(jarvis, 'updateRequest', { id: request.id, revision: request.revision, patch: { category: preview.category, nextStep: next.slice(0, 240) } }, env);
+      }
+      if (preview.action === 'bozza') await action(jarvis, 'generateDraft', { requestId: request.id }, env);
+    } catch (error) {
+      outcome = 'proponi';
+      blocked = String(error?.message || 'Operazione non completata.').slice(0, 300);
+    }
+    const message = blocked ? `${autopilotMessage(request.subject, { ...preview, why: '' }, 'proponi')} Bozza non generata: ${blocked}` : autopilotMessage(request.subject, preview, outcome);
+    const id = uid(), stamp = now();
+    const why = preview.reasons ? ` Fonte: ${preview.reasons}.` : '';
+    await auditedBatch(jarvis, [db.prepare('INSERT INTO notifications (id,request_id,channel,subject,body,priority,due_at,status,created_at) VALUES (?,?,?,?,?,?,?,?,?)')
+      .bind(id, request.id, 'in_app', outcome === 'bozza' ? 'Jarvis · bozza pronta' : 'Jarvis · serve una tua decisione', `${message}${why}`.slice(0, 5000), outcome === 'bozza' ? 'importante' : 'normale', null, 'mock', stamp)],
+    outcome === 'bozza' ? 'autopilot.draft' : 'autopilot.proposal', message, request.id, { sql: 'SELECT 1 FROM notifications WHERE id=?', args: [id] });
+    done.push({ requestId: request.id, outcome, message });
+  }
+  return done;
+}
+
 export async function state(db, env = {}) {
   const [clients, requests, materials, rawDrafts, versions, notifications, messages, audit, proposals, rawAnalyses, livePrs, ownerDeliveries, rawApprovals] = await Promise.all([
     rows(db, 'SELECT id,name,email,phone,contact_name AS contactName,contact_role AS contactRole,plan,payment_status AS paymentStatus,menu_id AS menuId,menu_url AS menuUrl,internal_notes AS internalNotes,trial_ends_at AS trialEndsAt,renewal_at AS renewalAt,revision,created_at AS createdAt,updated_at AS updatedAt FROM clients ORDER BY created_at DESC LIMIT 300'),
@@ -134,7 +171,7 @@ export async function state(db, env = {}) {
       versions: versions.filter((version) => version.draftId === draft.id).map(({ menuJson: json, ...v }) => ({ ...v, menu: JSON.parse(json) })),
       sourceExtras: ['bozza', 'revisione', 'pronta_pr'].includes(draft.status)
         ? proposeSourceExtras(requests.find((entry) => entry.id === draft.requestId)?.sourceText, JSON.parse(menuJson)) : [] })),
-    notifications, messages, audit,
+    notifications, messages, audit, autopilotPending: (await autopilotPending(db)).length,
     proposals: proposals.map(({ diffJson, ...p }) => ({ ...p, diff: JSON.parse(diffJson) })),
     analyses: rawAnalyses.map(({ provenanceJson, warningsJson, ...entry }) => ({ ...entry,
       provenance: JSON.parse(provenanceJson), warnings: JSON.parse(warningsJson) })),
@@ -445,6 +482,8 @@ async function action(db, type, input, env = {}) {
       { sql: 'SELECT 1 FROM draft_versions WHERE draft_id=? AND revision=?', args: [id, revision + 1] });
     assert(saved.every((entry) => entry.meta.changes === 1), 'Bozza o pratica modificata da un’altra sessione. Ricarica.', 409);
     result = { id, translation: { translated: translation.translated, total: translation.total, skipped: translation.skipped }, validation };
+  } else if (type === 'runAutopilot') {
+    result = { done: await runAutopilot(db, env) };
   } else if (type === 'applySourceExtras') {
     // Coperto e allergeni dichiarati nel testo della richiesta: ricalcolati sul server dal
     // testo salvato, applicati solo se scelti da Riccardo, con la riga come fonte.
