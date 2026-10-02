@@ -57,6 +57,10 @@ describe('Import automatico Gmail → D1 staging', () => {
       VALUES ('a1','d1','gmail-request-1a0fcabc123','RM-ABC234','sha','anteprima_inviata','cliente@example.com','u','s','b','x',1,'x','x')`).run();
     const reply = { ...base, messageId: 'reply1', subject: 'Re: Anteprima del vostro menu digitale RenMenu · rif. RM-ABC234', text: 'Approvo, grazie.\n\nIl giorno 2 ott RenMenu ha scritto:\n> ...', relevant: false };
     assert.equal(replyReference(reply), 'RM-ABC234');
+    // Oggetto svuotato dal client di posta: vale il riferimento letto nel messaggio citato.
+    assert.equal(replyReference({ ...reply, subject: 'Re:', reference: 'RM-ABC234' }), 'RM-ABC234');
+    assert.equal(replyReference({ ...reply, subject: 'Re:', reference: 'testo RM-ABC234 altro' }), null, 'solo il codice esatto');
+    assert.equal(replyReference({ ...reply, subject: 'Re:' }), null);
     const approval = db.prepare(APPROVAL_SQL).get('RM-ABC234');
     assert.equal(buildReplyBatch({ ...reply, from: 'altro@example.com' }, approval).error, 'REPLY_SENDER_MISMATCH');
     const plan = buildReplyBatch(reply, approval);
