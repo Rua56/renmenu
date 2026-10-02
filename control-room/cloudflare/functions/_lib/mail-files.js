@@ -63,7 +63,7 @@ export async function linkMailFiles(db, env, { now, uid, auditedBatch }) {
     }
     if (['completata', 'archiviata', 'chiusa'].includes(file.request_status) || file.client_email !== file.sender) {
       await db.prepare("UPDATE mail_files SET material_id='scartato' WHERE id=?").bind(file.id).run();
-      notices.push({ requestId: file.request_id, text: `Allegato «${file.filename}» non collegato: ${file.client_email !== file.sender ? 'il mittente non coincide con il cliente della pratica' : 'la pratica è chiusa'}.` });
+      if (file.client_email !== file.sender) notices.push({ requestId: file.request_id, text: `Allegato «${file.filename}» non collegato: il mittente non coincide con il cliente della pratica.` });
       continue;
     }
     const count = (await db.prepare('SELECT COUNT(*) AS n FROM materials WHERE request_id=?').bind(file.request_id).first())?.n || 0;
@@ -76,10 +76,11 @@ export async function linkMailFiles(db, env, { now, uid, auditedBatch }) {
     ], 'material.add', `Allegato dell'email importato da Jarvis: «${file.filename}» (${file.mime}, ${file.size} byte).`, file.request_id);
     touched.set(file.request_id, file);
   }
-  // Email con soli allegati in sospeso: ora che ci sono, la pratica torna all'autopilota.
+  // Email con allegati in sospeso (anche foto inserite nel testo, che rendono il corpo «incompleto»):
+  // ora che ci sono, la pratica torna all'autopilota. Tutto resta comunque da rivedere da Riccardo.
   for (const [requestId] of touched) {
     await db.prepare(`UPDATE requests SET status='nuova',internal_notes=?,next_step=?,updated_at=? WHERE id=? AND status='dati_da_confermare' AND revision=1
-      AND EXISTS (SELECT 1 FROM external_events e WHERE e.request_id=requests.id AND e.reason='attachments_pending')`)
+      AND EXISTS (SELECT 1 FROM external_events e WHERE e.request_id=requests.id AND e.reason IN ('attachments_pending','body_incomplete_or_attachments'))`)
       .bind('Email Gmail con allegati importati da Jarvis (foto/PDF): verificare la lettura sugli originali.', 'Jarvis legge gli allegati e prepara la bozza o la proposta.', now(), requestId).run();
   }
   return notices;
