@@ -174,7 +174,9 @@ async function insertPublication(db, {
   db.sqlite.prepare('INSERT INTO drafts (id,request_id,slug,menu_json,status,checks_json,revision,created_at,updated_at) VALUES (?,?,?,?,?,?,?,?,?)')
     .run(draftId, requestId, 'osteria-di-prova', menuJson, 'pronta_pr', JSON.stringify(checks()), draftRevision, now(), now());
   db.sqlite.prepare('INSERT INTO draft_versions (id,draft_id,revision,menu_json,actor,created_at) VALUES (?,?,?,?,?,?)')
-    .run(`${draftId}-version`, draftId, draftRevision, menuJson, 'editorial_review', now());
+    // Come nel flusso reale: le conferme della checklist alzano la revisione della bozza
+    // senza creare una nuova versione del contenuto (pilota 8).
+    .run(`${draftId}-version`, draftId, draftRevision - 2, menuJson, 'editorial_review', now());
   db.sqlite.prepare(`INSERT INTO live_pr_operations
     (id,draft_id,revision,snapshot_sha,base_sha,branch_name,pr_number,pr_url,status,last_error,created_at,updated_at)
     VALUES (?,?,?,?,?,?,?,?,?,?,?,?)`)

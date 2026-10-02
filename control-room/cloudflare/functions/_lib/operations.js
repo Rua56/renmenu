@@ -594,7 +594,9 @@ async function loadPublicationContext(context, p) {
     'Operazione PR priva di numero o URL verificabile.', 409);
 
   const version = await context.getOne(context.db,
-    'SELECT menu_json FROM draft_versions WHERE draft_id=? AND revision=?', draftId, revision);
+    // Ultima versione del contenuto: la checklist alza la revisione della bozza senza creare
+    // versioni nuove. L'uguaglianza con lo snapshot della PR è comunque verificata qui sotto.
+    'SELECT menu_json FROM draft_versions WHERE draft_id=? AND revision<=? ORDER BY revision DESC LIMIT 1', draftId, revision);
   assert(version && typeof version.menu_json === 'string',
     'Snapshot versionato della bozza non disponibile per la verifica.', 409);
   let expectedMenu;
@@ -694,7 +696,7 @@ async function verifyGitHubPublication(context, p) {
         AND EXISTS (SELECT 1 FROM drafts d JOIN requests r ON r.id=d.request_id
           WHERE d.id=? AND d.revision=? AND d.menu_json=? AND r.id=? AND r.revision=?
             AND EXISTS (SELECT 1 FROM draft_versions v
-              WHERE v.draft_id=d.id AND v.revision=d.revision AND v.menu_json=?))`)
+              WHERE v.draft_id=d.id AND v.revision<=d.revision AND v.menu_json=?))`)
       .bind(stamp, record.id, prepared.revision, record.snapshot_sha, record.base_sha,
         record.branch_name, record.pr_number, record.pr_url, prepared.draftId, prepared.revision,
         record.draft_menu_json, record.request_id, record.request_revision, prepared.versionMenuJson),
