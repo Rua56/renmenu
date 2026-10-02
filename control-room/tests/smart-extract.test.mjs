@@ -64,3 +64,18 @@ describe('Lettura assistita (il modello propone, il testo decide)', () => {
     assert.equal(await assistExtraction({ run: async () => { throw new Error('giù'); } }, 'x', 'la margherita costa 7', 'x', base), base);
   });
 });
+
+import { proposeReplyChanges } from '../cloudflare/functions/_lib/approvals.js';
+describe('Risposta del locale: sezione indicata e coperto', () => {
+  const menu = { sezioni: [{ nome: { it: 'Antipasti' }, voci: [{ nome: { it: 'Fritto' }, prezzo: '10,00' }] }, { nome: { it: 'Secondi' }, voci: [{ nome: { it: 'Tagliata' }, prezzo: '20,00' }] }, { nome: { it: 'Dolci' }, voci: [{ nome: { it: 'Tiramisù' }, prezzo: '6,00' }] }] };
+  it('mette il piatto nella sezione scritta dal locale e legge il coperto nella stessa frase', () => {
+    const out = proposeReplyChanges('Aggiungete il Richard arrosto a 35 euro nei secondi e il coperto 2 euro', menu);
+    assert.deepEqual(out.map(({ type, name, price, section, value }) => ({ type, name, price, section, value })), [
+      { type: 'aggiungi', name: 'Richard arrosto', price: '35,00', section: 1, value: undefined },
+      { type: 'coperto', name: undefined, price: undefined, section: undefined, value: '2,00' }]);
+  });
+  it('coperto con verbo davanti sì, con due importi no', () => {
+    assert.equal(proposeReplyChanges('Aggiungete il coperto di 3 euro', menu)[0].value, '3,00');
+    assert.equal(proposeReplyChanges('Coperto e pane 2 o 3 euro', menu)[0].type, 'manuale');
+  });
+});
