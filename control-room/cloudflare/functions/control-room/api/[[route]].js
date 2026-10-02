@@ -7,6 +7,7 @@ import { sendOwnerNotification, OWNER_NOTIFICATION_RECIPIENT } from '../../_lib/
 import { purgePublishedEmail } from '../../_lib/email-retention.js';
 import { resolveCategory, draftBlocker, PLAN_RULES } from '../../_lib/service-rules.js';
 import { translateMenu, translationEntries, translationSummary } from '../../_lib/translate.js';
+import { applyExtras, proposeSourceExtras } from '../../_lib/extras.js';
 import { ACTIVATIONS, approvalEvidence, approvalState, assessReply, previewEmail, previewUrl, proposeReplyChanges, referenceCode, sha256Hex } from '../../_lib/approvals.js';
 const headers = { 'Cache-Control': 'private, no-store', 'Content-Type': 'application/json; charset=utf-8' };
 const answer = (body, status = 200) => new Response(JSON.stringify(body), { status, headers });
@@ -130,7 +131,9 @@ export async function state(db, env = {}) {
     githubMode: String(env?.GITHUB_PROVIDER || 'mock').trim() === 'live' ? 'live' : 'mock',
     clients, requests, materials,
     drafts: rawDrafts.map(({ menuJson, checksJson, provenanceJson, ...draft }) => ({ ...draft, menu: JSON.parse(menuJson), checks: JSON.parse(checksJson), provenance: parseList(provenanceJson),
-      versions: versions.filter((version) => version.draftId === draft.id).map(({ menuJson: json, ...v }) => ({ ...v, menu: JSON.parse(json) })) })),
+      versions: versions.filter((version) => version.draftId === draft.id).map(({ menuJson: json, ...v }) => ({ ...v, menu: JSON.parse(json) })),
+      sourceExtras: ['bozza', 'revisione', 'pronta_pr'].includes(draft.status)
+        ? proposeSourceExtras(requests.find((entry) => entry.id === draft.requestId)?.sourceText, JSON.parse(menuJson)) : [] })),
     notifications, messages, audit,
     proposals: proposals.map(({ diffJson, ...p }) => ({ ...p, diff: JSON.parse(diffJson) })),
     analyses: rawAnalyses.map(({ provenanceJson, warningsJson, ...entry }) => ({ ...entry,
@@ -442,6 +445,37 @@ async function action(db, type, input, env = {}) {
       { sql: 'SELECT 1 FROM draft_versions WHERE draft_id=? AND revision=?', args: [id, revision + 1] });
     assert(saved.every((entry) => entry.meta.changes === 1), 'Bozza o pratica modificata da un’altra sessione. Ricarica.', 409);
     result = { id, translation: { translated: translation.translated, total: translation.total, skipped: translation.skipped }, validation };
+  } else if (type === 'applySourceExtras') {
+    // Coperto e allergeni dichiarati nel testo della richiesta: ricalcolati sul server dal
+    // testo salvato, applicati solo se scelti da Riccardo, con la riga come fonte.
+    const id = identifier(p.draftId), revision = Number(p.revision);
+    const draft = await getOne(db, 'SELECT * FROM drafts WHERE id=?', id);
+    assert(draft, 'Bozza non trovata.', 404);
+    assert(Number.isInteger(revision) && revision === draft.revision, 'Bozza modificata da un’altra sessione. Ricarica.', 409);
+    assert(['bozza', 'revisione', 'pronta_pr'].includes(draft.status), 'Bozza già chiusa: apri una nuova pratica.', 409);
+    const linkedRequest = await getOne(db, 'SELECT revision,source_text FROM requests WHERE id=?', draft.request_id);
+    const menu = JSON.parse(draft.menu_json);
+    const chosen = new Set(Array.isArray(p.accept) ? p.accept.map(String) : []);
+    const selected = proposeSourceExtras(linkedRequest.source_text, menu).filter((entry) => entry.type !== 'manuale' && chosen.has(entry.id));
+    assert(selected.length, 'Seleziona almeno un dato da inserire.', 422);
+    const applied = applyExtras(menu, selected, (entry) => `riga ${entry.line}`);
+    const validation = validateMenu(applied.menu);
+    assert(!validation.errors.length, `Menù non valido: ${validation.errors.slice(0, 3).join(' ')}`);
+    const paths = new Set(applied.provenance.map((row) => row.path));
+    const provenance = [...parseList(draft.provenance_json).filter((row) => !paths.has(row.path)), ...applied.provenance];
+    const menuJson = JSON.stringify(applied.menu), timestamp = now();
+    const summaryText = selected.map((entry) => entry.type === 'coperto' ? `coperto ${entry.value} (riga ${entry.line})` : `${entry.name}: ${entry.label} (riga ${entry.line})`).join('; ');
+    const saved = await auditedBatch(db, [
+      db.prepare("UPDATE drafts SET menu_json=?,checks_json=?,provenance_json=?,status='revisione',revision=revision+1,updated_at=? WHERE id=? AND revision=? AND EXISTS (SELECT 1 FROM requests WHERE requests.id=? AND requests.revision=?)")
+        .bind(menuJson, JSON.stringify(checksDefault()), JSON.stringify(provenance), timestamp, id, revision, draft.request_id, linkedRequest.revision),
+      db.prepare('INSERT INTO draft_versions (id,draft_id,revision,menu_json,actor,created_at) SELECT ?,id,?,?,?,? FROM drafts WHERE id=? AND revision=?')
+        .bind(uid(), revision + 1, menuJson, 'dati_dal_locale', timestamp, id, revision + 1),
+      db.prepare("UPDATE requests SET status='in_revisione',revision=revision+1,updated_at=? WHERE id=? AND revision=? AND EXISTS (SELECT 1 FROM drafts WHERE drafts.id=? AND drafts.revision=? AND drafts.status='revisione')")
+        .bind(timestamp, draft.request_id, linkedRequest.revision, id, revision + 1)
+    ], 'draft.source_extras', `Dati del locale inseriti da Riccardo: ${summaryText}.`.slice(0, 900), draft.request_id,
+      { sql: 'SELECT 1 FROM draft_versions WHERE draft_id=? AND revision=?', args: [id, revision + 1] });
+    assert(saved.every((entry) => entry.meta.changes === 1), 'Bozza o pratica modificata da un’altra sessione. Ricarica.', 409);
+    result = { id, applied: selected.length, validation };
   } else if (type === 'applyReplyChanges') {
     // Modifiche chieste dal locale: Jarvis le ricalcola dal testo salvato (mai dal browser)
     // e applica solo quelle scelte da Riccardo. Le fonti dei valori invariati restano.
@@ -462,6 +496,9 @@ async function action(db, type, input, env = {}) {
     const next = structuredClone(menu);
     const added = [];
     for (const entry of selected) if (entry.type === 'prezzo') next.sezioni[entry.si].voci[entry.vi].prezzo = entry.after;
+    // Coperto e allergeni scritti dal locale nella risposta (stessi indici del menu attuale).
+    const extras = applyExtras(next, selected.filter((entry) => ['coperto', 'allergeni'].includes(entry.type)), () => `Risposta del locale (rif. ${approval.reference_code})`);
+    Object.assign(next, extras.menu);
     for (const entry of selected) if (entry.type === 'aggiungi') {
       const si = Number.isInteger(Number(sectionsChoice[entry.id])) && next.sezioni[Number(sectionsChoice[entry.id])] ? Number(sectionsChoice[entry.id]) : entry.section;
       next.sezioni[si].voci.push({ nome: { it: entry.name }, prezzo: entry.price });
@@ -469,7 +506,7 @@ async function action(db, type, input, env = {}) {
     }
     // Rimozioni per ultime, dall'indice più alto: le fonti dei piatti successivi seguono il piatto.
     const removals = selected.filter((entry) => entry.type === 'rimuovi').sort((a, b) => b.si - a.si || b.vi - a.vi);
-    let provenance = parseList(draft.provenance_json);
+    let provenance = [...parseList(draft.provenance_json).filter((row) => !extras.provenance.some((extra) => extra.path === row.path)), ...extras.provenance];
     for (const entry of removals) {
       next.sezioni[entry.si].voci.splice(entry.vi, 1);
       const prefix = `sezioni.${entry.si}.voci.`;
@@ -503,7 +540,8 @@ async function action(db, type, input, env = {}) {
     const linkedRequest = await getOne(db, 'SELECT revision FROM requests WHERE id=?', draft.request_id);
     const menuJson = JSON.stringify(finalMenu), timestamp = now();
     const summaryText = selected.map((entry) => entry.type === 'prezzo' ? `${entry.name} ${entry.before} → ${entry.after}`
-      : entry.type === 'aggiungi' ? `aggiunto ${entry.name} ${entry.price}` : `rimosso ${entry.name}`).join('; ');
+      : entry.type === 'aggiungi' ? `aggiunto ${entry.name} ${entry.price}` : entry.type === 'coperto' ? `coperto ${entry.value}`
+      : entry.type === 'allergeni' ? `allergeni ${entry.name}: ${entry.label}` : `rimosso ${entry.name}`).join('; ');
     const saved = await auditedBatch(db, [
       db.prepare("UPDATE drafts SET menu_json=?,checks_json=?,provenance_json=?,status='revisione',revision=revision+1,updated_at=? WHERE id=? AND revision=? AND EXISTS (SELECT 1 FROM requests WHERE requests.id=? AND requests.revision=?)")
         .bind(menuJson, JSON.stringify(checksDefault()), JSON.stringify(provenance), timestamp, id, revision, draft.request_id, linkedRequest.revision),
