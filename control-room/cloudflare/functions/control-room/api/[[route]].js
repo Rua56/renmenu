@@ -9,6 +9,8 @@ import { resolveCategory, draftBlocker, PLAN_RULES } from '../../_lib/service-ru
 import { translateMenu, translationEntries, translationSummary } from '../../_lib/translate.js';
 import { applyExtras, proposeSourceExtras } from '../../_lib/extras.js';
 import { autopilotMessage, autopilotPreview } from '../../_lib/autopilot.js';
+import { createMissions } from '../../_lib/missions.js';
+import { getMe, randomToken, sendTelegram, setWebhook, telegramReady } from '../../_lib/telegram.js';
 import { ACTIVATIONS, approvalEvidence, approvalState, assessReply, previewEmail, previewUrl, proposeReplyChanges, referenceCode, sha256Hex } from '../../_lib/approvals.js';
 const headers = { 'Cache-Control': 'private, no-store', 'Content-Type': 'application/json; charset=utf-8' };
 const answer = (body, status = 200) => new Response(JSON.stringify(body), { status, headers });
@@ -172,6 +174,8 @@ export async function state(db, env = {}) {
       sourceExtras: ['bozza', 'revisione', 'pronta_pr'].includes(draft.status)
         ? proposeSourceExtras(requests.find((entry) => entry.id === draft.requestId)?.sourceText, JSON.parse(menuJson)) : [] })),
     notifications, messages, audit, autopilotPending: (await autopilotPending(db)).length,
+    missions: await missionRows(db),
+    telegram: { configured: telegramReady(env), linked: Boolean(await missions.setting(db, 'telegram_chat_id')) },
     proposals: proposals.map(({ diffJson, ...p }) => ({ ...p, diff: JSON.parse(diffJson) })),
     analyses: rawAnalyses.map(({ provenanceJson, warningsJson, ...entry }) => ({ ...entry,
       provenance: JSON.parse(provenanceJson), warnings: JSON.parse(warningsJson) })),
@@ -195,7 +199,13 @@ export async function state(db, env = {}) {
   };
 }
 
-async function action(db, type, input, env = {}) {
+// Jarvis autonomo: missioni affidate da Riccardo (vedi _lib/missions.js).
+export const missions = createMissions({ action: (...args) => action(...args), auditedBatch, getOne, rows, now, uid, fetchImpl: (...args) => globalThis.fetch(...args) });
+async function missionRows(db) {
+  try { return await rows(db, 'SELECT id,request_id AS requestId,draft_id AS draftId,status,note,rounds,step_started_at AS stepStartedAt,updated_at AS updatedAt FROM jarvis_missions ORDER BY updated_at DESC LIMIT 200'); }
+  catch (error) { if (/no such table/i.test(String(error?.message))) return []; throw error; }
+}
+export async function action(db, type, input, env = {}) {
   const p = input && typeof input === 'object' && !Array.isArray(input) ? input : {};
   const privateResult = await runPrivateIntegrationAction({
     db, env, auditedBatch, getOne, rows, now, uid
@@ -396,7 +406,7 @@ async function action(db, type, input, env = {}) {
     assert(approval.snapshot_sha === await sha256Hex(draft.menu_json), 'La bozza è cambiata dopo l’anteprima: preparane una nuova prima di inviarla.', 409);
     const stamp = now();
     await auditedBatch(db, [db.prepare("UPDATE publication_approvals SET status='anteprima_inviata',sent_at=?,revision=revision+1,updated_at=? WHERE id=? AND revision=? AND status='anteprima_pronta'").bind(stamp, stamp, id, revision)],
-      'approval.sent', `Anteprima rif. ${approval.reference_code} inviata da Riccardo; in attesa della risposta del locale.`, approval.request_id,
+      'approval.sent', `Anteprima rif. ${approval.reference_code} inviata ${db.actor === 'jarvis' ? 'da Jarvis (Gmail renmenu1569)' : 'da Riccardo'}; in attesa della risposta del locale.`, approval.request_id,
       { sql: "SELECT 1 FROM publication_approvals WHERE id=? AND status='anteprima_inviata'", args: [id] });
     result = { id };
   } else if (type === 'decideClientReply') {
@@ -482,6 +492,38 @@ async function action(db, type, input, env = {}) {
       { sql: 'SELECT 1 FROM draft_versions WHERE draft_id=? AND revision=?', args: [id, revision + 1] });
     assert(saved.every((entry) => entry.meta.changes === 1), 'Bozza o pratica modificata da un’altra sessione. Ricarica.', 409);
     result = { id, translation: { translated: translation.translated, total: translation.total, skipped: translation.skipped }, validation };
+  } else if (type === 'entrustToJarvis') {
+    result = await missions.entrust(db, env, p);
+  } else if (type === 'jarvisTick') {
+    result = { done: await missions.tick(db, env) };
+  } else if (type === 'jarvisDecide') {
+    result = await missions.decide(db, env, identifier(p.missionId), p.yes === true);
+  } else if (type === 'cancelMission') {
+    const mission = await getOne(db, 'SELECT * FROM jarvis_missions WHERE id=?', identifier(p.missionId));
+    assert(mission, 'Missione non trovata.', 404);
+    assert(!['completata', 'annullata'].includes(mission.status), 'Missione già chiusa.', 409);
+    const stamp = now();
+    await auditedBatch(db, [db.prepare("UPDATE jarvis_missions SET status='annullata',note='Ripresa in mano da Riccardo.',revision=revision+1,updated_at=? WHERE id=? AND revision=?").bind(stamp, mission.id, mission.revision),
+      db.prepare("UPDATE jarvis_outbox SET status='annullata',updated_at=? WHERE mission_id=? AND status='in_coda'").bind(stamp, mission.id)],
+    'jarvis.cancel', 'Riccardo ha ripreso in mano la pratica: Jarvis si ferma.', mission.request_id);
+    result = { id: mission.id };
+  } else if (type === 'telegramLink') {
+    assert(telegramReady(env), 'Manca il segreto TELEGRAM_BOT_TOKEN nel progetto Cloudflare.', 503);
+    const secret = randomToken(32), code = randomToken(16);
+    const me = await getMe(env);
+    assert(me?.ok && me.result?.username, 'Telegram non riconosce il token del bot: controlla TELEGRAM_BOT_TOKEN.', 502);
+    await missions.putSetting(db, 'telegram_webhook_secret', secret);
+    const hook = await setWebhook(env, secret);
+    assert(hook?.ok, `Telegram ha rifiutato il collegamento (${String(hook?.description || 'errore').slice(0, 120)}).`, 502);
+    await missions.putSetting(db, 'telegram_pair_code', code);
+    await missions.putSetting(db, 'telegram_pair_until', new Date(Date.now() + 15 * 60_000).toISOString());
+    await auditedBatch(db, [], 'jarvis.telegram_pairing', `Codice di collegamento Telegram generato per @${me.result.username} (valido 15 minuti).`, null);
+    result = { username: me.result.username, link: `https://t.me/${me.result.username}?start=${code}` };
+  } else if (type === 'telegramTest') {
+    const chat = await missions.setting(db, 'telegram_chat_id');
+    assert(chat && telegramReady(env), 'Telegram non ancora collegato.', 409);
+    const sent = await sendTelegram(env, chat, 'Prova dalla Control Room: Jarvis ti sente.');
+    assert(sent?.ok, 'Telegram non ha consegnato il messaggio.', 502);
   } else if (type === 'runAutopilot') {
     result = { done: await runAutopilot(db, env) };
   } else if (type === 'applySourceExtras') {

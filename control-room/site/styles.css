@@ -924,3 +924,7 @@ form { min-width: 0; }
 .owner-email-card code { color: var(--teal-soft); }
 .owner-email-card .owner-email-disabled { margin-top: .85rem; }
 .owner-email-card fieldset:disabled { opacity: .62; }
+/* Proposte coperto/allergeni: casella e testo vicini, a sinistra. */
+.list-row.extra-row { justify-content: flex-start; gap: .9rem; cursor: pointer; }
+.list-row.extra-row input[type="checkbox"] { flex: 0 0 auto; width: 1.15rem; height: 1.15rem; margin-top: .15rem; }
+.list-row.extra-row .list-main { text-align: left; align-items: flex-start; }

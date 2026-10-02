@@ -124,7 +124,7 @@ export function buildReplyBatch(e, approval, stamp = new Date().toISOString()) {
 
 export const VERIFY_SQL = 'SELECT status,request_id FROM external_events WHERE source=? AND source_event_id=?';
 
-function d1(sql, params) {
+export function d1(sql, params) {
   const url = `https://api.cloudflare.com/client/v4/accounts/${ACCOUNT_ID}/d1/database/${DATABASE_ID}/query`;
   // curl rispetta HTTPS_PROXY: la credenziale viene iniettata dal proxy, mai scritta qui.
   const out = execFileSync('curl', ['-sS', '-X', 'POST', url, '-H', 'Content-Type: application/json', '--data-binary', '@-'],
