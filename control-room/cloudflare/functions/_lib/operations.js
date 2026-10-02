@@ -541,6 +541,12 @@ async function reconcileLivePr(context, p) {
   return { operationId: operation.id, status: 'pr_open', pr: status, reconciled: true };
 }
 
+// Indirizzo della pagina che vedono i clienti (quello del QR), salvato nella pratica.
+// Il file JSON resta solo l'oggetto della verifica tecnica.
+function customerMenuUrl(slug) {
+  return `${PUBLIC_MENU_ORIGIN}/menu/?m=${encodeURIComponent(slug)}`;
+}
+
 function publicMenuUrl(slug) {
   return `${PUBLIC_MENU_ORIGIN}/menus/${encodeURIComponent(slug)}.json`;
 }
@@ -614,7 +620,7 @@ async function loadPublicationContext(context, p) {
     'Snapshot PR non coerente con la bozza versionata.', 409);
   return {
     record: { ...record, pr_number: prNumber }, draftId, revision, suppliedRequestRevision,
-    expectedMenu, versionMenuJson: version.menu_json, publicUrl: publicMenuUrl(record.slug)
+    expectedMenu, versionMenuJson: version.menu_json, publicUrl: customerMenuUrl(record.slug)
   };
 }
 
@@ -656,7 +662,7 @@ async function mergeLivePr(context, p) {
   }, options);
   await auditOnly({ ...context, requestId: record.request_id, revision: record.request_revision,
     event: 'github.pr.merged', message: `PR #${prNumber} unita a main (${String(merged.sha || '').slice(0, 12)}). Da verificare online.` });
-  return { merged: true, prNumber, prUrl: record.pr_url, sha: merged.sha, publicUrl: publicMenuUrl(record.slug) };
+  return { merged: true, prNumber, prUrl: record.pr_url, sha: merged.sha, publicUrl: customerMenuUrl(record.slug) };
 }
 
 async function verifyGitHubPublication(context, p) {
@@ -708,7 +714,7 @@ async function verifyGitHubPublication(context, p) {
           AND o.revision=? AND o.snapshot_sha=? AND o.base_sha=? AND o.branch_name=?
           AND o.pr_number=? AND o.pr_url=?)
         AND EXISTS (SELECT 1 FROM drafts d WHERE d.id=? AND d.request_id=? AND d.revision=? AND d.menu_json=?)`)
-      .bind(COMPLETED_REQUEST_STATUS, published.url, stamp, record.request_id, record.request_revision,
+      .bind(COMPLETED_REQUEST_STATUS, prepared.publicUrl, stamp, record.request_id, record.request_revision,
         record.id, prepared.revision, record.snapshot_sha, record.base_sha, record.branch_name,
         record.pr_number, record.pr_url, prepared.draftId, record.request_id, prepared.revision,
         record.draft_menu_json)
@@ -721,14 +727,14 @@ async function verifyGitHubPublication(context, p) {
         AND r.status=? AND r.public_url=?`,
     args: [record.request_id, record.id, prepared.revision, record.snapshot_sha, record.base_sha,
       record.branch_name, record.pr_number, record.pr_url, record.request_id,
-      Number(record.request_revision) + 1, COMPLETED_REQUEST_STATUS, published.url]
+      Number(record.request_revision) + 1, COMPLETED_REQUEST_STATUS, prepared.publicUrl]
   });
   assert(changed.length === 2 && changed.every((entry) => entry.meta.changes === 1),
     'Stato pubblicazione modificato durante la verifica. Ricarica.', 409);
   return {
     operationId: record.id, status: 'merged', requestId: record.request_id,
     requestRevision: Number(record.request_revision) + 1, prNumber: record.pr_number,
-    prUrl: record.pr_url, publicUrl: published.url, verified: true, reused: false
+    prUrl: record.pr_url, publicUrl: prepared.publicUrl, verified: true, reused: false
   };
 }
 

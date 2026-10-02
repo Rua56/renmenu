@@ -101,7 +101,11 @@ export function buildReplyBatch(e, approval, stamp = new Date().toISOString()) {
   if (!['anteprima_pronta', 'anteprima_inviata', 'risposta_ricevuta'].includes(approval.status)) return { error: 'REPLY_NOT_EXPECTED' };
   const receivedAt = new Date(e.receivedAt).toISOString();
   const raw = Buffer.from(String(e.text || ''), 'utf8').subarray(0, 3000).toString('utf8').replace(/\uFFFD$/, '').replace(/[\u0000-\u0008\u000b\u000c\u000e-\u001f\u007f]/g, ' ');
-  const partial = !e.bodyComplete || e.ambiguous || e.hasAttachments || Buffer.byteLength(String(e.text || ''), 'utf8') > 3000;
+  // Una risposta brevissima (es. "Approvo") sta tutta nell'anteprima di Gmail: anche se
+  // l'automazione non ha riaperto il messaggio, il testo non può essere tagliato (pilota 8).
+  // Oltre i 120 byte serve il corpo letto per intero. La decisione resta comunque a Riccardo.
+  const bytes = Buffer.byteLength(String(e.text || '').trim(), 'utf8');
+  const partial = (!e.bodyComplete && bytes > 120) || e.ambiguous || e.hasAttachments || bytes > 3000;
   const text = partial ? `${PARTIAL_MARK}\n${raw}` : raw;
   const eventId = `gmail-event-${e.messageId}`, auditId = `gmail-audit-${e.messageId}`;
   const gate = "EXISTS (SELECT 1 FROM external_events WHERE id=? AND status='received')";
