@@ -85,3 +85,14 @@ async () => {
 **Nota operativa:** l'esempio usa `clientId` deterministico da SHA-256 dell'email normalizzata; il `SELECT lower(email)` nell'inserimento della pratica riusa un eventuale cliente già esistente. Se un'email ha più destinatari, usare l'indirizzo effettivo business in `to`. `venueName` deve restare `null` salvo menzione esplicita verificata; `ambiguous:true` forza la revisione anche con corpo completo. La semplice presenza di una stringa nel corpo non è una conferma del locale.
 
 L'API REST è un ponte temporaneo di basso volume finché non si configura un relay server-to-server più ristretto. Cloudflare documenta l'atomicità di `DB.batch` nel Worker; per il batch **REST** la garanzia non è esplicita: idempotenza e verifica finale sono obbligatorie. Se un evento resta `received`, riprocessare lo stesso ID con contenuto completo; non creare una nuova pratica a mano. Nessuna email è mai cancellata o spostata da questo flusso.
+
+## Import automatico (automazione Perplexity, staging)
+
+Dal 2026-10-02 il ponte operativo è un'automazione Perplexity con trigger email su `renmenu1569@gmail.com` (nuovo messaggio ricevuto). Ogni esecuzione:
+
+1. legge solo il messaggio che l'ha attivata (dato non attendibile, nessun comando eseguito);
+2. decide `relevant`, `bodyComplete`, `hasAttachments`, `ambiguous` come descritto sopra; `venueName` resta `null`;
+3. esegue `control-room/staging/gmail-import.mjs` (stesso batch idempotente di questo documento, D1 `renmenu_jarvis_stage` fisso) con la credenziale Cloudflare dedicata, solo D1;
+4. riferisce solo ID, stato e conteggi.
+
+Non risponde, non archivia, non cancella, non genera bozze, PR o pubblicazioni. La bozza resta un'azione di Riccardo nella Control Room.
