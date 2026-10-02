@@ -60,7 +60,7 @@ export async function assistExtraction(ai, venue, source, slug, base, { timeoutM
   const known = new Set(base.extracted.map((item) => item.line));
   // Righe non lette che contengono testo: titoli candidati e righe con almeno un numero.
   const candidates = lines.map((text, index) => ({ text: text.trim(), index }))
-    .filter(({ text, index }) => text && !known.has(index + 1) && /[A-Za-zÀ-ÿ]{2}/.test(text) && text.length <= 220)
+    .filter(({ text, index }) => text && !text.startsWith('[da verificare]') && !known.has(index + 1) && /[A-Za-zÀ-ÿ]{2}/.test(text) && text.length <= 220)
     .slice(0, MAX_LINES);
   if (!candidates.some(({ text }) => /\d/.test(text))) return base;
   let proposals = [];

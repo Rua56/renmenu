@@ -5,7 +5,7 @@
 import { assessReply, proposeReplyChanges, sha256Hex } from './approvals.js';
 import { sendOwnerNotification } from './owner-notifications.js';
 import { briefingDue, buildBriefing, romeDay } from './briefing.js';
-import { answerCallback, clearButtons, sendTelegram, telegramReady } from './telegram.js';
+import { answerCallback, clearButtons, downloadTelegramFile, sendTelegram, telegramReady } from './telegram.js';
 
 export const PARTIAL_MARK = '[Testo parziale: leggi l’email completa in Gmail prima di decidere]';
 const ACTIVE = ['affidata', 'attesa_invio', 'attesa_cliente', 'attesa_si', 'pubblicazione', 'verifica'];
@@ -303,13 +303,15 @@ export function createMissions(deps) {
       const query = update.callback_query, from = String(query.message?.chat?.id || '');
       if (!chat || from !== chat) return;
       const [verb, missionId] = String(query.data || '').split(':');
-      const outcome = ['pub', 'no'].includes(verb) ? await decide(db, env, missionId, verb === 'pub') : { text: 'Comando sconosciuto.' };
+      const outcome = ['pub', 'no'].includes(verb) ? await decide(db, env, missionId, verb === 'pub')
+        : verb === 'att' ? await attachTelegramFile(db, env, missionId) : verb === 'attno' ? (await putSetting(db, 'tg_pending_file', ''), { text: 'Va bene, la foto non viene usata.' }) : { text: 'Comando sconosciuto.' };
       await answerCallback(env, query.id, outcome.text, deps.fetchImpl);
       if (query.message?.message_id) await clearButtons(env, chat, query.message.message_id, deps.fetchImpl);
       await sendTelegram(env, chat, outcome.text, null, deps.fetchImpl);
       return;
     }
     const message = update?.message;
+    if (message?.chat?.id && String(message.chat.id) === chat && (message.photo || message.document)) { await receiveTelegramFile(db, env, chat, message); return; }
     if (!message?.chat?.id || typeof message.text !== 'string') return;
     const from = String(message.chat.id), text = message.text.trim();
     const start = /^\/start\s+([a-f0-9]{16,64})$/i.exec(text);
@@ -332,7 +334,47 @@ export function createMissions(deps) {
       await sendTelegram(env, chat, `${lines.length ? `Pratiche affidate a me:\n${lines.join('\n')}` : 'Nessuna pratica affidata in corso.'}\nRichieste aperte nella Control Room: ${pending}.`, null, deps.fetchImpl);
       return;
     }
-    await sendTelegram(env, chat, 'Per ora capisco /stato, /briefing e i pulsanti SÌ / Non ancora. Il resto lo gestisci dalla Control Room.', null, deps.fetchImpl);
+    await sendTelegram(env, chat, 'Capisco /stato, /briefing, i pulsanti SÌ / Non ancora e le foto o i PDF dei menu (mandameli qui e ti chiedo a quale pratica collegarli). Il resto lo gestisci dalla Control Room.', null, deps.fetchImpl);
+  }
+
+  // Foto o PDF mandati da Riccardo al bot: Jarvis chiede a quale pratica collegarli.
+  const FILE_TYPES = new Set(['image/jpeg', 'image/png', 'image/webp', 'application/pdf']);
+  async function receiveTelegramFile(db, env, chat, message) {
+    const photo = Array.isArray(message.photo) ? message.photo.filter((p) => !p.file_size || p.file_size <= 4_500_000).sort((a, b) => (b.width * b.height) - (a.width * a.height))[0] : null;
+    const doc = message.document;
+    const mime = photo ? 'image/jpeg' : String(doc?.mime_type || '');
+    if (!photo && !FILE_TYPES.has(mime)) {
+      await sendTelegram(env, chat, /heic|heif/i.test(mime) ? 'Questa foto è in formato HEIC: mandamela come foto normale (non come file), così Telegram la converte in JPG.' : 'Posso leggere foto (JPG, PNG, WebP) e PDF dei menu.', null, deps.fetchImpl);
+      return;
+    }
+    const fileId = photo ? photo.file_id : doc.file_id;
+    const name = photo ? `foto-telegram-${now().slice(0, 16).replace(/[:T]/g, '-')}.jpg` : String(doc.file_name || 'menu.pdf').slice(0, 120);
+    await putSetting(db, 'tg_pending_file', JSON.stringify({ fileId, mime, name, at: now() }));
+    const open = await rows(db, "SELECT id,subject FROM requests WHERE status NOT IN ('completata','archiviata','chiusa') ORDER BY updated_at DESC LIMIT 5");
+    if (!open.length) { await sendTelegram(env, chat, 'Non ci sono pratiche aperte a cui collegare il file: crea prima la pratica nella Control Room.', null, deps.fetchImpl); return; }
+    await sendTelegram(env, chat, `Ricevuto «${name}». A quale pratica lo collego? Poi lo leggo e ti dico cosa ho trovato.`,
+      [...open.map((r) => [String(r.subject || r.id).slice(0, 48), `att:${r.id}`]), ['Nessuna, lascia stare', 'attno:x']], deps.fetchImpl, { stacked: true });
+  }
+  async function attachTelegramFile(db, env, requestId) {
+    let pending = null;
+    try { pending = JSON.parse(await setting(db, 'tg_pending_file') || 'null'); } catch {}
+    if (!pending?.fileId || Date.now() - Date.parse(pending.at) > 30 * MINUTE) return { text: 'Il file non è più disponibile: mandamelo di nuovo.' };
+    const request = await getOne(db, "SELECT id,subject,status FROM requests WHERE id=? AND status NOT IN ('completata','archiviata','chiusa')", requestId);
+    if (!request) return { text: 'Pratica non trovata o chiusa.' };
+    if (!env.BUCKET?.put) return { text: 'Archivio privato non configurato.' };
+    const count = (await getOne(db, 'SELECT COUNT(*) AS n FROM materials WHERE request_id=?', request.id))?.n || 0;
+    if (count >= 12) return { text: 'Questa pratica ha già 12 file: archiviane qualcuno nella Control Room.' };
+    const file = await downloadTelegramFile(env, pending.fileId, deps.fetchImpl);
+    if (!file?.bytes?.length) return { text: 'Non riesco a scaricare il file da Telegram: riprova.' };
+    const id = uid(), key = `private/requests/${request.id}/${id}`;
+    await env.BUCKET.put(key, file.bytes, { httpMetadata: { contentType: pending.mime } });
+    try {
+      await auditedBatch(jarvisDb(db), [db.prepare('INSERT INTO materials (id,request_id,r2_key,filename,mime,size,source,processing_status,text_preview,created_at) VALUES (?,?,?,?,?,?,?,?,?,?)')
+        .bind(id, request.id, key, pending.name, pending.mime, file.bytes.length, 'telegram', 'da_trascrivere', null, now())],
+      'material.add', `File da Telegram collegato da Riccardo: ${pending.mime}, ${file.bytes.length} byte.`, request.id);
+    } catch (error) { await env.BUCKET.delete(key); throw error; }
+    await putSetting(db, 'tg_pending_file', '');
+    return { text: `Collegato a «${String(request.subject || '').slice(0, 60)}». Lo leggo e ti scrivo tra circa un minuto.` };
   }
 
   // Briefing del mattino: una volta al giorno, lun–sab alle 8 (ora italiana).
@@ -347,5 +389,6 @@ export function createMissions(deps) {
     return text;
   }
 
-  return { entrust, tick, decide, telegramUpdate, setting, putSetting, briefing };
+  const notify = (db, env, requestId, subject, text) => tell(db, env, { request_id: requestId }, subject, text);
+  return { entrust, tick, decide, telegramUpdate, setting, putSetting, briefing, notify };
 }
