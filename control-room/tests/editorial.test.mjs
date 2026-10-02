@@ -3,6 +3,7 @@ import { describe, it } from 'node:test';
 import { criticalFields as serverFields, reviewIssues as serverReview } from '../cloudflare/functions/_lib/editorial.js';
 import { criticalFields as demoFields, reviewIssues as demoReview } from '../site/editorial.js';
 import { validateMenu as editorValidate } from '../site/model.js';
+import { extractMenuFromText } from '../cloudflare/functions/_lib/menu.js';
 
 const menu = () => ({ id: 'locale-di-prova', nome: { it: 'Locale di prova' }, lingue: ['it'],
   sezioni: [{ nome: { it: 'Primi' }, voci: [{ nome: { it: 'Gnocchi' }, prezzo: '12,00' }] }] });
@@ -15,6 +16,14 @@ const checks = () => ({ prices: true, allergens: true, languages: true, clientAp
   clientApprovalEvidence: 'Approvazione scritta del locale demo nel messaggio di prova.' });
 
 describe('Gate editoriale, parità demo/API', () => {
+  it('accetta il nome del locale come stringa, come nei menù pubblici e nella bozza estratta', () => {
+    const { menu: extracted } = extractMenuFromText('Trattoria Prova Gorizia', '# Primi\nTagliatelle al ragù — 12,00', 'trattoria-prova-gorizia');
+    assert.equal(typeof extracted.nome, 'string');
+    const result = editorValidate(extracted);
+    assert.equal(result.errors.length, 0, JSON.stringify(result.errors));
+    assert.ok(editorValidate({ ...extracted, nome: '  ' }).errors.some((error) => error.path === 'nome'));
+    assert.ok(editorValidate({ ...extracted, nome: { en: 'Only English' } }).errors.some((error) => error.path === 'nome'));
+  });
   it('non scambia gli allergeni assenti per allergeni confermati', () => {
     const draft = menu();
     assert.equal(serverFields(draft).allergensMissing.length, 1);
