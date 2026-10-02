@@ -106,17 +106,33 @@ export function validateMenu(menu) {
   return { errors, warnings };
 }
 
+// Riga esplicita "Locale: …" / "Ristorante: …" a inizio riga. Non deduce nomi dalla prosa.
+export const VENUE_LINE = /^(?:locale|ristorante)\s*:\s*(.{2,140}?)\s*$/i;
+export function venueFromSource(source) {
+  for (const line of String(source || '').split(/\r?\n/)) {
+    const match = line.trim().match(VENUE_LINE);
+    if (match) return match[1].trim();
+  }
+  return '';
+}
+
 export function extractMenuFromText(venue, source, requestedSlug) {
   const slug = slugify(requestedSlug || venue);
-  const items = [], unknown = [];
+  const items = [], unknown = [], provenance = [];
   let section = { nome: { it: 'Dal materiale ricevuto' }, voci: [] };
   const sections = [section];
-  for (const line of String(source || '').split(/\r?\n/)) {
-    const row = line.trim().replace(/^[-•*]\s*/, '');
+  const lines = String(source || '').split(/\r?\n/);
+  for (let index = 0; index < lines.length; index += 1) {
+    const lineNumber = index + 1;
+    const row = lines[index].trim().replace(/^[-•*]\s*/, '');
     if (!row) continue;
+    if (VENUE_LINE.test(row)) continue; // Nome del locale: gestito dal chiamante, non è un piatto.
     if (/^#{1,3}\s+/.test(row) || /^\[[^\]]+\]$/.test(row)) {
       const title = row.replace(/^#{1,3}\s+|^\[|\]$/g, '').trim();
-      if (title) { section = { nome: { it: title.slice(0, 100) }, voci: [] }; sections.push(section); }
+      if (title) {
+        section = { nome: { it: title.slice(0, 100) }, voci: [], line: lineNumber };
+        sections.push(section);
+      }
       continue;
     }
     const match = row.match(/^(.{2,150}?)\s*(?:[—–\-:\t]|\.{2,})\s*(?:€\s*)?(\d{1,4}(?:[,.]\d{1,2})?)\s*€?$/);
@@ -126,14 +142,25 @@ export function extractMenuFromText(venue, source, requestedSlug) {
       if (name && Number(price.replace(',', '.')) > 0) {
         const item = { nome: { it: name }, prezzo: price };
         section.voci.push(item);
-        items.push({ name, price, sourceLine: row });
+        items.push({ name, price, sourceLine: row, line: lineNumber });
         continue;
       }
     }
     unknown.push(row.slice(0, 220));
   }
-  const menu = { id: slug, nome: venue.trim(), lingue: ['it'], sezioni: sections.filter((s) => s.voci.length) };
-  return { menu, extracted: items, uncertain: unknown, warnings: [
+  const kept = sections.filter((s) => s.voci.length);
+  // Provenienza: ogni nome e prezzo punta alla riga del testo ricevuto da cui è stato letto.
+  kept.forEach((s, sectionIndex) => {
+    if (s.line) provenance.push({ path: `sezioni.${sectionIndex}.nome.it`, source: `riga ${s.line}`, value: s.nome.it, status: 'confermato' });
+    s.voci.forEach((item, itemIndex) => {
+      const found = items.find((entry) => entry.name === item.nome.it && entry.price === item.prezzo);
+      const where = found ? `riga ${found.line}` : 'nessuna fonte';
+      provenance.push({ path: `sezioni.${sectionIndex}.voci.${itemIndex}.nome.it`, source: where, value: item.nome.it, status: 'confermato' });
+      provenance.push({ path: `sezioni.${sectionIndex}.voci.${itemIndex}.prezzo`, source: where, value: item.prezzo, status: 'confermato' });
+    });
+  });
+  const menu = { id: slug, nome: venue.trim(), lingue: ['it'], sezioni: kept.map(({ nome, voci }) => ({ nome, voci })) };
+  return { menu, extracted: items, uncertain: unknown, provenance, warnings: [
     'Allergeni, ingredienti, coperto, contatti e traduzioni non sono stati dedotti.',
     ...(unknown.length ? [`${unknown.length} righe senza prezzo o formato riconosciuto richiedono controllo.`] : [])
   ] };

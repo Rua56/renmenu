@@ -31,6 +31,7 @@ function database() {
   sqlite.exec(readFileSync(new URL('../cloudflare/migrations/0002_integrations.sql', import.meta.url), 'utf8'));
   sqlite.exec(readFileSync(new URL('../cloudflare/migrations/0003_ai_free_scope.sql', import.meta.url), 'utf8'));
   sqlite.exec(readFileSync(new URL('../cloudflare/migrations/0004_request_category.sql', import.meta.url), 'utf8'));
+  sqlite.exec(readFileSync(new URL('../cloudflare/migrations/0005_draft_provenance.sql', import.meta.url), 'utf8'));
   return {
     prepare(sql) {
       return { bind(...params) {
@@ -362,6 +363,34 @@ describe('Control Room API staging', () => {
       assert.equal((await call(db, 'actions', { type: 'setMaterialTranscript', payload: {
         materialId, requestRevision: revision, text: 'Ripetuto senza rileggere la pratica'
       } }, { BUCKET })).status, 409);
+    } finally { db.close(); }
+  });
+
+  it('pilota Gmail: nome da riga Locale, provenienza registrata e azzerata al salvataggio', async () => {
+    const db = database();
+    try {
+      const client = await action(db, 'createClient', { name: 'Nuovo contatto email' });
+      const sourceText = 'Oggetto ricevuto: TEST\n\nLocale: Trattoria Prova Gorizia\nVorrei il menu Standard.\n\n# Primi\nTagliatelle al ragù — 12,00\n\n# Secondi\nFrico con polenta — 14,00';
+      const created = await action(db, 'createRequest', { clientId: client.body.result.id, subject: 'Pilota', sourceChannel: 'email', category: 'nuovo_standard', sourceText });
+      const generated = await action(db, 'generateDraft', { requestId: created.body.result.id });
+      assert.equal(generated.status, 200);
+      const draft = generated.body.state.drafts[0];
+      assert.equal(draft.slug, 'trattoria-prova-gorizia');
+      assert.equal(draft.menu.nome, 'Trattoria Prova Gorizia');
+      assert.equal(generated.body.result.extraction.warnings.some((w) => w.includes('confermalo in revisione')), true);
+      // La scheda cliente non viene toccata: il nome resta da confermare.
+      assert.equal(generated.body.state.clients.find((c) => c.id === client.body.result.id).name, 'Nuovo contatto email');
+      const price = draft.provenance.find((entry) => entry.path === 'sezioni.0.voci.0.prezzo');
+      assert.deepEqual(price, { path: 'sezioni.0.voci.0.prezzo', source: 'riga 7', value: '12,00', status: 'confermato' });
+      assert.equal(draft.provenance.find((entry) => entry.path === 'sezioni.1.voci.0.prezzo').source, 'riga 10');
+      const saved = await action(db, 'saveDraft', { id: draft.id, revision: draft.revision, menu: draft.menu, slug: draft.slug });
+      assert.equal(saved.status, 200);
+      assert.deepEqual(saved.body.state.drafts[0].provenance, []);
+      // Un cliente con nome già registrato non viene sostituito dalla riga Locale.
+      const named = await action(db, 'createClient', { name: 'Osteria Registrata' });
+      const other = await action(db, 'createRequest', { clientId: named.body.result.id, subject: 'Altro', sourceChannel: 'email', category: 'nuovo_standard', sourceText });
+      const second = await action(db, 'generateDraft', { requestId: other.body.result.id });
+      assert.equal(second.body.state.drafts.find((d) => d.requestId === other.body.result.id).slug, 'osteria-registrata');
     } finally { db.close(); }
   });
 });

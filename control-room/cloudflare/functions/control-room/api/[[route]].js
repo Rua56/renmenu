@@ -1,7 +1,7 @@
 import { isSameOriginWrite, verifyOwner } from '../../_lib/auth.js';
-import { validateMenu } from '../../_lib/menu.js';
+import { validateMenu, venueFromSource } from '../../_lib/menu.js';
 import { integrations } from '../../_lib/integrations.js';
-import { reviewIssues } from '../../_lib/editorial.js';
+import { reviewIssues, EVIDENCE_LABELS } from '../../_lib/editorial.js';
 import { runPrivateIntegrationAction } from '../../_lib/operations.js';
 import { sendOwnerNotification, OWNER_NOTIFICATION_RECIPIENT } from '../../_lib/owner-notifications.js';
 import { purgePublishedEmail } from '../../_lib/email-retention.js';
@@ -63,12 +63,22 @@ async function requestRows(db) {
     return (await rows(db, REQUESTS_SQL)).map((request) => ({ ...request, category: null }));
   }
 }
+const DRAFTS_SQL = 'SELECT id,request_id AS requestId,slug,menu_json AS menuJson,status,checks_json AS checksJson,revision,created_at AS createdAt,updated_at AS updatedAt FROM drafts ORDER BY created_at DESC LIMIT 500';
+// Fallback finche la migrazione 0005 (colonna provenance_json) non e applicata allo staging D1.
+async function draftRows(db) {
+  try { return await rows(db, DRAFTS_SQL.replace('checks_json AS checksJson,', 'checks_json AS checksJson,provenance_json AS provenanceJson,')); }
+  catch (error) {
+    if (!/no such column/i.test(String(error?.message))) throw error;
+    return rows(db, DRAFTS_SQL);
+  }
+}
+const parseList = (json) => { try { const value = JSON.parse(json || '[]'); return Array.isArray(value) ? value : []; } catch { return []; } };
 export async function state(db) {
   const [clients, requests, materials, rawDrafts, versions, notifications, messages, audit, proposals, rawAnalyses, livePrs, ownerDeliveries] = await Promise.all([
     rows(db, 'SELECT id,name,email,phone,contact_name AS contactName,contact_role AS contactRole,plan,payment_status AS paymentStatus,menu_id AS menuId,menu_url AS menuUrl,internal_notes AS internalNotes,trial_ends_at AS trialEndsAt,renewal_at AS renewalAt,revision,created_at AS createdAt,updated_at AS updatedAt FROM clients ORDER BY created_at DESC LIMIT 300'),
     requestRows(db),
     rows(db, 'SELECT id,request_id AS requestId,filename,mime,size,source,processing_status AS processingStatus,text_preview AS textPreview,archived_at AS archivedAt,created_at AS createdAt FROM materials ORDER BY created_at DESC LIMIT 500'),
-    rows(db, 'SELECT id,request_id AS requestId,slug,menu_json AS menuJson,status,checks_json AS checksJson,revision,created_at AS createdAt,updated_at AS updatedAt FROM drafts ORDER BY created_at DESC LIMIT 500'),
+    draftRows(db),
     rows(db, 'SELECT id,draft_id AS draftId,revision,menu_json AS menuJson,actor,created_at AS createdAt FROM draft_versions ORDER BY created_at DESC LIMIT 1000'),
     rows(db, 'SELECT id,request_id AS requestId,channel,subject,body,priority,due_at AS dueAt,read_at AS readAt,status,created_at AS createdAt FROM notifications ORDER BY created_at DESC LIMIT 300'),
     rows(db, 'SELECT id,request_id AS requestId,channel,body,status,created_at AS createdAt FROM messages ORDER BY created_at DESC LIMIT 300'),
@@ -80,7 +90,7 @@ export async function state(db) {
   ]);
   return {
     clients, requests, materials,
-    drafts: rawDrafts.map(({ menuJson, checksJson, ...draft }) => ({ ...draft, menu: JSON.parse(menuJson), checks: JSON.parse(checksJson),
+    drafts: rawDrafts.map(({ menuJson, checksJson, provenanceJson, ...draft }) => ({ ...draft, menu: JSON.parse(menuJson), checks: JSON.parse(checksJson), provenance: parseList(provenanceJson),
       versions: versions.filter((version) => version.draftId === draft.id).map(({ menuJson: json, ...v }) => ({ ...v, menu: JSON.parse(json) })) })),
     notifications, messages, audit,
     proposals: proposals.map(({ diffJson, ...p }) => ({ ...p, diff: JSON.parse(diffJson) })),
@@ -211,13 +221,18 @@ async function action(db, type, input, env = {}) {
     const planBlock = draftBlocker(request.plan);
     assert(!planBlock, planBlock, 422);
     if (request.kind !== 'nuovo') assert(request.menu_id || request.client_menu_id, 'Aggiornamento: serve il Menu ID esistente per preservare il QR.', 422);
-    const desiredSlug = request.menu_id || (request.kind !== 'nuovo' ? request.client_menu_id : request.client_name);
-    const extraction = integrations(env).ai.extract(request.client_name, request.source_text, desiredSlug);
+    // Contatto Gmail non attestato: per un menu nuovo usa solo una riga esplicita "Locale: …" del testo.
+    // La scheda cliente resta invariata; il nome va confermato in revisione.
+    const sourceVenue = request.kind === 'nuovo' && request.client_name === 'Nuovo contatto email' ? venueFromSource(request.source_text) : '';
+    const venue = sourceVenue || request.client_name;
+    const desiredSlug = request.menu_id || (request.kind !== 'nuovo' ? request.client_menu_id : venue);
+    const extraction = integrations(env).ai.extract(venue, request.source_text, desiredSlug);
+    if (sourceVenue) extraction.warnings.push(`Nome del locale letto dalla riga “Locale:” dell’email (“${sourceVenue}”): confermalo in revisione e aggiorna la scheda cliente.`);
     assert(extraction.extracted.length > 0 && extraction.menu.id, 'Nessun piatto con prezzo leggibile: aggiungi il materiale o trascrivi la fonte.', 422);
     const id = uid(), timestamp = now(), menuJson = JSON.stringify(extraction.menu);
     await auditedBatch(db, [
-      db.prepare('INSERT INTO drafts (id,request_id,slug,menu_json,status,checks_json,revision,created_at,updated_at) SELECT ?,id,?,?,?,?,?,?,? FROM requests WHERE id=? AND revision=?')
-        .bind(id, extraction.menu.id, menuJson, 'bozza', JSON.stringify(checksDefault()), 1, timestamp, timestamp, requestId, request.revision),
+      db.prepare('INSERT INTO drafts (id,request_id,slug,menu_json,status,checks_json,provenance_json,revision,created_at,updated_at) SELECT ?,id,?,?,?,?,?,?,?,? FROM requests WHERE id=? AND revision=?')
+        .bind(id, extraction.menu.id, menuJson, 'bozza', JSON.stringify(checksDefault()), JSON.stringify(extraction.provenance || []), 1, timestamp, timestamp, requestId, request.revision),
       db.prepare('INSERT INTO draft_versions (id,draft_id,revision,menu_json,actor,created_at) VALUES (?,?,?,?,?,?)')
         .bind(uid(), id, 1, menuJson, 'estrazione_deterministica', timestamp),
       db.prepare("UPDATE requests SET status='in_revisione',revision=revision+1,updated_at=? WHERE id=? AND revision=? AND EXISTS (SELECT 1 FROM drafts WHERE id=?)")
@@ -241,7 +256,7 @@ async function action(db, type, input, env = {}) {
     assert(!validation.errors.length, `Menù non valido: ${validation.errors.slice(0, 3).join(' ')}`);
     const menuJson = JSON.stringify(menu), timestamp = now();
     const saved = await auditedBatch(db, [
-      db.prepare("UPDATE drafts SET slug=?,menu_json=?,checks_json=?,status='revisione',revision=revision+1,updated_at=? WHERE id=? AND revision=? AND EXISTS (SELECT 1 FROM requests WHERE requests.id=? AND requests.revision=?)")
+      db.prepare("UPDATE drafts SET slug=?,menu_json=?,checks_json=?,provenance_json='[]',status='revisione',revision=revision+1,updated_at=? WHERE id=? AND revision=? AND EXISTS (SELECT 1 FROM requests WHERE requests.id=? AND requests.revision=?)")
         .bind(slug, menuJson, JSON.stringify(checksDefault()), timestamp, id, revision, draft.request_id, linkedRequest.revision),
       db.prepare('INSERT INTO draft_versions (id,draft_id,revision,menu_json,actor,created_at) SELECT ?,id,?,? ,?,? FROM drafts WHERE id=? AND revision=?')
         .bind(uid(), revision + 1, menuJson, 'owner', timestamp, id, revision + 1),
@@ -262,7 +277,7 @@ async function action(db, type, input, env = {}) {
     const checks = Object.fromEntries(['prices', 'allergens', 'languages', 'clientApproval'].map((key) => [key, selections[key]]));
     checks.clientApprovalEvidence = checks.clientApproval ? clean(p.approvalEvidence, 500, 'Riferimento approvazione scritta') : '';
     checks.fieldEvidence = Object.fromEntries(['prices', 'allergens', 'languages'].map((key) => [key,
-      checks[key] ? clean(p.fieldEvidence?.[key], 500, `Fonte ${key}`) : '']));
+      checks[key] ? clean(p.fieldEvidence?.[key], 500, EVIDENCE_LABELS[key]) : '']));
     checks.allergenOmissionConfirmed = checks.allergens && p.allergenOmissionConfirmed === true;
     // Approvazione creativa (obbligatoria solo per Premium): conferma di Riccardo, non del locale.
     checks.creativeApproval = p.creativeApproval === true;
