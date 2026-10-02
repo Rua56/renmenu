@@ -60,3 +60,15 @@ describe('Feedback del pilota Gmail', () => {
     assert.equal(reviewIssues(extraction.menu, checks, 'standard').issues.some((i) => i.startsWith('Evidenza')), false);
   });
 });
+
+describe('Pilota 6: nome del locale come nome proprio', () => {
+  it('una stringa semplice non conta come traduzione mancante; i piatti sì', async () => {
+    const { criticalFields } = await import('../cloudflare/functions/_lib/editorial.js');
+    const menu = { id: 'x', nome: 'Osteria Prova Carso', lingue: ['it', 'en'],
+      sezioni: [{ nome: { it: 'Primi', en: 'First courses' }, voci: [{ nome: { it: 'Jota', en: 'Jota' }, prezzo: '9,00' }] }] };
+    assert.deepEqual(criticalFields(menu).translationsMissing, []);
+    menu.sezioni[0].voci[0].nome = { it: 'Jota' };
+    assert.deepEqual(criticalFields(menu).translationsMissing, ['sezioni.0.voci.0.nome.en']);
+    assert.deepEqual(criticalFields({ ...menu, nome: { it: 'Osteria' }, sezioni: [] }).translationsMissing, ['nome.en']);
+  });
+});
