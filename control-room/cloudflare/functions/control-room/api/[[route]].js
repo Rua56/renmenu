@@ -1,5 +1,5 @@
 import { isSameOriginWrite, verifyOwner } from '../../_lib/auth.js';
-import { validateMenu, venueFromSource } from '../../_lib/menu.js';
+import { slugify, validateMenu, venueFromSource } from '../../_lib/menu.js';
 import { integrations } from '../../_lib/integrations.js';
 import { reviewIssues, EVIDENCE_LABELS } from '../../_lib/editorial.js';
 import { runPrivateIntegrationAction } from '../../_lib/operations.js';
@@ -62,6 +62,14 @@ async function requestRows(db) {
     if (!/no such column/i.test(String(error?.message))) throw error;
     return (await rows(db, REQUESTS_SQL)).map((request) => ({ ...request, category: null }));
   }
+}
+// Un nuovo menu non può riusare l'identificativo (URL/QR) di un'altra bozza o di un altro cliente:
+// una pubblicazione reale sovrascriverebbe il menu di un altro locale.
+async function assertSlugFree(db, slug, requestId, clientId) {
+  const draft = await getOne(db, 'SELECT d.slug, c.name AS clientName FROM drafts d JOIN requests r ON r.id=d.request_id JOIN clients c ON c.id=r.client_id WHERE d.slug=? AND d.request_id<>? LIMIT 1', slug, requestId);
+  const client = await getOne(db, 'SELECT name FROM clients WHERE menu_id=? AND id<>? LIMIT 1', slug, clientId || '');
+  const owner = draft?.clientName || client?.name;
+  assert(!owner, `Identificativo «${slug}» già usato da «${owner}»: un nuovo menu sovrascriverebbe quel locale. Imposta nella pratica un Menu ID diverso, poi salva e genera.`, 409);
 }
 const DRAFTS_SQL = 'SELECT id,request_id AS requestId,slug,menu_json AS menuJson,status,checks_json AS checksJson,revision,created_at AS createdAt,updated_at AS updatedAt FROM drafts ORDER BY created_at DESC LIMIT 500';
 // Fallback finche la migrazione 0005 (colonna provenance_json) non e applicata allo staging D1.
@@ -225,9 +233,16 @@ async function action(db, type, input, env = {}) {
     if (request.kind !== 'nuovo') assert(request.menu_id || request.client_menu_id, 'Aggiornamento: serve il Menu ID esistente per preservare il QR.', 422);
     // Contatto Gmail non attestato: per un menu nuovo usa solo una riga esplicita "Locale: …" del testo.
     // La scheda cliente resta invariata; il nome va confermato in revisione.
-    const sourceVenue = request.kind === 'nuovo' && request.client_name === 'Nuovo contatto email' ? venueFromSource(request.source_text) : '';
+    const emailVenue = request.kind === 'nuovo' ? venueFromSource(request.source_text) : '';
+    const placeholder = request.client_name === 'Nuovo contatto email';
+    // Riga "Locale:" diversa dal cliente collegato (es. stesso mittente, altro locale): decide Riccardo
+    // impostando nella pratica il Menu ID; senza quella scelta non si genera.
+    const mismatch = emailVenue && !placeholder && slugify(emailVenue) !== slugify(request.client_name);
+    assert(!mismatch || request.menu_id, `L’email indica il locale «${emailVenue}», ma il cliente collegato è «${request.client_name}». Se è un locale nuovo, imposta nella pratica il Menu ID (per esempio ${slugify(emailVenue)}); se è lo stesso locale, non è un menu nuovo: scegli la categoria di aggiornamento adatta. Poi salva e genera.`, 409);
+    const sourceVenue = emailVenue && (placeholder || (mismatch && slugify(request.menu_id) === slugify(emailVenue))) ? emailVenue : '';
     const venue = sourceVenue || request.client_name;
     const desiredSlug = request.menu_id || (request.kind !== 'nuovo' ? request.client_menu_id : venue);
+    if (request.kind === 'nuovo') await assertSlugFree(db, slugify(desiredSlug), requestId, request.client_id);
     const extraction = integrations(env).ai.extract(venue, request.source_text, desiredSlug);
     if (sourceVenue) extraction.warnings.push(`Nome del locale letto dalla riga “Locale:” dell’email (“${sourceVenue}”): confermalo in revisione e aggiorna la scheda cliente.`);
     assert(extraction.extracted.length > 0 && extraction.menu.id, 'Nessun piatto con prezzo leggibile: aggiungi il materiale o trascrivi la fonte.', 422);
@@ -253,6 +268,7 @@ async function action(db, type, input, env = {}) {
     assert(/^[a-z0-9]+(?:-[a-z0-9]+)*$/.test(slug), 'Slug non valido.');
     assert(menu && typeof menu === 'object' && !Array.isArray(menu) && menu.id === slug, 'ID JSON e slug non corrispondono.');
     if (linkedRequest.kind !== 'nuovo' || linkedRequest.menu_id) assert(slug === draft.slug, 'Aggiornamento: non cambiare il Menu ID di un QR già distribuito.', 422);
+    if (slug !== draft.slug) await assertSlugFree(db, slug, draft.request_id, null);
     assert(JSON.stringify(menu).length <= 250_000, 'Menù troppo grande.');
     const validation = validateMenu(menu);
     assert(!validation.errors.length, `Menù non valido: ${validation.errors.slice(0, 3).join(' ')}`);
