@@ -129,6 +129,15 @@ export function isPlainHeading(row, nextRow) {
   return PRICE_ROW.test(String(nextRow || '').trim().replace(/^[-•*]\s*/, ''));
 }
 
+// Titoli scritti tutto in maiuscolo ("PRIMI", "VINI AL CALICE") -> "Primi", "Vini al calice",
+// per uniformità con gli altri titoli. Titoli con minuscole restano come scritti dal cliente.
+export function sentenceCaseIfShouting(title) {
+  const letters = title.replace(/[^A-Za-zÀ-ÿ]/g, '');
+  if (letters.length < 2 || letters !== letters.toUpperCase()) return title;
+  const lower = title.toLocaleLowerCase('it-IT');
+  return lower.charAt(0).toLocaleUpperCase('it-IT') + lower.slice(1);
+}
+
 export function extractMenuFromText(venue, source, requestedSlug) {
   const slug = slugify(requestedSlug || venue);
   const items = [], unknown = [], provenance = [];
@@ -143,7 +152,7 @@ export function extractMenuFromText(venue, source, requestedSlug) {
     // Titolo di sezione: "# Primi" o "#Primi" (come nella demo) oppure "[Primi]".
     const nextRow = lines.slice(index + 1).find((line) => line.trim()) || '';
     if (/^#{1,3}\s*[^\s#]/.test(row) || /^\[[^\]]+\]$/.test(row) || isPlainHeading(row, nextRow)) {
-      const title = row.replace(/^#{1,3}\s*|^\[|\]$/g, '').replace(/:\s*$/, '').trim();
+      const title = sentenceCaseIfShouting(row.replace(/^#{1,3}\s*|^\[|\]$/g, '').replace(/:\s*$/, '').trim());
       if (title) {
         section = { nome: { it: title.slice(0, 100) }, voci: [], line: lineNumber };
         sections.push(section);
