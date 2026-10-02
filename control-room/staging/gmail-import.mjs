@@ -84,9 +84,14 @@ export function buildImportBatch(e, stamp = new Date().toISOString()) {
 export const REFERENCE = /\bRM-[A-HJ-NP-Z2-9]{6}\b/;
 export const PARTIAL_MARK = '[Testo parziale: leggi l’email completa in Gmail prima di decidere]';
 export const APPROVAL_SQL = "SELECT id,request_id,status,lower(recipient) AS recipient FROM publication_approvals WHERE reference_code=?";
+// Il riferimento si cerca nell'oggetto; se manca (oggetto svuotato dal client di posta),
+// vale il campo `reference` letto dall'automazione nel messaggio citato di RenMenu.
+// In ogni caso il mittente deve coincidere con il destinatario dell'anteprima.
 export function replyReference(e) {
   const match = REFERENCE.exec(String(e?.subject || ''));
-  return match ? match[0] : null;
+  if (match) return match[0];
+  const quoted = REFERENCE.exec(String(e?.reference || ''));
+  return quoted && quoted[0] === String(e.reference).trim() ? quoted[0] : null;
 }
 export function buildReplyBatch(e, approval, stamp = new Date().toISOString()) {
   const error = validateEvent(e);

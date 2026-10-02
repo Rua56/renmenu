@@ -54,7 +54,8 @@ export function previewEmail({ menu, code, url }) {
   ];
   if (!hasAllergens(menu)) lines.push('Gli allergeni non sono indicati perché non ci sono stati comunicati: se volete inserirli, inviateci l’elenco ufficiale.');
   lines.push('', 'Se è tutto corretto, rispondete a questa email scrivendo «Approvo».',
-    'Se qualcosa va cambiato, indicatelo nella risposta: prepariamo una nuova anteprima.', '', 'Grazie,', 'Riccardo · RenMenu');
+    'Se qualcosa va cambiato, indicatelo nella risposta: prepariamo una nuova anteprima.', '', 'Grazie,', 'Riccardo · RenMenu',
+    '', `Riferimento anteprima: ${code}`);
   return { subject, body: lines.join('\n') };
 }
 
