@@ -127,8 +127,9 @@ export function extractMenuFromText(venue, source, requestedSlug) {
     const row = lines[index].trim().replace(/^[-•*]\s*/, '');
     if (!row) continue;
     if (VENUE_LINE.test(row)) continue; // Nome del locale: gestito dal chiamante, non è un piatto.
-    if (/^#{1,3}\s+/.test(row) || /^\[[^\]]+\]$/.test(row)) {
-      const title = row.replace(/^#{1,3}\s+|^\[|\]$/g, '').trim();
+    // Titolo di sezione: "# Primi" o "#Primi" (come nella demo) oppure "[Primi]".
+    if (/^#{1,3}\s*[^\s#]/.test(row) || /^\[[^\]]+\]$/.test(row)) {
+      const title = row.replace(/^#{1,3}\s*|^\[|\]$/g, '').trim();
       if (title) {
         section = { nome: { it: title.slice(0, 100) }, voci: [], line: lineNumber };
         sections.push(section);

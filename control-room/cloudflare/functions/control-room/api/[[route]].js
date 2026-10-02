@@ -220,6 +220,8 @@ async function action(db, type, input, env = {}) {
     assert(!await getOne(db, 'SELECT id FROM drafts WHERE request_id=?', requestId), 'Esiste già una bozza per questa pratica.', 409);
     const planBlock = draftBlocker(request.plan);
     assert(!planBlock, planBlock, 422);
+    // Pratica importata e non classificata (kind 'altro', nessuna categoria): chiedere la categoria, non il Menu ID.
+    assert(!(request.kind === 'altro' && !request.category), 'Scegli la categoria della pratica (per esempio “Nuovo menu Standard”) e salva prima di generare la bozza.', 422);
     if (request.kind !== 'nuovo') assert(request.menu_id || request.client_menu_id, 'Aggiornamento: serve il Menu ID esistente per preservare il QR.', 422);
     // Contatto Gmail non attestato: per un menu nuovo usa solo una riga esplicita "Locale: …" del testo.
     // La scheda cliente resta invariata; il nome va confermato in revisione.

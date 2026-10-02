@@ -1,7 +1,8 @@
 import assert from 'node:assert/strict';
 import { describe, it } from 'node:test';
 import { extractMenuFromText, venueFromSource } from '../cloudflare/functions/_lib/menu.js';
-import { reviewIssues } from '../site/editorial.js';
+import { reviewIssues, suggestedEvidence } from '../site/editorial.js';
+import { suggestedEvidence as serverSuggested } from '../cloudflare/functions/_lib/editorial.js';
 import { planIssues, planWarnings } from '../site/service-rules.js';
 import { planWarnings as serverPlanWarnings } from '../cloudflare/functions/_lib/service-rules.js';
 
@@ -29,5 +30,33 @@ describe('Feedback del pilota Gmail', () => {
     assert.deepEqual(planWarnings(it, 'annuale'), []);
     assert.deepEqual(planWarnings(it, 'da_definire'), []);
     assert.deepEqual(serverPlanWarnings(it, 'standard'), planWarnings(it, 'standard'));
+  });
+  it('titoli di sezione anche senza spazio dopo #', () => {
+    const result = extractMenuFromText('Prova', '# Antipasti\nFrico — 7,00\n#Secondi\nGubana — 5,50');
+    assert.deepEqual(result.menu.sezioni.map((s) => s.nome.it), ['Antipasti', 'Secondi']);
+    assert.equal(result.uncertain.length, 0);
+  });
+  it('Jarvis propone le evidenze solo da fatti registrati', () => {
+    const extraction = extractMenuFromText('Osteria Prova', 'Oggetto ricevuto: TEST\n\n# Antipasti\nFrico croccante — 7,00\nGubana — 5,50');
+    const request = { subject: 'TEST PILOTA 2', sourceChannel: 'email', createdAt: '2026-10-02T12:44:13Z' };
+    const draft = { menu: extraction.menu, provenance: extraction.provenance };
+    const proposal = suggestedEvidence(draft, request);
+    assert.equal(proposal.prices, 'Email «TEST PILOTA 2» del 02/10/2026: riga 4 Frico croccante 7,00; riga 5 Gubana 5,50.');
+    assert.match(proposal.allergens, /non indica allergeni/);
+    assert.match(proposal.languages, /Inglese non fornito/);
+    assert.equal('clientApprovalEvidence' in proposal, false, 'mai approvazione scritta inventata');
+    assert.deepEqual(serverSuggested(draft, request), proposal);
+    // Bozza modificata a mano: provenienza azzerata, nessuna proposta su prezzi e allergeni.
+    const edited = suggestedEvidence({ menu: extraction.menu, provenance: [] }, request);
+    assert.equal(edited.prices, '');
+    assert.equal(edited.allergens, '');
+    assert.match(edited.notes.prices, /verifica i prezzi/);
+    // Prezzo cambiato dopo la generazione: la provenienza non combacia, nessuna proposta.
+    const changed = structuredClone(extraction.menu); changed.sezioni[0].voci[0].prezzo = '8,00';
+    assert.equal(suggestedEvidence({ menu: changed, provenance: extraction.provenance }, request).prices, '');
+    // Le evidenze proposte superano i controlli di lunghezza del server.
+    const checks = { prices: true, allergens: true, languages: true, clientApproval: false, allergenOmissionConfirmed: true,
+      fieldEvidence: { prices: proposal.prices, allergens: proposal.allergens, languages: proposal.languages } };
+    assert.equal(reviewIssues(extraction.menu, checks, 'standard').issues.some((i) => i.startsWith('Evidenza')), false);
   });
 });
