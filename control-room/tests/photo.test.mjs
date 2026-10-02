@@ -2,7 +2,7 @@ import assert from 'node:assert/strict';
 import { after, describe, it } from 'node:test';
 import { readFileSync } from 'node:fs';
 import { DatabaseSync } from 'node:sqlite';
-import { onRequest, readPendingMaterials } from "../cloudflare/functions/control-room/api/[[route]].js";
+import { linkPendingMailFiles, onRequest, readPendingMaterials, receivePendingMail } from "../cloudflare/functions/control-room/api/[[route]].js";
 
 const domain = 'https://team-api-test.cloudflareaccess.com';
 const accessEnv = { TEAM_DOMAIN: domain, POLICY_AUD: 'api-test-owner-only', OWNER_EMAIL: 'renmenu1569@gmail.com' };
@@ -30,6 +30,8 @@ function database({ withCategory = true } = {}) {
   if (withCategory) sqlite.exec(readFileSync(new URL('../cloudflare/migrations/0004_request_category.sql', import.meta.url), 'utf8'));
   sqlite.exec(readFileSync(new URL('../cloudflare/migrations/0005_draft_provenance.sql', import.meta.url), 'utf8'));
   sqlite.exec(readFileSync(new URL('../cloudflare/migrations/0006_publication_approvals.sql', import.meta.url), 'utf8'));
+  sqlite.exec(readFileSync(new URL('../cloudflare/migrations/0007_jarvis_missions.sql', import.meta.url), 'utf8'));
+  sqlite.exec(readFileSync(new URL('../cloudflare/migrations/0008_mail_files.sql', import.meta.url), 'utf8'));
   return {
     prepare(sql) {
       return { bind(...params) {
@@ -103,6 +105,47 @@ describe('Foto del menu nella pratica', () => {
       assert.ok(provenance.some((p) => /file «menu\.jpg» riga \d+ \(letta da Jarvis due volte\)/.test(p.source)), JSON.stringify(provenance));
       assert.match(draft.warnings_json || JSON.stringify(provenance), /.*/);
       assert.equal((await readPendingMaterials(db, env)).length, 0, 'ogni foto si legge una volta sola');
+    } finally { db.close(); }
+  });
+
+  it('allegati dell’email: collegati alla pratica dello stesso mittente, letti, poi bozza in automatico', async () => {
+    const db = database();
+    try {
+      const store = new Map();
+      const env = testEnv(db, { BUCKET: bucket(store), AI: ai, TRANSLATION_PROVIDER: 'disabled' });
+      const jpeg = Buffer.from([255, 216, 255, 224, 9, 9, 9]).toString('base64');
+      // Lo script Gmail arriva prima dell'importer: gli allegati restano in attesa.
+      const sent = await receivePendingMail(db, env, { messageId: 'att1', from: 'Locale@Example.com', subject: 'Nuovo menu Standard',
+        files: [{ name: 'menu.jpg', mime: 'image/jpeg', data: jpeg }, { name: 'falso.jpg', mime: 'image/jpeg', data: Buffer.from('ciao').toString('base64') }, { name: 'listino.docx', mime: 'application/vnd.openxmlformats-officedocument.wordprocessingml.document', data: 'AAAA' }] });
+      assert.deepEqual([sent.ok, sent.stored, sent.skipped], [true, 1, 2]);
+      assert.equal((await receivePendingMail(db, env, { messageId: 'att1', from: 'locale@example.com', files: [{ name: 'menu.jpg', mime: 'image/jpeg', data: jpeg }] })).stored, 1, 'ripetizione senza doppioni');
+      assert.equal((await db.prepare('SELECT COUNT(*) AS n FROM mail_files').bind().first()).n, 1);
+      assert.match((await db.prepare("SELECT body FROM notifications WHERE subject LIKE '%a mano%'").bind().first()).body, /falso\.jpg, listino\.docx/);
+      assert.deepEqual(await linkPendingMailFiles(db, env), [], 'nessuna pratica ancora');
+      const requestId = await importEmail(db, { ...email('att1', 'Nuovo menu Standard', 'Locale: Trattoria della Foto\nVorrei attivare il piano Standard. Il menu è in allegato.'), hasAttachments: true, attachmentNames: ['menu.jpg'] });
+      assert.equal((await db.prepare('SELECT status FROM requests WHERE id=?').bind(requestId).first()).status, 'dati_da_confermare');
+      await linkPendingMailFiles(db, env);
+      const material = await db.prepare('SELECT * FROM materials WHERE request_id=?').bind(requestId).first();
+      assert.equal(material.source, 'email');
+      assert.equal((await db.prepare('SELECT status FROM requests WHERE id=?').bind(requestId).first()).status, 'nuova', 'torna all’autopilota');
+      await act(db, 'runAutopilot', {}, { BUCKET: bucket(store), AI: ai, TRANSLATION_PROVIDER: 'disabled' });
+      assert.equal(await db.prepare('SELECT id FROM drafts WHERE request_id=?').bind(requestId).first(), null, 'aspetta la lettura');
+      assert.equal((await readPendingMaterials(db, env))[0].outcome.ok, true);
+      await act(db, 'runAutopilot', {}, { BUCKET: bucket(store), AI: ai, TRANSLATION_PROVIDER: 'disabled' });
+      const draft = await db.prepare('SELECT menu_json FROM drafts WHERE request_id=?').bind(requestId).first();
+      assert.ok(draft, 'bozza creata dalla foto allegata');
+      assert.equal(JSON.parse(draft.menu_json).sezioni.flatMap((s) => s.voci).length, 2);
+    } finally { db.close(); }
+  });
+  it('mittente diverso dal cliente della pratica: allegato non collegato', async () => {
+    const db = database();
+    try {
+      const env = testEnv(db, { BUCKET: bucket(), AI: ai });
+      await receivePendingMail(db, env, { messageId: 'att2', from: 'altro@example.com', files: [{ name: 'm.pdf', mime: 'application/pdf', data: Buffer.from('%PDF-1.4 x').toString('base64') }] });
+      const requestId = await importEmail(db, { ...email('att2', 'Menu', 'Ciao'), hasAttachments: true, attachmentNames: ['m.pdf'] });
+      const notices = await linkPendingMailFiles(db, env);
+      assert.match(notices[0].text, /mittente non coincide/);
+      assert.equal(await db.prepare('SELECT id FROM materials WHERE request_id=?').bind(requestId).first(), null);
     } finally { db.close(); }
   });
 });

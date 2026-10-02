@@ -2,7 +2,7 @@
 // - /jarvis-hook/telegram: aggiornamenti del bot (header segreto impostato con setWebhook);
 // - /jarvis-hook/tick: l'orologio (Worker con cron) con il segreto JARVIS_CLOCK_SECRET.
 // Nessun dato viene restituito: solo esiti sintetici.
-import { missions, readPendingMaterials, runAutopilot } from '../control-room/api/[[route]].js';
+import { linkPendingMailFiles, missions, readPendingMaterials, receivePendingMail, runAutopilot } from '../control-room/api/[[route]].js';
 import { sameSecret, sendTelegram, telegramReady } from '../_lib/telegram.js';
 
 const reply = (body, status = 200) => new Response(JSON.stringify(body), { status, headers: { 'Content-Type': 'application/json', 'Cache-Control': 'no-store' } });
@@ -20,8 +20,19 @@ export async function onRequest(context) {
       if (update) await missions.telegramUpdate(env.DB, env, update);
       return reply({ ok: true });
     }
+    if (path === '/jarvis-hook/mail-files') {
+      // Script Google dell'account renmenu1569: foto e PDF allegati alle email dei clienti.
+      const expected = await missions.setting(env.DB, 'mail_files_secret');
+      if (!expected || !sameSecret(request.headers.get('X-Jarvis-Mail'), expected)) return reply({ ok: false }, 403);
+      if (Number(request.headers.get('content-length') || 0) > 90_000_000) return reply({ ok: false, error: 'TOO_LARGE' }, 413);
+      const payload = await request.json().catch(() => null);
+      const outcome = await receivePendingMail(env.DB, env, payload);
+      return reply(outcome, outcome.ok ? 200 : 400);
+    }
     if (path === '/jarvis-hook/tick') {
       if (!sameSecret(request.headers.get('X-Jarvis-Clock'), env.JARVIS_CLOCK_SECRET)) return reply({ ok: false }, 403);
+      const linked = await linkPendingMailFiles(env.DB, env).catch(() => []);
+      for (const notice of linked) await missions.notify(env.DB, env, notice.requestId, 'allegato', notice.text);
       const read = await readPendingMaterials(env.DB, env).catch(() => []);
       for (const { material, request, outcome } of read) {
         const head = `Ho letto «${material.filename}»${request?.subject ? ` (pratica «${String(request.subject).slice(0, 60)}»)` : ''}`;

@@ -2,6 +2,7 @@ import { assistExtraction } from '../../_lib/assist.js';
 import { applyMenuChanges } from '../../_lib/changes.js';
 import { prepareUpdate } from '../../_lib/update.js';
 import { PHOTO_TYPES, readMenuPdf, readMenuPhoto } from '../../_lib/vision.js';
+import { linkMailFiles, receiveMailFiles } from '../../_lib/mail-files.js';
 import { readCurrentMenu } from '../../_lib/github-live.js';
 import { isSameOriginWrite, verifyOwner } from '../../_lib/auth.js';
 import { slugify, validateMenu, venueFromSource } from '../../_lib/menu.js';
@@ -132,6 +133,15 @@ async function autopilotPending(db) {
 const asJarvis = (db) => ({ prepare: (sql) => db.prepare(sql), batch: (statements) => db.batch(statements), actor: 'jarvis' });
 // Foto e PDF arrivati (email, Telegram o caricati da Riccardo): Jarvis li legge da solo, uno per
 // giro dell'orologio, e poi riprova l'autopilota sulla pratica.
+export const receivePendingMail = async (db, env, payload) => {
+  const outcome = await receiveMailFiles(db, env, payload, { now, uid });
+  if (outcome.ok && outcome.skipped.length) {
+    // Allegati che Jarvis non sa leggere (Word, HEIC, ecc.): li segnala, non li perde in silenzio.
+    await missions.notify(db, env, null, 'allegati da caricare a mano', `L'email di ${String(payload.from).slice(0, 120)} «${String(payload.subject || '').slice(0, 80)}» ha allegati che non so leggere: ${outcome.skipped.join(', ')}. Aprili in Gmail e, se servono, caricali in Materiali come PDF o foto.`);
+  }
+  return { ok: outcome.ok, stored: outcome.stored ?? 0, skipped: outcome.skipped?.length ?? 0, error: outcome.error };
+};
+export const linkPendingMailFiles = (db, env) => linkMailFiles(db, env, { now, uid, auditedBatch });
 export async function readPendingMaterials(db, env = {}) {
   let pending = [];
   try { pending = await rows(db, "SELECT id,request_id,filename FROM materials WHERE processing_status='da_trascrivere' AND archived_at IS NULL AND (mime='application/pdf' OR mime IN ('image/jpeg','image/png','image/webp')) AND created_at>'2026-10-02T22:30' ORDER BY created_at ASC LIMIT 1"); }

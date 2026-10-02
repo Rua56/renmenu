@@ -49,14 +49,16 @@ export function buildImportBatch(e, stamp = new Date().toISOString()) {
   const source = `Oggetto ricevuto: ${subject}\n\n${clipped}`;
   if (Buffer.byteLength(source, 'utf8') > 8192) return { error: 'BODY_TOO_LARGE' };
   const note = incomplete
-    ? `Email Gmail da verificare; pertinenza, corpo o allegati da confermare. Allegati nominati (NON importati): ${names.join(', ') || 'da controllare in Gmail'}. Conservare l'originale.`.slice(0, 2000)
+    ? `Email Gmail da verificare; pertinenza, corpo o allegati da confermare. Allegati nominati: ${names.join(', ') || 'da controllare in Gmail'} (foto e PDF li importa Jarvis da Gmail; gli altri vanno caricati a mano). Conservare l'originale.`.slice(0, 2000)
     : 'Email Gmail importata; controllare fonte e dati prima di generare bozze. Conservare l’originale.';
   const step = incomplete ? 'Aprire il messaggio originale in Gmail e importare manualmente gli allegati prima della bozza.'
     : 'Verificare manualmente testo e dati della richiesta prima della bozza.';
   const eventId = `gmail-event-${e.messageId}`, requestId = `gmail-request-${e.messageId}`, auditId = `gmail-audit-${e.messageId}`;
   const clientId = `gmail-contact-${createHash('sha256').update(from).digest('hex').slice(0, 32)}`;
   const status = incomplete ? 'needs_review' : 'imported';
-  const reason = e.ambiguous ? 'ambiguous_request' : incomplete ? 'body_incomplete_or_attachments' : '';
+  // Solo allegati in sospeso (corpo completo e chiaro): Jarvis li importa con lo script Gmail e poi riprende la pratica.
+  const onlyAttachments = incomplete && !e.ambiguous && e.bodyComplete && rawBytes.length <= 7000;
+  const reason = e.ambiguous ? 'ambiguous_request' : onlyAttachments ? 'attachments_pending' : incomplete ? 'body_incomplete_or_attachments' : '';
   if (!e.relevant) {
     return { ids: { eventId, requestId: null }, expectedStatus: 'ignored', batch: [{
       sql: "INSERT INTO external_events (id,source,source_event_id,request_id,status,reason,received_at) VALUES (?,'gmail',?,NULL,'ignored','not_relevant',?) ON CONFLICT(source,source_event_id) DO NOTHING",
