@@ -26,7 +26,8 @@ export async function onRequest(context) {
       const chat = drafted.length ? await missions.setting(env.DB, 'telegram_chat_id') : null;
       if (chat && telegramReady(env)) for (const entry of drafted) await sendTelegram(env, chat, entry.message);
       const done = await missions.tick(env.DB, env);
-      return reply({ ok: true, autopilot: drafted.length, missions: done.map(({ from, to, error }) => ({ from, to, error: error ? 'errore' : undefined })) });
+      const briefed = await missions.briefing(env.DB, env).catch(() => null);
+      return reply({ ok: true, autopilot: drafted.length, briefing: Boolean(briefed), missions: done.map(({ from, to, error }) => ({ from, to, error: error ? 'errore' : undefined })) });
     }
     return reply({ ok: false }, 404);
   } catch {
