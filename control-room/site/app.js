@@ -297,7 +297,7 @@ function jarvisPanel() {
   const tg = state.telegram || {};
   const telegram = isDemoMode ? '' : !tg.configured ? '' : !tg.linked
     ? `<div class="notice spaced-top-small">${telegramLinkUrl ? `Tocca il link e poi <strong>Avvia</strong> in Telegram (valido 15 minuti): <a href="${escapeHtml(telegramLinkUrl)}" target="_blank" rel="noopener">Apri Jarvis su Telegram</a>` : 'Collega Telegram: Jarvis ti scriverà lì e ti chiederà il SÌ prima di pubblicare.'}</div><div class="button-row spaced-top-small"><button class="button" type="button" data-action="telegram-link">${telegramLinkUrl ? 'Nuovo link' : 'Collega Telegram'}</button></div>`
-    : `<div class="button-row spaced-top-small"><span class="status good">Telegram collegato</span><button class="mini-button" type="button" data-action="telegram-test">Messaggio di prova</button></div>`;
+    : `<div class="button-row spaced-top-small"><span class="status good">Telegram collegato</span><button class="mini-button" type="button" data-action="telegram-test">Messaggio di prova</button><button class="mini-button" type="button" data-action="jarvis-briefing">Briefing ora</button></div>`;
   if (!notes.length && !autopilotRunning && !telegram) return '';
   const row = (item) => `<div class="list-row"><div class="list-main"><strong>${escapeHtml(item.subject)}</strong><small>${escapeHtml(item.body)}</small><small>${time(item.createdAt)}</small></div><div class="button-row"><button class="mini-button" type="button" data-select-request="${escapeHtml(item.requestId || '')}" data-route="${item.subject.includes('bozza pronta') ? 'revisione' : 'richieste'}">Apri</button><button class="mini-button" type="button" data-action="mark-notification" data-notification-id="${escapeHtml(item.id)}" data-read="true">Fatto</button></div></div>`;
   return `<section class="panel spaced-top-small"><p class="eyebrow">JARVIS</p>${autopilotRunning ? '<p class="notice">Jarvis sta preparando le nuove richieste…</p>' : ''}<div class="list">${notes.map(row).join('')}</div>${telegram}</section>`;
@@ -873,6 +873,10 @@ async function handleClick(event) {
     const response = await performAction('telegramLink', {});
     const link = response?.result?.link;
     if (link) { telegramLinkUrl = link; render(); }
+    return;
+  }
+  if (action === 'jarvis-briefing') {
+    await doAction('jarvisBriefing', {}, 'Briefing inviato su Telegram e nel riquadro Jarvis.');
     return;
   }
   if (action === 'telegram-test') {

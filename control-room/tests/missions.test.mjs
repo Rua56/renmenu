@@ -196,3 +196,28 @@ describe('Jarvis autonomo: dalla bozza affidata alla pubblicazione', () => {
     } finally { db.close(); }
   });
 });
+
+import { briefingDue, buildBriefing } from '../cloudflare/functions/_lib/briefing.js';
+describe('Briefing del mattino', () => {
+  it('parte solo lun–sab tra le 8:00 e le 8:14 ora italiana', () => {
+    assert.equal(briefingDue(new Date('2026-10-05T06:03:00Z')), true, 'lunedì 8:03 (ora legale)');
+    assert.equal(briefingDue(new Date('2026-10-04T06:03:00Z')), false, 'domenica');
+    assert.equal(briefingDue(new Date('2026-10-05T07:03:00Z')), false, '9:03');
+    assert.equal(briefingDue(new Date('2026-12-07T07:05:00Z')), true, 'dicembre, ora solare');
+  });
+  it('riassume richieste, pratiche e salute dei menu online senza dati di contatto', async () => {
+    const db = database();
+    try {
+      await run(db, buildImportBatch(event('b1', 'Nuovo menu', SOURCE)));
+      const fakeFetch = async (url) => String(url).startsWith('https://api.github.com/')
+        ? Response.json([{ type: 'file', name: 'bakaro.json' }, { type: 'file', name: 'rotto.json' }])
+        : String(url).endsWith('/bakaro.json') ? Response.json({ id: 'bakaro', nome: 'Bakaro', lingue: ['it'], sezioni: [{ id: 's', nome: { it: 'Vini' }, voci: [{ id: 'v', nome: { it: 'Prosecco' }, prezzo: '4,00' }] }] })
+          : new Response('no', { status: 404 });
+      const text = await buildBriefing(db, { GITHUB_TOKEN: 'x' }, { now: new Date('2026-10-05T06:03:00Z'), fetchImpl: fakeFetch });
+      assert.match(text, /Briefing di Jarvis · 05\/10/);
+      assert.match(text, /1 da guardare \(nuove 1/);
+      assert.match(text, /rotto: risponde 404/);
+      assert.doesNotMatch(text, /@/);
+    } finally { db.close(); }
+  });
+});

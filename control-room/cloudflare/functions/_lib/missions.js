@@ -4,6 +4,7 @@
 // Si ferma e chiede a Riccardo quando qualcosa non è chiaro; pubblica solo dopo il suo SÌ.
 import { assessReply, proposeReplyChanges, sha256Hex } from './approvals.js';
 import { sendOwnerNotification } from './owner-notifications.js';
+import { briefingDue, buildBriefing, romeDay } from './briefing.js';
 import { answerCallback, clearButtons, sendTelegram, telegramReady } from './telegram.js';
 
 export const PARTIAL_MARK = '[Testo parziale: leggi l’email completa in Gmail prima di decidere]';
@@ -317,6 +318,7 @@ export function createMissions(deps) {
       return;
     }
     if (!chat || from !== chat) return;
+    if (/^\/briefing\b/i.test(text)) { await briefing(db, env, { force: true }); return; }
     if (/^\/stato\b/i.test(text)) {
       const list = await rows(db, "SELECT m.status,m.note,d.menu_json FROM jarvis_missions m JOIN drafts d ON d.id=m.draft_id WHERE m.status NOT IN ('completata','annullata') ORDER BY m.updated_at DESC LIMIT 10");
       const pending = (await getOne(db, "SELECT COUNT(*) AS n FROM requests WHERE status IN ('nuova','dati_da_confermare','in_revisione')"))?.n || 0;
@@ -324,8 +326,20 @@ export function createMissions(deps) {
       await sendTelegram(env, chat, `${lines.length ? `Pratiche affidate a me:\n${lines.join('\n')}` : 'Nessuna pratica affidata in corso.'}\nRichieste aperte nella Control Room: ${pending}.`, null, deps.fetchImpl);
       return;
     }
-    await sendTelegram(env, chat, 'Per ora capisco /stato e i pulsanti SÌ / Non ancora. Il resto lo gestisci dalla Control Room.', null, deps.fetchImpl);
+    await sendTelegram(env, chat, 'Per ora capisco /stato, /briefing e i pulsanti SÌ / Non ancora. Il resto lo gestisci dalla Control Room.', null, deps.fetchImpl);
   }
 
-  return { entrust, tick, decide, telegramUpdate, setting, putSetting };
+  // Briefing del mattino: una volta al giorno, lun–sab alle 8 (ora italiana).
+  async function briefing(db, env, { force = false, now: at = new Date() } = {}) {
+    const day = romeDay(at);
+    if (!force) {
+      if (!briefingDue(at) || (await setting(db, 'last_briefing_day')) === day) return null;
+      await putSetting(db, 'last_briefing_day', day);
+    }
+    const text = await buildBriefing(db, env, { now: at, fetchImpl: deps.fetchImpl });
+    await tell(db, env, null, 'briefing', text);
+    return text;
+  }
+
+  return { entrust, tick, decide, telegramUpdate, setting, putSetting, briefing };
 }

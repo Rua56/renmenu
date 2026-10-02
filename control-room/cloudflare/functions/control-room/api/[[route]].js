@@ -519,6 +519,8 @@ export async function action(db, type, input, env = {}) {
     await missions.putSetting(db, 'telegram_pair_until', new Date(Date.now() + 15 * 60_000).toISOString());
     await auditedBatch(db, [], 'jarvis.telegram_pairing', `Codice di collegamento Telegram generato per @${me.result.username} (valido 15 minuti).`, null);
     result = { username: me.result.username, link: `https://t.me/${me.result.username}?start=${code}` };
+  } else if (type === 'jarvisBriefing') {
+    result = { text: await missions.briefing(db, env, { force: true }) };
   } else if (type === 'telegramTest') {
     const chat = await missions.setting(db, 'telegram_chat_id');
     assert(chat && telegramReady(env), 'Telegram non ancora collegato.', 409);
