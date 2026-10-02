@@ -1,3 +1,5 @@
+import { planIssues } from './service-rules.js';
+
 // A mock PR must never be prepared from checkbox assertions alone.
 // These checks are intentionally stricter than the public JSON schema: a structurally valid
 // menu may still need source evidence and written permission to omit allergen labels.
@@ -26,7 +28,8 @@ export function criticalFields(menu) {
   return { pricesMissing, allergensMissing, translationsMissing };
 }
 
-export function reviewIssues(menu, checks) {
+// `plan` is optional for backward compatibility; every production caller passes it.
+export function reviewIssues(menu, checks, plan) {
   const issues = [];
   const missing = criticalFields(menu);
   const required = ['prices', 'allergens', 'languages', 'clientApproval'];
@@ -41,5 +44,6 @@ export function reviewIssues(menu, checks) {
   }
   if (checks?.clientApproval && !description(checks?.clientApprovalEvidence))
     issues.push('Riferimento all’approvazione scritta del locale mancante (12–500 caratteri).');
+  if (plan !== undefined) issues.push(...planIssues(menu, plan, checks));
   return { issues, missing };
 }

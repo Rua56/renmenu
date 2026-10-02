@@ -61,7 +61,7 @@ export function createDemoState() {
         id: DEMO_IDS.requestAurora, clientId: DEMO_IDS.clientAurora, subject: 'Nuovo menu pranzo (demo)', sourceChannel: 'manuale',
         sourceText: 'Locale: Bottega Aurora — demo\n# Piccoli piatti\nCrostino alle erbe — 4,50\nVerdure arrosto — 6,00\n# Bevande\nAcqua naturale 0,75 l — 2,50\nTisana della casa — 3,00',
         kind: 'nuovo', status: 'in_revisione', revision: 3, createdAt: '2026-09-28T09:15:00.000Z', updatedAt: '2026-10-01T08:42:00.000Z', lastActionAt: '2026-10-01T08:42:00.000Z'
-        , plan: 'da_definire', internalNotes: 'Contenuti e prezzi fittizi; verifica editoriale in corso.', nextStep: 'Completa i quattro controlli di revisione.', followUpAt: '2026-10-02T09:00:00.000Z'
+        , plan: 'standard', category: 'nuovo_standard', internalNotes: 'Contenuti e prezzi fittizi; verifica editoriale in corso.', nextStep: 'Completa i quattro controlli di revisione.', followUpAt: '2026-10-02T09:00:00.000Z'
       },
       {
         id: DEMO_IDS.requestGinestra, clientId: DEMO_IDS.clientGinestra, subject: 'Aggiornamento pranzo: due prezzi da verificare', sourceChannel: 'manuale',
