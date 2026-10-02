@@ -80,6 +80,7 @@ describe('GitHub live adapter (fake fetch only)', () => {
       assert.equal(url.pathname, '/repos/Rua56/renmenu/contents/menus/trattoria-test.json');
       assert.equal(url.searchParams.get('ref'), 'main');
       assert.equal(init.headers.Authorization, `Bearer ${token}`);
+      assert.equal(init.headers['User-Agent'], 'RenMenu-Jarvis-Control-Room', 'GitHub rifiuta le API senza User-Agent');
       return json({ message: 'Not Found' }, 404);
     });
     const result = await readCurrentMenu(env(missing.fetch), 'trattoria-test');
