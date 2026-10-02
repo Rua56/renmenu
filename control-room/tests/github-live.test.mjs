@@ -75,6 +75,14 @@ async function rejectsCode(run, code) {
 }
 
 describe('GitHub live adapter (fake fetch only)', () => {
+  it('un menu nuovo (file assente su main) supera l’ispezione; uno esistente deve avere lo stesso id', () => {
+    const menu = { id: 'agriturismo-prova', nome: 'Agriturismo prova', lingue: ['it'], sezioni: [{ nome: { it: 'Primi' }, voci: [{ nome: { it: 'Gnocchi' }, prezzo: '10,00', allergeni: ['1'] }] }] };
+    const fresh = inspectApprovedMenu({ slug: 'agriturismo-prova', menu, requestKind: 'nuovo', currentMenu: { exists: false } });
+    assert.equal(fresh.mode, 'new');
+    assert.throws(() => inspectApprovedMenu({ slug: 'agriturismo-prova', menu, requestKind: 'aggiornamento', currentMenu: { exists: true, menu: { ...menu, id: 'altro' }, sha: 'x' } }),
+      (error) => error.code === 'CURRENT_SLUG_MISMATCH');
+  });
+
   it('distingue un menu mancante 404 da un errore GitHub e conserva lo SHA quando esiste', async () => {
     const missing = fakeFetch((url, init) => {
       assert.equal(url.pathname, '/repos/Rua56/renmenu/contents/menus/trattoria-test.json');

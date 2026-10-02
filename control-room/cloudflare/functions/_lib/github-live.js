@@ -324,7 +324,8 @@ export function inspectApprovedMenu({ slug, menu, requestKind, kind, mode, isNew
   if (existing !== undefined) {
     if (requestedMode === 'new' && existing) fail('SLUG_EXISTS', 'Esiste già un menu con questo slug: non creare un nuovo locale.', { status: 409 });
     if (requestedMode === 'update' && !existing) fail('MENU_NOT_FOUND', 'Il menu da aggiornare non esiste.', { status: 404 });
-    if (existing?.menu?.id !== slug) fail('CURRENT_SLUG_MISMATCH', 'Il menu esistente non rispetta lo slug richiesto.', { status: 409 });
+    // Solo per un menu che esiste già: un menu nuovo (null) non ha un id da confrontare.
+    if (existing && existing.menu?.id !== slug) fail('CURRENT_SLUG_MISMATCH', 'Il menu esistente non rispetta lo slug richiesto.', { status: 409 });
   }
   const previous = existing?.menu || null;
   const changes = menuDiff(previous, candidate);

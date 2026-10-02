@@ -30,7 +30,9 @@ const EDITABLE_REQUESTS = new Set(['nuova', 'materiale_ricevuto', 'in_analisi', 
 const RETRYABLE_WITHOUT_WRITE = new Set([
   'GITHUB_NOT_CONFIGURED', 'GITHUB_FETCH_UNAVAILABLE', 'INVALID_SLUG', 'REQUEST_KIND_REQUIRED',
   'INVALID_MENU', 'SLUG_MISMATCH', 'SLUG_EXISTS', 'MENU_NOT_FOUND', 'BASE_SHA_CONFLICT',
-  'FILE_SHA_CONFLICT', 'FILE_SHA_REQUIRED', 'BASE_SHA_REQUIRED'
+  'FILE_SHA_CONFLICT', 'FILE_SHA_REQUIRED', 'BASE_SHA_REQUIRED',
+  // Controlli locali che falliscono prima di qualunque scrittura su GitHub.
+  'CURRENT_SLUG_MISMATCH', 'IDEMPOTENCY_KEY_REQUIRED'
 ]);
 const PUBLIC_LANGUAGES = new Set(['it', 'en', 'de', 'fr', 'es']);
 // This is deliberately a constant rather than configuration or client input:
