@@ -372,6 +372,8 @@ export function createMissions(deps) {
   async function converse(db, env, chat, utterance, spoken) {
     const said = spoken ? `«${utterance}»\n\n` : '';
     const intent = await understand(env.AI, utterance, await voiceContext(db, env));
+    // Registro minimo per capire gli errori (senza il testo del comando).
+    await auditedBatch(jarvisDb(db), [], 'jarvis.conversation', `Comando ${spoken ? 'vocale' : 'scritto'}: ${intent.intent}${intent.why ? ` (${intent.why})` : ''}.`, null).catch(() => {});
     if (intent.intent === 'risposta' && intent.risposta) { await reply(db, env, chat, `${said}${intent.risposta}`, spoken); return; }
     if (intent.intent === 'pubblica') {
       const waiting = await rows(db, "SELECT m.id,d.menu_json,d.slug FROM jarvis_missions m JOIN drafts d ON d.id=m.draft_id WHERE m.status='attesa_si' ORDER BY m.updated_at DESC LIMIT 10");
