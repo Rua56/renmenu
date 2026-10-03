@@ -16,6 +16,7 @@ from pathlib import Path
 from urllib.parse import urlparse
 
 ALLOWED_ALLERGENS = {str(number) for number in range(1, 15)}
+ALLOWED_THEMES = {"bordeaux", "trattoria", "mare", "terracotta", "notte", "sole"}
 ALLOWED_TAGS = {"veg", "vegan", "spicy", "gf", "new", "top", "frozen"}
 LEGACY_SUPPORTED_TAGS = {"hot", "riserva"}
 SUPPORTED_UI_LANGUAGES = {"it", "en", "de", "fr", "es"}
@@ -228,6 +229,9 @@ def validate_menu(path: Path, report: Report) -> None:
 
     if not non_empty_text(data.get("nome")):
         report.error("manca un nome del locale non vuoto ('nome').")
+
+    if "tema" in data and data["tema"] not in ALLOWED_THEMES:
+        report.error(f"tema '{data['tema']}' non supportato (consentiti: {', '.join(sorted(ALLOWED_THEMES))}).")
 
     languages: list[str] = []
     if "lingue" in data:
