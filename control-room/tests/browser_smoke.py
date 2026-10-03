@@ -19,7 +19,7 @@ with sync_playwright() as playwright:
         errors = []
         page.on('pageerror', lambda e: errors.append(str(e)))
         page.goto(BASE, wait_until='networkidle')
-        page.get_by_role('heading', name='Command Center').wait_for()
+        page.get_by_role('heading', name='Buonasera, Riccardo.').wait_for()
         dimensions = page.evaluate('({inner: window.innerWidth, scroll: document.documentElement.scrollWidth, body: document.body.scrollWidth})')
         assert dimensions['scroll'] <= width and dimensions['body'] <= width, f'overflow {width}: {dimensions}'
         assert not errors, f'JS error {width}: {errors}'
