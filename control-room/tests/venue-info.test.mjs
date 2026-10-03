@@ -68,3 +68,12 @@ test('comandi con refusi: Jarvis capisce il compito', () => {
   assert.equal(guessIntent('pubblca il bakaro', { locales }).intent, 'pubblica');
   assert.equal(guessIntent('che orari ha il bakaro?', { locales }).intent, 'risposta');
 });
+
+test('Indirizzo scritto nel testo: via e città in qualsiasi ordine; frasi che non sono indirizzi ignorate', () => {
+  const v = (t) => extractVenueInfo(t).found.indirizzo?.value || null;
+  assert.equal(v("sono Marta, titolare dell'Enoteca Isonzo a Gorizia, in via Rastello 12. Vorremmo il Premium."), 'Via Rastello 12, Gorizia');
+  assert.equal(v('Indirizzo: Via Roma 5, 34170 Gorizia'), 'Via Roma 5, Gorizia');
+  assert.equal(v('Siamo in piazza della Vittoria 59 a Gorizia'), 'Piazza della Vittoria 59, Gorizia');
+  assert.equal(v('Il risotto della via lattea 3 persone'), null);
+  assert.equal(v('Frico con polenta — 12'), null);
+});

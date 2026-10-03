@@ -73,6 +73,23 @@ function facebookIn(text) {
   return { doubt: 'Il locale cita Facebook ma non scrive la pagina: chiedila.' };
 }
 
+// Indirizzo scritto nel testo: «a Gorizia, in via Rastello 12» oppure «Via Rastello 12, 34170 Gorizia».
+const STREET = /\b([Vv]iale|[Vv]ia|[Pp]iazzale|[Pp]iazza|[Cc]orso|[Bb]orgo|[Ll]argo|[Vv]icolo|[Ss]trada|[Cc]ontrada|[Rr]iva|[Cc]alle)\s+((?:[A-ZÀ-Ý0-9][\p{L}'’.]*|d[aei]l?l?[aeoi]?['’]?|d[ei]|del|della|dei|degli|delle|san|santa)(?:\s+(?:[A-ZÀ-Ý0-9][\p{L}'’.]*|d[aei]l?l?[aeoi]?['’]?|d[ei]|del|della|dei|degli|delle|san|santa)){0,4}?)\s*,?\s*(?:n\.?\s*)?(\d{1,4}(?:\/?[a-zA-Z])?)\b/u;
+const CITY = "([A-ZÀ-Ý][\\p{L}'’]+(?:\\s+(?:[A-ZÀ-Ý][\\p{L}'’]+|d[ie]l?|sul|al)){0,3})";
+function addressIn(text) {
+  const t = String(text);
+  if (!/\b(?:via|viale|piazza|piazzale|corso|borgo|largo|vicolo|strada|contrada|riva|calle|indirizzo)\b/i.test(t)) return null;
+  const st = STREET.exec(t);
+  if (!st || !/(?:^|\s)[A-ZÀ-Ý]/.test(st[2])) return null;
+  const street = `${st[1].charAt(0).toUpperCase()}${st[1].slice(1).toLowerCase()} ${st[2]} ${st[3]}`;
+  const after = t.slice(st.index + st[0].length);
+  const before = t.slice(0, st.index);
+  const cityAfter = new RegExp(`^(?:\\s*[,–-]\\s*(?:\\d{5}\\s+)?|\\s+(?:a|ad)\\s+)${CITY}`, 'u').exec(after);
+  const cityBefore = new RegExp(`\\b(?:a|ad|in)\\s+${CITY}\\s*,?\\s*(?:in\\s+|nella\\s+|sulla\\s+)?$`, 'u').exec(before);
+  const city = (cityAfter || cityBefore)?.[1]?.replace(/\s+(?:d[ie]l?|sul|al)$/, '');
+  return city ? { value: `${street}, ${city}` } : { value: street, check: 'senza città: aggiungila se serve' };
+}
+
 function coverIn(text) {
   const t = plain(text);
   if (!/\bcoperto\b/.test(t)) return null;
@@ -133,6 +150,11 @@ export function extractVenueInfo(sourceText, { protectedWords = [] } = {}) {
       if (ph && (!hr || /\b(?:tel|telefono|cell|cellulare|numero|whatsapp|chiamate)\b/i.test(clause))) put('telefono', ph);
     }
   });
+  if (!found.indirizzo) for (const [k, raw] of lines.entries()) {
+    if (/^>/.test(raw.trim())) continue;
+    const ad = addressIn(raw);
+    if (ad) { found.indirizzo = { ...ad, line: lineNo[k], source: raw.trim(), fixed: false, clause: null }; break; }
+  }
   if (hours.length) {
     // orari: refuso segnalato se una delle parti è stata corretta
     const sameBlock = hours.every((h, i) => !i || h.line - hours[i - 1].line <= 2);
@@ -154,7 +176,7 @@ export function withoutVenueInfo(sourceText, info) {
   }).join('\n');
 }
 
-export const INFO_LABELS = { coperto: 'Coperto', telefono: 'Telefono', orari: 'Orari', instagram: 'Instagram', facebook: 'Facebook' };
+export const INFO_LABELS = { coperto: 'Coperto', telefono: 'Telefono', orari: 'Orari', instagram: 'Instagram', facebook: 'Facebook', indirizzo: 'Indirizzo' };
 const show = (field, value) => (field === 'coperto' ? `${value} €` : field === 'instagram' ? `@${value}` : value);
 
 /**
