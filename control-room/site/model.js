@@ -4,9 +4,12 @@ const ALLOWED_ALLERGENS = new Set(Array.from({ length: 14 }, (_, index) => Strin
 const ALLOWED_TAGS = new Set(['veg', 'vegan', 'spicy', 'gf', 'new', 'top', 'frozen']);
 const LEGACY_TAGS = new Set(['hot', 'riserva']);
 const PRICE_PATTERN = /^\d+(?:[,.]\d{1,2})?$/;
-const PUBLIC_ROOT = new Set(['id', 'nome', 'sottotitolo', 'indirizzo', 'telefono', 'instagram', 'facebook', 'maps', 'orari', 'wifi', 'avviso', 'coperto', 'note', 'tema', 'sezioni', 'lingue', 'url', 'sito', 'website']);
-const PUBLIC_SECTION = new Set(['nome', 'descrizione', 'voci']);
-const PUBLIC_ITEM = new Set(['nome', 'descrizione', 'prezzo', 'allergeni', 'tag']);
+const PUBLIC_ROOT = new Set(['id', 'nome', 'sottotitolo', 'indirizzo', 'telefono', 'instagram', 'facebook', 'maps', 'orari', 'wifi', 'avviso', 'coperto', 'note', 'tema', 'premium', 'sezioni', 'lingue', 'url', 'sito', 'website']);
+const PUBLIC_SECTION = new Set(['nome', 'descrizione', 'voci', 'tipo', 'prezzo', 'unita']);
+const PUBLIC_ITEM = new Set(['nome', 'descrizione', 'prezzo', 'prezzi', 'allergeni', 'tag']);
+// Blocco «premium» (menu su misura): stesse regole di _lib/premium.js e scripts/validate-menus.py.
+const PREMIUM_KEYS = new Set(['direzione', 'caratteri', 'colori', 'logo', 'copertina', 'motto', 'storia']);
+const PREMIUM_IMAGE = /^(?:\.\.\/|\/)?[a-z0-9_./-]+\.(?:webp|png|jpe?g|svg|avif)$/i;
 
 const isObject = (value) => value !== null && typeof value === 'object' && !Array.isArray(value);
 const nonEmptyText = (value) => {
@@ -66,6 +69,21 @@ export function validateMenu(menu) {
   };
   allowed(menu, PUBLIC_ROOT, 'menu');
   for (const key of ['nome', 'sottotitolo', 'orari', 'avviso', 'note']) if (key in menu) publicText(menu[key], `menu.${key}`);
+  if ('premium' in menu) {
+    const pm = menu.premium;
+    if (!isObject(pm)) add('error', 'menu.premium', 'Il blocco premium deve essere un oggetto.');
+    else {
+      for (const key of Object.keys(pm)) if (!PREMIUM_KEYS.has(key)) add('error', `menu.premium.${key}`, 'Campo non previsto nel blocco premium.');
+      if ('direzione' in pm && !['editoriale', 'bistrot', 'moderno'].includes(pm.direzione)) add('error', 'menu.premium.direzione', 'Usa editoriale, bistrot o moderno.');
+      if ('caratteri' in pm && !['classico', 'moderno', 'artigianale'].includes(pm.caratteri)) add('error', 'menu.premium.caratteri', 'Usa classico, moderno o artigianale.');
+      if ('colori' in pm) {
+        if (!isObject(pm.colori)) add('error', 'menu.premium.colori', 'Deve essere un oggetto.');
+        else for (const [key, color] of Object.entries(pm.colori)) if (!['fondo', 'testo', 'accento', 'secondario'].includes(key) || typeof color !== 'string' || !/^#[0-9a-f]{6}$/i.test(color)) add('error', `menu.premium.colori.${key}`, 'Usa un colore #rrggbb.');
+      }
+      for (const key of ['logo', 'copertina']) if (key in pm && !(typeof pm[key] === 'string' && (pm[key].startsWith('https://') || PREMIUM_IMAGE.test(pm[key])))) add('error', `menu.premium.${key}`, 'Serve un indirizzo https o un file immagine del sito.');
+      for (const key of ['motto', 'storia']) if (key in pm) publicText(pm[key], `menu.premium.${key}`);
+    }
+  }
   for (const key of ['indirizzo', 'telefono', 'instagram', 'maps', 'wifi', 'coperto', 'url', 'sito', 'website'])
     if (key in menu && typeof menu[key] !== 'string') add('error', `menu.${key}`, 'Serve un testo pubblico, non un oggetto tecnico.');
   if (!nonEmptyText(menu.nome)) add('error', 'nome', "Manca un nome del locale non vuoto ('nome').");
@@ -109,6 +127,8 @@ export function validateMenu(menu) {
     if (!isObject(section)) { add('error', sectionPath, 'La sezione deve essere un oggetto JSON.'); return; }
     allowed(section, PUBLIC_SECTION, sectionPath);
     for (const key of ['nome', 'descrizione']) if (key in section) publicText(section[key], `${sectionPath}.${key}`);
+    if ('tipo' in section && section.tipo !== 'degustazione') add('error', `${sectionPath}.tipo`, 'Tipo di sezione non supportato (consentito: degustazione).');
+    if ('prezzo' in section) price(section.prezzo, `${sectionPath}.prezzo`);
     if (!nonEmptyText(section.nome)) add('error', `${sectionPath}.nome`, 'Manca un nome della sezione.');
     else essential.push([`${sectionPath}.nome`, section.nome]);
     if (!Array.isArray(section.voci) || !section.voci.length) { add('error', `${sectionPath}.voci`, 'La sezione deve contenere almeno una voce.'); return; }
@@ -119,7 +139,16 @@ export function validateMenu(menu) {
       for (const key of ['nome', 'descrizione']) if (key in item) publicText(item[key], `${itemPath}.${key}`);
       if (!nonEmptyText(item.nome)) add('error', `${itemPath}.nome`, 'Manca un nome della voce.');
       else essential.push([`${itemPath}.nome`, item.nome]);
+      const variants = 'prezzi' in item;
+      if (variants) {
+        if (!Array.isArray(item.prezzi) || !item.prezzi.length) add('error', `${itemPath}.prezzi`, 'Prezzi deve essere una lista di varianti (etichetta + prezzo).');
+        else item.prezzi.forEach((v, vi) => {
+          if (!isObject(v) || !nonEmptyText(v.etichetta)) add('error', `${itemPath}.prezzi.${vi}`, 'Manca l’etichetta della variante (es. calice, bottiglia).');
+          else price(v.prezzo, `${itemPath}.prezzi.${vi}.prezzo`);
+        });
+      }
       if ('prezzo' in item) price(item.prezzo, `${itemPath}.prezzo`);
+      else if (variants || section.tipo === 'degustazione') { /* prezzo nelle varianti o della sezione */ }
       else add('warning', `${itemPath}.prezzo`, 'PREZZO NON CONFERMATO DAL LOCALE: nessuna fonte esplicita.');
       if ('allergeni' in item) {
         if (!Array.isArray(item.allergeni)) add('error', `${itemPath}.allergeni`, 'Allergeni deve essere una lista da 1 a 14.');

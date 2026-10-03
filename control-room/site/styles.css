@@ -1017,3 +1017,13 @@ h1, h2, .view-header h1 { font-family: var(--serif); font-weight: 600; letter-sp
 .notes-list { list-style: none; margin: 0; padding: 0; display: grid; gap: 10px; }
 .notes-list li { padding: 10px 12px; border: 1px solid var(--line); border-radius: 12px; line-height: 1.45; }
 .notes-list .capsule { margin-right: 4px; }
+
+/* Premium su misura: scheda creativa e direzioni grafiche */
+.pm-brief { margin: 0 0 12px; padding-left: 18px; display: grid; gap: 4px; font-size: 14px; }
+.pm-dirs { display: grid; grid-template-columns: repeat(auto-fill, minmax(220px, 1fr)); gap: 12px; margin-bottom: 10px; }
+.pm-dir { border: 1px solid var(--line); border-radius: 14px; padding: 12px; display: grid; gap: 6px; align-content: start; }
+.pm-dir[aria-current='true'] { border-color: var(--teal); box-shadow: 0 0 0 2px color-mix(in srgb, var(--teal) 35%, transparent); }
+.pm-dir p { margin: 0; }
+.pm-dir__sw { display: flex; gap: 6px; }
+.pm-dir__sw span { width: 24px; height: 24px; border-radius: 7px; box-shadow: inset 0 0 0 1px rgba(127,127,127,.35); }
+.pm-dir__actions { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 4px; }
