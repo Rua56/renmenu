@@ -1,4 +1,5 @@
 import { notesSummary, reviewNotes } from './notes.js';
+import { applyVenueInfo, extractVenueInfo } from './venue-info.js';
 // Autopilota di Jarvis (2026-10-02): appena arriva una richiesta email, Jarvis la classifica
 // e, se il locale ha scritto in modo esplicito nome e piano di un nuovo menu, prepara da solo
 // la bozza (con l'inglese). Le regole restano quelle di docs/renmenu-service-rules.md:
@@ -93,7 +94,7 @@ export function autopilotPreview(request) {
     categoryLabel: plan.proposal.category ? categoryByCode(plan.proposal.category).label : plan.proposal.kind === 'nuovo' ? 'Nuovo menu (piano da scegliere)' : null,
     plan: plan.proposal.plan, venue: plan.proposal.venue, reasons: reasonText(plan.proposal),
     items: extraction.extracted.length, uncertain: extraction.uncertain.length,
-    notes: reviewNotes({ sourceText: text, uncertain: extraction.uncertain, extracted: extraction.extracted }),
+    notes: reviewNotes({ sourceText: text, uncertain: extraction.uncertain, extracted: extraction.extracted, info: applyVenueInfo(extraction.menu, extractVenueInfo(text)) }),
     extras: extras.filter((entry) => entry.type !== 'manuale').map((entry) => (entry.type === 'coperto' ? `coperto ${entry.value}` : `allergeni ${entry.name}`))
   };
 }
@@ -101,12 +102,12 @@ export function autopilotPreview(request) {
 /** Testo breve per Riccardo (notifica in app, email o push). Nessun dato personale del mittente. */
 export function autopilotMessage(subject, preview, outcome = preview.action) {
   const base = autopilotBase(subject, preview, outcome);
-  const todo = preview.kind === 'nuovo' && Array.isArray(preview.notes) ? notesSummary(preview.notes) : '';
+  const todo = preview.kind === 'nuovo' && Array.isArray(preview.notes) ? notesSummary(preview.notes, 6, { preview: outcome !== 'bozza' }) : '';
   return todo ? `${base}\n\n${todo}` : base;
 }
 function autopilotBase(subject, preview, outcome) {
   const head = String(subject || 'Nuova richiesta').slice(0, 70);
-  const facts = preview.kind !== 'nuovo' ? '' : `${preview.items} piatti letti${preview.uncertain ? `, ${preview.uncertain} righe da verificare` : ''}${preview.extras.length ? `, trovati ${preview.extras.join(' e ')}` : ''}`;
+  const facts = preview.kind !== 'nuovo' ? '' : `${preview.items} piatti letti${Array.isArray(preview.notes) ? '' : `${preview.uncertain ? `, ${preview.uncertain} righe da verificare` : ''}${preview.extras.length ? `, trovati ${preview.extras.join(' e ')}` : ''}`}`;
   if (outcome === 'bozza' && preview.menuId) return `Riccardo, aggiornamento pronto per il menu online «${preview.menuId}» (${preview.categoryLabel}): ho applicato solo le modifiche scritte nell’email, QR invariato. Apri Revisione per controllarle.`;
   if (outcome === 'bozza') return `Riccardo, bozza pronta per «${preview.venue}» (${preview.categoryLabel}): ${facts}. Apri Revisione per controllarla.`;
   if (outcome === 'proponi') return `Riccardo, nuova richiesta «${head}». Propongo: ${preview.categoryLabel}. ${preview.why}${facts ? ` ${facts}.` : ''}`;

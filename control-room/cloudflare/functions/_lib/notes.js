@@ -26,9 +26,19 @@ export function reviewNotes({ sourceText = '', uncertain = [], extracted = [], m
   const menuLines = extracted.map((e) => e.line).filter(Number.isFinite);
   const first = menuLines.length ? Math.min(...menuLines) : null, last = menuLines.length ? Math.max(...menuLines) : null;
   const dishKeys = extracted.map((e) => norm(e.name).split(/\s+/).filter((w) => w.length > 2).slice(0, 2).join(' ')).filter((k) => k.length > 4);
-  const notes = uncertain.map((raw) => {
+  // Le email arrivano spesso «a capo» ogni ~75 caratteri: le righe della stessa frase diventano una nota sola.
+  const rows = [];
+  for (const raw of uncertain) {
+    if (/^Oggetto ricevuto:/i.test(String(raw))) continue;
+    const line = lineOf(String(raw)), prev = rows[rows.length - 1];
+    if (prev && line && prev.last && line === prev.last + 1 && !/[.!?:]$/.test(prev.text.trim()) && !String(raw).startsWith('[da verificare]') && prev.text.length > 45) {
+      prev.text = `${prev.text} ${String(raw).trim()}`; prev.last = line; continue;
+    }
+    rows.push({ text: String(raw), line, last: line });
+  }
+  const notes = rows.map(({ text: raw, line: first }) => {
     const text = String(raw).replace(/^\[da verificare\]\s*/, '');
-    const t = norm(text), line = lineOf(String(raw));
+    const t = norm(text), line = first;
     if (String(raw).startsWith('[da verificare]')) return { kind: 'foto', text, hint: 'Letta in modo diverso dalle due letture della foto: guarda la foto e inseriscila tu.', line };
     const doubts = doubtsBy(raw), done = appliedBy(raw);
     if (doubts.length) return { kind: 'conferma', text, hint: doubts.map((d) => d.doubt).join(' '), line, also: done.length ? ['inserito'] : [] };
@@ -55,11 +65,11 @@ const INFO = { coperto: 'Coperto', telefono: 'Telefono', orari: 'Orari', instagr
 export const NOTE_LABELS = { inserito: 'Inserito da Jarvis', conferma: 'Da confermare', piatto: 'Righe del menu non lette', correzione: 'Correzioni da applicare', foto: 'Righe dubbie delle foto', piano: 'Piano', tema: 'Tema grafico', coperto: 'Coperto', orari: 'Orari', contatti: 'Contatti', allergeni: 'Allergeni', lingue: 'Lingue', testo: 'Altro testo dell’email' };
 
 /** Riassunto breve per Telegram/notifiche: prima le cose che richiedono un intervento. */
-export function notesSummary(notes, max = 6) {
+export function notesSummary(notes, max = 6, { preview = false } = {}) {
   const done = notes.filter((n) => n.kind === 'inserito');
   const urgent = notes.filter((n) => !['testo', 'inserito'].includes(n.kind));
   const parts = [];
-  if (done.length) parts.push(`Ho inserito dal testo: ${done.map((n) => n.hint.replace(/^Inserito nel menu: /, '').replace(/\. Controlla\.$/, '')).join('; ')}.`);
+  if (done.length) parts.push(`${preview ? 'Quando generi la bozza inserisco dal testo' : 'Ho inserito dal testo'}: ${done.map((n) => n.hint.replace(/^Inserito nel menu: /, '').replace(/\. Controlla\.$/, '')).join('; ')}.`);
   if (urgent.length) {
     const shown = urgent.slice(0, max).map((n) => `• ${[n.kind, ...(n.also || [])].map((k) => NOTE_LABELS[k]).join(' e ')}: «${n.text.slice(0, 80)}»${n.kind === 'conferma' ? ` — ${n.hint.slice(0, 140)}` : ''}`);
     parts.push(`Da sistemare o confermare (${urgent.length}):\n${shown.join('\n')}${urgent.length > max ? `\n…e altre ${urgent.length - max} in Revisione.` : ''}`);
