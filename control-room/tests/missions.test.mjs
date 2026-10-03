@@ -151,6 +151,38 @@ describe('Jarvis autonomo: dalla bozza affidata alla pubblicazione', () => {
     } finally { db.close(); }
   });
 
+  it('locale senza email (pratica aperta su Telegram): anteprima a Riccardo su Telegram e pubblica solo al suo SÌ', async () => {
+    const db = database();
+    try {
+      await run(db, buildImportBatch(event('t1', 'Nuovo menu', SOURCE)));
+      await db.prepare('UPDATE clients SET email=NULL').bind().run();
+      await action(db, 'runAutopilot', {});
+      await missions.putSetting(db, 'telegram_chat_id', '42');
+      const act = (type, payload) => call(db, 'actions', { type, payload }, env);
+      const draft = (await call(db, 'state')).body.drafts[0];
+      telegramCalls.length = 0;
+      const entrusted = await act('entrustToJarvis', { draftId: draft.id, revision: draft.revision, confirmation: 'AFFIDO A JARVIS' });
+      assert.equal(entrusted.status, 200, String(entrusted.body.error));
+      assert.equal(entrusted.body.result.status, 'attesa_si');
+      assert.equal(await outbox(db), null, 'nessuna email a nessuno');
+      const message = telegramCalls.find((c) => c.method === 'sendMessage' && /anteprima/.test(c.body.text));
+      assert.match(message.body.text, /https:\/\/\S+/, 'link dell’anteprima su Telegram');
+      assert.match(JSON.stringify(message.body.reply_markup), /pub:/);
+      let state = entrusted.body.state;
+      assert.equal(state.approvals[0].recipient, 'telegram:riccardo');
+      assert.equal(state.approvals[0].status, 'anteprima_inviata');
+      await tick(db);
+      assert.equal((await call(db, 'state')).body.missions[0].status, 'attesa_si', 'aspetta solo Riccardo');
+      const yes = await act('jarvisDecide', { missionId: state.missions[0].id, yes: true });
+      assert.equal(yes.status, 200, String(yes.body.error));
+      state = yes.body.state;
+      assert.equal(state.approvals[0].status, 'approvata_cliente');
+      assert.match(state.approvals[0].approvalEvidence || state.approvals[0].approval_evidence || '', /approvata da Riccardo su Telegram/);
+      assert.equal(state.approvals[0].activation, 'prova_30_giorni');
+      assert.equal(state.missions[0].status, 'pubblicazione');
+    } finally { db.close(); }
+  });
+
   it('si ferma su allergeni o risposte ambigue e lascia la decisione a Riccardo', async () => {
     const db = database();
     try {

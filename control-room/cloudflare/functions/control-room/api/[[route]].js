@@ -4,6 +4,7 @@ import { prepareUpdate } from '../../_lib/update.js';
 import { PHOTO_TYPES, readMenuPdf, readMenuPhoto } from '../../_lib/vision.js';
 import { linkMailFiles, receiveMailFiles } from '../../_lib/mail-files.js';
 import { speak } from '../../_lib/voice.js';
+import { OWNER_REVIEW } from '../../_lib/missions.js';
 import { readCurrentMenu } from '../../_lib/github-live.js';
 import { isSameOriginWrite, verifyOwner } from '../../_lib/auth.js';
 import { slugify, validateMenu, venueFromSource } from '../../_lib/menu.js';
@@ -497,8 +498,10 @@ export async function action(db, type, input, env = {}) {
     assert(!internal.length, internal[0], 422);
     const request = await getOne(db, 'SELECT r.status,r.kind,c.email AS client_email FROM requests r JOIN clients c ON c.id=r.client_id WHERE r.id=?', draft.request_id);
     assert(!['completata', 'archiviata', 'chiusa'].includes(request.status), 'Pratica chiusa.', 409);
-    const recipient = String(p.recipient || request.client_email || '').trim().toLowerCase();
-    assert(/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(recipient) && recipient.length <= 254, 'Indica l’email del locale (scheda cliente o campo destinatario).', 422);
+    // Anteprima per Riccardo su Telegram: solo se il locale non ha email (pratiche aperte da Riccardo).
+    const ownerReview = p.ownerReview === true && !request.client_email;
+    const recipient = ownerReview ? OWNER_REVIEW : String(p.recipient || request.client_email || '').trim().toLowerCase();
+    assert(ownerReview || (/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(recipient) && recipient.length <= 254), 'Indica l’email del locale (scheda cliente o campo destinatario).', 422);
     assert(recipient !== OWNER_NOTIFICATION_RECIPIENT, 'Il destinatario non può essere la casella RenMenu: serve l’email del locale.', 422);
     const sha = await sha256Hex(draft.menu_json);
     const existing = await getOne(db, 'SELECT * FROM publication_approvals WHERE draft_id=?', draftId);
