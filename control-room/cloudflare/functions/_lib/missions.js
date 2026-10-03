@@ -8,7 +8,7 @@ import { briefingDue, buildBriefing, romeDay } from './briefing.js';
 import { answerCallback, clearButtons, downloadTelegramFile, sendTelegram, sendVoice, telegramReady } from './telegram.js';
 import { matchVenue, planFromText, speak, transcribe, understand, venueSaid } from './voice.js';
 import { classifyRequest } from './autopilot.js';
-import { slugify } from './menu.js';
+import { findDishes, findLocales, guessIntent, hintsText } from './understanding.js';
 import { memoryContext, memoryFor, menuStatements, noteStatement } from './memory.js';
 
 export const PARTIAL_MARK = '[Testo parziale: leggi l’email completa in Gmail prima di decidere]';
@@ -414,55 +414,86 @@ export function createMissions(deps) {
     if (!heard.ok) { await sendTelegram(env, chat, `Perdona Riccardo, ${heard.reason}. Puoi ripetere?`, null, deps.fetchImpl); return; }
     await converse(db, env, chat, heard.text, true);
   }
-  // Locali nominati nel comando → la loro memoria (note e ultimo menu online) entra nel contesto.
-  async function mentionedLocales(db, utterance) {
-    const said = `-${String(utterance || '').toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/[^a-z0-9]+/g, '-')}-`;
+  // Comprensione: locali (anche trascritti male) e piatti dei menu in memoria citati nel comando.
+  async function readClues(db, utterance) {
     const all = await rows(db, 'SELECT id,name,menu_id FROM clients ORDER BY updated_at DESC LIMIT 200').catch(() => []);
-    return all.filter((client) => {
-      const words = slugify(client.name).split('-').filter((w) => w.length > 2 && !['locale', 'ristorante', 'bar', 'osteria', 'trattoria', 'pizzeria'].includes(w));
-      return words.length && words.every((w) => said.includes(`-${w}-`));
-    }).slice(0, 2);
+    const menus = await rows(db, "SELECT m.client_id,m.text FROM venue_memory m WHERE m.kind='menu' AND m.archived_at IS NULL").catch(() => []);
+    const locales = findLocales(utterance, all);
+    const dishes = findDishes(utterance, menus.map((m) => ({ client: all.find((c) => c.id === m.client_id), summary: m.text })).filter((m) => m.client));
+    return { all, locales, dishes, guess: guessIntent(utterance, { locales, dishes }) };
   }
-  async function mentionedMemory(db, utterance) {
+  async function mentionedMemory(db, clues) {
+    const online = clues.all.filter((c) => c.menu_id);
+    const ids = [...new Set([...clues.locales, ...clues.dishes.map((d) => d.client), ...(online.length === 1 ? online : [])].map((c) => c.id))].slice(0, 2);
     const parts = [];
-    for (const client of await mentionedLocales(db, utterance)) parts.push(memoryContext(client, await memoryFor(db, client.id).catch(() => [])));
+    for (const id of ids) { const client = clues.all.find((c) => c.id === id); parts.push(memoryContext(client, await memoryFor(db, id).catch(() => []))); }
     return parts.join('\n\n');
   }
-  async function voiceRemember(db, utterance, spokenVenue) {
+  // Locale da usare: quello detto (se corrisponde) oppure l'unico riconosciuto da nome o piatti.
+  function pickLocale(spoken, clues, list) {
+    const named = spoken ? matchVenue(spoken, list) : { client: null, candidates: [] };
+    if (named.client) return named;
+    const ids = new Set(list.map((c) => c.id));
+    const seen = [...new Map([...clues.locales, ...clues.dishes.map((d) => d.client)].filter((c) => ids.has(c.id)).map((c) => [c.id, c])).values()];
+    return seen.length === 1 ? { client: list.find((c) => c.id === seen[0].id), candidates: [] } : { client: null, candidates: named.candidates.length ? named.candidates : seen };
+  }
+  async function voiceRemember(db, utterance, spokenVenue, clues) {
     const all = await rows(db, 'SELECT id,name,menu_id FROM clients ORDER BY name LIMIT 200');
-    const found = spokenVenue ? matchVenue(spokenVenue, all) : { client: null, candidates: [] };
-    const named = found.client || (await mentionedLocales(db, utterance)).find((c, i, list) => list.length === 1) || null;
-    if (!named) return found.candidates.length > 1 ? `Più locali corrispondono: ${found.candidates.map((c) => c.name).join(', ')}. Di quale parliamo?` : 'Di quale locale devo ricordarlo, Riccardo? Dimmi il nome com’è registrato.';
+    const found = pickLocale(spokenVenue, clues, all);
+    const named = found.client;
+    if (!named) return found.candidates.length > 1 ? `Più locali corrispondono: ${found.candidates.map((c) => c.name).join(', ')}. Di quale parliamo?` : 'Di quale locale devo ricordarlo, Riccardo?';
     const note = String(utterance).replace(/^\s*(?:ok\s+)?(?:jarvis[,\s]+)?(?:per favore\s+)?(?:ricorda(?:ti)?|memorizza|segna(?:ti)?|annota(?:ti)?)\s+(?:che\s+)?/i, '').trim();
     await auditedBatch(jarvisDb(db), [noteStatement(db, named.id, note || utterance, 'Telegram (Riccardo)')], 'memory.note', `Jarvis ricorda una nuova nota su ${named.name}.`, null);
     return `D’accordo, lo ricorderò per «${named.name}».`;
   }
-  async function voiceContext(db, env, utterance = '') {
+  async function voiceContext(db, env, clues, history) {
     const brief = await buildBriefing(db, env, { fetchImpl: deps.fetchImpl }).catch(() => '');
     const clients = await rows(db, "SELECT name,menu_id,plan,trial_ends_at,renewal_at FROM clients WHERE menu_id IS NOT NULL AND menu_id<>'' ORDER BY name LIMIT 60").catch(() => []);
     const open = await rows(db, "SELECT subject,status FROM requests WHERE status NOT IN ('completata','archiviata','chiusa') ORDER BY updated_at DESC LIMIT 15").catch(() => []);
-    const memory = await mentionedMemory(db, utterance);
-    return `${brief}${memory ? `\n\n${memory}` : ''}\n\nLocali con menu online: ${clients.map((c) => `${c.name} (menu ${c.menu_id}, piano ${c.plan}${c.trial_ends_at ? `, prova fino al ${String(c.trial_ends_at).slice(0, 10)}` : ''}${c.renewal_at ? `, rinnovo ${String(c.renewal_at).slice(0, 10)}` : ''})`).join('; ') || 'nessuno'}.\nPratiche aperte: ${open.map((r) => `${r.subject} [${r.status}]`).join('; ') || 'nessuna'}.`;
+    const memory = await mentionedMemory(db, clues);
+    const hints = hintsText(clues);
+    return `${history ? `CONVERSAZIONE RECENTE (dal più vecchio):\n${history}\n\n` : ''}${hints ? `${hints}\n\n` : ''}${memory ? `${memory}\n\n` : ''}${brief}\n\nLocali con menu online: ${clients.map((c) => `${c.name} (menu ${c.menu_id}, piano ${c.plan}${c.trial_ends_at ? `, prova fino al ${String(c.trial_ends_at).slice(0, 10)}` : ''}${c.renewal_at ? `, rinnovo ${String(c.renewal_at).slice(0, 10)}` : ''})`).join('; ') || 'nessuno'}.\nPratiche aperte: ${open.map((r) => `${r.subject} [${r.status}]`).join('; ') || 'nessuna'}.`;
   }
-  async function converse(db, env, chat, utterance, spoken) {
-    const said = spoken ? `«${utterance}»\n\n` : '';
-    const intent = await understand(env.AI, utterance, await voiceContext(db, env, utterance));
-    // Registro minimo per capire gli errori (senza il testo del comando).
-    await auditedBatch(jarvisDb(db), [], 'jarvis.conversation', `Comando ${spoken ? 'vocale' : 'scritto'}: ${intent.intent}${intent.why ? ` (${intent.why})` : ''}.`, null).catch(() => {});
-    if (intent.intent === 'risposta' && intent.risposta) { await reply(db, env, chat, `${said}${intent.risposta}`, spoken); return; }
+  // Conversazione: ricorda gli ultimi scambi e, se Jarvis ha appena chiesto un chiarimento,
+  // unisce la risposta di Riccardo al comando precedente (es. «cambia il frico a 12» → «quale locale?» → «Bakaro»).
+  const PENDING_MINUTES = 10;
+  async function converse(db, env, chat, said0, spoken) {
+    const said = spoken ? `«${said0}»\n\n` : '';
+    let pending = null; try { pending = JSON.parse(await setting(db, 'tg_pending') || 'null'); } catch {}
+    const fresh = pending && Date.now() - Date.parse(pending.at) < PENDING_MINUTES * MINUTE;
+    const utterance = fresh ? `${pending.text}\n${said0}` : said0;
+    let history = []; try { history = JSON.parse(await setting(db, 'tg_history') || '[]').filter((h) => Date.now() - Date.parse(h.at) < 30 * MINUTE); } catch {}
+    const clues = await readClues(db, utterance);
+    const understood = await understand(env.AI, utterance, await voiceContext(db, env, clues, history.map((h) => `${h.who}: ${h.text}`).join('\n')));
+    // Se il modello non è sicuro (o risponde a parole a un ordine) ma le parole chiave indicano un compito chiaro, Jarvis procede.
+    const fallbackUsed = (understood.intent === 'non_chiaro' || (understood.intent === 'risposta' && !fresh)) && !['non_chiaro', 'ambiguo', 'risposta'].includes(clues.guess.intent);
+    const intent = fallbackUsed ? { ...understood, intent: clues.guess.intent, locale: understood.locale || clues.guess.locale } : understood;
+    if (intent.intent === 'non_chiaro' && !intent.risposta && clues.guess.intent === 'ambiguo') {
+      const venue = clues.locales[0]?.name || clues.dishes[0]?.client?.name;
+      const dish = clues.dishes[0]?.dish?.name;
+      intent.risposta = `Vuoi che modifichi ${dish ? `«${dish}» nel` : 'il'} menu di «${venue}», o ti serve un’informazione?`;
+    }
+    await auditedBatch(jarvisDb(db), [], 'jarvis.conversation', `Comando ${spoken ? 'vocale' : 'scritto'}: ${intent.intent}${fallbackUsed ? ' (da parole chiave)' : ''}${fresh ? ' (con chiarimento)' : ''}${understood.why ? ` (${understood.why})` : ''}.`, null).catch(() => {});
+    const answer = async (text, buttons = null) => {
+      const asks = /\?\s*$/.test(String(text)) && !buttons;
+      await putSetting(db, 'tg_pending', asks ? JSON.stringify({ text: utterance.slice(-1200), at: now() }) : 'null').catch(() => {});
+      await putSetting(db, 'tg_history', JSON.stringify([...history, { who: 'Riccardo', text: said0.slice(0, 400), at: now() }, { who: 'Jarvis', text: String(text).slice(0, 400), at: now() }].slice(-8))).catch(() => {});
+      await reply(db, env, chat, `${said}${text}`, spoken, buttons);
+    };
+    if (intent.intent === 'risposta' && intent.risposta) { await answer(intent.risposta); return; }
     if (intent.intent === 'pubblica') {
       const waiting = await rows(db, "SELECT m.id,d.menu_json,d.slug FROM jarvis_missions m JOIN drafts d ON d.id=m.draft_id WHERE m.status='attesa_si' ORDER BY m.updated_at DESC LIMIT 10");
       const named = waiting.map((m) => { let name = m.slug; try { name = JSON.parse(m.menu_json).nome || name; } catch {} return { ...m, name, menu_id: m.slug }; });
       const pick = intent.locale ? matchVenue(intent.locale, named).client : named.length === 1 ? named[0] : null;
-      if (!named.length) { await reply(db, env, chat, `${said}Al momento nessun menu aspetta il tuo SÌ, Riccardo.`, spoken); return; }
-      if (!pick) { await reply(db, env, chat, `${said}Aspettano il tuo SÌ: ${named.map((m) => m.name).join(', ')}. Quale pubblico?`, spoken); return; }
-      await reply(db, env, chat, `${said}«${pick.name}» è pronto. Per sicurezza la pubblicazione la confermi tu col pulsante.`, spoken, [['SÌ, pubblica', `pub:${pick.id}`], ['Non ancora', `no:${pick.id}`]]);
+      if (!named.length) { await answer('Al momento nessun menu aspetta il tuo SÌ, Riccardo.'); return; }
+      if (!pick) { await answer(`Aspettano il tuo SÌ: ${named.map((m) => m.name).join(', ')}. Quale pubblico?`); return; }
+      await answer(`«${pick.name}» è pronto. Per sicurezza la pubblicazione la confermi tu col pulsante.`, [['SÌ, pubblica', `pub:${pick.id}`], ['Non ancora', `no:${pick.id}`]]);
       return;
     }
-    if (intent.intent === 'ricorda') { await reply(db, env, chat, `${said}${await voiceRemember(db, utterance, intent.locale)}`, spoken); return; }
-    if (intent.intent === 'crea_pratica') { await reply(db, env, chat, `${said}${await voiceCreate(db, utterance, intent.locale)}`, spoken); return; }
-    if (intent.intent === 'aggiorna_menu') { await reply(db, env, chat, `${said}${await voiceUpdate(db, env, utterance, intent.locale)}`, spoken); return; }
-    await reply(db, env, chat, `${said}${intent.risposta || 'Non sono sicuro di aver capito, Riccardo. Puoi ripetere con altre parole?'}`, spoken);
+    if (intent.intent === 'ricorda') { await answer(await voiceRemember(db, utterance, intent.locale, clues)); return; }
+    if (intent.intent === 'crea_pratica') { await answer(await voiceCreate(db, utterance, intent.locale)); return; }
+    if (intent.intent === 'aggiorna_menu') { await answer(await voiceUpdate(db, env, utterance, intent.locale, clues)); return; }
+    await answer(intent.risposta || 'Non ho afferrato, Riccardo: di quale locale parliamo e cosa devo fare?');
   }
   // Nuova pratica a voce: cliente (esistente o nuovo) + pratica «nuovo menu». Le foto e i PDF che
   // Riccardo manda nell'ora successiva si collegano da soli a questa pratica.
@@ -490,10 +521,10 @@ export function createMissions(deps) {
   }
 
   // Modifica a voce di un menu già online: pratica + bozza dal menu su main, con le sole parole di Riccardo.
-  async function voiceUpdate(db, env, utterance, spokenVenue) {
+  async function voiceUpdate(db, env, utterance, spokenVenue, clues = { locales: [], dishes: [] }) {
     const clients = await rows(db, "SELECT id,name,menu_id,plan FROM clients WHERE menu_id IS NOT NULL AND menu_id<>''");
-    const { client, candidates } = matchVenue(spokenVenue, clients);
-    if (!client) return candidates.length > 1 ? `Ho trovato più locali: ${candidates.map((c) => c.name).join(', ')}. Quale intendi?` : `Non trovo un locale con menu online che si chiami «${spokenVenue || '…'}». Dimmi il nome come nella scheda cliente.`;
+    const { client, candidates } = pickLocale(spokenVenue, clues, clients);
+    if (!client) return candidates.length > 1 ? `Ho trovato più locali: ${candidates.map((c) => c.name).join(', ')}. Quale intendi?` : `${spokenVenue ? `Non trovo un locale con menu online che si chiami «${spokenVenue}».` : 'Non ho capito di quale locale si tratta.'} Su quale menu devo intervenire?`;
     const proposal = classifyRequest('Richiesta a voce', utterance);
     const category = ['prezzo', 'piatto', 'vini_cocktail', 'disponibilita'].includes(proposal.category) ? proposal.category : 'piatto';
     const jarvis = jarvisDb(db);
