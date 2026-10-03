@@ -1,5 +1,5 @@
 import { premiumErrors } from './premium.js';
-import { WINE_SECTION, allergenNumbers, namelessVariants, columnsHeader, degustazioneHeading, degustazionePrice, descriptionLike, fmt, labelOnlyRow, labelSuffix, labeledVariants, pairingRow, unlabeledVariants } from './menu-structure.js';
+import { WINE_SECTION, allergenNumbers, degustazioneNote, namelessVariants, columnsHeader, degustazioneHeading, degustazionePrice, descriptionLike, fmt, labelOnlyRow, labelSuffix, labeledVariants, pairingRow, unlabeledVariants } from './menu-structure.js';
 // Independent server-side rules. scripts/validate-menus.py remains the publication authority.
 const PRICE = /^\d+(?:[,.]\d{1,2})?$/;
 const TAGS = new Set(['veg', 'vegan', 'spicy', 'gf', 'new', 'top', 'frozen']);
@@ -210,7 +210,9 @@ export function sentenceCaseIfShouting(title) {
   const letters = title.replace(/[^A-Za-zÀ-ÿ]/g, '');
   if (letters.length < 2 || letters !== letters.toUpperCase()) return title;
   const lower = title.toLocaleLowerCase('it-IT');
-  return lower.charAt(0).toLocaleUpperCase('it-IT') + lower.slice(1);
+  // Nome proprio tra virgolette («PERCORSO "TERRE DELL'ISONZO"»): iniziali maiuscole, virgolette «».
+  const named = lower.replace(/["“”«»]([^"“”«»]{2,60})["“”«»]/g, (_, inner) => `«${inner.replace(/(^|[\s'’-])([a-zà-ÿ])([a-zà-ÿ]*)/g, (m, sep, first, rest, at) => (at > 0 && /^(?:di|del|della|dei|delle|dell|e|ed|al|alla|da|in|con|per|tra)$/.test(first + rest) ? m : sep + first.toLocaleUpperCase('it-IT') + rest))}»`);
+  return named.charAt(0).toLocaleUpperCase('it-IT') + named.slice(1);
 }
 
 export function extractMenuFromText(venue, source, requestedSlug) {
@@ -293,12 +295,24 @@ export function extractMenuFromText(venue, source, requestedSlug) {
         consumed.push(lineNumber); section.priceLine = lineNumber;
         continue;
       }
+      // «Il percorso è servito per tutto il tavolo», «Minimo 2 persone», «Bevande escluse»: nota del percorso, non una portata.
+      const note = degustazioneNote(row);
+      if (note) {
+        section.descrizione = { it: section.descrizione?.it ? `${section.descrizione.it} ${note}` : note };
+        consumed.push(lineNumber);
+        confirm.push({ text: row, line: lineNumber, hint: `Nota del percorso «${section.nome.it}» messa come descrizione del percorso (non come portata): «${note}».` });
+        continue;
+      }
       const pairing = pairingRow(row);
       if (pairing) { addItem({ nome: { it: pairing.name }, prezzo: fmt(pairing.amount) }, { name: pairing.name, price: fmt(pairing.amount), sourceLine: row, line: lineNumber, loose: false }); continue; }
     }
     // Più prezzi sulla stessa voce: con etichette scritte, o due prezzi in una sezione vini/colonne.
     const labeled = labeledVariants(row);
     if (labeled) { variantItem(labeled.name, labeled.variants, lineNumber, row); continue; }
+    // «Franciacorta Satèn — bottiglia 48», «Rosso della casa: calice 4»: un solo prezzo con la sua etichetta.
+    const tail = row.match(/^(.*?[A-Za-zÀ-ÿ]{3}.*?)\s+[—–-]\s+(.+)$/) || row.match(/^(.*?[A-Za-zÀ-ÿ]{3}[^:]*?):\s+(.+)$/);
+    const single = tail && labelOnlyRow(tail[2]);
+    if (single && /^(?:Calice|Bottiglia|Mezza bottiglia|Magnum)$/.test(single.label) && !/\d/.test(tail[1].replace(/\b(?:19|20)\d{2}\b/g, ''))) { variantItem(tail[1].trim(), [single], lineNumber, row); continue; }
     const unlabeled = unlabeledVariants(row, { section: sectionName(), columns: section.columns });
     if (unlabeled) {
       variantItem(unlabeled.name, unlabeled.variants, lineNumber, row, unlabeled.inferred ? `Due prezzi senza etichetta in «${sectionName()}»: inseriti come calice ${fmt(unlabeled.variants[0].amount)} € e bottiglia ${fmt(unlabeled.variants[1].amount)} €. Conferma.` : '');
@@ -336,8 +350,9 @@ export function extractMenuFromText(venue, source, requestedSlug) {
       unknown.push(row.slice(0, 220)); last = null; pending = null;
       continue;
     }
+    // Nel percorso una portata «secondo stagione» senza importo è una portata, non un prezzo variabile.
     const special = specialPriceRow(row);
-    if (special) {
+    if (special && !(section.tipo === 'degustazione' && !special.amount)) {
       const item = { nome: { it: special.name } };
       let price = '';
       if (special.amount) { price = fmt(special.amount); item.prezzo = price; }

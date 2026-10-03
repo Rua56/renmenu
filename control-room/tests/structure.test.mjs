@@ -214,3 +214,29 @@ describe('Stessa pagina mandata due volte', () => {
     assert.equal(dropRepeatedPages([old, wine]).kept.length, 2);
   });
 });
+
+describe('Email di prova Premium «Enoteca Isonzo Test»: carta completa', () => {
+  it('piatti con descrizione, percorso con prezzo/nota/abbinamento, vini calice e bottiglia, bottiglia sola', async () => {
+    const { readFileSync } = await import('node:fs');
+    const text = readFileSync(new URL('./fixtures-email-premium-isonzo.txt', import.meta.url), 'utf8');
+    const r = read(text);
+    const by = (name) => r.menu.sezioni.find((s) => s.nome.it === name);
+    assert.deepEqual(r.menu.sezioni.map((s) => s.nome.it), ['Antipasti', 'Primi', 'Secondi', 'Dolci', 'Percorso degustazione «Terre dell\'Isonzo»', 'Vini bianchi', 'Vini rossi', 'Bollicine']);
+    assert.equal(by('Primi').voci[0].descrizione.it, 'ripieni di patate, uvetta e cannella, con burro fuso e ricotta affumicata');
+    assert.equal(by('Primi').voci[2].descrizione, undefined);
+    const p = r.menu.sezioni[4];
+    assert.equal(p.tipo, 'degustazione'); assert.equal(p.prezzo, '55,00'); assert.equal(p.unita.it, 'a persona');
+    assert.equal(p.descrizione.it, 'Il percorso è servito per tutto il tavolo.');
+    assert.deepEqual(p.voci.map((v) => [v.nome.it, v.prezzo || '']), [['Frico croccante', ''], ['Cjarsons della Carnia', ''], ['Guancia di manzo al Refosco', ''], ['Gubana con grappa', ''], ['Abbinamento vini', '25,00']]);
+    const wine = (v) => [v.nome.it, (v.prezzi || []).map((x) => `${x.etichetta.it} ${x.prezzo}`).join(' / ')];
+    assert.deepEqual(by('Vini bianchi').voci.map(wine), [['Ribolla Gialla Collio 2024', 'Calice 5,00 / Bottiglia 28,00'], ['Friulano Colli Orientali 2023', 'Calice 6,00 / Bottiglia 32,00'], ['Malvasia Istriana 2022', 'Calice 6,50 / Bottiglia 35,00']]);
+    assert.deepEqual(by('Bollicine').voci.map(wine), [['Ribolla Gialla Spumante Brut', 'Calice 6,00 / Bottiglia 30,00'], ['Franciacorta Satèn', 'Bottiglia 48,00']]);
+    assert.ok(!r.menu.sezioni.flatMap((s) => s.voci).some((v) => /tavolo|grazie|marta/i.test(v.nome.it)));
+  });
+  it('una portata «secondo stagione» resta una portata; un piatto con l’anno nel nome resta un piatto', () => {
+    const r = read('Menu degustazione — 60 a persona\nDolce secondo la stagione\nMinimo 2 persone\n\n# Vini rossi\nRefosco 2021 — bottiglia 30');
+    assert.deepEqual(r.menu.sezioni[0].voci.map((v) => v.nome.it), ['Dolce secondo la stagione']);
+    assert.equal(r.menu.sezioni[0].descrizione.it, 'Minimo 2 persone');
+    assert.deepEqual(r.menu.sezioni[1].voci[0].prezzi, [{ etichetta: { it: 'Bottiglia' }, prezzo: '30,00' }]);
+  });
+});
