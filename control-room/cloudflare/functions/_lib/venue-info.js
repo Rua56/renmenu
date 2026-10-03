@@ -103,9 +103,16 @@ function hoursIn(text) {
 export function extractVenueInfo(sourceText, { protectedWords = [] } = {}) {
   const found = {};
   const guard = new Set(protectedWords.map(plain));
-  const lines = String(sourceText || '').split(/\r?\n/);
+  // Righe spezzate dall'a capo automatico dell'email: si riuniscono le frasi (la riga indicata resta la prima).
+  const rawLines = String(sourceText || '').split(/\r?\n/), lines = [], lineNo = [];
+  rawLines.forEach((raw, i) => {
+    const prev = lines.length - 1, t = raw.trim();
+    if (prev >= 0 && t && lines[prev].trim().length > 45 && !/[.!?:]$/.test(lines[prev].trim()) && /^[a-zà-ÿ0-9]/.test(t)) { lines[prev] = `${lines[prev].trim()} ${t}`; return; }
+    lines.push(raw); lineNo.push(i + 1);
+  });
   const hours = [];
-  lines.forEach((raw, index) => {
+  lines.forEach((raw, k) => {
+    const index = lineNo[k] - 1;
     const original = raw.trim().replace(/^[-•*]\s*/, '');
     if (!original || /^>/.test(original)) return;
     const line = fixTypos(original, VOCAB, guard);

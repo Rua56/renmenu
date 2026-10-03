@@ -60,3 +60,11 @@ test('prezzo variabile dichiarato: non blocca la pubblicazione, un prezzo vuoto 
   const menu = { lingue: ['it'], sezioni: [{ nome: { it: 'Secondi' }, voci: [{ nome: { it: 'Grigliata' }, descrizione: { it: 'Prezzo variabile secondo il pescato del giorno' } }, { nome: { it: 'Orata' } }] }] };
   assert.deepEqual(criticalFields(menu).pricesMissing, ['sezioni.0.voci.1.prezzo']);
 });
+
+test('email con a capo automatico: una frase spezzata su più righe è una nota sola', () => {
+  const src = 'Oggetto ricevuto: Menu\n\nAvremmo bisogno del menù digitale anche in inglese perché d\'estate abbiamo\ntanti turisti austriaci e tedeschi.\n\n# Primi\nBigoli — 12,00\n';
+  const r = extractMenuFromText('X', src);
+  const notes = reviewNotes({ sourceText: src, uncertain: r.uncertain, extracted: r.extracted });
+  assert.equal(notes.length, 1);
+  assert.match(notes[0].text, /abbiamo tanti turisti/);
+});
