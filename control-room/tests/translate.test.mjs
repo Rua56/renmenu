@@ -42,7 +42,7 @@ describe('traduzione automatica EN (bozza)', () => {
   it('servizio assente o in errore: nessuna modifica, segnalato come non disponibile', async () => {
     const none = await translateMenu(undefined, menu());
     assert.equal(none.unavailable, true); assert.equal(none.translated, 0); assert.equal(none.menu.lingue.length, 1);
-    const broken = await translateMenu({ run: async () => { throw new Error('quota'); } }, menu());
+    const broken = await translateMenu({ run: async () => { throw new Error('servizio in errore'); } }, menu());
     assert.equal(broken.unavailable, true);
     assert.match(translationSummary(broken), /non riuscita/);
   });
@@ -98,5 +98,16 @@ describe('Traduzione: secondo tentativo a metà se la risposta è tagliata', () 
     assert.equal(out.translated, out.total);
     assert.deepEqual(out.menu.lingue, ['it', 'en']);
     assert.equal(out.menu.sezioni[0].voci[7].nome.en, 'Dish number h');
+  });
+});
+
+describe('Traduzione: quota gratuita finita', () => {
+  it('lo dice chiaramente e non riprova a vuoto', async () => {
+    const { translateMenu, translationSummary } = await import('../cloudflare/functions/_lib/translate.js');
+    let calls = 0;
+    const ai = { run: async () => { calls += 1; throw new Error('4006: you have used up your daily free allocation of 10,000 neurons'); } };
+    const out = await translateMenu(ai, menu());
+    assert.equal(out.unavailable, true); assert.equal(out.quota, true); assert.equal(calls, 1);
+    assert.match(translationSummary(out), /quota gratuita/);
   });
 });

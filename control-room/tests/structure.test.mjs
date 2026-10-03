@@ -258,3 +258,16 @@ describe('Email vera da Gmail (righe spezzate): nome del locale, colori e sfondo
     assert.equal(brief.sfondoScuro, true);
   });
 });
+
+describe('Revisione: vini calice/bottiglia e portate del percorso non sono «prezzi non attestati»', () => {
+  it('varianti con importo e portate di un percorso con prezzo passano; percorso senza prezzo si segnala una volta', async () => {
+    const { criticalFields } = await import('../cloudflare/functions/_lib/editorial.js');
+    const { readFileSync } = await import('node:fs');
+    const r = read(readFileSync(new URL('./fixtures-email-premium-isonzo.txt', import.meta.url), 'utf8'));
+    assert.deepEqual(criticalFields(r.menu).pricesMissing, []);
+    const noPrice = structuredClone(r.menu); const di = noPrice.sezioni.findIndex((s) => s.tipo === 'degustazione'); delete noPrice.sezioni[di].prezzo;
+    assert.deepEqual(criticalFields(noPrice).pricesMissing, [`sezioni.${di}.prezzo`]);
+    const emptyVariant = structuredClone(r.menu); emptyVariant.sezioni.at(-1).voci[0].prezzi[1].prezzo = '';
+    assert.equal(criticalFields(emptyVariant).pricesMissing.length, 1);
+  });
+});
