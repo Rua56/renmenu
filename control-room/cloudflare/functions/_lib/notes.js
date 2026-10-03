@@ -17,7 +17,7 @@ const PROSE = /\b(?:buongiorno|buonasera|salve|ciao|grazie|cordiali|saluti|disti
  * @param {{ sourceText?: string, uncertain?: string[], extracted?: Array<{name?: string, line?: number}>, mode?: string }} input
  * @returns {Array<{ kind: string, text: string, hint: string, line: number|null }>}
  */
-export function reviewNotes({ sourceText = '', uncertain = [], extracted = [], mode = '', info = null } = {}) {
+export function reviewNotes({ sourceText = '', uncertain = [], extracted = [], mode = '', info = null, corrections = [] } = {}) {
   const plainRow = (r) => norm(String(r).trim());
   const appliedBy = (row) => (info?.applied || []).filter((a) => plainRow(a.source).includes(plainRow(row).slice(0, 60)) || plainRow(row).includes(plainRow(a.source).slice(0, 60)));
   const doubtsBy = (row) => (info?.doubts || []).filter((d) => d.source && (plainRow(d.source).includes(plainRow(row).slice(0, 60)) || plainRow(row).includes(plainRow(d.source).slice(0, 60))));
@@ -40,6 +40,8 @@ export function reviewNotes({ sourceText = '', uncertain = [], extracted = [], m
     const text = String(raw).replace(/^\[da verificare\]\s*/, '');
     const t = norm(text), line = first;
     if (String(raw).startsWith('[da verificare]')) return { kind: 'foto', text, hint: 'Letta in modo diverso dalle due letture della foto: guarda la foto e inseriscila tu.', line };
+    const fix = (corrections || []).find((c) => plainRow(c.source) === plainRow(text) || plainRow(text).includes(plainRow(c.source).slice(0, 60)));
+    if (fix) return { kind: 'inserito', text, hint: `Inserito nel menu: correzione ${fix.name} ${fix.before} → ${fix.after} €. Controlla.`, line };
     const doubts = doubtsBy(raw), done = appliedBy(raw);
     if (doubts.length) return { kind: 'conferma', text, hint: doubts.map((d) => d.doubt).join(' '), line, also: done.length ? ['inserito'] : [] };
     if (done.length) return { kind: 'inserito', text, hint: `Inserito nel menu: ${done.map((a) => `${INFO[a.field]} ${a.field === 'coperto' ? `${a.value} €` : a.field === 'instagram' ? `@${a.value}` : a.value}${a.fixed ? ' (corretto un refuso)' : ''}${a.check ? ` (${a.check})` : ''}`).join(', ')}. Controlla.`, line };

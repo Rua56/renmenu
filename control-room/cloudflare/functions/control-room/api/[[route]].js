@@ -22,6 +22,7 @@ import { noteStatement } from '../../_lib/memory.js';
 import { THEMES, proposeTheme, themeFromText } from '../../_lib/themes.js';
 import { notesSummary, reviewNotes } from '../../_lib/notes.js';
 import { applyVenueInfo, extractVenueInfo } from '../../_lib/venue-info.js';
+import { applyPriceCorrections } from '../../_lib/corrections.js';
 async function draftNotes(db, requestId) {
   try { return parseList((await getOne(db, 'SELECT review_notes_json AS n FROM drafts WHERE request_id=? ORDER BY created_at DESC LIMIT 1', requestId))?.n); }
   catch { return []; }
@@ -490,6 +491,7 @@ export async function action(db, type, input, env = {}) {
     // Menu nuovo: coperto, telefono, orari, Instagram e Facebook scritti dal locale entrano nella bozza
     // (solo se chiari; i dubbi diventano domande). Gli aggiornamenti li gestisce prepareUpdate.
     if (!['aggiornamento', 'sostituzione'].includes(extraction.mode)) {
+      extraction.corrections = applyPriceCorrections(extraction, combinedSource);
       const info = applyVenueInfo(extraction.menu, extractVenueInfo(combinedSource));
       extraction.menu = info.menu;
       extraction.provenance = [...(extraction.provenance || []), ...info.provenance];
@@ -497,7 +499,7 @@ export async function action(db, type, input, env = {}) {
       extraction.info = { applied: info.applied, doubts: info.doubts };
     }
     // Tutto ciò che non è entrato nella bozza, riga per riga e già diviso per tipo.
-    extraction.notes = reviewNotes({ sourceText: combinedSource, uncertain: extraction.uncertain, extracted: extraction.extracted, mode: extraction.mode, info: extraction.info });
+    extraction.notes = reviewNotes({ sourceText: combinedSource, uncertain: extraction.uncertain, extracted: extraction.extracted, mode: extraction.mode, info: extraction.info, corrections: extraction.corrections });
     const id = uid(), timestamp = now(), menuJson = JSON.stringify(extraction.menu);
     await auditedBatch(db, [
       db.prepare('INSERT INTO drafts (id,request_id,slug,menu_json,status,checks_json,provenance_json,review_notes_json,revision,created_at,updated_at) SELECT ?,id,?,?,?,?,?,?,?,?,? FROM requests WHERE id=? AND revision=?')
