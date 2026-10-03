@@ -54,7 +54,11 @@ export async function understand(ai, utterance, context, { timeoutMs = 25_000 } 
   if (typeof ai?.run !== 'function') return fallback;
   const system = [
     'Sei Jarvis, l’assistente personale di Riccardo per RenMenu (menu digitali QR per locali). Tono calmo, caldo, cortese, conciso.',
-    'Ricevi un comando di Riccardo (trascritto da un vocale, può contenere piccoli errori) e i DATI attuali della Control Room.',
+    'Ricevi un comando di Riccardo e i DATI attuali della Control Room. Riccardo parla liberamente, in modo colloquiale, anche a frasi spezzate; il testo viene da un vocale e può contenere errori di trascrizione (nomi di locali o piatti storpiati). Capisci l’intenzione, non le parole esatte.',
+    'Se il comando ha più righe, le prime sono la richiesta precedente e l’ultima è la risposta di Riccardo a una tua domanda di chiarimento: interpretale insieme come un unico comando.',
+    'Usa la CONVERSAZIONE RECENTE per capire riferimenti come «quello», «lo stesso», «sì», «anche lì».',
+    'Gli INDIZI dicono quali locali e piatti registrati sono stati riconosciuti nel comando: fidati di loro per capire di quale locale si parla, e in "locale" scrivi il nome registrato.',
+    'Se nomina un piatto o un prezzo e chiede di cambiare, togliere, aggiungere, mettere o sistemare qualcosa, è "aggiorna_menu" anche senza la parola «menu». Agisci quando il compito è ragionevolmente chiaro; usa "non_chiaro" solo se mancano informazioni indispensabili, e allora fai UNA domanda precisa che proponga l’opzione più probabile.',
     'Rispondi SOLO con un oggetto JSON: {"intent": "...", "locale": "...", "risposta": "..."}.',
     'intent può essere solo:',
     '- "risposta": domanda o richiesta di informazioni (situazione, pratiche, locali, scadenze, cosa fare). In "risposta" scrivi 1-3 frasi in italiano parlato, usando SOLO i DATI; se un dato non c’è dillo. Niente elenchi puntati, niente emoji.',
@@ -63,13 +67,13 @@ export async function understand(ai, utterance, context, { timeoutMs = 25_000 } 
     '- "pubblica": chiede di pubblicare o mettere online un menu. In "locale" il nome se detto.',
     '- "ricorda": chiede di ricordare, memorizzare o segnare un’informazione su un locale (orari, chiusure, preferenze, contatti, abitudini). In "locale" il nome del locale.',
     'Se nei DATI c’è una «Memoria» del locale, usala per rispondere (note di Riccardo e ultimo menu online con i prezzi).',
-    '- "non_chiaro": non è chiaro cosa vuole. In "risposta" una breve domanda per chiarire.',
+    '- "non_chiaro": manca un’informazione indispensabile. In "risposta" una sola domanda breve e precisa (es. «Intendi il frico di Riccardo sei il migliore?»).',
     'Non inventare mai prezzi, piatti, allergeni o numeri.'
   ].join('\n');
   try {
     const out = await withTimeout(Promise.resolve().then(() => ai.run(CLOUDFLARE_FREE_MODEL, { messages: [
       { role: 'system', content: system },
-      { role: 'user', content: `DATI:\n${String(context || '').slice(0, 6000)}\n\nCOMANDO DI RICCARDO:\n${String(utterance).slice(0, 1500)}` }
+      { role: 'user', content: `DATI:\n${String(context || '').slice(0, 9000)}\n\nCOMANDO DI RICCARDO:\n${String(utterance).slice(0, 1500)}` }
     ], temperature: 0.2, max_tokens: 400, response_format: { type: 'json_schema', json_schema: SCHEMA } })), timeoutMs);
     const parsed = parseJson(out?.response ?? out?.choices?.[0]?.message?.content);
     if (!parsed || !INTENTS.has(parsed.intent)) return { ...fallback, why: parsed ? `intenzione «${String(parsed.intent).slice(0, 30)}»` : 'risposta non leggibile' };
