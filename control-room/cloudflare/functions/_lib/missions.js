@@ -8,6 +8,8 @@ import { briefingDue, buildBriefing, romeDay } from './briefing.js';
 import { answerCallback, clearButtons, downloadTelegramFile, sendTelegram, sendVoice, telegramReady } from './telegram.js';
 import { matchVenue, planFromText, speak, transcribe, understand, venueSaid } from './voice.js';
 import { classifyRequest } from './autopilot.js';
+import { slugify } from './menu.js';
+import { memoryContext, memoryFor, menuStatements, noteStatement } from './memory.js';
 
 export const PARTIAL_MARK = '[Testo parziale: leggi l’email completa in Gmail prima di decidere]';
 export const OWNER_REVIEW = 'telegram:riccardo';
@@ -274,6 +276,9 @@ export function createMissions(deps) {
     await auditedBatch(jarvisDb(db), [db.prepare('UPDATE clients SET menu_id=?,menu_url=?,plan=?,payment_status=?,trial_ends_at=?,renewal_at=?,revision=revision+1,updated_at=? WHERE id=?')
       .bind(draft.slug, publicUrl || client.menu_url, plan, payment, trial, renewal, now(), client.id)],
     'client.publish_sync', `Scheda cliente aggiornata dopo la pubblicazione: menu ${draft.slug}${fresh ? `, piano ${PLAN_LABEL[request.plan]}` : ''}.`, request.id).catch(() => {});
+    // Memoria: Jarvis ricorda com'è fatto il menu appena andato online.
+    let menu = null; try { menu = JSON.parse(draft.menu_json); } catch {}
+    if (menu) await db.batch(menuStatements(db, client.id, menu, `pubblicazione ${draft.slug}`)).catch(() => {});
   }
   async function stepVerifying(db, env, mission) {
     if (Date.now() - Date.parse(mission.step_started_at) < 75_000) return mission;
@@ -409,15 +414,39 @@ export function createMissions(deps) {
     if (!heard.ok) { await sendTelegram(env, chat, `Perdona Riccardo, ${heard.reason}. Puoi ripetere?`, null, deps.fetchImpl); return; }
     await converse(db, env, chat, heard.text, true);
   }
-  async function voiceContext(db, env) {
+  // Locali nominati nel comando → la loro memoria (note e ultimo menu online) entra nel contesto.
+  async function mentionedLocales(db, utterance) {
+    const said = `-${String(utterance || '').toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/[^a-z0-9]+/g, '-')}-`;
+    const all = await rows(db, 'SELECT id,name,menu_id FROM clients ORDER BY updated_at DESC LIMIT 200').catch(() => []);
+    return all.filter((client) => {
+      const words = slugify(client.name).split('-').filter((w) => w.length > 2 && !['locale', 'ristorante', 'bar', 'osteria', 'trattoria', 'pizzeria'].includes(w));
+      return words.length && words.every((w) => said.includes(`-${w}-`));
+    }).slice(0, 2);
+  }
+  async function mentionedMemory(db, utterance) {
+    const parts = [];
+    for (const client of await mentionedLocales(db, utterance)) parts.push(memoryContext(client, await memoryFor(db, client.id).catch(() => [])));
+    return parts.join('\n\n');
+  }
+  async function voiceRemember(db, utterance, spokenVenue) {
+    const all = await rows(db, 'SELECT id,name,menu_id FROM clients ORDER BY name LIMIT 200');
+    const found = spokenVenue ? matchVenue(spokenVenue, all) : { client: null, candidates: [] };
+    const named = found.client || (await mentionedLocales(db, utterance)).find((c, i, list) => list.length === 1) || null;
+    if (!named) return found.candidates.length > 1 ? `Più locali corrispondono: ${found.candidates.map((c) => c.name).join(', ')}. Di quale parliamo?` : 'Di quale locale devo ricordarlo, Riccardo? Dimmi il nome com’è registrato.';
+    const note = String(utterance).replace(/^\s*(?:ok\s+)?(?:jarvis[,\s]+)?(?:per favore\s+)?(?:ricorda(?:ti)?|memorizza|segna(?:ti)?|annota(?:ti)?)\s+(?:che\s+)?/i, '').trim();
+    await auditedBatch(jarvisDb(db), [noteStatement(db, named.id, note || utterance, 'Telegram (Riccardo)')], 'memory.note', `Jarvis ricorda una nuova nota su ${named.name}.`, null);
+    return `D’accordo, lo ricorderò per «${named.name}».`;
+  }
+  async function voiceContext(db, env, utterance = '') {
     const brief = await buildBriefing(db, env, { fetchImpl: deps.fetchImpl }).catch(() => '');
     const clients = await rows(db, "SELECT name,menu_id,plan,trial_ends_at,renewal_at FROM clients WHERE menu_id IS NOT NULL AND menu_id<>'' ORDER BY name LIMIT 60").catch(() => []);
     const open = await rows(db, "SELECT subject,status FROM requests WHERE status NOT IN ('completata','archiviata','chiusa') ORDER BY updated_at DESC LIMIT 15").catch(() => []);
-    return `${brief}\n\nLocali con menu online: ${clients.map((c) => `${c.name} (menu ${c.menu_id}, piano ${c.plan}${c.trial_ends_at ? `, prova fino al ${String(c.trial_ends_at).slice(0, 10)}` : ''}${c.renewal_at ? `, rinnovo ${String(c.renewal_at).slice(0, 10)}` : ''})`).join('; ') || 'nessuno'}.\nPratiche aperte: ${open.map((r) => `${r.subject} [${r.status}]`).join('; ') || 'nessuna'}.`;
+    const memory = await mentionedMemory(db, utterance);
+    return `${brief}${memory ? `\n\n${memory}` : ''}\n\nLocali con menu online: ${clients.map((c) => `${c.name} (menu ${c.menu_id}, piano ${c.plan}${c.trial_ends_at ? `, prova fino al ${String(c.trial_ends_at).slice(0, 10)}` : ''}${c.renewal_at ? `, rinnovo ${String(c.renewal_at).slice(0, 10)}` : ''})`).join('; ') || 'nessuno'}.\nPratiche aperte: ${open.map((r) => `${r.subject} [${r.status}]`).join('; ') || 'nessuna'}.`;
   }
   async function converse(db, env, chat, utterance, spoken) {
     const said = spoken ? `«${utterance}»\n\n` : '';
-    const intent = await understand(env.AI, utterance, await voiceContext(db, env));
+    const intent = await understand(env.AI, utterance, await voiceContext(db, env, utterance));
     // Registro minimo per capire gli errori (senza il testo del comando).
     await auditedBatch(jarvisDb(db), [], 'jarvis.conversation', `Comando ${spoken ? 'vocale' : 'scritto'}: ${intent.intent}${intent.why ? ` (${intent.why})` : ''}.`, null).catch(() => {});
     if (intent.intent === 'risposta' && intent.risposta) { await reply(db, env, chat, `${said}${intent.risposta}`, spoken); return; }
@@ -430,6 +459,7 @@ export function createMissions(deps) {
       await reply(db, env, chat, `${said}«${pick.name}» è pronto. Per sicurezza la pubblicazione la confermi tu col pulsante.`, spoken, [['SÌ, pubblica', `pub:${pick.id}`], ['Non ancora', `no:${pick.id}`]]);
       return;
     }
+    if (intent.intent === 'ricorda') { await reply(db, env, chat, `${said}${await voiceRemember(db, utterance, intent.locale)}`, spoken); return; }
     if (intent.intent === 'crea_pratica') { await reply(db, env, chat, `${said}${await voiceCreate(db, utterance, intent.locale)}`, spoken); return; }
     if (intent.intent === 'aggiorna_menu') { await reply(db, env, chat, `${said}${await voiceUpdate(db, env, utterance, intent.locale)}`, spoken); return; }
     await reply(db, env, chat, `${said}${intent.risposta || 'Non sono sicuro di aver capito, Riccardo. Puoi ripetere con altre parole?'}`, spoken);

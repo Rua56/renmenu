@@ -18,6 +18,7 @@ import { translateMenu, translationEntries, translationSummary } from '../../_li
 import { applyExtras, proposeSourceExtras } from '../../_lib/extras.js';
 import { autopilotMessage, autopilotPreview } from '../../_lib/autopilot.js';
 import { createMissions } from '../../_lib/missions.js';
+import { noteStatement } from '../../_lib/memory.js';
 import { getMe, randomToken, sendTelegram, sendVoice, setWebhook, telegramReady } from '../../_lib/telegram.js';
 import { ACTIVATIONS, approvalEvidence, approvalState, assessReply, previewEmail, previewUrl, proposeReplyChanges, referenceCode, sha256Hex } from '../../_lib/approvals.js';
 const headers = { 'Cache-Control': 'private, no-store', 'Content-Type': 'application/json; charset=utf-8' };
@@ -239,6 +240,7 @@ export async function state(db, env = {}) {
         ? proposeSourceExtras(requests.find((entry) => entry.id === draft.requestId)?.sourceText, JSON.parse(menuJson)) : [] })),
     notifications, messages, audit, autopilotPending: (await autopilotPending(db)).length,
     missions: await missionRows(db),
+    venueMemory: await rows(db, 'SELECT id,client_id AS clientId,kind,text,source,created_at AS createdAt FROM venue_memory WHERE archived_at IS NULL ORDER BY created_at DESC LIMIT 400').catch(() => []),
     telegram: { configured: telegramReady(env), linked: Boolean(await missions.setting(db, 'telegram_chat_id')) },
     voice: { provider: (await missions.setting(db, 'voice_provider')) || '', voiceId: (await missions.setting(db, 'voice_id')) || '', hasKey: Boolean(await missions.setting(db, 'voice_api_key')) },
     proposals: proposals.map(({ diffJson, ...p }) => ({ ...p, diff: JSON.parse(diffJson) })),
@@ -976,6 +978,16 @@ export async function action(db, type, input, env = {}) {
       ], 'material.read.jarvis', `Jarvis ha letto «${material.filename}»: ${read.warnings[0]}`.slice(0, 600), request.id);
       result = { ok: true, agreed: read.agreed ?? null, doubts: read.doubts ?? 0, method: read.method, warnings: read.warnings };
     }
+  } else if (type === 'addVenueNote') {
+    const clientId = identifier(p.clientId);
+    const client = await getOne(db, 'SELECT name FROM clients WHERE id=?', clientId);
+    assert(client, 'Cliente non trovato.', 404);
+    await auditedBatch(db, [noteStatement(db, clientId, p.text, 'Control Room (Riccardo)')], 'memory.note', `Jarvis ricorda una nuova nota su ${client.name}.`, null);
+  } else if (type === 'forgetVenueNote') {
+    const id = identifier(p.id);
+    const note = await getOne(db, "SELECT m.id,c.name FROM venue_memory m JOIN clients c ON c.id=m.client_id WHERE m.id=? AND m.kind='nota' AND m.archived_at IS NULL", id);
+    assert(note, 'Nota non trovata.', 404);
+    await auditedBatch(db, [db.prepare('UPDATE venue_memory SET archived_at=? WHERE id=?').bind(now(), id)], 'memory.forget', `Nota dimenticata su ${note.name}.`, null);
   } else if (type === 'archiveMaterial') {
     const id = identifier(p.id);
     assert(p.confirmation === 'ARCHIVIA MATERIALE', 'Conferma archiviazione mancante.', 403);
