@@ -15,7 +15,7 @@ import { sendOwnerNotification, OWNER_NOTIFICATION_RECIPIENT } from '../../_lib/
 import { purgePublishedEmail } from '../../_lib/email-retention.js';
 import { resolveCategory, draftBlocker, PLAN_RULES } from '../../_lib/service-rules.js';
 import { translateMenu, translationEntries, translationSummary } from '../../_lib/translate.js';
-import { applyExtras, proposeSourceExtras } from '../../_lib/extras.js';
+import { allExtras, applyExtras, proposeSourceExtras } from '../../_lib/extras.js';
 import { autopilotMessage, autopilotPreview } from '../../_lib/autopilot.js';
 import { createMissions } from '../../_lib/missions.js';
 import { noteStatement } from '../../_lib/memory.js';
@@ -261,7 +261,7 @@ export async function state(db, env = {}) {
     drafts: rawDrafts.map(({ menuJson, checksJson, provenanceJson, reviewNotesJson, creativeJson, ...draft }) => ({ ...draft, creative: parseCreative(creativeJson), menu: JSON.parse(menuJson), checks: JSON.parse(checksJson), provenance: parseList(provenanceJson), notes: parseList(reviewNotesJson),
       versions: versions.filter((version) => version.draftId === draft.id).map(({ menuJson: json, ...v }) => ({ ...v, menu: JSON.parse(json) })),
       sourceExtras: ['bozza', 'revisione', 'pronta_pr'].includes(draft.status)
-        ? proposeSourceExtras(requests.find((entry) => entry.id === draft.requestId)?.sourceText, JSON.parse(menuJson)) : [] })),
+        ? allExtras(requests.find((entry) => entry.id === draft.requestId)?.sourceText, JSON.parse(menuJson)) : [] })),
     notifications, messages, audit, autopilotPending: (await autopilotPending(db)).length,
     missions: await missionRows(db),
     venueMemory: await rows(db, 'SELECT id,client_id AS clientId,kind,text,source,created_at AS createdAt FROM venue_memory WHERE archived_at IS NULL ORDER BY created_at DESC LIMIT 400').catch(() => []),
@@ -770,9 +770,9 @@ export async function action(db, type, input, env = {}) {
     const linkedRequest = await getOne(db, 'SELECT revision,source_text FROM requests WHERE id=?', draft.request_id);
     const menu = JSON.parse(draft.menu_json);
     const chosen = new Set(Array.isArray(p.accept) ? p.accept.map(String) : []);
-    const selected = proposeSourceExtras(linkedRequest.source_text, menu).filter((entry) => entry.type !== 'manuale' && chosen.has(entry.id));
+    const selected = allExtras(linkedRequest.source_text, menu).filter((entry) => entry.type !== 'manuale' && chosen.has(entry.id));
     assert(selected.length, 'Seleziona almeno un dato da inserire.', 422);
-    const applied = applyExtras(menu, selected, (entry) => `riga ${entry.line}`);
+    const applied = applyExtras(menu, selected, (entry) => (entry.line ? `riga ${entry.line}` : 'numeri allergeni scritti dal locale sotto il piatto'));
     const validation = validateMenu(applied.menu);
     assert(!validation.errors.length, `Menù non valido: ${validation.errors.slice(0, 3).join(' ')}`);
     const paths = new Set(applied.provenance.map((row) => row.path));

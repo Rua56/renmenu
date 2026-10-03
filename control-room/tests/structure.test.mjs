@@ -144,6 +144,18 @@ describe('Foto: due letture anche con nomi, descrizioni, calici e percorsi', () 
   });
 });
 
+describe('Foto reali «Il Culo di Alex» (letture dal vivo del 3 ottobre)', () => {
+  it('nome in maiuscolo da una lettura: si tiene quello normale; avvisi della foto mai persi', () => {
+    const c = combineReadings('# I Primi\nFregola e Polipetti — 15\n> con crema di zucchine, verdure croccanti (1-4-7)',
+      '# I PRIMI\n\nFREGOLA E POLIPETTI — 15\n> CON CREMA DI ZUCCHINE, VERDURE CROCCANTI (1-4-7)\n\nTUTTE LE NOSTRE PASTE, FRESCHE, SONO FATTE IN CASA E TIRATE RIGOROSAMENTE AL MATTARELLO');
+    assert.equal(c.agreed, 1);
+    assert.match(c.text, /^# I Primi\nFregola e Polipetti — 15,00\n> con crema di zucchine, verdure croccanti \(1-4-7\)/);
+    assert.match(c.text, /\[da verificare\] Testo sulla foto \(non è un piatto\): «TUTTE LE NOSTRE PASTE/);
+    const d = combineReadings('# Primi\nFREGOLA — 15', '# I PRIMI\nFregola — 15');
+    assert.equal(d.text, '# Primi\nFregola — 15,00');
+  });
+});
+
 describe('Note, traduzioni e Revisione', () => {
   it('note: etichette dedotte da confermare, voci con più prezzi e percorsi elencati', () => {
     const r = read('# Percorso degustazione — 55 € a persona\nFrico\nCjarsons\n# Vini\nRibolla — calice 5 / bottiglia 40\nFriulano 5/30');
@@ -158,5 +170,19 @@ describe('Note, traduzioni e Revisione', () => {
     assert.ok(paths.includes('sezioni.0.unita'));
     assert.ok(paths.includes('sezioni.1.voci.0.prezzi.0.etichetta'));
     assert.ok(paths.includes('sezioni.1.voci.0.prezzi.1.etichetta'));
+  });
+});
+
+describe('Numeri degli allergeni scritti sotto i piatti', () => {
+  it('proposte non preselezionate, solo numeri UE validi, mai su piatti con allergeni già inseriti', async () => {
+    const { proposeMenuAllergens, applyExtras } = await import('../cloudflare/functions/_lib/extras.js');
+    const r = read('Primi\nFregola e Polipetti 15\ncon crema di zucchine (1-4-7)\nGnocchi 14\ncon burro (1-3-27)\nRisotto 17\ncon cozze (3-9-14)');
+    r.menu.sezioni[0].voci[2].allergeni = ['14'];
+    const proposals = proposeMenuAllergens(r.menu);
+    assert.deepEqual(proposals.map((p) => [p.name, p.codes.join(','), p.legend]), [['Fregola e Polipetti', '1,4,7', true]]);
+    const applied = applyExtras(r.menu, proposals, () => 'numeri allergeni scritti dal locale sotto il piatto');
+    assert.deepEqual(applied.menu.sezioni[0].voci[0].allergeni, ['1', '4', '7']);
+    const notes = structureNotes(r);
+    assert.equal(notes.filter((n) => n.kind === 'allergeni').length, 1);
   });
 });
