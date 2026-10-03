@@ -99,6 +99,8 @@ export function createMissions(deps) {
     const existing = await getOne(db, 'SELECT * FROM jarvis_missions WHERE request_id=?', draft.request_id);
     if (existing && ACTIVE.includes(existing.status)) throw Object.assign(new Error('Jarvis sta già seguendo questa pratica.'), { status: 409 });
     const request = await getOne(db, 'SELECT r.*,c.email AS client_email FROM requests r JOIN clients c ON c.id=r.client_id WHERE r.id=?', draft.request_id);
+    if (['completata', 'archiviata', 'chiusa'].includes(request.status) || existing?.status === 'completata')
+      throw Object.assign(new Error('Questo menu è già pubblicato: per modificarlo apri una pratica di aggiornamento (o dimmelo su Telegram).'), { status: 409 });
     if (request.kind === 'nuovo' && !ACTIVATION_BY_PLAN[request.plan]) throw Object.assign(new Error('Piano non confermato: scegli Standard, Annuale o Premium prima di affidare la pratica.'), { status: 422 });
     const pendingReply = await getOne(db, "SELECT 1 AS x FROM publication_approvals WHERE draft_id=? AND status='risposta_ricevuta'", draftId);
     if (pendingReply) throw Object.assign(new Error('C’è una risposta del locale ancora da decidere: valutala in Approvazioni, poi affida di nuovo.'), { status: 422 });
