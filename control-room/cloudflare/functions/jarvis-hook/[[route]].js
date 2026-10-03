@@ -10,6 +10,14 @@ const reply = (body, status = 200) => new Response(JSON.stringify(body), { statu
 export async function onRequest(context) {
   const { request, env } = context;
   const path = new URL(request.url).pathname.replace(/\/+$/, '');
+  // Link breve dell'anteprima per Riccardo su Telegram (il link completo supera il limite dei messaggi).
+  const short = path.match(/^\/jarvis-hook\/anteprima\/(RM-[A-Z0-9]{4,12})$/);
+  if (request.method === 'GET' && short && env.DB?.prepare) {
+    let row = null;
+    try { row = await env.DB.prepare("SELECT preview_url FROM publication_approvals WHERE reference_code=? AND recipient='telegram:riccardo' AND status IN ('anteprima_inviata','risposta_ricevuta','approvata_cliente')").bind(short[1]).first(); } catch { row = null; }
+    if (!row?.preview_url) return new Response('Anteprima non più disponibile.', { status: 404, headers: { 'Content-Type': 'text/plain; charset=utf-8', 'Cache-Control': 'no-store' } });
+    return new Response(null, { status: 302, headers: { Location: row.preview_url, 'Cache-Control': 'no-store', 'Referrer-Policy': 'no-referrer' } });
+  }
   if (request.method !== 'POST' || !env.DB?.prepare) return reply({ ok: false }, 404);
   try {
     if (path === '/jarvis-hook/telegram') {
