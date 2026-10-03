@@ -239,12 +239,15 @@ describe('Percorso di approvazione nella API staging', () => {
     } finally { db.close(); }
   });
 
-  it('inserisce coperto e allergeni scritti nella richiesta solo se scelti, con la riga come fonte', async () => {
+  it('coperto scritto nella richiesta già in bozza; allergeni inseriti solo se scelti, con la riga come fonte', async () => {
     const db = database();
     try {
       const { draft } = await setup(db, { sourceText: '## Primi\nGnocchi — 12,00\nCoperto 2,50 €\nGli gnocchi contengono glutine e uova.' });
       const extras = draft.sourceExtras;
-      assert.deepEqual(extras.map((p) => p.type), ['coperto', 'allergeni']);
+      assert.equal(draft.menu.coperto, '2,50', 'coperto scritto chiaramente: Jarvis lo inserisce');
+      assert.ok(draft.provenance.some((row) => row.path === 'coperto' && row.source === 'riga 3'));
+      assert.ok(draft.notes.some((n) => n.kind === 'inserito' && /Coperto 2,50/.test(n.hint)));
+      assert.deepEqual(extras.map((p) => p.type), ['allergeni']);
       const applied = await action(db, 'applySourceExtras', { draftId: draft.id, revision: draft.revision, accept: extras.map((p) => p.id) });
       assert.equal(applied.status, 200, String(applied.body.error));
       const saved = applied.body.state.drafts[0];

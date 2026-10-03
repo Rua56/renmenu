@@ -3,7 +3,7 @@ const PRICE = /^\d+(?:[,.]\d{1,2})?$/;
 const TAGS = new Set(['veg', 'vegan', 'spicy', 'gf', 'new', 'top', 'frozen']);
 const LEGACY = new Set(['hot', 'riserva']);
 const LANGS = new Set(['it', 'en', 'de', 'fr', 'es']);
-const PUBLIC_ROOT = new Set(['id', 'nome', 'sottotitolo', 'indirizzo', 'telefono', 'instagram', 'maps', 'orari', 'wifi', 'avviso', 'coperto', 'note', 'tema', 'sezioni', 'lingue', 'url', 'sito', 'website']);
+const PUBLIC_ROOT = new Set(['id', 'nome', 'sottotitolo', 'indirizzo', 'telefono', 'instagram', 'facebook', 'maps', 'orari', 'wifi', 'avviso', 'coperto', 'note', 'tema', 'sezioni', 'lingue', 'url', 'sito', 'website']);
 const PUBLIC_SECTION = new Set(['nome', 'descrizione', 'voci']);
 const PUBLIC_ITEM = new Set(['nome', 'descrizione', 'prezzo', 'allergeni', 'tag']);
 const text = (value) => typeof value === 'string' ? value.trim() : value && typeof value === 'object' && !Array.isArray(value) ? Object.values(value).some((item) => typeof item === 'string' && item.trim()) : false;
@@ -27,7 +27,7 @@ export function validateMenu(menu) {
   allowed(menu, PUBLIC_ROOT, 'menu');
   for (const key of ['nome', 'sottotitolo', 'orari', 'avviso', 'note']) if (key in menu) publicText(menu[key], `menu.${key}`);
   if ('tema' in menu && !['bordeaux', 'trattoria', 'mare', 'terracotta', 'notte', 'sole'].includes(menu.tema)) errors.push('menu.tema: usa bordeaux, trattoria, mare, terracotta, notte o sole.');
-  for (const key of ['indirizzo', 'telefono', 'instagram', 'maps', 'wifi', 'coperto', 'url', 'sito', 'website'])
+  for (const key of ['indirizzo', 'telefono', 'instagram', 'facebook', 'maps', 'wifi', 'coperto', 'url', 'sito', 'website'])
     if (key in menu && typeof menu[key] !== 'string') errors.push(`menu.${key}: serve testo pubblico, non un oggetto tecnico.`);
   for (const [si, section] of (Array.isArray(menu.sezioni) ? menu.sezioni : []).entries()) {
     allowed(section, PUBLIC_SECTION, `sezioni.${si}`);
@@ -217,6 +217,9 @@ export function extractMenuFromText(venue, source, requestedSlug) {
       }
       continue;
     }
+    // Coperto, telefono, orari e social non sono piatti: li gestisce venue-info.js.
+    if (/^(?:il\s+)?coperto\b/i.test(row)) { unknown.push(row.slice(0, 220)); continue; }
+    if (/^(?:orari\w*|pranzo|cena|aperti|apertura|chiusi|chiuso|tutti i giorni|dal\s|lun|mar|mer|gio|ven|sab|dom)\b.*\d{1,2}(?:[:.]\d{2})?\s*[-–]\s*\d{1,2}/i.test(row)) { unknown.push(row.slice(0, 220)); continue; }
     const special = specialPriceRow(row);
     if (special) {
       const item = { nome: { it: special.name } };

@@ -21,6 +21,7 @@ import { createMissions } from '../../_lib/missions.js';
 import { noteStatement } from '../../_lib/memory.js';
 import { THEMES, proposeTheme, themeFromText } from '../../_lib/themes.js';
 import { notesSummary, reviewNotes } from '../../_lib/notes.js';
+import { applyVenueInfo, extractVenueInfo } from '../../_lib/venue-info.js';
 async function draftNotes(db, requestId) {
   try { return parseList((await getOne(db, 'SELECT review_notes_json AS n FROM drafts WHERE request_id=? ORDER BY created_at DESC LIMIT 1', requestId))?.n); }
   catch { return []; }
@@ -486,8 +487,17 @@ export async function action(db, type, input, env = {}) {
       extraction.menu.tema = theme.tema;
       extraction.warnings.push(`Tema grafico proposto: ${THEMES[theme.tema]} (${theme.why}). Puoi cambiarlo in Revisione.`);
     }
+    // Menu nuovo: coperto, telefono, orari, Instagram e Facebook scritti dal locale entrano nella bozza
+    // (solo se chiari; i dubbi diventano domande). Gli aggiornamenti li gestisce prepareUpdate.
+    if (!['aggiornamento', 'sostituzione'].includes(extraction.mode)) {
+      const info = applyVenueInfo(extraction.menu, extractVenueInfo(combinedSource));
+      extraction.menu = info.menu;
+      extraction.provenance = [...(extraction.provenance || []), ...info.provenance];
+      extraction.warnings = [...extraction.warnings.map((w) => (w.startsWith('Allergeni, ingredienti, coperto, contatti') ? 'Allergeni e ingredienti non sono stati dedotti; traduzioni da verificare.' : w)), ...info.warnings];
+      extraction.info = { applied: info.applied, doubts: info.doubts };
+    }
     // Tutto ciò che non è entrato nella bozza, riga per riga e già diviso per tipo.
-    extraction.notes = reviewNotes({ sourceText: combinedSource, uncertain: extraction.uncertain, extracted: extraction.extracted, mode: extraction.mode });
+    extraction.notes = reviewNotes({ sourceText: combinedSource, uncertain: extraction.uncertain, extracted: extraction.extracted, mode: extraction.mode, info: extraction.info });
     const id = uid(), timestamp = now(), menuJson = JSON.stringify(extraction.menu);
     await auditedBatch(db, [
       db.prepare('INSERT INTO drafts (id,request_id,slug,menu_json,status,checks_json,provenance_json,review_notes_json,revision,created_at,updated_at) SELECT ?,id,?,?,?,?,?,?,?,?,? FROM requests WHERE id=? AND revision=?')
@@ -496,7 +506,7 @@ export async function action(db, type, input, env = {}) {
         .bind(uid(), id, 1, menuJson, extraction.mode === 'aggiornamento' || extraction.mode === 'sostituzione' ? `menu_online_${extraction.mode}` : 'estrazione_deterministica', timestamp),
       db.prepare("UPDATE requests SET status='in_revisione',plan=COALESCE(?,plan),revision=revision+1,updated_at=? WHERE id=? AND revision=? AND EXISTS (SELECT 1 FROM drafts WHERE id=?)")
         .bind(inheritedPlan, timestamp, requestId, request.revision, id)
-    ], 'draft.generate', `Bozza da ${extraction.extracted.length} voci attestate; ${extraction.notes.filter((n) => n.kind !== 'testo').length} cose da sistemare a mano${extraction.notes.some((n) => n.kind === 'testo') ? ` (più ${extraction.notes.filter((n) => n.kind === 'testo').length} righe di testo dell’email)` : ''}.`, requestId,
+    ], 'draft.generate', `Bozza da ${extraction.extracted.length} voci attestate${extraction.info?.applied?.length ? `, ${extraction.info.applied.length} informazioni del locale inserite` : ''}; ${extraction.notes.filter((n) => !['testo', 'inserito'].includes(n.kind)).length} cose da sistemare o confermare${extraction.notes.some((n) => n.kind === 'testo') ? ` (più ${extraction.notes.filter((n) => n.kind === 'testo').length} righe di testo dell’email)` : ''}.`, requestId,
       { sql: 'SELECT 1 FROM drafts WHERE id=?', args: [id] });
     result = { id, extraction };
   } else if (type === 'preparePreview') {

@@ -2,6 +2,11 @@
  * i locali registrati e i piatti dei loro menu, e da parole chiave intuisce il compito. Sono solo
  * indizi: non inventano mai prezzi o piatti e non eseguono nulla da soli. */
 
+import { fixTypos } from './typos.js';
+
+// Parole dei comandi: con un refuso («agiungi», «toglii», «pubblca», «copreto») valgono lo stesso.
+const COMMAND_WORDS = ['aggiungi', 'aggiungere', 'togli', 'togliere', 'rimuovi', 'elimina', 'cambia', 'cambiare', 'modifica', 'modificare', 'sostituisci', 'inserisci', 'metti', 'mettere', 'alza', 'abbassa', 'aumenta', 'prezzo', 'prezzi', 'costa', 'coperto', 'telefono', 'numero', 'orari', 'orario', 'aperti', 'chiusi', 'instagram', 'facebook', 'pubblica', 'pubblicare', 'ricorda', 'ricordati', 'memorizza', 'annota', 'esaurito', 'finito', 'terminato', 'disponibile', 'tema', 'colori', 'grafica', 'pratica', 'cliente', 'nuovo', 'nuova', 'crea', 'registra'];
+
 const STOP = new Set(['con', 'alla', 'alle', 'allo', 'agli', 'dal', 'della', 'delle', 'dello', 'degli', 'del', 'nel', 'nella', 'sul', 'sulla', 'una', 'uno', 'gli', 'per', 'tra', 'fra', 'che', 'locale', 'ristorante', 'bar', 'osteria', 'trattoria', 'pizzeria', 'menu']);
 
 export const words = (value) => String(value || '').toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '')
@@ -75,7 +80,7 @@ const RX = {
   pubblica: /\b(pubblic\w*|metti\w*\s+online|mandal\w*\s+online|vai\s+online|online\s+subito)\b/,
   ricorda: /\b(ricorda\w*\s+che|memorizz\w*|segna\w*\s+che|segnat\w*|annota\w*|tieni\s+a\s+mente|prendi\s+nota)\b/,
   crea: /\b(crea\w*|apri\w*|nuov[ao]|registra\w*|inizia\w*)\b.*\b(pratica|cliente|menu|locale)\b/,
-  modifica: /\b(\d+(?:[.,]\d+)?|euro|€|(?:uno|due|tre|quattro|cinque|sei|sette|otto|nove|dieci|undici|dodici|tredici|quattordici|quindici|sedici|diciassette|diciotto|diciannove|venti\w*|trenta\w*|quaranta\w*|cinquanta)|alz\w*|port\w*\s+a|prezz\w*|cost\w*|aument\w*|abbass\w*|scont\w*|togli\w*|tolg\w*|rimuov\w*|elimin\w*|aggiung\w*|inserisc\w*|metti\w*|cambi\w*|modific\w*|sostitu\w*|coperto|tema|temi|color\w*|grafica|finit\w*|esaurit\w*|terminat\w*|non\b[a-z ]{0,30}\bpiu)\b/,
+  modifica: /\b(\d+(?:[.,]\d+)?|euro|€|(?:uno|due|tre|quattro|cinque|sei|sette|otto|nove|dieci|undici|dodici|tredici|quattordici|quindici|sedici|diciassette|diciotto|diciannove|venti\w*|trenta\w*|quaranta\w*|cinquanta)|alz\w*|port\w*\s+a|prezz\w*|cost\w*|aument\w*|abbass\w*|scont\w*|togli\w*|tolg\w*|rimuov\w*|elimin\w*|aggiung\w*|inserisc\w*|metti\w*|cambi\w*|modific\w*|sostitu\w*|coperto|tema|temi|color\w*|grafica|telefon\w*|numero|orari\w*|apert\w*|chius\w*|instagram|facebook|finit\w*|esaurit\w*|terminat\w*|non\b[a-z ]{0,30}\bpiu)\b/,
   domanda: /\?|\b(quant[oiae]|quale|quali|come|cosa|quando|dove|perch\w*|dimmi|sai|mostra\w*|elenca\w*|situazione|riepilog\w*)\b/
 };
 
@@ -83,12 +88,12 @@ const RX = {
 export function guessIntent(text, { locales = [], dishes = [] } = {}) {
   // Il nome del locale non conta come parola chiave («Riccardo sei il migliore» non è il numero sei).
   const names = new Set(locales.flatMap((c) => keyWords(c.name)));
-  const t = words(text).filter((w) => !names.has(w)).join(' ');
+  const t = words(fixTypos(text, COMMAND_WORDS, names)).filter((w) => !names.has(w)).join(' ');
   const venue = locales[0]?.name || dishes[0]?.client?.name || '';
   if (RX.ricorda.test(t)) return { intent: 'ricorda', locale: venue };
   if (RX.crea.test(t) && !dishes.length) return { intent: 'crea_pratica', locale: '' };
   if (RX.pubblica.test(t)) return { intent: 'pubblica', locale: venue };
-  if (RX.domanda.test(String(text).toLowerCase()) && !/\b(cambi|togli|aggiung|metti|aument|abbass|alz)\w*/.test(t)) return { intent: 'risposta', locale: venue };
+  if (RX.domanda.test(String(text).toLowerCase()) && !/\b(cambi|togli|aggiung|metti|aument|abbass|alz|inserisc|aggiorn)\w*/.test(t)) return { intent: 'risposta', locale: venue };
   if ((venue || dishes.length) && RX.modifica.test(t)) return { intent: 'aggiorna_menu', locale: venue };
   return { intent: venue || dishes.length ? 'ambiguo' : 'non_chiaro', locale: venue };
 }
