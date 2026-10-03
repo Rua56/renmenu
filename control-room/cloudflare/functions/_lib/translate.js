@@ -23,9 +23,11 @@ export function translationEntries(menu, lang = 'en') {
   for (const [si, section] of (menu?.sezioni || []).entries()) {
     add(`sezioni.${si}.nome`, section?.nome);
     if (section && 'descrizione' in section) add(`sezioni.${si}.descrizione`, section.descrizione);
+    if (section && 'unita' in section) add(`sezioni.${si}.unita`, section.unita);
     for (const [vi, item] of (section?.voci || []).entries()) {
       add(`sezioni.${si}.voci.${vi}.nome`, item?.nome);
       if (item && 'descrizione' in item) add(`sezioni.${si}.voci.${vi}.descrizione`, item.descrizione);
+      for (const [pi, variant] of (item?.prezzi || []).entries()) if (variant && 'etichetta' in variant) add(`sezioni.${si}.voci.${vi}.prezzi.${pi}.etichetta`, variant.etichetta);
     }
   }
   return entries;

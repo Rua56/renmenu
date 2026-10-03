@@ -1,4 +1,4 @@
-import { notesSummary, reviewNotes } from './notes.js';
+import { notesSummary, reviewNotes, structureNotes } from './notes.js';
 import { applyVenueInfo, extractVenueInfo } from './venue-info.js';
 // Autopilota di Jarvis (2026-10-02): appena arriva una richiesta email, Jarvis la classifica
 // e, se il locale ha scritto in modo esplicito nome e piano di un nuovo menu, prepara da solo
@@ -98,7 +98,7 @@ export function autopilotPreview(request) {
     categoryLabel: plan.proposal.category ? categoryByCode(plan.proposal.category).label : plan.proposal.kind === 'nuovo' ? 'Nuovo menu (piano da scegliere)' : null,
     plan: plan.proposal.plan, venue: plan.proposal.venue, reasons: reasonText(plan.proposal),
     items: extraction.extracted.length, uncertain: extraction.uncertain.length,
-    notes: reviewNotes({ sourceText: text, uncertain: extraction.uncertain, extracted: extraction.extracted, info: applyVenueInfo(extraction.menu, extractVenueInfo(text)) }),
+    notes: [...reviewNotes({ sourceText: text, uncertain: extraction.uncertain, extracted: extraction.extracted, info: applyVenueInfo(extraction.menu, extractVenueInfo(text)) }), ...structureNotes(extraction)],
     brief: plan.proposal.plan === 'premium' ? briefLines(creativeBrief(text, { attachments: Number(request.attachments || 0) })) : [],
     extras: extras.filter((entry) => entry.type !== 'manuale').map((entry) => (entry.type === 'coperto' ? `coperto ${entry.value}` : `allergeni ${entry.name}`))
   };
