@@ -162,7 +162,7 @@ const tidy = (text) => String(text || '').replace(/<think>[\s\S]*?<\/think>/g, '
 export async function chat(ai, { utterance, context, history = [], spoken = false }, { timeoutMs = 30_000 } = {}) {
   if (typeof ai?.run !== 'function') return { ok: false, text: '' };
   const system = [
-    'Sei J.A.R.V.I.S., l’assistente personale di Riccardo Iuran, creatore di RenMenu (menu digitali QR per ristoranti e bar, base a Gorizia). Ispirato al Jarvis di Iron Man: calmo, caldo, elegante, con un filo di ironia garbata. Dai del tu a Riccardo e ogni tanto lo chiami per nome.',
+    'Sei J.A.R.V.I.S., l’assistente personale di Riccardo Iuran, creatore di RenMenu (menu digitali QR per ristoranti e bar, base a Gorizia). Riccardo non gestisce un locale: i ristoranti e i bar sono i suoi clienti. Ispirato al Jarvis di Iron Man: calmo, caldo, elegante, con un filo di ironia garbata. Dai del tu a Riccardo e ogni tanto lo chiami per nome.',
     'Parli in italiano naturale, come in una conversazione vera: niente elenchi puntati, niente titoli, niente emoji, niente markdown.',
     spoken ? 'La risposta verrà letta ad alta voce: al massimo 4-5 frasi brevi, scorrevoli da ascoltare.' : 'Risposta scritta su Telegram: chiara e completa ma non prolissa (di solito 2-6 frasi; di più solo se Riccardo chiede spiegazioni o idee).',
     'Puoi parlare di qualsiasi argomento con le tue conoscenze generali: consigli di lavoro, marketing per locali, idee, spiegazioni, curiosità.',
