@@ -81,7 +81,11 @@ export function notesSummary(notes, max = 6, { preview = false } = {}) {
 
 /** Note sulle strutture lette (più prezzi, percorsi, descrizioni): cosa confermare, mai in silenzio. */
 export function structureNotes(extraction = {}) {
-  const notes = (extraction.confirm || []).map((c) => ({ kind: 'conferma', text: String(c.text || '').slice(0, 220), hint: c.hint, line: c.line ?? null }));
+  const confirm = extraction.confirm || [];
+  const notes = confirm.filter((c) => c.type !== 'allergeni').map((c) => ({ kind: 'conferma', text: String(c.text || '').slice(0, 220), hint: c.hint, line: c.line ?? null }));
+  // Numeri di allergeni sotto i piatti: una nota sola, con la proposta già pronta nel riquadro dei dati del locale.
+  const numbered = confirm.filter((c) => c.type === 'allergeni');
+  if (numbered.length) notes.push({ kind: 'allergeni', text: numbered.slice(0, 5).map((c) => c.name).join(', ') + (numbered.length > 5 ? '…' : ''), hint: `Il locale ha scritto i numeri degli allergeni sotto ${numbered.length} piatti: sono nella descrizione. Se la legenda del menu segue i numeri UE 1–14, spuntali in «Dati scritti dal locale» e Jarvis li inserisce come allergeni.`, line: numbered[0].line ?? null });
   const variants = (extraction.extracted || []).filter((e) => e.variants?.length);
   if (variants.length) notes.push({ kind: 'inserito', text: variants.slice(0, 6).map((e) => `${e.name}: ${e.variants.join(' · ')}`).join('; ') + (variants.length > 6 ? '…' : ''), hint: `Inserite ${variants.length} voci con più prezzi (es. calice e bottiglia), ogni prezzo con la sua etichetta come scritto. Controllale.`, line: variants[0].line ?? null });
   for (const s of extraction.menu?.sezioni || []) if (s.tipo === 'degustazione') {

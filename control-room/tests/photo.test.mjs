@@ -184,7 +184,7 @@ describe('Foto del menu nella pratica', () => {
       assert.match(voci[0].descrizione.it, /^Con barbabietola sottaceto, pistacchio tostato \(7-8-12\)$/);
       assert.ok(voci.every((v) => !v.allergeni?.length), 'allergeni mai assegnati da soli');
       const notes = JSON.parse((await db.prepare('SELECT review_notes_json FROM drafts WHERE request_id=?').bind(requestId).first()).review_notes_json);
-      assert.ok(notes.some((n) => n.kind === 'conferma' && /7, 8, 12/.test(n.hint)));
+      assert.ok(notes.some((n) => n.kind === 'allergeni' && /numeri degli allergeni sotto 2 piatti/.test(n.hint)));
     } finally { db.close(); }
   });
 

@@ -375,7 +375,7 @@ export function extractMenuFromText(venue, source, requestedSlug) {
       last.descLine = lineNumber; last.line = lineNumber; last.entry.descriptionLine = last.entry.descriptionLine || lineNumber;
       consumed.push(lineNumber);
       const allergens = allergenNumbers(desc);
-      if (allergens) confirm.push({ text: row, line: lineNumber, hint: `Numeri di allergeni scritti dal locale per «${item.nome.it}» (${allergens.join(', ')}): sono rimasti nella descrizione. Se seguono la legenda UE 1–14 inseriscili negli allergeni del piatto.` });
+      if (allergens) confirm.push({ type: 'allergeni', name: item.nome.it, text: row, line: lineNumber, hint: `Numeri di allergeni scritti dal locale per «${item.nome.it}» (${allergens.join(', ')}): sono rimasti nella descrizione. Se seguono la legenda UE 1–14 inseriscili negli allergeni del piatto.` });
       continue;
     }
     if (section.tipo === 'degustazione' && courseLike(row)) {

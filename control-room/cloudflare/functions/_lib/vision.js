@@ -41,6 +41,7 @@ function descriptionAsName(name) {
   return shouting || /^(?:con|al|allo|alla|alle|ai|agli|in|su|e|di|servit\w*|accompagnat\w*)\s/i.test(text) || /^[a-zà-ÿ]/.test(text) || /\(\d{1,2}(?:\s*[-,]\s*\d{1,2})*\)\s*$/.test(text);
 }
 
+const shouting = (text) => { const l = String(text).replace(/[^A-Za-zÀ-ÿ]/g, ''); return l.length >= 4 && l === l.toUpperCase(); };
 function toBase64(bytes) {
   let binary = '';
   const chunk = 0x8000;
@@ -110,13 +111,13 @@ export function combineReadings(first, second) {
     const candidates = B.items.map((other, index) => ({ other, index })).filter(({ index }) => !used.has(index));
     // 1) stesso nome (simile) e stessi prezzi.
     let hit = candidates.find(({ other }) => other.course === row.course && priceKey(other) === priceKey(row) && similar(other.name, row.name));
-    let name = row.name;
+    let name = row.name, aNameIsDesc = false;
     // 2) stessa posizione e stessi prezzi, ma una lettura ha scritto la descrizione al posto del nome.
     if (!hit && !row.course) {
       const next = candidates.find(({ index, other }) => index > lastB && !other.course);
       if (next && amountsKey(next.other) === amountsKey(row) && (similar(next.other.name, row.descr) || similar(row.name, next.other.descr) || descriptionAsName(next.other.name) || descriptionAsName(row.name))) {
         hit = next;
-        if (descriptionAsName(row.name) && !descriptionAsName(next.other.name)) name = next.other.name;
+        if (descriptionAsName(row.name) && !descriptionAsName(next.other.name)) { name = next.other.name; aNameIsDesc = true; }
       }
     }
     if (!hit) {
@@ -127,12 +128,21 @@ export function combineReadings(first, second) {
     used.add(hit.index); lastB = Math.max(lastB, hit.index); agreed += 1;
     sectionHead(row.section);
     const other = hit.other;
+    // Nome scritto tutto in maiuscolo da una lettura e normale dall'altra: si tiene quello normale.
+    if (shouting(name) && !shouting(other.name) && similar(name, other.name)) name = other.name;
     lines.push(row.course ? name : `${name} — ${priceText(row)}`);
     // Descrizione: solo se confermata da entrambe le letture (anche quando l'altra l'ha scritta come nome).
-    const descA = row.descr || (name !== row.name ? row.name : ''), descB = other.descr || (descriptionAsName(other.name) && name !== other.name ? other.name : '');
+    const descA = row.descr || (aNameIsDesc ? row.name : ''), descB = other.descr || (!aNameIsDesc && descriptionAsName(other.name) && !similar(other.name, name) ? other.name : '');
     if (descA && descB && similar(descA, descB)) lines.push(`> ${descA.length >= descB.length ? descA : descB}`);
     else if (descA || descB) doubts.push(`${DOUBT} Descrizione di «${name}» letta una sola volta: «${(descA || descB).slice(0, 160)}»`);
   }
+  // Avvisi scritti sulla foto («prodotti abbattuti a -18°», «paste fatte in casa»): mai persi, li valuta Riccardo.
+  const notes = [];
+  for (const line of [...A.other, ...B.other]) {
+    const text = String(line).replace(/^\*+\s*/, '').trim();
+    if (text.length >= 20 && !text.startsWith(DOUBT) && !notes.some((n) => similar(n, text))) notes.push(text);
+  }
+  for (const text of notes) doubts.push(`${DOUBT} Testo sulla foto (non è un piatto): «${text.slice(0, 200)}»`);
   if (!single) B.items.forEach((other, index) => {
     if (used.has(index) || A.items.some((row) => similar(row.name, other.name))) return;
     if (descriptionAsName(other.name) && A.items.some((row) => similar(row.descr, other.name))) return;

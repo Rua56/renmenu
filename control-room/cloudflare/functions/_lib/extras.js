@@ -81,6 +81,22 @@ export function proposeSourceExtras(sourceText, menu) {
   return proposals;
 }
 
+/** Numeri di allergeni scritti dal locale in fondo alla descrizione («… panna acida (7)», «(1-3-4-7)»):
+ * proposte NON preselezionate, valgono solo se la legenda del menu segue i numeri UE 1–14. */
+export function proposeMenuAllergens(menu) {
+  const proposals = [];
+  (menu?.sezioni || []).forEach((section, si) => (section?.voci || []).forEach((item, vi) => {
+    const text = String(item?.descrizione?.it || '');
+    const m = text.match(/\((\d{1,2}(?:\s*[-,/]\s*\d{1,2})*)\)/);
+    if (!m || (Array.isArray(item.allergeni) && item.allergeni.length)) return;
+    const codes = [...new Set(m[1].split(/\s*[-,/]\s*/))].filter((c) => Number(c) >= 1 && Number(c) <= 14).sort((a, b) => Number(a) - Number(b));
+    if (!codes.length || codes.length !== m[1].split(/\s*[-,/]\s*/).length) return;
+    proposals.push({ id: `d${proposals.length + 1}`, line: null, type: 'allergeni', si, vi, name: nameOf(item.nome), codes, label: allergenLabel(codes), source: text.slice(0, 200), legend: true });
+  }));
+  return proposals;
+}
+export const allExtras = (sourceText, menu) => [...proposeSourceExtras(sourceText, menu), ...proposeMenuAllergens(menu)];
+
 /** Applica coperto/allergeni scelti a una copia del menu e restituisce le nuove fonti. */
 export function applyExtras(menu, selected, sourceFor) {
   const next = structuredClone(menu);
