@@ -1,0 +1,390 @@
+{
+  "id": "il-culo-di-alex",
+  "nome": "Il Culo di Alex",
+  "lingue": [
+    "it",
+    "en"
+  ],
+  "sezioni": [
+    {
+      "nome": {
+        "it": "Gli Antipasti",
+        "en": "Starters"
+      },
+      "voci": [
+        {
+          "nome": {
+            "it": "Salmone e Barbabietola",
+            "en": "Salmon and Beetroot"
+          },
+          "prezzo": "15,00",
+          "descrizione": {
+            "it": "con barbabietola sottaceto, pistacchio tostato, avocado e emulsione di kefir (7-8-12)",
+            "en": "with pickled beetroot, toasted pistachio, avocado and kefir emulsion (7-8-12)"
+          },
+          "allergeni": [
+            "7",
+            "8",
+            "12"
+          ]
+        },
+        {
+          "nome": {
+            "it": "Prosciutto di Picanha",
+            "en": "Picanha Ham"
+          },
+          "prezzo": "17,00",
+          "descrizione": {
+            "it": "marinato e affumicato in crosta di farina di polenta, accompagnato da verdure di stagione (9)",
+            "en": "marinated and smoked in a polenta flour crust, served with seasonal vegetables (9)"
+          },
+          "allergeni": [
+            "9"
+          ]
+        },
+        {
+          "nome": {
+            "it": "Patate e Capasanta",
+            "en": "Potatoes and Scallops"
+          },
+          "prezzo": "16,00",
+          "descrizione": {
+            "it": "con spuma di patate, semi di pomodorini, clorofilla al basilico e pane aromatizzato al limone (1-7-14)",
+            "en": "with potato foam, cherry tomato seeds, basil chlorophyll and lemon-scented bread (1-7-14)"
+          },
+          "allergeni": [
+            "1",
+            "7",
+            "14"
+          ]
+        },
+        {
+          "nome": {
+            "it": "Gazpacho",
+            "en": "Gazpacho"
+          },
+          "prezzo": "14,00",
+          "descrizione": {
+            "it": "con verdure del nostro orto, mela verde e panna acida (7)",
+            "en": "with vegetables from our garden, green apple and sour cream (7)"
+          },
+          "allergeni": [
+            "7"
+          ]
+        },
+        {
+          "nome": {
+            "it": "Vitello Tonnato",
+            "en": "Vitello Tonnato"
+          },
+          "prezzo": "15,00",
+          "descrizione": {
+            "it": "con lingua di vitello cbt, salsa tonnata, fondo di vitello, capperi e clorofilla al prezzemolo (4-10-11)",
+            "en": "with vitello cbt tongue, tonnata sauce, vitello stock, capers and parsley chlorophyll (4-10-11)"
+          },
+          "allergeni": [
+            "4",
+            "10",
+            "11"
+          ]
+        }
+      ]
+    },
+    {
+      "nome": {
+        "it": "I Primi",
+        "en": "First courses"
+      },
+      "voci": [
+        {
+          "nome": {
+            "it": "Fregola e Polipetti",
+            "en": "Fregola and Octopus"
+          },
+          "prezzo": "15,00",
+          "descrizione": {
+            "it": "con crema di zucchine, verdure croccanti e clorofilla al basilico (1-4-7)",
+            "en": "with zucchini cream, crunchy vegetables and basil chlorophyll (1-4-7)"
+          },
+          "allergeni": [
+            "1",
+            "4",
+            "7"
+          ]
+        },
+        {
+          "nome": {
+            "it": "Gnocchi con pan grattato",
+            "en": "Gnocchi with grated bread"
+          },
+          "prezzo": "14,00",
+          "descrizione": {
+            "it": "con burro, ricotta di malga e spuma di spinacini e menta (1-3-7)",
+            "en": "with butter, malga ricotta and spinach and mint foam (1-3-7)"
+          },
+          "allergeni": [
+            "1",
+            "3",
+            "7"
+          ]
+        },
+        {
+          "nome": {
+            "it": "Ditalini e trota di San Daniele",
+            "en": "Ditalini and San Daniele Trout"
+          },
+          "prezzo": "15,00",
+          "descrizione": {
+            "it": "con trota di San Daniele, panna acida e le sue uova (1-3-4-7)",
+            "en": "with San Daniele trout, sour cream and its eggs (1-3-4-7)"
+          },
+          "allergeni": [
+            "1",
+            "3",
+            "4",
+            "7"
+          ]
+        },
+        {
+          "nome": {
+            "it": "Risotto con cozze e finocchietto",
+            "en": "Risotto with mussels and wild fennel"
+          },
+          "prezzo": "17,00",
+          "descrizione": {
+            "it": "con cozze, burro al finocchietto, mela verde e gel di acqua di cozze (3-9-14) (per due persone)",
+            "en": "with mussels, wild fennel butter, green apple and mussel water jelly (3-9-14) (for two people)"
+          },
+          "allergeni": [
+            "3",
+            "9",
+            "14"
+          ]
+        },
+        {
+          "nome": {
+            "it": "Cannolo di pasta",
+            "en": "Pasta cannolo"
+          },
+          "prezzo": "14,00",
+          "descrizione": {
+            "it": "ripieno ai tre pomodori, melanzane, polpo basilico e crema di burrata (1-3-7-14)",
+            "en": "Filling with three tomatoes, aubergine, octopus basilico and burrata cream (1-3-7-14)"
+          },
+          "allergeni": [
+            "1",
+            "3",
+            "7",
+            "14"
+          ]
+        }
+      ]
+    },
+    {
+      "nome": {
+        "it": "Secondi",
+        "en": "Second courses"
+      },
+      "voci": [
+        {
+          "nome": {
+            "it": "Petto d'anatra",
+            "en": "Duck breast"
+          },
+          "prezzo": "21,00",
+          "descrizione": {
+            "it": "con friggitelli in due consistenze, valeriana e fondo al balsamico midolini (7-9)",
+            "en": "with friggitelli in two consistencies, valeriana and balsamic midolini fond (7-9)"
+          },
+          "allergeni": [
+            "7",
+            "9"
+          ]
+        },
+        {
+          "nome": {
+            "it": "Ricciola",
+            "en": "Amberjack"
+          },
+          "prezzo": "24,00",
+          "descrizione": {
+            "it": "con il suo fondo, spinacino saltato e crunchy di riso (1-3-4-7)",
+            "en": "with its fond, wilted spinacino and crunchy rice (1-3-4-7)"
+          },
+          "allergeni": [
+            "1",
+            "3",
+            "4",
+            "7"
+          ]
+        },
+        {
+          "nome": {
+            "it": "Spiedo di polpo",
+            "en": "Octopus skewer"
+          },
+          "prezzo": "23,00",
+          "descrizione": {
+            "it": "patate, terra di olive, pomodori confit e crema di basilico (4-7-8)",
+            "en": "potatoes, olive soil, confit tomatoes and basil cream (4-7-8)"
+          },
+          "allergeni": [
+            "4",
+            "7",
+            "8"
+          ]
+        },
+        {
+          "nome": {
+            "it": "Melanzana alla brace",
+            "en": "Grilled aubergine"
+          },
+          "prezzo": "20,00",
+          "descrizione": {
+            "it": "tahina, ceci, mandorle e brunoise di verdure (8)",
+            "en": "tahina, chickpeas, almonds and brunoise of vegetables (8)"
+          },
+          "allergeni": [
+            "8"
+          ]
+        },
+        {
+          "nome": {
+            "it": "Pancetta di tonno",
+            "en": "Tuna pancetta"
+          },
+          "prezzo": "29,00",
+          "descrizione": {
+            "it": "con gazpacho, anguria, ravanelli e ponzu (6-12)",
+            "en": "with gazpacho, watermelon, ravanelli and ponzu (6-12)"
+          },
+          "allergeni": [
+            "6",
+            "12"
+          ]
+        }
+      ]
+    },
+    {
+      "nome": {
+        "it": "Bollicine",
+        "en": "Sparkling wines"
+      },
+      "descrizione": {
+        "it": "Al calice",
+        "en": "By the glass"
+      },
+      "voci": [
+        {
+          "nome": {
+            "it": "Rodaro Brut Nature",
+            "en": "Rodaro Brut Nature"
+          },
+          "prezzo": "7,00"
+        },
+        {
+          "nome": {
+            "it": "Coquard Cremant de Bourgogne",
+            "en": "Coquard Cremant de Bourgogne"
+          },
+          "prezzo": "7,00"
+        },
+        {
+          "nome": {
+            "it": "Revì Trento Doc Dosaggio Zero",
+            "en": "Revì Trento Doc Dosaggio Zero"
+          },
+          "prezzo": "6,50"
+        }
+      ]
+    },
+    {
+      "nome": {
+        "it": "Vini Bianchi",
+        "en": "White wines"
+      },
+      "descrizione": {
+        "it": "Al calice",
+        "en": "By the glass"
+      },
+      "voci": [
+        {
+          "nome": {
+            "it": "Ermacora Friulano 2024",
+            "en": "Ermacora Friulano 2024"
+          },
+          "prezzo": "4,50"
+        },
+        {
+          "nome": {
+            "it": "Vitis Nova Ribolla Gialla 2024",
+            "en": "Vitis Nova Ribolla Gialla 2024"
+          },
+          "prezzo": "4,50"
+        },
+        {
+          "nome": {
+            "it": "Aquila del Torre Torre Bianco (Sauvignon, Friulano) 2022",
+            "en": "Aquila del Torre Torre Bianco 2022"
+          },
+          "prezzo": "5,00"
+        },
+        {
+          "nome": {
+            "it": "La Rajade Pinot Grigio Ramato 2021",
+            "en": "La Rajade Pinot Grigio Ramato 2021"
+          },
+          "prezzo": "5,00"
+        },
+        {
+          "nome": {
+            "it": "Donna Fugata Etna Bianco (Carricante e Altre Uve) 2022",
+            "en": "Donna Fugata Etna Bianco 2022"
+          },
+          "prezzo": "6,00"
+        }
+      ]
+    },
+    {
+      "nome": {
+        "it": "Vini Rossi",
+        "en": "Red wines"
+      },
+      "descrizione": {
+        "it": "Al calice",
+        "en": "By the glass"
+      },
+      "voci": [
+        {
+          "nome": {
+            "it": "Travaglino Pinot Nero 2024",
+            "en": "Travaglino Pinot Nero 2024"
+          },
+          "prezzo": "5,00"
+        },
+        {
+          "nome": {
+            "it": "Petrussa Merlot 2023",
+            "en": "Petrussa Merlot 2023"
+          },
+          "prezzo": "5,50"
+        },
+        {
+          "nome": {
+            "it": "Masut da Rive Sassi Rossi (Merlot, Cabernet Sauvignon) 2022",
+            "en": "Masut da Rive Sassi Rossi 2022"
+          },
+          "prezzo": "6,00"
+        },
+        {
+          "nome": {
+            "it": "Russiz Superiore Cabernet Franc 2022",
+            "en": "Russiz Superiore Cabernet Franc 2022"
+          },
+          "prezzo": "5,50"
+        }
+      ]
+    }
+  ],
+  "tema": "notte"
+}
