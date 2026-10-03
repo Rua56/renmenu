@@ -20,6 +20,12 @@ ALLOWED_THEMES = {"bordeaux", "trattoria", "mare", "terracotta", "notte", "sole"
 ALLOWED_TAGS = {"veg", "vegan", "spicy", "gf", "new", "top", "frozen"}
 LEGACY_SUPPORTED_TAGS = {"hot", "riserva"}
 SUPPORTED_UI_LANGUAGES = {"it", "en", "de", "fr", "es"}
+PREMIUM_DIRECTIONS = {"editoriale", "bistrot", "moderno"}
+PREMIUM_FONTS = {"classico", "moderno", "artigianale"}
+PREMIUM_COLORS = {"fondo", "testo", "accento", "secondario"}
+PREMIUM_KEYS = {"direzione", "caratteri", "colori", "logo", "copertina", "motto", "storia"}
+HEX_COLOR = re.compile(r"^#[0-9a-fA-F]{6}$")
+IMAGE_PATH = re.compile(r"^(?:\.\./|/)?[A-Za-z0-9_./-]+\.(?:webp|png|jpe?g|svg|avif)$", re.IGNORECASE)
 PRICE_PATTERN = re.compile(r"^\d+(?:[,.]\d{1,2})?$")
 INSTAGRAM_PATTERN = re.compile(r"^@?[A-Za-z0-9._]{1,30}$")
 PHONE_DIGITS_PATTERN = re.compile(r"\D+")
@@ -209,6 +215,32 @@ def validate_translations(essential_values: list[tuple[str, object]], languages:
         )
 
 
+def validate_premium(value: object, report: Report) -> None:
+    """Blocco «premium» (menu su misura): solo aspetto, mai dati del menu."""
+    if not isinstance(value, Mapping):
+        report.error("premium deve essere un oggetto JSON.")
+        return
+    for key in value:
+        if key not in PREMIUM_KEYS:
+            report.error(f"premium: campo '{key}' non previsto.")
+    if "direzione" in value and value["direzione"] not in PREMIUM_DIRECTIONS:
+        report.error(f"premium.direzione '{value['direzione']}' non supportata ({', '.join(sorted(PREMIUM_DIRECTIONS))}).")
+    if "caratteri" in value and value["caratteri"] not in PREMIUM_FONTS:
+        report.error(f"premium.caratteri '{value['caratteri']}' non supportati ({', '.join(sorted(PREMIUM_FONTS))}).")
+    colors = value.get("colori", {})
+    if not isinstance(colors, Mapping):
+        report.error("premium.colori deve essere un oggetto.")
+    else:
+        for key, color in colors.items():
+            if key not in PREMIUM_COLORS or not isinstance(color, str) or not HEX_COLOR.match(color):
+                report.error(f"premium.colori.{key}: usa un colore esadecimale #rrggbb.")
+    for key in ("logo", "copertina"):
+        if key in value:
+            src = value[key]
+            if not isinstance(src, str) or not (src.startswith("https://") or IMAGE_PATH.match(src)):
+                report.error(f"premium.{key}: serve un indirizzo https o un file immagine del sito.")
+
+
 def validate_menu(path: Path, report: Report) -> None:
     report.start_file(path)
     errors_before = report.errors
@@ -232,6 +264,9 @@ def validate_menu(path: Path, report: Report) -> None:
 
     if "tema" in data and data["tema"] not in ALLOWED_THEMES:
         report.error(f"tema '{data['tema']}' non supportato (consentiti: {', '.join(sorted(ALLOWED_THEMES))}).")
+
+    if "premium" in data:
+        validate_premium(data["premium"], report)
 
     languages: list[str] = []
     if "lingue" in data:
@@ -271,6 +306,11 @@ def validate_menu(path: Path, report: Report) -> None:
         else:
             essential_values.append((f"{section_label}.nome", section_name))
 
+        if "tipo" in section and section["tipo"] not in {"degustazione"}:
+            report.error(f"{section_label}: tipo '{section['tipo']}' non supportato (consentito: degustazione).")
+        if "prezzo" in section:
+            validate_price(section["prezzo"], section_label, report)
+
         items = section.get("voci")
         if not isinstance(items, list) or not items:
             report.error(f"{section_label}: deve contenere almeno una voce in 'voci'.")
@@ -290,6 +330,16 @@ def validate_menu(path: Path, report: Report) -> None:
 
             if "prezzo" in item:
                 validate_price(item["prezzo"], item_label, report)
+            if "prezzi" in item:
+                variants = item["prezzi"]
+                if not isinstance(variants, list) or not variants:
+                    report.error(f"{item_label}: 'prezzi' deve essere una lista di varianti (etichetta + prezzo).")
+                else:
+                    for variant_index, variant in enumerate(variants, start=1):
+                        if not isinstance(variant, Mapping) or not non_empty_text(variant.get("etichetta")):
+                            report.error(f"{item_label}, variante {variant_index}: manca l'etichetta (es. calice, bottiglia).")
+                            continue
+                        validate_price(variant.get("prezzo"), f"{item_label}, variante {variant_index}", report)
             if "allergeni" in item:
                 validate_allergens(item["allergeni"], item_label, report)
             if "tag" in item:

@@ -1,0 +1,142 @@
+/* RenMenu Premium su misura: stessa scheda dati dei menu Standard (menus/<id>.json),
+   aspetto deciso dal blocco "premium" (direzione, colori, caratteri, logo, copertina). */
+body.pm {
+  --pm-fondo: #f6f1e7; --pm-testo: #1f2622; --pm-accento: #8a5a2b; --pm-secondario: #22352c;
+  --pm-titoli: 'Cormorant Garamond', Georgia, serif; --pm-corpo: 'DM Sans', system-ui, sans-serif;
+  --pm-muted: color-mix(in oklab, var(--pm-testo) 62%, var(--pm-fondo));
+  --pm-linea: color-mix(in oklab, var(--pm-testo) 16%, var(--pm-fondo));
+  --pm-velo: color-mix(in oklab, var(--pm-testo) 5%, var(--pm-fondo));
+  --pm-su-secondario: #fff;
+  margin: 0; background: var(--pm-fondo); color: var(--pm-testo); font-family: var(--pm-corpo);
+  font-size: 16px; line-height: 1.55; -webkit-font-smoothing: antialiased; text-rendering: optimizeLegibility;
+}
+body.pm *, body.pm *::before, body.pm *::after { box-sizing: border-box; }
+body.pm a { color: inherit; }
+body.pm img { max-width: 100%; display: block; }
+.pm-wrap { width: min(100% - 40px, 760px); margin-inline: auto; }
+.pm-skip { position: absolute; left: -999px; top: 8px; background: var(--pm-testo); color: var(--pm-fondo); padding: 8px 12px; border-radius: 6px; z-index: 99; }
+.pm-skip:focus { left: 8px; }
+
+/* Barra in alto: nome, lingue */
+.pm-bar { position: sticky; top: 0; z-index: 30; background: color-mix(in oklab, var(--pm-fondo) 90%, transparent); backdrop-filter: blur(10px); -webkit-backdrop-filter: blur(10px); border-bottom: 1px solid transparent; transition: border-color .25s; }
+.pm-bar.scrolled { border-color: var(--pm-linea); }
+.pm-bar__row { display: flex; align-items: center; gap: 12px; min-height: 56px; }
+.pm-bar__name { font-family: var(--pm-titoli); font-size: 1.15rem; font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; opacity: 0; transition: opacity .25s; }
+.pm-bar.scrolled .pm-bar__name { opacity: 1; }
+.pm-lang { margin-left: auto; display: inline-flex; gap: 2px; padding: 3px; border: 1px solid var(--pm-linea); border-radius: 999px; flex: none; }
+.pm-lang button { font: 600 .72rem/1 var(--pm-corpo); letter-spacing: .08em; text-transform: uppercase; color: var(--pm-muted); background: none; border: 0; padding: 7px 10px; border-radius: 999px; cursor: pointer; min-width: 36px; }
+.pm-lang button[aria-pressed='true'] { background: var(--pm-testo); color: var(--pm-fondo); }
+.pm-nav { display: flex; gap: 6px; overflow-x: auto; scrollbar-width: none; padding: 0 0 10px; }
+.pm-nav::-webkit-scrollbar { display: none; }
+.pm-nav a { flex: none; text-decoration: none; font-size: .86rem; font-weight: 500; color: var(--pm-muted); padding: 7px 14px; border-radius: 999px; border: 1px solid var(--pm-linea); white-space: nowrap; }
+.pm-nav a[aria-current='true'] { color: var(--pm-fondo); background: var(--pm-accento-forte, var(--pm-accento)); border-color: transparent; }
+
+/* Copertina */
+.pm-hero { text-align: center; padding: 56px 0 40px; }
+.pm-hero__logo { max-height: 96px; max-width: 220px; width: auto; margin: 0 auto 22px; object-fit: contain; }
+.pm-hero__eyebrow { display: block; font-size: .74rem; letter-spacing: .22em; text-transform: uppercase; color: var(--pm-accento-forte, var(--pm-accento)); font-weight: 600; margin-bottom: 14px; }
+.pm-hero h1 { font-family: var(--pm-titoli); font-weight: 500; font-size: clamp(2.5rem, 9vw, 4.4rem); line-height: 1; letter-spacing: -.01em; margin: 0; text-wrap: balance; }
+.pm-hero__motto { font-family: var(--pm-titoli); font-style: italic; font-size: clamp(1.1rem, 3.6vw, 1.35rem); color: var(--pm-muted); margin: 14px auto 0; max-width: 34ch; text-wrap: balance; }
+.pm-hero__meta { margin-top: 22px; display: flex; flex-wrap: wrap; justify-content: center; gap: 8px 18px; font-size: .9rem; color: var(--pm-muted); }
+.pm-hero__actions { margin-top: 22px; display: flex; flex-wrap: wrap; justify-content: center; gap: 8px; }
+.pm-btn { display: inline-flex; align-items: center; gap: 8px; text-decoration: none; font-size: .88rem; font-weight: 600; padding: 10px 16px; border-radius: 999px; border: 1px solid var(--pm-linea); background: var(--pm-fondo); min-height: 44px; }
+.pm-btn svg, .pm-row svg { width: 18px; height: 18px; flex: none; }
+.pm-cover { position: relative; overflow: hidden; border-radius: 22px; margin-top: 18px; aspect-ratio: 16 / 10; background: var(--pm-secondario); }
+.pm-cover img { width: 100%; height: 100%; object-fit: cover; }
+.pm-storia { font-size: 1.02rem; color: var(--pm-muted); max-width: 58ch; margin: 30px auto 0; text-align: center; text-wrap: pretty; }
+.pm-avviso { margin: 26px 0 0; padding: 14px 18px; border-left: 3px solid var(--pm-accento); background: var(--pm-velo); border-radius: 0 12px 12px 0; }
+.pm-avviso b { color: var(--pm-accento-forte, var(--pm-accento)); margin-right: 6px; }
+
+/* Ricerca */
+.pm-search { margin: 30px 0 6px; position: relative; }
+.pm-search input { width: 100%; font: inherit; color: inherit; background: transparent; border: 0; border-bottom: 1px solid var(--pm-linea); padding: 12px 4px 12px 30px; outline: none; border-radius: 0; }
+.pm-search input:focus { border-color: var(--pm-accento); }
+.pm-search svg { position: absolute; left: 2px; top: 50%; width: 18px; height: 18px; transform: translateY(-50%); color: var(--pm-muted); }
+
+/* Sezioni e voci */
+.pm-sezione { padding: 44px 0 10px; scroll-margin-top: 110px; }
+.pm-sezione__head { text-align: center; margin-bottom: 22px; }
+.pm-sezione__num { display: block; font-size: .72rem; letter-spacing: .24em; color: var(--pm-accento-forte, var(--pm-accento)); font-weight: 600; margin-bottom: 8px; }
+.pm-sezione h2 { font-family: var(--pm-titoli); font-weight: 500; font-size: clamp(1.9rem, 6vw, 2.5rem); line-height: 1.05; margin: 0; text-wrap: balance; }
+.pm-sezione__desc { color: var(--pm-muted); font-style: italic; margin: 8px auto 0; max-width: 46ch; }
+.pm-voce { display: grid; grid-template-columns: 1fr auto; gap: 4px 16px; padding: 14px 0; border-bottom: 1px solid var(--pm-linea); }
+.pm-voce:last-child { border-bottom: 0; }
+.pm-voce__nome { font-weight: 600; font-size: 1.02rem; display: flex; align-items: baseline; gap: 10px; min-width: 0; }
+.pm-voce__nome span { min-width: 0; }
+.pm-voce__prezzo { font-variant-numeric: tabular-nums; font-weight: 600; white-space: nowrap; color: var(--pm-accento-forte, var(--pm-accento)); text-align: right; }
+.pm-voce__prezzo small { display: block; font-weight: 400; font-size: .75rem; color: var(--pm-muted); }
+.pm-voce__desc { grid-column: 1 / -1; color: var(--pm-muted); font-size: .93rem; margin: 0; max-width: 60ch; }
+.pm-voce__meta { grid-column: 1 / -1; display: flex; flex-wrap: wrap; gap: 6px 10px; font-size: .78rem; color: var(--pm-muted); }
+.pm-voce__meta i { font-style: normal; display: inline-grid; place-items: center; min-width: 20px; height: 20px; padding: 0 5px; border-radius: 999px; border: 1px solid var(--pm-linea); font-size: .7rem; margin-left: 3px; }
+.pm-tag--top { color: var(--pm-accento-forte, var(--pm-accento)); font-weight: 600; }
+.pm-varianti { grid-column: 1 / -1; display: flex; flex-wrap: wrap; gap: 6px 18px; font-size: .9rem; }
+.pm-varianti span { white-space: nowrap; }
+.pm-varianti b { font-weight: 600; color: var(--pm-accento-forte, var(--pm-accento)); font-variant-numeric: tabular-nums; margin-left: 4px; }
+
+/* Percorso degustazione */
+.pm-degu { border: 1px solid var(--pm-linea); border-radius: 22px; padding: 30px 22px; text-align: center; background: var(--pm-velo); }
+.pm-degu__prezzo { display: inline-block; margin-top: 4px; font-weight: 600; font-size: 1.2rem; color: var(--pm-accento-forte, var(--pm-accento)); font-variant-numeric: tabular-nums; }
+.pm-degu__prezzo small { font-weight: 400; color: var(--pm-muted); font-size: .85rem; margin-left: 4px; }
+.pm-degu ol { list-style: none; margin: 20px 0 0; padding: 0; }
+.pm-degu li { padding: 12px 0; border-top: 1px solid var(--pm-linea); }
+.pm-degu li b { display: block; font-family: var(--pm-titoli); font-weight: 500; font-size: 1.25rem; }
+.pm-degu li span { color: var(--pm-muted); font-size: .92rem; }
+
+/* Informazioni */
+.pm-info { margin: 56px 0 0; padding: 34px 0 10px; border-top: 1px solid var(--pm-linea); }
+.pm-info h3 { font-family: var(--pm-titoli); font-weight: 500; font-size: 1.7rem; margin: 0 0 14px; text-align: center; }
+.pm-info__grid { display: grid; gap: 12px; }
+.pm-row { display: flex; gap: 12px; align-items: flex-start; }
+.pm-row svg { color: var(--pm-accento-forte, var(--pm-accento)); margin-top: 2px; }
+.pm-coperto, .pm-note { color: var(--pm-muted); font-size: .92rem; margin: 14px 0 0; }
+.pm-legenda { display: flex; flex-wrap: wrap; gap: 6px 14px; margin-top: 16px; font-size: .8rem; color: var(--pm-muted); }
+.pm-legenda b { margin-right: 4px; color: var(--pm-testo); }
+.pm-empty { text-align: center; color: var(--pm-muted); padding: 40px 0; }
+.pm-footer { text-align: center; padding: 40px 0 calc(32px + env(safe-area-inset-bottom)); font-size: .78rem; color: var(--pm-muted); }
+.pm-footer a { font-weight: 600; text-decoration: none; }
+.pm-su { position: fixed; right: 16px; bottom: calc(18px + env(safe-area-inset-bottom)); width: 46px; height: 46px; border-radius: 50%; border: 1px solid var(--pm-linea); background: var(--pm-fondo); color: var(--pm-testo); display: grid; place-items: center; opacity: 0; pointer-events: none; transition: opacity .25s; cursor: pointer; }
+.pm-su.show { opacity: 1; pointer-events: auto; }
+.pm-su svg { width: 20px; height: 20px; }
+.pm-error { text-align: center; padding: 80px 20px; }
+
+/* ── Direzione «editoriale»: carta stampata elegante, puntini fra nome e prezzo ── */
+.pm--editoriale .pm-voce__nome::after { content: ''; flex: 1; border-bottom: 1px dotted color-mix(in oklab, var(--pm-testo) 35%, var(--pm-fondo)); transform: translateY(-4px); min-width: 24px; }
+.pm--editoriale .pm-voce { border-bottom: 0; padding: 11px 0; }
+.pm--editoriale .pm-sezione__head::after { content: '✦'; display: block; color: var(--pm-accento); font-size: .8rem; margin-top: 14px; }
+.pm--editoriale .pm-voce__desc { font-style: italic; }
+
+/* ── Direzione «bistrot»: fascia di colore, sezioni incorniciate ── */
+.pm--bistrot .pm-hero { background: var(--pm-secondario); color: var(--pm-su-secondario); margin: 0 -20px; padding: 56px 20px 46px; border-radius: 0 0 28px 28px; }
+.pm--bistrot .pm-hero__eyebrow, .pm--bistrot .pm-hero__motto, .pm--bistrot .pm-hero__meta { color: color-mix(in oklab, var(--pm-su-secondario) 80%, var(--pm-secondario)); }
+.pm--bistrot .pm-hero .pm-btn { background: transparent; color: var(--pm-su-secondario); border-color: color-mix(in oklab, var(--pm-su-secondario) 35%, var(--pm-secondario)); }
+.pm--bistrot .pm-sezione__body { border: 1px solid var(--pm-linea); outline: 1px solid var(--pm-linea); outline-offset: 4px; border-radius: 6px; padding: 8px 20px; background: var(--pm-fondo); }
+.pm--bistrot .pm-sezione__head { text-align: left; display: flex; align-items: baseline; gap: 14px; }
+.pm--bistrot .pm-sezione__num { order: 2; margin: 0 0 0 auto; }
+.pm--bistrot .pm-sezione__desc { margin: 4px 0 0; }
+.pm--bistrot .pm-sezione__head > div { min-width: 0; }
+
+/* ── Direzione «moderno»: copertina piena, numeri grandi, prezzi in evidenza ── */
+.pm--moderno .pm-hero { text-align: left; padding-top: 40px; }
+.pm--moderno .pm-hero__logo { margin: 0 0 22px; }
+.pm--moderno .pm-hero h1 { font-weight: 700; letter-spacing: -.03em; font-size: clamp(2.6rem, 11vw, 5rem); }
+.pm--moderno .pm-hero__motto { margin-left: 0; font-style: normal; }
+.pm--moderno .pm-hero__meta, .pm--moderno .pm-hero__actions { justify-content: flex-start; }
+.pm--moderno .pm-sezione__head { text-align: left; display: grid; grid-template-columns: auto 1fr; gap: 0 16px; align-items: end; }
+.pm--moderno .pm-sezione__num { font-size: 2.6rem; letter-spacing: -.04em; line-height: .9; margin: 0; font-family: var(--pm-titoli); font-weight: 700; grid-row: span 2; }
+.pm--moderno .pm-sezione h2 { font-weight: 700; letter-spacing: -.02em; }
+.pm--moderno .pm-sezione__desc { margin: 4px 0 0; font-style: normal; }
+.pm--moderno .pm-voce__prezzo { background: var(--pm-velo); padding: 4px 10px; border-radius: 999px; align-self: start; }
+.pm--moderno .pm-degu { text-align: left; }
+
+@media (min-width: 900px) {
+  .pm-wrap { width: min(100% - 64px, 980px); }
+  .pm--bistrot .pm-voci { display: grid; grid-template-columns: 1fr 1fr; column-gap: 40px; }
+  .pm--bistrot .pm-voci:has(> .pm-voce:only-child) { grid-template-columns: 1fr; }
+  .pm--bistrot .pm-voce:nth-last-child(2):nth-child(odd) { border-bottom: 0; }
+  .pm--bistrot .pm-hero { margin: 0; border-radius: 0 0 28px 28px; }
+  .pm--editoriale .pm-wrap, .pm--editoriale.pm-wrap { width: min(100% - 64px, 720px); }
+}
+@media (prefers-reduced-motion: no-preference) {
+  .pm-sezione.pm-in { animation: pm-in .6s ease both; }
+  @keyframes pm-in { from { opacity: 0; transform: translateY(14px); } to { opacity: 1; transform: none; } }
+}
