@@ -86,11 +86,15 @@ export function createMissions(deps) {
   // Riccardo attesta la revisione interna con un solo gesto; Jarvis la registra a suo nome.
   async function attest(db, env, draftId, evidence, actorDb = db) {
     const draft = await getOne(db, 'SELECT * FROM drafts WHERE id=?', draftId);
+    // L'approvazione creativa Premium registrata da Riccardo resta: l'affido non la cancella.
+    let saved = {};
+    try { saved = JSON.parse(draft.checks_json || '{}') || {}; } catch { saved = {}; }
+    const creative = saved.creativeApproval === true ? { creativeApproval: true, creativeApprovalEvidence: saved.creativeApprovalEvidence } : {};
     await action(actorDb, 'reviewDraft', {
       id: draft.id, revision: draft.revision,
       checks: { prices: true, allergens: true, languages: true, clientApproval: false },
       fieldEvidence: { prices: evidence, allergens: evidence, languages: evidence },
-      allergenOmissionConfirmed: true
+      allergenOmissionConfirmed: true, ...creative
     }, env);
   }
 

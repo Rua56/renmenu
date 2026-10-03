@@ -32,6 +32,8 @@ function database({ withCategory = true } = {}) {
   sqlite.exec(readFileSync(new URL('../cloudflare/migrations/0010_draft_review_notes.sql', import.meta.url), 'utf8'));
   sqlite.exec(readFileSync(new URL('../cloudflare/migrations/0011_draft_creative.sql', import.meta.url), 'utf8'));
   sqlite.exec(readFileSync(new URL('../cloudflare/migrations/0006_publication_approvals.sql', import.meta.url), 'utf8'));
+  sqlite.exec(readFileSync(new URL('../cloudflare/migrations/0007_jarvis_missions.sql', import.meta.url), 'utf8'));
+  sqlite.exec(readFileSync(new URL('../cloudflare/migrations/0008_mail_files.sql', import.meta.url), 'utf8'));
   return {
     prepare(sql) {
       return { bind(...params) {
@@ -172,6 +174,13 @@ describe('Premium su misura', () => {
       assert.ok(wines.every((v) => Array.isArray(v.prezzi) && v.prezzi.length && !('prezzo' in v)));
       assert.ok(draft.menu.coperto === '3,00' || draft.sourceExtras.some((e) => e.type === 'coperto' && e.value === '3,00'), JSON.stringify([draft.menu.coperto, draft.sourceExtras]));
       assert.ok(!draft.menu.sezioni.flatMap((s) => s.voci).some((v) => /allergen/i.test(JSON.stringify(v.allergeni || ''))));
+      // Riccardo approva la grafica (solo quella), poi affida a Jarvis: l'approvazione creativa non si perde.
+      const reviewed = await action(db, 'reviewDraft', { id: draft.id, revision: draft.revision, checks: { prices: false, allergens: false, languages: false, clientApproval: false }, fieldEvidence: {}, creativeApproval: true, creativeApprovalEvidence: 'Proposta grafica approvata' });
+      assert.equal(reviewed.status, 200, String(reviewed.body.error));
+      const fresh = reviewed.body.state.drafts.find((d) => d.id === draft.id);
+      const entrusted = await action(db, 'entrustToJarvis', { draftId: draft.id, revision: fresh.revision, accept: [], confirmation: 'AFFIDO A JARVIS' });
+      assert.equal(entrusted.status, 200, String(entrusted.body.error));
+      assert.ok(!/approvazione creativa/.test(String(entrusted.body.error || '')), String(entrusted.body.error));
     } finally { db.close(); }
   });
 
