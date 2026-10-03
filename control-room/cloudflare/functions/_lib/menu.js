@@ -143,8 +143,32 @@ export function venueFromSource(source) {
     const match = line.match(VENUE_SENTENCE);
     if (match && venueOk(match[1])) return match[1].trim();
   }
+  // «sono Marta, titolare dell'Enoteca Isonzo Test (…) a Gorizia»: il nome come scritto, con le maiuscole.
+  // Le email di Gmail vanno a capo da sole: le righe spezzate si riuniscono prima di cercare.
+  const prose = String(source || '').replace(/\r/g, '').replace(/([^\n.!?:;])\n(?=[a-zà-ÿ(])/g, '$1 ');
+  const owner = prose.match(new RegExp(`\\b(?:titolar[ei]|proprietari[oa]|gestor[ei]|responsabile|chef)\\s+(?:(?:del|dello|della)\\s+|dell['’]\\s*)(${VENUE_WORDS})\\s+([^\\n]{2,120})`, 'iu'));
+  if (owner) {
+    // Dopo il tipo di locale: un articolo/preposizione («da Mario», «al Ponte») poi solo parole con la maiuscola.
+    const words = owner[2].split(/\s+/), kept = [];
+    for (const [k, w] of words.entries()) {
+      const clean = w.replace(/[,.;:!?)]+$/, '');
+      if (!clean || /^\(/.test(clean)) break;
+      if (/^[A-ZÀ-Ý0-9]/.test(clean)) { kept.push(clean); if (clean !== w) break; continue; }
+      if (k === 0 && /^(?:da|dal|dalla|al|alla|ai|alle|del|della|dei|di|la|il|lo|le|i)$/.test(clean) && /^[A-ZÀ-Ý]/.test(words[1] || '')) { kept.push(clean); continue; }
+      break;
+    }
+    const kind = owner[1].charAt(0).toUpperCase() + owner[1].slice(1);
+    const name = `${kind} ${kept.join(' ')}`.trim();
+    if (kept.some((w) => /^[A-ZÀ-Ý0-9]/.test(w)) && venueOk(name)) return name;
+  }
+  // Oggetto «Nuovo menu Premium · Enoteca Isonzo Test (TEST)»: il nome dopo l'ultimo «·», se ha le maiuscole.
+  const subject = rows.find((line) => /^oggetto(?: ricevuto)?\s*:/i.test(line));
+  const tail = subject && subject.split(/\s[·|–—-]\s/).slice(1).at(-1);
+  const named = tail && tail.replace(/\s*\([^)]*\)\s*$/, '').trim();
+  if (named && /^[A-ZÀ-Ý]/.test(named) && named.length <= 60 && venueOk(named) && !/\b(?:menu|menù|richiesta|abbonamento|premium|standard|annuale|nuovo|aggiornamento|prezzi)\b/i.test(named)) return named;
   return '';
 }
+const VENUE_WORDS = "ristorante|trattoria|osteria|pizzeria|enoteca|locanda|agriturismo|bar|caff[eè]|pub|bistrot|birreria|braceria|gelateria|pasticceria|cantina|wine bar|frasca|hotel|albergo|taverna|hosteria|steakhouse|sushi|paninoteca|piadineria|rosticceria|lounge|cocktail bar";
 
 // Titolo di sezione senza "#" (come scrivono i clienti veri: "Antipasti", "PRIMI", "Dolci:").
 // Regola fissa: riga breve, senza prezzo né punteggiatura da frase, non un saluto/frase,

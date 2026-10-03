@@ -477,7 +477,10 @@ export async function action(db, type, input, env = {}) {
       extraction = integrations(env).ai.extract(venue, combinedSource, desiredSlug);
       // Menu scritto a parole: lettura assistita, verificata riga per riga (nessun valore inventato).
       // Le righe dubbie delle foto non passano dal modello: le controlla Riccardo sulla foto.
-      if (autoTranslationReady(env) && extraction.uncertain.some((row) => /\d/.test(row) && !row.startsWith('[da verificare]'))) {
+      // Telefono, orari, indirizzo, coperto e frasi di presentazione non sono piatti: niente lettura assistita per loro.
+      const menuLike = (row) => /\d/.test(row) && !row.startsWith('[da verificare]') && !/^(?:tel\w*|cell\w*|orari\w*|instagram|facebook|indirizzo|via\b|piazza\b|il coperto|coperto|p\.?\s?iva)\b/i.test(row)
+        && !/\b(?:sono|siamo|vorremmo|vorrei|buongiorno|buonasera|salve|titolare|abbonamento)\b/i.test(row) && !/\b\d{1,2}[:.]\d{2}\s*[-–]\s*\d{1,2}[:.]\d{2}\b/.test(row);
+      if (autoTranslationReady(env) && extraction.uncertain.some(menuLike)) {
         extraction = await assistExtraction(env.AI, venue, combinedSource, desiredSlug, extraction);
       }
     }

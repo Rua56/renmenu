@@ -22,7 +22,8 @@ const IMAGE = /^(?:\.\.\/|\/)?[a-z0-9_./-]+\.(?:webp|png|jpe?g|svg|avif)$/i;
 export const PREMIUM_LANGS = { it: 'italiano', en: 'inglese', de: 'tedesco', fr: 'francese', es: 'spagnolo', sl: 'sloveno' };
 
 const norm = (v) => String(v || '').toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '');
-const sentences = (text) => String(text || '').replace(/\r/g, '').split(/\n+|(?<=[.!?;])\s+/).map((s) => s.trim()).filter(Boolean);
+// Le email di Gmail vanno a capo da sole: le righe spezzate a metà frase si riuniscono.
+const sentences = (text) => String(text || '').replace(/\r/g, '').replace(/([^\n.!?:;])\n(?=[a-zà-ÿ(])/g, '$1 ').split(/\n+|(?<=[.!?;])\s+/).map((s) => s.trim()).filter(Boolean);
 const cut = (s) => s.length > 160 ? `${s.slice(0, 157)}…` : s;
 
 const STYLE = [
@@ -80,7 +81,7 @@ export function creativeBrief(text, { attachments = 0 } = {}) {
       let rest = t;
       for (const [nome, rx, hex] of COLORS) if (rx.test(rest)) { push('colori', nome, { nome, hex, fonte: cut(row) }); rest = rest.replace(rx, ' '); }
     }
-    if (/sfondo (?:scuro|nero|blu notte)|fondo (?:scuro|nero)|\bdark\b|tutto (?:nero|scuro)/.test(t)) brief.sfondoScuro = true;
+    if (/sfondo (?:scuro|nero|blu notte)|fondo (?:scuro|nero)|\bdark\b|tutto (?:nero|scuro)|\b(?:grafica|tema|stile|look|aspetto|menu)\b[^.]{0,30}\bscur[ao]\b/.test(t)) brief.sfondoScuro = true;
     if (/\b(lingu\w*|tradu\w*|tradott\w*|versione|anche in|in italiano|turist\w*|stranier\w*)\b/.test(t) || LANG_WORDS.filter(([, rx]) => rx.test(t)).length >= 2)
       for (const [code, rx] of LANG_WORDS) if (rx.test(t)) {
         if (PREMIUM_LANGS[code]) push('lingue', code, code); else push('lingueFuori', code, { lingua: code, fonte: cut(row) });

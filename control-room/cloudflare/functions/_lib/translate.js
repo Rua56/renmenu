@@ -102,7 +102,18 @@ export async function translateMenu(ai, menu, { lang = 'en', timeoutMs = 25_000 
   for (let start = 0; start < entries.length; start += BATCH) {
     const batch = entries.slice(start, start + BATCH);
     let results = [];
-    try { results = await runModel(ai, batch, timeoutMs); } catch { failures += 1; }
+    try { results = await runModel(ai, batch, timeoutMs); } catch { results = null; }
+    // Un tentativo andato male (risposta tagliata, timeout): si riprova una volta a metà, così un menu lungo non resta senza inglese.
+    if (!results || results.length < batch.length / 2) {
+      const half = Math.ceil(batch.length / 2), merged = new Map((results || []).filter((r) => Number.isInteger(r?.id)).map((r) => [r.id, r]));
+      for (const offset of [0, half]) {
+        const part = batch.slice(offset, offset + half);
+        if (!part.length || part.every((_, i) => merged.has(offset + i))) continue;
+        try { for (const r of await runModel(ai, part, timeoutMs)) if (Number.isInteger(r?.id) && r.id < part.length) merged.set(offset + r.id, { ...r, id: offset + r.id }); } catch { /* resta da completare */ }
+      }
+      results = [...merged.values()];
+      if (!results.length) failures += 1;
+    }
     const byId = new Map(results.filter((r) => Number.isInteger(r?.id)).map((r) => [r.id, r.en]));
     for (const [id, entry] of batch.entries()) {
       const candidate = byId.get(id);

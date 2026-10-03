@@ -240,3 +240,21 @@ describe('Email di prova Premium «Enoteca Isonzo Test»: carta completa', () =>
     assert.deepEqual(r.menu.sezioni[1].voci[0].prezzi, [{ etichetta: { it: 'Bottiglia' }, prezzo: '30,00' }]);
   });
 });
+
+describe('Email vera da Gmail (righe spezzate): nome del locale, colori e sfondo scuro', () => {
+  it('nome dal «titolare dell’…» o dall’oggetto, mai le parole minuscole che seguono', async () => {
+    const { venueFromSource } = await import('../cloudflare/functions/_lib/menu.js');
+    const { creativeBrief } = await import('../cloudflare/functions/_lib/premium.js');
+    const raw = 'Oggetto ricevuto: Nuovo menu Premium su misura · Enoteca Isonzo Test (TEST)\n\nsono Marta, titolare dell\'Enoteca Isonzo Test (TEST, ignorare) a Gorizia,\nin via Rastello 12. Vorremmo il Premium per\nil nostro menu digitale, con una grafica elegante e scura, nei toni del\nbordeaux e dell\'oro.';
+    assert.equal(venueFromSource(raw), 'Enoteca Isonzo Test');
+    assert.equal(venueFromSource(raw.split('\n').slice(2).join('\n')), 'Enoteca Isonzo Test');
+    assert.equal(venueFromSource('Oggetto ricevuto: Nuovo menu · Enoteca Isonzo Test (TEST)\nCiao'), 'Enoteca Isonzo Test');
+    assert.equal(venueFromSource('sono il titolare della trattoria da Mario a Udine'), 'Trattoria da Mario');
+    assert.equal(venueFromSource('Sono lo chef del Ristorante Al Faro di Grado'), 'Ristorante Al Faro');
+    assert.equal(venueFromSource('sono il titolare del bar sotto casa'), '');
+    assert.equal(venueFromSource('Oggetto: Nuovo menu Standard\nCiao'), '');
+    const brief = creativeBrief(raw);
+    assert.deepEqual(brief.colori.map((c) => c.nome).sort(), ['bordeaux', 'oro']);
+    assert.equal(brief.sfondoScuro, true);
+  });
+});
