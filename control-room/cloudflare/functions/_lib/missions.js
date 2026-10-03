@@ -1,3 +1,4 @@
+import { notesSummary } from './notes.js';
 // Jarvis autonomo: una «missione» per ogni pratica che Riccardo affida a Jarvis dopo aver
 // controllato la bozza. Jarvis porta la pratica fino alla pubblicazione usando le stesse
 // operazioni (con gli stessi controlli) dell'interfaccia, con «jarvis» come autore nel registro.
@@ -543,7 +544,9 @@ export function createMissions(deps) {
       return `Ho aperto la pratica per «${client.name}», ma non ho preparato la bozza: ${String(error?.message || 'errore').slice(0, 200)}`;
     }
     const done = await getOne(db, "SELECT summary FROM audit_events WHERE request_id=? AND action='draft.generate' ORDER BY created_at DESC LIMIT 1", requestId);
-    return `Fatto. Ho preparato l’aggiornamento di «${client.name}» partendo dal menu online. ${done?.summary || ''} Lo trovi in Revisione: niente va online senza il tuo SÌ.`;
+    let todo = '';
+    try { todo = notesSummary(JSON.parse((await getOne(db, 'SELECT review_notes_json AS n FROM drafts WHERE request_id=? ORDER BY created_at DESC LIMIT 1', requestId))?.n || '[]')); } catch {}
+    return `Fatto. Ho preparato l’aggiornamento di «${client.name}» partendo dal menu online. ${done?.summary || ''} Lo trovi in Revisione: niente va online senza il tuo SÌ.${todo ? `\n\n${todo}` : ''}`;
   }
 
   // Foto o PDF mandati da Riccardo al bot: Jarvis chiede a quale pratica collegarli.

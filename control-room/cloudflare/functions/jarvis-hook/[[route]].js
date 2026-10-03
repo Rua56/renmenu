@@ -53,7 +53,7 @@ export async function onRequest(context) {
         if (outcome?.ok && outcome.waiting) continue; // altre foto in coda: un solo messaggio alla fine
         const head = `Ho letto «${material.filename}»${request?.subject ? ` (pratica «${String(request.subject).slice(0, 60)}»)` : ''}`;
         const text = !outcome?.ok ? `Non sono riuscito a leggere «${material.filename}»: ${outcome?.reason || 'errore'}.`
-          : `${head}. ${outcome.warnings?.[0] || ''}${outcome.drafted ? ' Bozza pronta con tutti i file della pratica: controllala in Revisione, confrontando i prezzi con le foto.' : outcome.draftError ? ` Bozza non generata: ${outcome.draftError}` : ''}`;
+          : `${head}. ${outcome.warnings?.[0] || ''}${outcome.drafted ? ` Bozza pronta con tutti i file della pratica: controllala in Revisione, confrontando i prezzi con le foto.${outcome.notesText ? `\n\n${outcome.notesText}` : ''}` : outcome.draftError ? ` Bozza non generata: ${outcome.draftError}` : ''}`;
         await missions.notify(env.DB, env, material.request_id, outcome?.ok ? 'foto letta' : 'foto non leggibile', text);
       }
       const drafted = await runAutopilot(env.DB, env);

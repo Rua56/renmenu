@@ -7,7 +7,7 @@ import { assessReply } from '../cloudflare/functions/_lib/approvals.js';
 
 function database() {
   const sqlite = new DatabaseSync(':memory:');
-  for (const name of ['0001_initial.sql', '0002_integrations.sql', '0003_ai_free_scope.sql', '0004_request_category.sql', '0005_draft_provenance.sql', '0006_publication_approvals.sql'])
+  for (const name of ['0001_initial.sql', '0002_integrations.sql', '0003_ai_free_scope.sql', '0004_request_category.sql', '0005_draft_provenance.sql', '0010_draft_review_notes.sql', '0006_publication_approvals.sql'])
     sqlite.exec(readFileSync(new URL(`../cloudflare/migrations/${name}`, import.meta.url), 'utf8'));
   return sqlite;
 }

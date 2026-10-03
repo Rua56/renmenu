@@ -20,7 +20,9 @@ export function criticalFields(menu) {
     }
     for (const [itemIndex, item] of (section?.voci || []).entries()) {
       const path = `sezioni.${sectionIndex}.voci.${itemIndex}`;
-      if (!item?.prezzo && item?.prezzo !== 0) pricesMissing.push(`${path}.prezzo`);
+      // Prezzo variabile dichiarato dal locale («secondo il pescato», «a peso»): niente importo, ma è attestato.
+      const variable = /^Prezzo (?:variabile|secondo|a peso)/.test(typeof item?.descrizione === 'string' ? item.descrizione : item?.descrizione?.it || '');
+      if (!item?.prezzo && item?.prezzo !== 0 && !variable) pricesMissing.push(`${path}.prezzo`);
       if (!Array.isArray(item?.allergeni) || item.allergeni.length === 0) allergensMissing.push(`${path}.allergeni`);
     }
   }

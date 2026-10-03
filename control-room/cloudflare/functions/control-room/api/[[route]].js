@@ -20,6 +20,11 @@ import { autopilotMessage, autopilotPreview } from '../../_lib/autopilot.js';
 import { createMissions } from '../../_lib/missions.js';
 import { noteStatement } from '../../_lib/memory.js';
 import { THEMES, proposeTheme, themeFromText } from '../../_lib/themes.js';
+import { notesSummary, reviewNotes } from '../../_lib/notes.js';
+async function draftNotes(db, requestId) {
+  try { return parseList((await getOne(db, 'SELECT review_notes_json AS n FROM drafts WHERE request_id=? ORDER BY created_at DESC LIMIT 1', requestId))?.n); }
+  catch { return []; }
+}
 import { getMe, randomToken, sendTelegram, sendVoice, setWebhook, telegramReady } from '../../_lib/telegram.js';
 import { ACTIVATIONS, approvalEvidence, approvalState, assessReply, previewEmail, previewUrl, proposeReplyChanges, referenceCode, sha256Hex } from '../../_lib/approvals.js';
 const headers = { 'Cache-Control': 'private, no-store', 'Content-Type': 'application/json; charset=utf-8' };
@@ -117,7 +122,7 @@ const autoTranslationReady = (env) => typeof env?.AI?.run === 'function' && Stri
 const DRAFTS_SQL = 'SELECT id,request_id AS requestId,slug,menu_json AS menuJson,status,checks_json AS checksJson,revision,created_at AS createdAt,updated_at AS updatedAt FROM drafts ORDER BY created_at DESC LIMIT 500';
 // Fallback finche la migrazione 0005 (colonna provenance_json) non e applicata allo staging D1.
 async function draftRows(db) {
-  try { return await rows(db, DRAFTS_SQL.replace('checks_json AS checksJson,', 'checks_json AS checksJson,provenance_json AS provenanceJson,')); }
+  try { return await rows(db, DRAFTS_SQL.replace('checks_json AS checksJson,', 'checks_json AS checksJson,provenance_json AS provenanceJson,review_notes_json AS reviewNotesJson,')); }
   catch (error) {
     if (!/no such column/i.test(String(error?.message))) throw error;
     return rows(db, DRAFTS_SQL);
@@ -177,7 +182,7 @@ export async function readPendingMaterials(db, env = {}) {
       if (outcome.ok) await discardUntouchedJarvisDraft(db, material.request_id);
       const hasDraft = await getOne(db, 'SELECT id FROM drafts WHERE request_id=?', material.request_id);
       if (outcome.ok && request?.category && !hasDraft) {
-        try { await action(jarvis, 'generateDraft', { requestId: request.id }, env); outcome.drafted = true; }
+        try { await action(jarvis, 'generateDraft', { requestId: request.id }, env); outcome.drafted = true; outcome.notesText = notesSummary(await draftNotes(db, request.id)); }
         catch (error) { outcome.draftError = String(error?.message || 'errore').slice(0, 240); }
       }
       done.push({ material, request, outcome });
@@ -200,7 +205,7 @@ export async function runAutopilot(db, env = {}) {
         const next = preview.action === 'bozza' ? 'Bozza preparata da Jarvis: controllala in Revisione.' : `Proposta di Jarvis: ${preview.categoryLabel}. Conferma o cambia la categoria.`;
         await action(jarvis, 'updateRequest', { id: request.id, revision: request.revision, patch: { category: preview.category, nextStep: next.slice(0, 240) } }, env);
       }
-      if (preview.action === 'bozza') await action(jarvis, 'generateDraft', { requestId: request.id }, env);
+      if (preview.action === 'bozza') { await action(jarvis, 'generateDraft', { requestId: request.id }, env); preview.notes = await draftNotes(db, request.id); }
     } catch (error) {
       outcome = 'proponi';
       blocked = String(error?.message || 'Operazione non completata.').slice(0, 300);
@@ -235,7 +240,7 @@ export async function state(db, env = {}) {
   return {
     githubMode: String(env?.GITHUB_PROVIDER || 'mock').trim() === 'live' ? 'live' : 'mock',
     clients, requests, materials,
-    drafts: rawDrafts.map(({ menuJson, checksJson, provenanceJson, ...draft }) => ({ ...draft, menu: JSON.parse(menuJson), checks: JSON.parse(checksJson), provenance: parseList(provenanceJson),
+    drafts: rawDrafts.map(({ menuJson, checksJson, provenanceJson, reviewNotesJson, ...draft }) => ({ ...draft, menu: JSON.parse(menuJson), checks: JSON.parse(checksJson), provenance: parseList(provenanceJson), notes: parseList(reviewNotesJson),
       versions: versions.filter((version) => version.draftId === draft.id).map(({ menuJson: json, ...v }) => ({ ...v, menu: JSON.parse(json) })),
       sourceExtras: ['bozza', 'revisione', 'pronta_pr'].includes(draft.status)
         ? proposeSourceExtras(requests.find((entry) => entry.id === draft.requestId)?.sourceText, JSON.parse(menuJson)) : [] })),
@@ -481,15 +486,17 @@ export async function action(db, type, input, env = {}) {
       extraction.menu.tema = theme.tema;
       extraction.warnings.push(`Tema grafico proposto: ${THEMES[theme.tema]} (${theme.why}). Puoi cambiarlo in Revisione.`);
     }
+    // Tutto ciò che non è entrato nella bozza, riga per riga e già diviso per tipo.
+    extraction.notes = reviewNotes({ sourceText: combinedSource, uncertain: extraction.uncertain, extracted: extraction.extracted, mode: extraction.mode });
     const id = uid(), timestamp = now(), menuJson = JSON.stringify(extraction.menu);
     await auditedBatch(db, [
-      db.prepare('INSERT INTO drafts (id,request_id,slug,menu_json,status,checks_json,provenance_json,revision,created_at,updated_at) SELECT ?,id,?,?,?,?,?,?,?,? FROM requests WHERE id=? AND revision=?')
-        .bind(id, extraction.menu.id, menuJson, 'bozza', JSON.stringify(checksDefault()), JSON.stringify(extraction.provenance || []), 1, timestamp, timestamp, requestId, request.revision),
+      db.prepare('INSERT INTO drafts (id,request_id,slug,menu_json,status,checks_json,provenance_json,review_notes_json,revision,created_at,updated_at) SELECT ?,id,?,?,?,?,?,?,?,?,? FROM requests WHERE id=? AND revision=?')
+        .bind(id, extraction.menu.id, menuJson, 'bozza', JSON.stringify(checksDefault()), JSON.stringify(extraction.provenance || []), JSON.stringify(extraction.notes), 1, timestamp, timestamp, requestId, request.revision),
       db.prepare('INSERT INTO draft_versions (id,draft_id,revision,menu_json,actor,created_at) VALUES (?,?,?,?,?,?)')
         .bind(uid(), id, 1, menuJson, extraction.mode === 'aggiornamento' || extraction.mode === 'sostituzione' ? `menu_online_${extraction.mode}` : 'estrazione_deterministica', timestamp),
       db.prepare("UPDATE requests SET status='in_revisione',plan=COALESCE(?,plan),revision=revision+1,updated_at=? WHERE id=? AND revision=? AND EXISTS (SELECT 1 FROM drafts WHERE id=?)")
         .bind(inheritedPlan, timestamp, requestId, request.revision, id)
-    ], 'draft.generate', `Bozza da ${extraction.extracted.length} voci attestate; ${extraction.uncertain.length} righe da verificare.`, requestId,
+    ], 'draft.generate', `Bozza da ${extraction.extracted.length} voci attestate; ${extraction.notes.filter((n) => n.kind !== 'testo').length} cose da sistemare a mano${extraction.notes.some((n) => n.kind === 'testo') ? ` (più ${extraction.notes.filter((n) => n.kind === 'testo').length} righe di testo dell’email)` : ''}.`, requestId,
       { sql: 'SELECT 1 FROM drafts WHERE id=?', args: [id] });
     result = { id, extraction };
   } else if (type === 'preparePreview') {
