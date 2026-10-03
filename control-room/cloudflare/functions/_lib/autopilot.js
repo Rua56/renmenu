@@ -1,3 +1,4 @@
+import { notesSummary, reviewNotes } from './notes.js';
 // Autopilota di Jarvis (2026-10-02): appena arriva una richiesta email, Jarvis la classifica
 // e, se il locale ha scritto in modo esplicito nome e piano di un nuovo menu, prepara da solo
 // la bozza (con l'inglese). Le regole restano quelle di docs/renmenu-service-rules.md:
@@ -11,10 +12,12 @@ const plain = (value) => String(value || '').toLocaleLowerCase('it-IT').normaliz
 const RECEIVED_SUBJECT = /^Oggetto ricevuto:\s*/i;
 
 const PLAN_PATTERNS = [
-  ['standard', /\b(?:piano |menu |menù |formula )?standard\b/],
-  ['annuale', /\b(?:piano |formula |abbonamento )?annual[ei]\b/],
-  ['premium', /\bpremium\b|\bsu misura\b/]
+  ['standard', /\b(?:piano |menu |menù |formula )?standard\b|\b25 ?(?:€|euro)(?: al mese| mensili)?\b/],
+  ['annuale', /\b(?:piano |formula |abbonamento )?annual[ei]\b|\b249 ?(?:€|euro)/],
+  ['premium', /\bpremium\b|\bsu misura\b|\b490 ?(?:€|euro)/]
 ];
+// Il cliente cita un piano ma non ha deciso («forse», «non abbiamo ancora deciso»): il piano resta da confermare.
+const HESITANT = /\b(?:forse|non (?:abbiamo|ho|hanno) ancora deciso|non sappiamo|indecis\w*|stiamo valutando|valutando|stiamo pensando|ci pensiamo|magari|oppure|in alternativa)\b/;
 const NEW_MENU = /\bnuovo menu\b|\bmenu nuovo\b|\bmenu digitale\b|\b(?:attivare|creare|fare|realizzare|vorrei|vorremmo)\b[^.\n]{0,40}\bmenu\b|\bprova gratuita\b/;
 const UPDATE_RULES = [
   ['prezzo', /\b(?:cambi\w*|aggiorn\w*|modific\w*|alz\w*|abbass\w*)\b[^.\n]{0,40}\bprezz\w*|\bprezz\w*\b[^.\n]{0,30}\b(?:diventa|passa|ora|nuovo)\b/],
@@ -40,11 +43,12 @@ export function classifyRequest(subject, text) {
   const newMenu = rows.find((row) => NEW_MENU.test(plain(row.text)));
   const venue = venueFromSource(text);
   if (newMenu || (plans.size && venue)) {
-    const plan = plans.size === 1 ? [...plans.keys()][0] : null;
+    const hesitant = [...plans.values()].some((row) => HESITANT.test(plain(row.text)));
+    const plan = plans.size === 1 && !hesitant ? [...plans.keys()][0] : null;
     const reasons = [newMenu, ...plans.values()].filter(Boolean);
     return {
       category: plan ? `nuovo_${plan}` : null, kind: 'nuovo', plan, venue: venue || null,
-      explicitPlan: Boolean(plan), ambiguousPlan: plans.size > 1,
+      explicitPlan: Boolean(plan), ambiguousPlan: plans.size > 1 || (plans.size > 0 && hesitant), hesitant,
       reasons: [...new Map(reasons.map((row) => [row.line, row])).values()]
     };
   }
@@ -62,7 +66,7 @@ export const reasonText = (proposal) => proposal.reasons.map((row) => `${where(r
 export function autopilotPlan(request) {
   const proposal = classifyRequest(request.subject, request.source_text ?? request.sourceText);
   const entry = proposal.category ? categoryByCode(proposal.category) : null;
-  if (!entry && proposal.kind === 'nuovo') return { proposal, action: 'proponi', why: proposal.ambiguousPlan ? 'Il testo cita più piani: scegli tu.' : 'Il piano non è scritto nella richiesta: scegli tu Standard, Annuale o Premium.' };
+  if (!entry && proposal.kind === 'nuovo') return { proposal, action: 'proponi', why: proposal.ambiguousPlan ? (proposal.hesitant ? 'Il cliente cita un piano ma non ha ancora deciso: piano da confermare.' : 'Il testo cita più piani: scegli tu.') : 'Il piano non è scritto nella richiesta: scegli tu Standard, Annuale o Premium.' };
   if (!entry) return { proposal, action: 'chiedi', why: 'Richiesta non riconosciuta: decidi tu la categoria.' };
   if (['aggiornamento', 'prezzo'].includes(entry.kind)) {
     // Il menu da aggiornare è quello collegato al cliente (o indicato da Riccardo nella pratica):
@@ -72,7 +76,7 @@ export function autopilotPlan(request) {
     return { proposal, action: 'proponi', why: 'Non so ancora quale menu online aggiornare: imposta il Menu ID nella scheda cliente (una volta sola) o nella pratica, poi genera la bozza.' };
   }
   if (entry.kind !== 'nuovo') return { proposal, action: 'proponi', why: 'Per ora questo tipo di richiesta lo prepari tu.' };
-  if (!proposal.explicitPlan) return { proposal, action: 'proponi', why: proposal.ambiguousPlan ? 'Il testo cita più piani: scegli tu.' : 'Il piano non è scritto nella richiesta: scegli tu Standard, Annuale o Premium.' };
+  if (!proposal.explicitPlan) return { proposal, action: 'proponi', why: proposal.ambiguousPlan ? (proposal.hesitant ? 'Il cliente cita un piano ma non ha ancora deciso: piano da confermare.' : 'Il testo cita più piani: scegli tu.') : 'Il piano non è scritto nella richiesta: scegli tu Standard, Annuale o Premium.' };
   if (!proposal.venue) return { proposal, action: 'proponi', why: 'Manca una riga «Locale: …»: indica il nome del locale (Menu ID) e genera tu la bozza.' };
   return { proposal, action: 'bozza', why: '' };
 }
@@ -89,12 +93,18 @@ export function autopilotPreview(request) {
     categoryLabel: plan.proposal.category ? categoryByCode(plan.proposal.category).label : plan.proposal.kind === 'nuovo' ? 'Nuovo menu (piano da scegliere)' : null,
     plan: plan.proposal.plan, venue: plan.proposal.venue, reasons: reasonText(plan.proposal),
     items: extraction.extracted.length, uncertain: extraction.uncertain.length,
+    notes: reviewNotes({ sourceText: text, uncertain: extraction.uncertain, extracted: extraction.extracted }),
     extras: extras.filter((entry) => entry.type !== 'manuale').map((entry) => (entry.type === 'coperto' ? `coperto ${entry.value}` : `allergeni ${entry.name}`))
   };
 }
 
 /** Testo breve per Riccardo (notifica in app, email o push). Nessun dato personale del mittente. */
 export function autopilotMessage(subject, preview, outcome = preview.action) {
+  const base = autopilotBase(subject, preview, outcome);
+  const todo = preview.kind === 'nuovo' && Array.isArray(preview.notes) ? notesSummary(preview.notes) : '';
+  return todo ? `${base}\n\n${todo}` : base;
+}
+function autopilotBase(subject, preview, outcome) {
   const head = String(subject || 'Nuova richiesta').slice(0, 70);
   const facts = preview.kind !== 'nuovo' ? '' : `${preview.items} piatti letti${preview.uncertain ? `, ${preview.uncertain} righe da verificare` : ''}${preview.extras.length ? `, trovati ${preview.extras.join(' e ')}` : ''}`;
   if (outcome === 'bozza' && preview.menuId) return `Riccardo, aggiornamento pronto per il menu online «${preview.menuId}» (${preview.categoryLabel}): ho applicato solo le modifiche scritte nell’email, QR invariato. Apri Revisione per controllarle.`;

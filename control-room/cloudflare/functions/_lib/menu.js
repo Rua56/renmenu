@@ -141,7 +141,33 @@ const PRICE_ROW = /^(.{2,150}?)\s*(?:[—–\-:\t]|\.{2,})\s*(?:€\s*)?(\d{1,4}
 const LOOSE_ROW = /^(.{2,150}?[A-Za-zÀ-ÿ)'’.])\s+(€\s*)?(\d{1,4}(?:[,.]\d{1,2})?)\s*(€|euro|eur)?\.?$/i;
 // Frasi ("la margherita costa 7", "il fritto lo facciamo a 12"): non sono nomi di piatti.
 // Restano alla lettura assistita, che prende solo nome e prezzo presenti nella riga.
-const LOOSE_STOP = /\b(?:costa|costano|costerebbe|viene|vengono|invece|scusa|prezzo|prezzi|facciamo|mettiamo|vendiamo|euro|eur|lo|la|le|li|gli|il)$|\b(?:costa|costano|viene|vengono|invece|scusa|prezzo|facciamo|mettiamo|vendiamo|euro|eur|alle|dalle|ore|apriamo|chiudiamo|aperti|chiusi|orario|orari|tel|telefono|cell|via|piazza|numero|tavoli|posti|persone)\b|€|,\s|\s(?:a|al|da)$/i;
+const LOOSE_STOP = /\b(?:costa|costano|costerebbe|viene|vengono|invece|scusa|prezzo|prezzi|facciamo|mettiamo|vendiamo|euro|eur|lo|la|le|li|gli|il)$|\b(?:costa|costano|viene|vengono|invece|scusa|prezzo|facciamo|mettiamo|vendiamo|euro|eur|(?:alle|dalle|ore)\s*\d|apriamo|chiudiamo|aperti|chiusi|orario|orari|tel|telefono|cell|via|piazza|numero|tavoli|posti|persone)\b|€|,\s|\s(?:a|al|da)$/i;
+// Prezzi particolari scritti dal cliente: «18 € a persona (minimo 2 persone)» e «prezzo secondo pescato».
+// Il valore resta quello scritto; la condizione diventa una nota visibile sotto il piatto.
+const PER_PERSON = /^(.{2,150}?)\s*[—–\-:]?\s*(?:€\s*)?(\d{1,4}(?:[,.]\d{1,2})?)\s*(?:€|euro|eur)\s*(?:a|per|\/)\s*(?:persona|pers\.?|testa)\.?$/i;
+const MIN_PEOPLE = /\s*\(?\s*(?:min(?:imo|\.)?|almeno)\s*(\d+|due|tre|quattro|cinque|sei)\s*(?:persone|pers\.?|porzioni)\s*\)?/i;
+const VARIABLE = /^(.{2,150}?)\s*[—–\-:,]?\s*\(?\s*(?:(?:prezzo\s+)?(?:secondo(?: il| la)?|in base al(?:la)?|a seconda del(?:la)?)\s+(pescato|mercato|peso|disponibilit\w*|stagione|grammatura)(?:\s+del giorno)?|(?:prezzo\s+)?(variabile|da definire|a peso|al kg|al chilo|all'etto)|(s\.\s?q\.?))\s*\)?\.?$/i;
+const NUMBER_WORDS = { due: 2, tre: 3, quattro: 4, cinque: 5, sei: 6 };
+export function specialPriceRow(row) {
+  if (row.startsWith('[da verificare]') || /^(?:coperto|servizio)\b/i.test(row)) return null;
+  const person = row.match(PER_PERSON);
+  if (person && /[A-Za-zÀ-ÿ]{3}/.test(person[1])) {
+    const min = person[1].match(MIN_PEOPLE) || row.match(MIN_PEOPLE);
+    const name = person[1].replace(MIN_PEOPLE, ' ').replace(/\s{2,}/g, ' ').replace(/\s*[—–\-:,]\s*$/, '').trim();
+    const people = min ? (NUMBER_WORDS[min[1].toLowerCase()] || Number(min[1])) : null;
+    return { kind: 'a_persona', name, amount: person[2], note: people ? `Prezzo a persona, minimo ${people} persone` : 'Prezzo a persona', people };
+  }
+  const variable = row.match(VARIABLE);
+  if (variable && /[A-Za-zÀ-ÿ]{3}/.test(variable[1]) && !/\d/.test(variable[1])) {
+    const why = (variable[2] || variable[3] || variable[4] || '').toLowerCase();
+    const note = why === 'pescato' ? 'Prezzo variabile secondo il pescato del giorno'
+      : why === 'mercato' ? 'Prezzo secondo il mercato del giorno'
+        : /peso|kg|chilo|etto|grammatura/.test(why) ? 'Prezzo a peso, chiedere al personale'
+          : 'Prezzo variabile, chiedere al personale';
+    return { kind: 'variabile', name: variable[1].replace(/\s*(?:prezzo)\s*$/i, '').trim(), note };
+  }
+  return null;
+}
 export function priceRow(row) {
   if (row.startsWith('[da verificare]')) return null; // righe dubbie delle foto: mai un prezzo
   const strict = row.match(PRICE_ROW);
@@ -191,6 +217,16 @@ export function extractMenuFromText(venue, source, requestedSlug) {
       }
       continue;
     }
+    const special = specialPriceRow(row);
+    if (special) {
+      const item = { nome: { it: special.name } };
+      let price = '';
+      if (special.amount) { const [w, c = ''] = special.amount.replace('.', ',').split(','); price = `${w},${c.padEnd(2, '0')}`; item.prezzo = price; }
+      item.descrizione = { it: special.note };
+      section.voci.push(item);
+      items.push({ name: special.name, price, sourceLine: row, line: lineNumber, loose: false, special: special.kind, note: special.note });
+      continue;
+    }
     const match = priceRow(row);
     if (match) {
       const name = match.name.replace(/\s*[—–\-:]\s*$/, '').trim();
@@ -211,16 +247,18 @@ export function extractMenuFromText(venue, source, requestedSlug) {
   kept.forEach((s, sectionIndex) => {
     if (s.line) provenance.push({ path: `sezioni.${sectionIndex}.nome.it`, source: `riga ${s.line}`, value: s.nome.it, status: 'confermato' });
     s.voci.forEach((item, itemIndex) => {
-      const found = items.find((entry) => entry.name === item.nome.it && entry.price === item.prezzo);
+      const found = items.find((entry) => entry.name === item.nome.it && entry.price === (item.prezzo || ''));
       const where = found ? `riga ${found.line}` : 'nessuna fonte';
       provenance.push({ path: `sezioni.${sectionIndex}.voci.${itemIndex}.nome.it`, source: where, value: item.nome.it, status: 'confermato' });
-      provenance.push({ path: `sezioni.${sectionIndex}.voci.${itemIndex}.prezzo`, source: where, value: item.prezzo, status: 'confermato' });
+      if (item.prezzo !== undefined) provenance.push({ path: `sezioni.${sectionIndex}.voci.${itemIndex}.prezzo`, source: where, value: item.prezzo, status: 'confermato' });
+      if (found?.special) provenance.push({ path: `sezioni.${sectionIndex}.voci.${itemIndex}.descrizione.it`, source: where, value: item.descrizione.it, status: 'confermato' });
     });
   });
   const menu = { id: slug, nome: venue.trim(), lingue: ['it'], sezioni: kept.map(({ nome, voci }) => ({ nome, voci })) };
   return { menu, extracted: items, uncertain: unknown, provenance, warnings: [
     'Allergeni, ingredienti, coperto, contatti e traduzioni non sono stati dedotti.',
-    ...(items.some((i) => i.loose) ? [`${items.filter((i) => i.loose).length} prezzi scritti senza € (es. “Fritto misto 10”): controlla che siano davvero prezzi.`] : []),
+    ...items.filter((i) => i.special).map((i) => `«${i.name}»: ${i.special === 'variabile' ? 'senza prezzo fisso' : `${i.price} €`} con la nota «${i.note}» (dalla riga ${i.line}: “${i.sourceLine.slice(0, 90)}”). Controlla la nota.`),
+    ...(items.some((i) => i.loose) ? [`${items.filter((i) => i.loose).length} prezzi scritti senza €, controlla che siano davvero prezzi: ${items.filter((i) => i.loose).map((i) => `«${i.name}» ${i.price}`).join(', ')}.`] : []),
     ...(unknown.length ? [`${unknown.length} righe senza prezzo o formato riconosciuto richiedono controllo.`] : [])
   ] };
 }
