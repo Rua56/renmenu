@@ -142,6 +142,9 @@ describe('Comandi vocali di Jarvis', () => {
       const voice = calls.find((c) => c.method === 'sendVoice');
       assert.ok(voice, 'risposta a voce');
       assert.match(voice.body.caption, /«Jarvis, all’Osteria Viva.*»[\s\S]*Ho preparato l’aggiornamento di «Osteria Viva»/);
+      const spokenText = calls.find((c) => c.method === 'tts').body.text;
+      assert.match(spokenText, /^Fatto\./, 'a voce solo la risposta');
+      assert.doesNotMatch(spokenText, /spritz ora costa 5 euro»/);
       assert.equal(await db.prepare('SELECT COUNT(*) AS n FROM jarvis_missions').bind().first().n, 0, 'niente affidato né pubblicato');
     } finally { globalThis.fetch = previous; db.close(); }
   });
