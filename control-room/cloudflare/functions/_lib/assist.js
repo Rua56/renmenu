@@ -6,6 +6,7 @@
 // così la provenienza resta "riga N" del testo originale. Niente prezzi o piatti inventati.
 import { CLOUDFLARE_FREE_MODEL } from './ai-live.js';
 import { extractMenuFromText } from './menu.js';
+import { priceCorrections } from './corrections.js';
 
 const MAX_LINES = 60;
 const norm = (value) => String(value || '').toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/[^a-z0-9]+/g, ' ').trim();
@@ -61,6 +62,8 @@ export async function assistExtraction(ai, venue, source, slug, base, { timeoutM
   // Righe non lette che contengono testo: titoli candidati e righe con almeno un numero.
   const candidates = lines.map((text, index) => ({ text: text.trim(), index }))
     .filter(({ text, index }) => text && !text.startsWith('[da verificare]') && !known.has(index + 1) && /[A-Za-zÀ-ÿ]{2}/.test(text) && text.length <= 220)
+    // Le correzioni di prezzo di un piatto già letto non sono piatti nuovi: le gestisce corrections.js.
+    .filter(({ text }) => !priceCorrections([text], base.menu).length)
     .slice(0, MAX_LINES);
   if (!candidates.some(({ text }) => /\d/.test(text))) return base;
   let proposals = [];
@@ -70,6 +73,8 @@ export async function assistExtraction(ai, venue, source, slug, base, { timeoutM
     const candidate = Number.isInteger(proposal?.id) ? candidates[proposal.id] : null;
     const accepted = candidate && acceptProposal(candidate.text, proposal);
     if (!accepted) continue;
+    // Nome già presente nel menu (es. «fritto misto» quando c'è «Fritto misto dell'Adriatico»): non è un piatto nuovo.
+    if (!accepted.title && base.extracted.some((item) => { const a = norm(accepted.name), b = norm(item.name); return a.length > 3 && (b.includes(a) || a.includes(b)); })) continue;
     rewritten[candidate.index] = accepted.title ? `# ${accepted.title}` : `${accepted.name} — ${accepted.price}`;
     if (!accepted.title) assisted.push(candidate.index + 1);
   }
