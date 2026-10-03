@@ -256,11 +256,29 @@ export function createMissions(deps) {
     }
     return move(db, mission, 'verifica', 'Menu unito a main: verifico la pubblicazione online.');
   }
+  // Menu online: la scheda cliente si allinea (Menu ID, link, piano e prova/rinnovo dell'attivazione),
+  // così Jarvis lo riconosce subito per gli aggiornamenti a voce e nel briefing.
+  async function syncClientAfterPublish(db, draft, request, publicUrl) {
+    const client = await getOne(db, 'SELECT * FROM clients WHERE id=?', request.client_id);
+    if (!client || (client.menu_id && client.menu_id !== draft.slug)) return;
+    const day = romeDate();
+    const plus = (months) => { const d = new Date(`${day}T12:00:00Z`); d.setUTCMonth(d.getUTCMonth() + months); return d.toISOString().slice(0, 10); };
+    const plusDays = (n) => new Date(Date.parse(`${day}T12:00:00Z`) + n * 86_400_000).toISOString().slice(0, 10);
+    const fresh = request.kind === 'nuovo' && ACTIVATION_BY_PLAN[request.plan];
+    const plan = fresh ? request.plan : client.plan;
+    const payment = !fresh ? client.payment_status : request.plan === 'standard' ? 'in_prova' : 'attivo';
+    const trial = fresh && request.plan === 'standard' ? plusDays(30) : client.trial_ends_at;
+    const renewal = fresh && request.plan === 'annuale' ? plus(12) : fresh && request.plan === 'premium' ? plus(1) : client.renewal_at;
+    await auditedBatch(jarvisDb(db), [db.prepare('UPDATE clients SET menu_id=?,menu_url=?,plan=?,payment_status=?,trial_ends_at=?,renewal_at=?,revision=revision+1,updated_at=? WHERE id=?')
+      .bind(draft.slug, publicUrl || client.menu_url, plan, payment, trial, renewal, now(), client.id)],
+    'client.publish_sync', `Scheda cliente aggiornata dopo la pubblicazione: menu ${draft.slug}${fresh ? `, piano ${PLAN_LABEL[request.plan]}` : ''}.`, request.id).catch(() => {});
+  }
   async function stepVerifying(db, env, mission) {
     if (Date.now() - Date.parse(mission.step_started_at) < 75_000) return mission;
     const { draft, request, menu } = await load(db, mission);
     try {
       const done = (await action(jarvisDb(db), 'githubVerifyPublication', { draftId: draft.id, revision: draft.revision, requestRevision: request.revision, confirmation: 'CONFERMO VERIFICA PUBBLICAZIONE' }, env)).result;
+      await syncClientAfterPublish(db, draft, request, done.publicUrl);
       const next = await move(db, mission, 'completata', `Menu online e verificato: ${done.publicUrl}`);
       await tell(db, env, next, 'menu online', `Fatto: «${menu.nome}» è online e verificato.\n${done.publicUrl}\nPR #${done.prNumber}.`, null, 'importante');
       return next;

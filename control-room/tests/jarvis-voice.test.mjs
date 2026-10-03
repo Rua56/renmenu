@@ -198,4 +198,19 @@ describe('Comandi vocali di Jarvis', () => {
       assert.equal((await db.prepare('SELECT COUNT(*) AS n FROM requests').bind().first()).n, 0);
     } finally { globalThis.fetch = previous; db.close(); }
   });
+  it('coperto detto a voce sul menu online: «aggiungi nella sezione informazioni … un coperto da 3 euro»', async () => {
+    const db = database();
+    const previous = globalThis.fetch;
+    globalThis.fetch = fakeFetch;
+    try {
+      await db.prepare("INSERT INTO clients (id,name,email,plan,menu_id,internal_notes,revision,created_at,updated_at) VALUES ('c1','Osteria Viva',NULL,'standard','osteria-viva','',1,'2026-10-01','2026-10-01')").bind().run();
+      await missions.putSetting(db, 'telegram_chat_id', '42');
+      const said = 'Jarvis, aggiungi nella sezione informazioni del menu Osteria Viva un coperto da 3 euro';
+      const env = testEnv(db, { TELEGRAM_BOT_TOKEN: TOKEN, GITHUB_PROVIDER: 'live', GITHUB_TOKEN: 't', GITHUB_FETCH: fakeFetch, TRANSLATION_PROVIDER: 'disabled', AI: aiSaying('', { intent: 'aggiorna_menu', locale: 'Osteria Viva', risposta: '' }) });
+      await missions.telegramUpdate(db, env, { message: { chat: { id: 42, type: 'private' }, text: said } });
+      const draft = await db.prepare('SELECT menu_json FROM drafts').bind().first();
+      assert.ok(draft, JSON.stringify(calls.at(-1)?.body));
+      assert.equal(JSON.parse(draft.menu_json).coperto, '3,00');
+    } finally { globalThis.fetch = previous; db.close(); }
+  });
 });
