@@ -789,6 +789,8 @@ export async function action(db, type, input, env = {}) {
     assert(draft, 'Bozza non trovata.', 404);
     assert(revision === draft.revision, 'Revisione superata. Ricarica.', 409);
     assert(['bozza', 'revisione', 'pronta_pr'].includes(draft.status), 'Revisione chiusa.', 409);
+    const owning = await getOne(db, 'SELECT status FROM requests WHERE id=?', draft.request_id);
+    assert(!['completata', 'archiviata', 'chiusa'].includes(owning?.status), 'Pratica chiusa: menu già pubblicato.', 409);
     const selections = p.checks;
     assert(selections && typeof selections === 'object' && ['prices', 'allergens', 'languages', 'clientApproval'].every((key) => typeof selections[key] === 'boolean'), 'Conferme incomplete.');
     const checks = Object.fromEntries(['prices', 'allergens', 'languages', 'clientApproval'].map((key) => [key, selections[key]]));

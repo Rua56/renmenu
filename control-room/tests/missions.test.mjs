@@ -261,3 +261,19 @@ describe('Briefing del mattino', () => {
     } finally { db.close(); }
   });
 });
+
+describe('Pratiche già pubblicate', () => {
+  it('non si riaffidano a Jarvis e non si rivedono', async () => {
+    const db = database();
+    try {
+      await run(db, buildImportBatch(event('c1', 'Nuovo menu', SOURCE)));
+      await action(db, 'runAutopilot', {});
+      const draft = (await call(db, 'state')).body.drafts[0];
+      await db.prepare("UPDATE requests SET status='completata'").bind().run();
+      const again = await action(db, 'entrustToJarvis', { draftId: draft.id, revision: draft.revision, confirmation: 'AFFIDO A JARVIS' });
+      assert.equal(again.status, 409);
+      assert.match(again.body.error, /già pubblicato/);
+      assert.equal((await db.prepare("SELECT status FROM requests").bind().first()).status, 'completata', 'resta chiusa');
+    } finally { db.close(); }
+  });
+});
