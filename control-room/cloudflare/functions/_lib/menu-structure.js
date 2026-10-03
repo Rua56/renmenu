@@ -152,6 +152,14 @@ export function degustazionePrice(row) {
   if (!unit.length && !prices[0].currency && !/prezzo|costo/i.test(row)) return null;
   return positive(prices[0].amount) ? { amount: prices[0].amount, unit: unit.join(', ') } : null;
 }
+/** Riga senza prezzo dentro il percorso che è una regola o una nota, non una portata. */
+export function degustazioneNote(row) {
+  const text = row.replace(/^>\s*/, '').trim();
+  if (amounts(text).length || text.length > 200) return null;
+  const rule = /\b(?:per tutto il tavolo|intero tavolo|tutti i commensali|minimo\s+\d+\s+persone|almeno\s+\d+\s+persone|bevande\s+(?:escluse|incluse)|vini\s+(?:esclusi|inclusi)|acqua e caff[eè]|su prenotazione|prenotazione obbligatoria)\b/i;
+  const sentence = /\.$/.test(text) && text.split(/\s+/).length >= 5 && /\b(?:è|sono|viene|vengono|servit\w*|può|possono|richiede|prevede)\b/i.test(text);
+  return rule.test(text) || sentence ? text : null;
+}
 /** «Abbinamento vini 25 €», «con abbinamento calici +25»: supplemento del percorso. */
 export function pairingRow(row) {
   if (!/\babbinament\w*|\bcalici in abbinamento|\bwine pairing\b/i.test(row)) return null;

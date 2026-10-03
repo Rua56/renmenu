@@ -151,6 +151,30 @@ describe('Premium su misura', () => {
     } finally { db.close(); }
   });
 
+  it('email di prova «Enoteca Isonzo Test»: Premium, percorso e vini calice/bottiglia fino alla bozza valida', async () => {
+    const db = database();
+    try {
+      const text = readFileSync(new URL('./fixtures-email-premium-isonzo.txt', import.meta.url), 'utf8');
+      const requestId = await importEmail(db, email('iso1', 'Nuovo menu Premium su misura · Enoteca Isonzo Test (TEST)', text));
+      const run = await action(db, 'runAutopilot', {});
+      assert.equal(run.status, 200, String(run.body.error));
+      assert.equal(run.body.state.requests.find((r) => r.id === requestId).category, 'nuovo_premium');
+      const generated = await action(db, 'generateDraft', { requestId });
+      assert.equal(generated.status, 200, String(generated.body.error));
+      const draft = generated.body.state.drafts.find((d) => d.requestId === requestId);
+      assert.deepEqual(validateMenu(draft.menu).errors, []);
+      assert.ok(draft.menu.premium, 'blocco Premium');
+      const degu = draft.menu.sezioni.find((s) => s.tipo === 'degustazione');
+      assert.equal(degu.prezzo, '55,00');
+      assert.equal(degu.voci.length, 5);
+      const wines = draft.menu.sezioni.filter((s) => /vini|bollicine/i.test(s.nome.it)).flatMap((s) => s.voci);
+      assert.equal(wines.length, 7);
+      assert.ok(wines.every((v) => Array.isArray(v.prezzi) && v.prezzi.length && !('prezzo' in v)));
+      assert.ok(draft.menu.coperto === '3,00' || draft.sourceExtras.some((e) => e.type === 'coperto' && e.value === '3,00'), JSON.stringify([draft.menu.coperto, draft.sourceExtras]));
+      assert.ok(!draft.menu.sezioni.flatMap((s) => s.voci).some((v) => /allergen/i.test(JSON.stringify(v.allergeni || ''))));
+    } finally { db.close(); }
+  });
+
   it('i menu Standard restano invariati: tema sì, premium no', async () => {
     const db = database();
     try {
