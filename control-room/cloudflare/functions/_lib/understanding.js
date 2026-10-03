@@ -75,7 +75,7 @@ const RX = {
   pubblica: /\b(pubblic\w*|metti\w*\s+online|mandal\w*\s+online|vai\s+online|online\s+subito)\b/,
   ricorda: /\b(ricorda\w*\s+che|memorizz\w*|segna\w*\s+che|segnat\w*|annota\w*|tieni\s+a\s+mente|prendi\s+nota)\b/,
   crea: /\b(crea\w*|apri\w*|nuov[ao]|registra\w*|inizia\w*)\b.*\b(pratica|cliente|menu|locale)\b/,
-  modifica: /\b(\d+(?:[.,]\d+)?|euro|€|(?:uno|due|tre|quattro|cinque|sei|sette|otto|nove|dieci|undici|dodici|tredici|quattordici|quindici|sedici|diciassette|diciotto|diciannove|venti\w*|trenta\w*|quaranta\w*|cinquanta)|alz\w*|port\w*\s+a|prezz\w*|cost\w*|aument\w*|abbass\w*|scont\w*|togli\w*|tolg\w*|rimuov\w*|elimin\w*|aggiung\w*|inserisc\w*|metti\w*|cambi\w*|modific\w*|sostitu\w*|coperto|finit\w*|esaurit\w*|terminat\w*|non\b[a-z ]{0,30}\bpiu)\b/,
+  modifica: /\b(\d+(?:[.,]\d+)?|euro|€|(?:uno|due|tre|quattro|cinque|sei|sette|otto|nove|dieci|undici|dodici|tredici|quattordici|quindici|sedici|diciassette|diciotto|diciannove|venti\w*|trenta\w*|quaranta\w*|cinquanta)|alz\w*|port\w*\s+a|prezz\w*|cost\w*|aument\w*|abbass\w*|scont\w*|togli\w*|tolg\w*|rimuov\w*|elimin\w*|aggiung\w*|inserisc\w*|metti\w*|cambi\w*|modific\w*|sostitu\w*|coperto|tema|temi|color\w*|grafica|finit\w*|esaurit\w*|terminat\w*|non\b[a-z ]{0,30}\bpiu)\b/,
   domanda: /\?|\b(quant[oiae]|quale|quali|come|cosa|quando|dove|perch\w*|dimmi|sai|mostra\w*|elenca\w*|situazione|riepilog\w*)\b/
 };
 
