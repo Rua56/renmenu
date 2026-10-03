@@ -90,6 +90,10 @@
   [data-theme='dark'] .tag--top { color: #1a140f; }
   .all { display: inline-flex; gap: 4px; align-items: center; font-size: var(--text-xs); color: var(--color-text-faint); }
   .all i { font-style: normal; min-width: 20px; height: 20px; padding: 0 5px; border-radius: 10px; display: inline-grid; place-items: center; font-size: 11px; font-weight: 600; color: var(--color-text-muted); background: var(--color-surface-offset); }
+  .voce__prezzo--var { display: flex; flex-direction: column; align-items: flex-end; gap: 2px; border-radius: var(--radius-md, 12px); }
+  .voce__var { white-space: nowrap; }
+  .voce__var small, .degu__prezzo small { font-weight: 400; opacity: .75; font-size: .8em; margin-right: 4px; }
+  .degu__prezzo { font-family: var(--font-display); font-weight: 600; font-size: var(--text-lg, 1.15rem); margin: 0 0 12px; }
   .voce__prezzo { font-family: var(--font-display); font-size: var(--text-base); font-weight: 600; white-space: nowrap; font-variant-numeric: tabular-nums; padding: 4px 12px; border-radius: var(--radius-full); color: var(--m-accent); background: color-mix(in oklab, var(--m-accent) 10%, var(--color-surface)); }
   .empty { text-align: center; color: var(--color-text-muted); padding: var(--space-12) 0; font-size: var(--text-sm); }
 
@@ -215,11 +219,11 @@
   document.documentElement.lang = lang;
 
   const L = {
-    it: { powered: 'Menù digitale realizzato con', cerca: 'Cerca un piatto…', nessuno: 'Nessun piatto trovato.', info: 'Informazioni', allergeni: 'Allergeni', coperto: 'Coperto', mappa: 'Apri in Google Maps', chiama: 'Chiama', oggi: 'Oggi', mappa2: 'Mappa', benvenuti: 'Benvenuti', piatti: 'piatti', piatto: 'piatto', su: 'Torna su' },
-    en: { powered: 'Digital menu made with', cerca: 'Search a dish…', nessuno: 'No dishes found.', info: 'Info', allergeni: 'Allergens', coperto: 'Cover charge', mappa: 'Open in Google Maps', chiama: 'Call', oggi: 'Today', mappa2: 'Map', benvenuti: 'Welcome', piatti: 'dishes', piatto: 'dish', su: 'Back to top' },
-    de: { powered: 'Digitale Speisekarte erstellt mit', cerca: 'Gericht suchen…', nessuno: 'Keine Gerichte gefunden.', info: 'Info', allergeni: 'Allergene', coperto: 'Gedeck', mappa: 'In Google Maps öffnen', chiama: 'Anrufen', oggi: 'Heute', mappa2: 'Karte', benvenuti: 'Willkommen', piatti: 'Gerichte', piatto: 'Gericht', su: 'Nach oben' },
-    fr: { powered: 'Menu numérique réalisé avec', cerca: 'Rechercher un plat…', nessuno: 'Aucun plat trouvé.', info: 'Infos', allergeni: 'Allergènes', coperto: 'Couvert', mappa: 'Ouvrir dans Google Maps', chiama: 'Appeler', oggi: "Aujourd'hui", mappa2: 'Plan', benvenuti: 'Bienvenue', piatti: 'plats', piatto: 'plat', su: 'Haut de page' },
-    es: { powered: 'Menú digital creado con', cerca: 'Buscar un plato…', nessuno: 'No se encontraron platos.', info: 'Información', allergeni: 'Alérgenos', coperto: 'Cubierto', mappa: 'Abrir en Google Maps', chiama: 'Llamar', oggi: 'Hoy', mappa2: 'Mapa', benvenuti: 'Bienvenidos', piatti: 'platos', piatto: 'plato', su: 'Volver arriba' }
+    it: { persona: 'a persona', powered: 'Menù digitale realizzato con', cerca: 'Cerca un piatto…', nessuno: 'Nessun piatto trovato.', info: 'Informazioni', allergeni: 'Allergeni', coperto: 'Coperto', mappa: 'Apri in Google Maps', chiama: 'Chiama', oggi: 'Oggi', mappa2: 'Mappa', benvenuti: 'Benvenuti', piatti: 'piatti', piatto: 'piatto', su: 'Torna su' },
+    en: { persona: 'per person', powered: 'Digital menu made with', cerca: 'Search a dish…', nessuno: 'No dishes found.', info: 'Info', allergeni: 'Allergens', coperto: 'Cover charge', mappa: 'Open in Google Maps', chiama: 'Call', oggi: 'Today', mappa2: 'Map', benvenuti: 'Welcome', piatti: 'dishes', piatto: 'dish', su: 'Back to top' },
+    de: { persona: 'pro Person', powered: 'Digitale Speisekarte erstellt mit', cerca: 'Gericht suchen…', nessuno: 'Keine Gerichte gefunden.', info: 'Info', allergeni: 'Allergene', coperto: 'Gedeck', mappa: 'In Google Maps öffnen', chiama: 'Anrufen', oggi: 'Heute', mappa2: 'Karte', benvenuti: 'Willkommen', piatti: 'Gerichte', piatto: 'Gericht', su: 'Nach oben' },
+    fr: { persona: 'par personne', powered: 'Menu numérique réalisé avec', cerca: 'Rechercher un plat…', nessuno: 'Aucun plat trouvé.', info: 'Infos', allergeni: 'Allergènes', coperto: 'Couvert', mappa: 'Ouvrir dans Google Maps', chiama: 'Appeler', oggi: "Aujourd'hui", mappa2: 'Plan', benvenuti: 'Bienvenue', piatti: 'plats', piatto: 'plat', su: 'Haut de page' },
+    es: { persona: 'por persona', powered: 'Menú digital creado con', cerca: 'Buscar un plato…', nessuno: 'No se encontraron platos.', info: 'Información', allergeni: 'Alérgenos', coperto: 'Cubierto', mappa: 'Abrir en Google Maps', chiama: 'Llamar', oggi: 'Hoy', mappa2: 'Mapa', benvenuti: 'Bienvenidos', piatti: 'platos', piatto: 'plato', su: 'Volver arriba' }
   };
   // Premium su misura: stessi dati, aspetto deciso dal blocco «premium» (?standard=1 mostra la versione Standard).
   if (menu.premium && typeof menu.premium === 'object' && params.get('standard') !== '1') {
@@ -268,12 +272,14 @@
       if (!voci.length) return;
       total += voci.length;
       const count = `${voci.length} ${voci.length === 1 ? S().piatto : S().piatti}`;
-      html += `<section class="sezione${revealed ? '' : ' reveal'}" id="${slug(s, i)}" data-tono="${i % 4}"><div class="sezione__head"><span class="sezione__icon">${iconFor(s)}</span><h2>${esc(t(s.nome))}</h2>${s.descrizione && t(s.descrizione) ? `<span class="sezione__desc">${esc(t(s.descrizione))}</span>` : `<span class="sezione__count">${count}</span>`}</div><div class="voci">`;
+      html += `<section class="sezione${revealed ? '' : ' reveal'}" id="${slug(s, i)}" data-tono="${i % 4}"><div class="sezione__head"><span class="sezione__icon">${iconFor(s)}</span><h2>${esc(t(s.nome))}</h2>${s.descrizione && t(s.descrizione) ? `<span class="sezione__desc">${esc(t(s.descrizione))}</span>` : s.tipo === 'degustazione' ? '' : `<span class="sezione__count">${count}</span>`}</div>${s.tipo === 'degustazione' && s.prezzo ? `<div class="degu__prezzo">€ ${esc(s.prezzo)} <small>${esc(t(s.unita) || S().persona)}</small></div>` : ''}<div class="voci${s.tipo === 'degustazione' ? ' voci--degu' : ''}">`;
       html += voci.map(v => {
         const tags = (v.tag || []).map(k => R.tags[k] ? `<span class="tag ${k === 'top' ? 'tag--top' : ''}">${R.tags[k].icon} ${esc(R.tags[k][lang] || R.tags[k].it)}</span>` : '').join('');
         const all = (v.allergeni || []).length ? `<span class="all" title="${S().allergeni}">${S().allergeni} ${v.allergeni.map((k) => `<i>${esc(k)}</i>`).join('')}</span>` : '';
-        const prezzo = v.prezzo ? `€ ${esc(v.prezzo)}` : '';
-        return `<article class="voce${(v.tag || []).includes('top') ? ' voce--top' : ''}"><div><div class="voce__nome">${esc(t(v.nome))}</div>${v.descrizione && t(v.descrizione) ? `<p class="voce__desc">${esc(t(v.descrizione))}</p>` : ''}${(tags || all) ? `<div class="voce__meta">${tags}${all}</div>` : ''}</div>${prezzo ? `<div class="voce__prezzo">${prezzo}${v.unita ? `<small>${esc(v.unita)}</small>` : ''}</div>` : ''}</article>`;
+        // Più prezzi sulla stessa voce (calice / bottiglia, piccola / grande): uno per riga, con l'etichetta.
+        const varianti = (v.prezzi || []).filter(p => p && p.prezzo);
+        const prezzo = varianti.length ? varianti.map(p => `<span class="voce__var"><small>${esc(t(p.etichetta))}</small> € ${esc(p.prezzo)}</span>`).join('') : v.prezzo ? `€ ${esc(v.prezzo)}` : '';
+        return `<article class="voce${(v.tag || []).includes('top') ? ' voce--top' : ''}"><div><div class="voce__nome">${esc(t(v.nome))}</div>${v.descrizione && t(v.descrizione) ? `<p class="voce__desc">${esc(t(v.descrizione))}</p>` : ''}${(tags || all) ? `<div class="voce__meta">${tags}${all}</div>` : ''}</div>${prezzo ? `<div class="voce__prezzo${varianti.length ? ' voce__prezzo--var' : ''}">${prezzo}${v.unita ? `<small>${esc(v.unita)}</small>` : ''}</div>` : ''}</article>`;
       }).join('');
       html += `</div></section>`;
     });

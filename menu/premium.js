@@ -108,7 +108,7 @@
       const desc = s.descrizione && t(s.descrizione) ? `<p class="pm-sezione__desc">${esc(t(s.descrizione))}</p>` : '';
       if (s.tipo === 'degustazione') {
         const pp = s.prezzo ? `<span class="pm-degu__prezzo">${price(s.prezzo)}<small>${esc(t(s.unita) || S().persona)}</small></span>` : '';
-        return `<section class="pm-sezione" id="pm-sez-${i}"><div class="pm-degu"><span class="pm-sezione__num">${num}</span><h2>${esc(t(s.nome))}</h2>${desc}${pp}<ol>${voci.map((v) => `<li><b>${esc(t(v.nome))}</b>${v.descrizione && t(v.descrizione) ? `<span>${esc(t(v.descrizione))}</span>` : ''}</li>`).join('')}</ol></div></section>`;
+        return `<section class="pm-sezione" id="pm-sez-${i}"><div class="pm-degu"><span class="pm-sezione__num">${num}</span><h2>${esc(t(s.nome))}</h2>${desc}${pp}<ol>${voci.map((v) => `<li><b>${esc(t(v.nome))}</b>${v.descrizione && t(v.descrizione) ? `<span>${esc(t(v.descrizione))}</span>` : ''}${v.prezzo ? `<em class="pm-degu__extra">+ ${price(v.prezzo)}</em>` : ''}</li>`).join('')}</ol></div></section>`;
       }
       const head = style.direzione === 'bistrot' ? `<div class="pm-sezione__head"><div><h2>${esc(t(s.nome))}</h2>${desc}</div><span class="pm-sezione__num">${num}</span></div>`
         : `<div class="pm-sezione__head"><span class="pm-sezione__num">${num}</span><h2>${esc(t(s.nome))}</h2>${desc}</div>`;
