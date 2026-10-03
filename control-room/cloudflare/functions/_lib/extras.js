@@ -38,8 +38,10 @@ export function detectExtra(sentence, menu) {
   // "Il coperto è 2,50", "Aggiungete il coperto di 3 euro", "vorrei mettere anche il coperto a 2€":
   // un solo importo nella frase, altrimenti decide Riccardo.
   const amounts = lower.match(/\d{1,4}(?:[,.]\d{1,2})?/g) || [];
-  const cover = amounts.length === 1 && lower.match(/^(?:[a-zà-ÿ'’\s]{0,40}\s)?(?:il\s+)?coperto\b[^\d]*(\d{1,2})(?:[,.](\d{1,2}))?\s*(?:€|euro)?(?:\s+(?:a\s+persona|a\s+testa|per\s+persona))?\s*\.?$/);
+  const cover = amounts.length === 1 && lower.match(/^(?:[a-zà-ÿ'’,\s]{0,120}\s)?(?:il\s+|un\s+)?coperto\b[^\d]*(\d{1,2})(?:[,.](\d{1,2}))?\s*(?:€|euro)?(?:\s+(?:a\s+persona|a\s+testa|per\s+persona))?\s*\.?$/);
   // Importo insolito per un coperto (oltre 10 €): può essere un refuso, decide Riccardo.
+  // Negazioni o rimozioni ("togliete il coperto di 2 euro", "non mettete il coperto"): decide Riccardo.
+  if (cover && /\b(?:non|togli\w*|toglie\w*|rimuov\w*|elimin\w*|senza|niente)\b/.test(lower.slice(0, lower.indexOf('coperto')))) return { type: 'manuale', source: text, note: 'Coperto da togliere o frase negativa: decidi tu.' };
   if (cover && Number(`${cover[1]}.${cover[2] || 0}`) > 10) return { type: 'manuale', source: text, note: `coperto di ${Number(cover[1])},${(cover[2] || '').padEnd(2, '0')} €: importo insolito, confermalo tu` };
   if (cover) return { type: 'coperto', value: `${Number(cover[1])},${(cover[2] || '').padEnd(2, '0')}`, source: text };
   if (/\bcoperto\b/.test(lower)) return { type: 'manuale', source: text, note: 'Coperto citato senza un importo chiaro: inseriscilo a mano.' };
