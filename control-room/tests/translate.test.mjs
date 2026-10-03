@@ -82,3 +82,21 @@ describe('titoli in maiuscolo', () => {
     assert.equal(menu.sezioni[0].nome.it, 'Secondi');
   });
 });
+
+describe('Traduzione: secondo tentativo a metà se la risposta è tagliata', () => {
+  it('il primo blocco fallisce, i due mezzi blocchi riescono: tutto tradotto', async () => {
+    const { translateMenu } = await import('../cloudflare/functions/_lib/translate.js');
+    const menu = { id: 'x', nome: 'X', lingue: ['it'], sezioni: [{ nome: { it: 'Primi' }, voci: Array.from({ length: 8 }, (_, i) => ({ nome: { it: `Piatto numero ${'abcdefgh'[i]}` }, prezzo: '10,00' })) }] };
+    let calls = 0;
+    const ai = { run: async (_m, payload) => {
+      calls += 1;
+      if (calls === 1) throw new Error('risposta tagliata');
+      const items = JSON.parse(payload.messages[1].content.split('\n').slice(1).join('\n'));
+      return { response: { translations: items.map((it) => ({ id: it.id, en: it.it.replace('Piatto numero', 'Dish number').replace('Primi', 'First courses') })) } };
+    } };
+    const out = await translateMenu(ai, menu);
+    assert.equal(out.translated, out.total);
+    assert.deepEqual(out.menu.lingue, ['it', 'en']);
+    assert.equal(out.menu.sezioni[0].voci[7].nome.en, 'Dish number h');
+  });
+});
