@@ -160,4 +160,42 @@ describe('Comandi vocali di Jarvis', () => {
       assert.match(calls.at(-1).body.text, /nessun menu aspetta il tuo SÌ/);
     } finally { globalThis.fetch = previous; db.close(); }
   });
+  it('«crea una nuova pratica per Antoine I love You con piano standard» → cliente + pratica, poi la foto si collega da sola', async () => {
+    const db = database();
+    const previous = globalThis.fetch;
+    globalThis.fetch = fakeFetch;
+    try {
+      calls.length = 0;
+      await missions.putSetting(db, 'telegram_chat_id', '42');
+      const store = new Map();
+      const BUCKET = { put: async (k, v) => { store.set(k, v); }, get: async () => null, delete: async () => {} };
+      const env = testEnv(db, { TELEGRAM_BOT_TOKEN: TOKEN, BUCKET, AI: aiSaying('', { intent: 'crea_pratica', locale: 'Antoine I love You', risposta: '' }) });
+      await missions.telegramUpdate(db, env, { message: { chat: { id: 42, type: 'private' }, text: 'Jarvis, crea una nuova pratica per il locale Antoine I love You con un piano standard e attendi nuove direttive' } });
+      const request = await db.prepare('SELECT r.*,c.name AS client FROM requests r JOIN clients c ON c.id=r.client_id').bind().first();
+      assert.deepEqual([request.client, request.category, request.plan, request.kind, request.status], ['Antoine I love You', 'nuovo_standard', 'standard', 'nuovo', 'nuova']);
+      assert.match(calls.at(-1).body.text, /Ho creato il cliente «Antoine I love You»/);
+      await missions.telegramUpdate(db, env, { message: { chat: { id: 42, type: 'private' }, photo: [{ file_id: 'p1', width: 800, height: 1200, file_size: 7 }] } });
+      const material = await db.prepare('SELECT * FROM materials WHERE request_id=?').bind(request.id).first();
+      assert.ok(material, 'foto collegata alla pratica appena aperta');
+      assert.equal(material.source, 'telegram');
+      assert.match(calls.at(-1).body.text, /pratica che mi hai appena fatto aprire/);
+    } finally { globalThis.fetch = previous; db.close(); }
+  });
+  it('nome non detto davvero o cliente simile: chiede, non crea', async () => {
+    const db = database();
+    const previous = globalThis.fetch;
+    globalThis.fetch = fakeFetch;
+    try {
+      calls.length = 0;
+      await missions.putSetting(db, 'telegram_chat_id', '42');
+      let env = testEnv(db, { TELEGRAM_BOT_TOKEN: TOKEN, AI: aiSaying('', { intent: 'crea_pratica', locale: 'Trattoria Inventata', risposta: '' }) });
+      await missions.telegramUpdate(db, env, { message: { chat: { id: 42, type: 'private' }, text: 'crea una nuova pratica' } });
+      assert.match(calls.at(-1).body.text, /Come si chiama il locale/);
+      await db.prepare("INSERT INTO clients (id,name,plan,internal_notes,revision,created_at,updated_at) VALUES ('c9','Al Bakaro','standard','',1,'2026-10-01','2026-10-01')").bind().run();
+      env = testEnv(db, { TELEGRAM_BOT_TOKEN: TOKEN, AI: aiSaying('', { intent: 'crea_pratica', locale: 'Bakaro', risposta: '' }) });
+      await missions.telegramUpdate(db, env, { message: { chat: { id: 42, type: 'private' }, text: 'apri una pratica per Bakaro' } });
+      assert.match(calls.at(-1).body.text, /Esiste già un cliente simile: «Al Bakaro»/);
+      assert.equal((await db.prepare('SELECT COUNT(*) AS n FROM requests').bind().first()).n, 0);
+    } finally { globalThis.fetch = previous; db.close(); }
+  });
 });
