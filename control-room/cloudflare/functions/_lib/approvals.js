@@ -86,6 +86,8 @@ export function approvalEvidence(approval) {
   const date = new Date(approval.reply_received_at);
   const day = Number.isFinite(date.getTime()) ? date.toISOString().slice(0, 10).split('-').reverse().join('/') : '';
   const excerpt = stripQuoted(approval.reply_text).replace(/\s+/g, ' ').slice(0, 220);
+  if (approval.recipient === 'telegram:riccardo')
+    return `Anteprima approvata da Riccardo su Telegram${day ? ` il ${day}` : ''} (rif. ${approval.reference_code}): il locale non ha email, pratica aperta da Riccardo.`;
   return `Email del cliente${day ? ` del ${day}` : ''} da ${approval.reply_from} (rif. ${approval.reference_code}): «${excerpt}»`.slice(0, 500);
 }
 

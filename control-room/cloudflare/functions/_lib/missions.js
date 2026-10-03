@@ -10,6 +10,7 @@ import { matchVenue, planFromText, speak, transcribe, understand, venueSaid } fr
 import { classifyRequest } from './autopilot.js';
 
 export const PARTIAL_MARK = '[Testo parziale: leggi l’email completa in Gmail prima di decidere]';
+export const OWNER_REVIEW = 'telegram:riccardo';
 const ACTIVE = ['affidata', 'attesa_invio', 'attesa_cliente', 'attesa_si', 'pubblicazione', 'verifica'];
 // Modifiche che Jarvis applica da solo; gli allergeni restano sempre a Riccardo.
 const HARMLESS = /^(?!.*\d)(?!.*\b(?:ma|però|pero|tranne|cambi\w*|modific\w*|sbagliat\w*|manca\w*|togli\w*|aggiung\w*|non)\b).*\b(?:perfett\w*|benissimo|bene|ottim\w*|grazie|approv\w*|ok|confermo|tutto|bellissim\w*)\b/i;
@@ -74,7 +75,7 @@ export function createMissions(deps) {
   }
   const load = async (db, mission) => {
     const draft = await getOne(db, 'SELECT * FROM drafts WHERE id=?', mission.draft_id);
-    const request = await getOne(db, 'SELECT r.*,c.name AS client_name FROM requests r JOIN clients c ON c.id=r.client_id WHERE r.id=?', mission.request_id);
+    const request = await getOne(db, 'SELECT r.*,c.name AS client_name,c.email AS client_email FROM requests r JOIN clients c ON c.id=r.client_id WHERE r.id=?', mission.request_id);
     const approval = await getOne(db, 'SELECT * FROM publication_approvals WHERE draft_id=?', mission.draft_id);
     return { draft, request, approval, menu: JSON.parse(draft.menu_json) };
   };
@@ -119,7 +120,9 @@ export function createMissions(deps) {
   // ——— passi della missione ———
   async function stepEntrusted(db, env, mission) {
     const jarvis = jarvisDb(db);
-    const { draft } = await load(db, mission);
+    const { draft, request, menu } = await load(db, mission);
+    // Pratica senza email del locale (es. aperta da Riccardo su Telegram): l'anteprima la approva lui, su Telegram.
+    if (!request.client_email) return stepOwnerPreview(db, env, mission, draft, menu);
     let prepared;
     try { prepared = (await action(jarvis, 'preparePreview', { draftId: draft.id, revision: draft.revision }, env)).result; }
     catch (error) { return stop(db, env, mission, `non riesco a preparare l’anteprima (${String(error?.message || 'errore').slice(0, 200)})`); }
@@ -130,6 +133,21 @@ export function createMissions(deps) {
       .bind(uid(), mission.id, mission.request_id, approval.id, prepared.referenceCode, prepared.recipient, prepared.subject, prepared.body, stamp, stamp).run();
     const next = await move(db, mission, 'attesa_invio', `Anteprima ${prepared.referenceCode} in coda per Gmail.`);
     await trigger(db, env, next, prepared.referenceCode);
+    return next;
+  }
+  async function stepOwnerPreview(db, env, mission, draft, menu) {
+    const chat = await setting(db, 'telegram_chat_id');
+    if (!chat || !telegramReady(env)) return stop(db, env, mission, 'il locale non ha un’email e Telegram non è collegato: non ho a chi mandare l’anteprima');
+    let prepared;
+    try { prepared = (await action(jarvisDb(db), 'preparePreview', { draftId: draft.id, revision: draft.revision, ownerReview: true }, env)).result; }
+    catch (error) { return stop(db, env, mission, `non riesco a preparare l’anteprima (${String(error?.message || 'errore').slice(0, 200)})`); }
+    const stamp = now();
+    await db.prepare("UPDATE publication_approvals SET status='anteprima_inviata',sent_at=?,revision=revision+1,updated_at=? WHERE draft_id=? AND status='anteprima_pronta'").bind(stamp, stamp, draft.id).run();
+    const request = await getOne(db, 'SELECT kind,plan FROM requests WHERE id=?', mission.request_id);
+    const activation = request.kind === 'nuovo' ? `\nAl SÌ attivo: ${PLAN_LABEL[request.plan]} da oggi (${romeDate()}).` : '';
+    const next = await move(db, mission, 'attesa_si', `Anteprima ${prepared.referenceCode} mandata a Riccardo su Telegram (il locale non ha email): attendo il suo SÌ.`);
+    await tell(db, env, next, 'anteprima da approvare', `Ecco l’anteprima di «${menu.nome || 'menu'}» (rif. ${prepared.referenceCode}):\n${prepared.previewUrl}\n\nIl locale non ha un’email, quindi l’approvazione è tua.${activation}\nSe va bene pubblico; se c’è da correggere tocca «Non ancora», sistemala in Revisione e affidamela di nuovo.`,
+      [['SÌ, pubblica', `pub:${mission.id}`], ['Non ancora', `no:${mission.id}`]], 'importante');
     return next;
   }
   // L'invio parte dall'automazione Gmail di renmenu1569: Jarvis le manda un comando interno
@@ -281,7 +299,14 @@ export function createMissions(deps) {
       await move(db, mission, 'ferma', 'Riccardo ha risposto «Non ancora»: pubblicazione sospesa.');
       return { ok: true, text: 'Va bene, non pubblico. La pratica resta ferma in Approvazioni.' };
     }
-    const { approval, draft, request } = await load(db, mission);
+    let { approval, draft, request } = await load(db, mission);
+    if (approval?.recipient === OWNER_REVIEW && approval.status === 'anteprima_inviata') {
+      // L'approvazione è di Riccardo: il suo SÌ su Telegram è la risposta registrata.
+      const stamp = now();
+      await db.prepare("UPDATE publication_approvals SET status='risposta_ricevuta',reply_from='Riccardo (Telegram)',reply_text='Approvo: SÌ, pubblica.',reply_received_at=?,revision=revision+1,updated_at=? WHERE id=? AND status='anteprima_inviata'")
+        .bind(stamp, stamp, approval.id).run();
+      ({ approval, draft, request } = await load(db, mission));
+    }
     if (approval?.status !== 'risposta_ricevuta' || approval.snapshot_sha !== await sha256Hex(draft.menu_json))
       return { ok: false, text: 'La bozza o la risposta sono cambiate: controlla in Approvazioni.' };
     const jarvis = jarvisDb(db);
