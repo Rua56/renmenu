@@ -1,143 +1,211 @@
 /* RenMenu Premium su misura: stessa scheda dati dei menu Standard (menus/<id>.json),
-   aspetto deciso dal blocco "premium" (direzione, colori, caratteri, logo, copertina). */
+   aspetto deciso dal blocco "premium" (direzione, colori, caratteri, logo, copertina).
+   Impianto da carta stampata: apertura con stemma, carta della cucina e carta dei vini separate,
+   percorso degustazione in evidenza, vini con colonne calice / bottiglia. */
 body.pm {
   --pm-fondo: #f6f1e7; --pm-testo: #1f2622; --pm-accento: #8a5a2b; --pm-secondario: #22352c;
+  --pm-apertura: var(--pm-secondario); --pm-su-apertura: #fbf7f0; --pm-oro-apertura: var(--pm-accento);
   --pm-titoli: 'Cormorant Garamond', Georgia, serif; --pm-corpo: 'DM Sans', system-ui, sans-serif;
-  --pm-muted: color-mix(in oklab, var(--pm-testo) 62%, var(--pm-fondo));
-  --pm-linea: color-mix(in oklab, var(--pm-testo) 16%, var(--pm-fondo));
-  --pm-velo: color-mix(in oklab, var(--pm-testo) 5%, var(--pm-fondo));
+  --pm-muted: color-mix(in oklab, var(--pm-testo) 64%, var(--pm-fondo));
+  --pm-linea: color-mix(in oklab, var(--pm-testo) 15%, var(--pm-fondo));
+  --pm-velo: color-mix(in oklab, var(--pm-testo) 4%, var(--pm-fondo));
+  --pm-oro: var(--pm-accento-forte, var(--pm-accento));
   --pm-su-secondario: #fff;
   margin: 0; background: var(--pm-fondo); color: var(--pm-testo); font-family: var(--pm-corpo);
   font-size: 16px; line-height: 1.55; -webkit-font-smoothing: antialiased; text-rendering: optimizeLegibility;
 }
+body.pm--scuro {
+  --pm-velo: color-mix(in oklab, var(--pm-secondario) 16%, var(--pm-fondo));
+  --pm-linea: color-mix(in oklab, var(--pm-accento) 22%, var(--pm-fondo));
+  background:
+    radial-gradient(120% 60% at 50% 0%, color-mix(in oklab, var(--pm-secondario) 22%, transparent), transparent 70%),
+    var(--pm-fondo);
+}
 body.pm *, body.pm *::before, body.pm *::after { box-sizing: border-box; }
 body.pm a { color: inherit; }
 body.pm img { max-width: 100%; display: block; }
+:where(body.pm) :where(h1, h2, h3, h4) { margin: 0; }
 .pm-wrap { width: min(100% - 40px, 760px); margin-inline: auto; }
 .pm-skip { position: absolute; left: -999px; top: 8px; background: var(--pm-testo); color: var(--pm-fondo); padding: 8px 12px; border-radius: 6px; z-index: 99; }
 .pm-skip:focus { left: 8px; }
+.pm-eyebrow { display: block; font: 600 .7rem/1.3 var(--pm-corpo); letter-spacing: .24em; text-transform: uppercase; color: var(--pm-oro-apertura); }
+.pm-eyebrow--scuro { color: var(--pm-oro); }
+.pm-orn { display: block; color: var(--pm-oro); font-size: .78rem; letter-spacing: .6em; text-indent: .6em; }
+.pm-orn::before, .pm-orn::after { content: ''; display: inline-block; width: 46px; height: 1px; background: currentColor; opacity: .55; vertical-align: middle; margin: 0 12px; }
 
-/* Barra in alto: nome, lingue */
-.pm-bar { position: sticky; top: 0; z-index: 30; background: color-mix(in oklab, var(--pm-fondo) 90%, transparent); backdrop-filter: blur(10px); -webkit-backdrop-filter: blur(10px); border-bottom: 1px solid transparent; transition: border-color .25s; }
+/* Barra in alto */
+.pm-bar { position: sticky; top: 0; z-index: 30; background: color-mix(in oklab, var(--pm-fondo) 88%, transparent); backdrop-filter: blur(12px); -webkit-backdrop-filter: blur(12px); border-bottom: 1px solid transparent; transition: border-color .25s; }
 .pm-bar.scrolled { border-color: var(--pm-linea); }
-.pm-bar__row { display: flex; align-items: center; gap: 12px; min-height: 56px; }
-.pm-bar__name { font-family: var(--pm-titoli); font-size: 1.15rem; font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; opacity: 0; transition: opacity .25s; }
-.pm-bar.scrolled .pm-bar__name { opacity: 1; }
+.pm-bar__row { display: flex; align-items: center; gap: 12px; min-height: 58px; }
+.pm-id { display: flex; flex-direction: column; text-decoration: none; min-width: 0; line-height: 1.05; }
+.pm-id small { font: 600 .6rem/1 var(--pm-corpo); letter-spacing: .22em; text-transform: uppercase; color: var(--pm-oro); margin-bottom: 3px; }
+.pm-id span { font-family: var(--pm-titoli); font-size: 1.3rem; font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .pm-lang { margin-left: auto; display: inline-flex; gap: 2px; padding: 3px; border: 1px solid var(--pm-linea); border-radius: 999px; flex: none; }
-.pm-lang button { font: 600 .72rem/1 var(--pm-corpo); letter-spacing: .08em; text-transform: uppercase; color: var(--pm-muted); background: none; border: 0; padding: 7px 10px; border-radius: 999px; cursor: pointer; min-width: 36px; }
-.pm-lang button[aria-pressed='true'] { background: var(--pm-testo); color: var(--pm-fondo); }
-.pm-nav { display: flex; gap: 6px; overflow-x: auto; scrollbar-width: none; padding: 0 0 10px; }
-.pm-nav::-webkit-scrollbar { display: none; }
-.pm-nav a { flex: none; text-decoration: none; font-size: .86rem; font-weight: 500; color: var(--pm-muted); padding: 7px 14px; border-radius: 999px; border: 1px solid var(--pm-linea); white-space: nowrap; }
-.pm-nav a[aria-current='true'] { color: var(--pm-fondo); background: var(--pm-accento-forte, var(--pm-accento)); border-color: transparent; }
+.pm-lang button { font: 600 .7rem/1 var(--pm-corpo); letter-spacing: .1em; text-transform: uppercase; color: var(--pm-muted); background: none; border: 0; padding: 8px 10px; border-radius: 999px; cursor: pointer; min-width: 38px; min-height: 32px; }
+.pm-lang button[aria-pressed='true'] { background: var(--pm-oro); color: var(--pm-fondo); }
 
-/* Copertina */
-.pm-hero { text-align: center; padding: 56px 0 40px; }
-.pm-hero__logo { max-height: 96px; max-width: 220px; width: auto; margin: 0 auto 22px; object-fit: contain; }
-.pm-hero__eyebrow { display: block; font-size: .74rem; letter-spacing: .22em; text-transform: uppercase; color: var(--pm-accento-forte, var(--pm-accento)); font-weight: 600; margin-bottom: 14px; }
-.pm-hero h1 { font-family: var(--pm-titoli); font-weight: 500; font-size: clamp(2.5rem, 9vw, 4.4rem); line-height: 1; letter-spacing: -.01em; margin: 0; text-wrap: balance; }
-.pm-hero__motto { font-family: var(--pm-titoli); font-style: italic; font-size: clamp(1.1rem, 3.6vw, 1.35rem); color: var(--pm-muted); margin: 14px auto 0; max-width: 34ch; text-wrap: balance; }
-.pm-hero__meta { margin-top: 22px; display: flex; flex-wrap: wrap; justify-content: center; gap: 8px 18px; font-size: .9rem; color: var(--pm-muted); }
-.pm-hero__actions { margin-top: 22px; display: flex; flex-wrap: wrap; justify-content: center; gap: 8px; }
-.pm-btn { display: inline-flex; align-items: center; gap: 8px; text-decoration: none; font-size: .88rem; font-weight: 600; padding: 10px 16px; border-radius: 999px; border: 1px solid var(--pm-linea); background: var(--pm-fondo); min-height: 44px; }
-.pm-btn svg, .pm-row svg { width: 18px; height: 18px; flex: none; }
-.pm-cover { position: relative; overflow: hidden; border-radius: 22px; margin-top: 18px; aspect-ratio: 16 / 10; background: var(--pm-secondario); }
+/* Apertura: fascia con stemma, nome e due ingressi (menù / vini) */
+.pm-open { background: linear-gradient(168deg, var(--pm-apertura), color-mix(in oklab, var(--pm-apertura) 72%, #000)); color: var(--pm-su-apertura); position: relative; overflow: hidden; }
+.pm-open::before { content: ''; position: absolute; inset: 14px; border: 1px solid color-mix(in oklab, var(--pm-oro-apertura) 45%, transparent); border-radius: 4px; pointer-events: none; }
+.pm-open::after { content: ''; position: absolute; inset: 19px; border: 1px solid color-mix(in oklab, var(--pm-oro-apertura) 18%, transparent); border-radius: 2px; pointer-events: none; }
+.pm-open__in { position: relative; text-align: center; padding: 58px 0 54px; }
+.pm-crest { position: relative; display: grid; place-items: center; width: 104px; height: 104px; margin: 26px auto 18px; color: var(--pm-oro-apertura); }
+.pm-crest svg { position: absolute; inset: 0; width: 100%; height: 100%; }
+.pm-crest b { font: 500 3.1rem/1 var(--pm-titoli); font-style: italic; }
+.pm-open__logo { max-height: 110px; max-width: 220px; width: auto; margin: 26px auto 18px; object-fit: contain; }
+.pm-open h1 { font-family: var(--pm-titoli); font-weight: 500; font-size: clamp(2.7rem, 11vw, 4.6rem); line-height: .98; letter-spacing: -.01em; text-wrap: balance; }
+.pm-open h1 small { display: block; font: 500 italic clamp(1.2rem, 4.6vw, 1.6rem)/1.2 var(--pm-titoli); letter-spacing: .02em; color: var(--pm-oro-apertura); margin-bottom: 6px; }
+.pm-open .pm-orn { color: var(--pm-oro-apertura); margin: 20px 0 0; }
+.pm-open__motto { font: italic 500 clamp(1.15rem, 4vw, 1.4rem)/1.35 var(--pm-titoli); margin: 16px auto 0; max-width: 30ch; opacity: .92; text-wrap: balance; }
+.pm-open__orari { display: inline-flex; gap: 8px; align-items: flex-start; font-size: .88rem; margin: 18px auto 0; max-width: 34ch; opacity: .85; text-align: left; }
+.pm-open__orari svg { width: 17px; height: 17px; flex: none; margin-top: 2px; color: var(--pm-oro-apertura); }
+.pm-open__links { margin-top: 28px; display: flex; flex-wrap: wrap; justify-content: center; gap: 10px; }
+.pm-btn { display: inline-flex; align-items: center; justify-content: center; gap: 8px; text-decoration: none; font: 600 .86rem/1.2 var(--pm-corpo); letter-spacing: .02em; padding: 12px 20px; border-radius: 2px; min-height: 46px; border: 1px solid transparent; }
+.pm-btn svg, .pm-social svg { width: 17px; height: 17px; flex: none; }
+.pm-btn--pieno { background: var(--pm-accento); color: var(--pm-su-accento, #fff); }
+.pm-btn--linea { border-color: currentColor; background: transparent; }
+.pm-open .pm-btn--linea { color: var(--pm-su-apertura); border-color: color-mix(in oklab, var(--pm-su-apertura) 55%, transparent); }
+.pm-cover { overflow: hidden; border-radius: 4px; margin-top: 22px; aspect-ratio: 16 / 10; background: var(--pm-secondario); }
 .pm-cover img { width: 100%; height: 100%; object-fit: cover; }
-.pm-storia { font-size: 1.02rem; color: var(--pm-muted); max-width: 58ch; margin: 30px auto 0; text-align: center; text-wrap: pretty; }
-.pm-avviso { margin: 26px 0 0; padding: 14px 18px; border-left: 3px solid var(--pm-accento); background: var(--pm-velo); border-radius: 0 12px 12px 0; }
-.pm-avviso b { color: var(--pm-accento-forte, var(--pm-accento)); margin-right: 6px; }
+.pm-storia { font: italic 500 1.2rem/1.5 var(--pm-titoli); color: var(--pm-muted); max-width: 46ch; margin: 34px auto 0; text-align: center; text-wrap: pretty; }
+.pm-avviso { margin: 26px 0 0; padding: 14px 18px; border-left: 2px solid var(--pm-oro); background: var(--pm-velo); }
+.pm-avviso b { color: var(--pm-oro); margin-right: 8px; }
 
-/* Ricerca */
-.pm-search { margin: 30px 0 6px; position: relative; }
-.pm-search input { width: 100%; font: inherit; color: inherit; background: transparent; border: 0; border-bottom: 1px solid var(--pm-linea); padding: 12px 4px 12px 30px; outline: none; border-radius: 0; }
-.pm-search input:focus { border-color: var(--pm-accento); }
+/* Carta */
+.pm-carta { padding: 54px 0 10px; scroll-margin-top: 64px; }
+.pm-carta__intro { text-align: center; }
+.pm-carta__intro h2 { font: 500 clamp(2.4rem, 9vw, 3.4rem)/1 var(--pm-titoli); margin-top: 8px; }
+.pm-carta__intro p { color: var(--pm-muted); font-size: .9rem; margin: 12px auto 0; max-width: 40ch; }
+.pm-tools { position: sticky; top: 58px; z-index: 20; background: color-mix(in oklab, var(--pm-fondo) 92%, transparent); backdrop-filter: blur(12px); -webkit-backdrop-filter: blur(12px); padding: 14px 0 6px; margin-top: 22px; display: grid; gap: 10px; }
+.pm-switch { display: grid; grid-template-columns: 1fr 1fr; border: 1px solid var(--pm-linea); }
+.pm-switch button { font: 600 .82rem/1 var(--pm-corpo); letter-spacing: .14em; text-transform: uppercase; background: none; color: var(--pm-muted); border: 0; padding: 14px 8px; cursor: pointer; min-height: 46px; }
+.pm-switch button[aria-pressed='true'] { background: var(--pm-testo); color: var(--pm-fondo); }
+.pm--scuro .pm-switch button[aria-pressed='true'] { background: var(--pm-accento); color: var(--pm-su-accento, #fff); }
+.pm-search { position: relative; }
+.pm-search input { width: 100%; font: inherit; font-size: .95rem; color: inherit; background: transparent; border: 0; border-bottom: 1px solid var(--pm-linea); padding: 11px 4px 11px 30px; outline: none; border-radius: 0; }
+.pm-search input:focus { border-color: var(--pm-oro); }
 .pm-search svg { position: absolute; left: 2px; top: 50%; width: 18px; height: 18px; transform: translateY(-50%); color: var(--pm-muted); }
+.pm-nav { display: flex; flex-wrap: wrap; gap: 4px 18px; padding: 18px 0 4px; }
+.pm-nav a { text-decoration: none; font: italic 500 1.08rem/1.4 var(--pm-titoli); color: var(--pm-muted); display: inline-flex; align-items: baseline; gap: 6px; padding: 4px 0; border-bottom: 1px solid transparent; }
+.pm-nav a i { font: 600 .66rem/1 var(--pm-corpo); font-style: normal; letter-spacing: .08em; color: var(--pm-oro); }
+.pm-nav a[aria-current='true'] { color: var(--pm-testo); border-color: var(--pm-oro); }
 
-/* Sezioni e voci */
-.pm-sezione { padding: 44px 0 10px; scroll-margin-top: 110px; }
-.pm-sezione__head { text-align: center; margin-bottom: 22px; }
-.pm-sezione__num { display: block; font-size: .72rem; letter-spacing: .24em; color: var(--pm-accento-forte, var(--pm-accento)); font-weight: 600; margin-bottom: 8px; }
-.pm-sezione h2 { font-family: var(--pm-titoli); font-weight: 500; font-size: clamp(1.9rem, 6vw, 2.5rem); line-height: 1.05; margin: 0; text-wrap: balance; }
-.pm-sezione__desc { color: var(--pm-muted); font-style: italic; margin: 8px auto 0; max-width: 46ch; }
-.pm-voce { display: grid; grid-template-columns: 1fr auto; gap: 4px 16px; padding: 14px 0; border-bottom: 1px solid var(--pm-linea); }
+/* Sezioni */
+.pm-sezione { padding: 40px 0 6px; scroll-margin-top: 190px; }
+.pm-sezione__head { display: flex; align-items: baseline; gap: 14px; padding-bottom: 12px; border-bottom: 1px solid var(--pm-testo); }
+.pm--scuro .pm-sezione__head { border-color: color-mix(in oklab, var(--pm-accento) 60%, var(--pm-fondo)); }
+.pm-sezione__num { font: 600 .74rem/1 var(--pm-corpo); letter-spacing: .1em; color: var(--pm-oro); }
+.pm-sezione h2 { font: 500 clamp(2rem, 7.4vw, 2.6rem)/1.02 var(--pm-titoli); text-wrap: balance; }
+.pm-sezione__desc { color: var(--pm-muted); font: italic 500 1.05rem/1.45 var(--pm-titoli); margin: 12px 0 0; max-width: 52ch; }
+.pm-voce { display: grid; grid-template-columns: 1fr auto; gap: 3px 18px; padding: 16px 0; border-bottom: 1px solid var(--pm-linea); }
 .pm-voce:last-child { border-bottom: 0; }
-.pm-voce__nome { font-weight: 600; font-size: 1.02rem; display: flex; align-items: baseline; gap: 10px; min-width: 0; }
-.pm-voce__nome span { min-width: 0; }
-.pm-voce__prezzo { font-variant-numeric: tabular-nums; font-weight: 600; white-space: nowrap; color: var(--pm-accento-forte, var(--pm-accento)); text-align: right; }
-.pm-voce__prezzo small { display: block; font-weight: 400; font-size: .75rem; color: var(--pm-muted); }
-.pm-voce__desc { grid-column: 1 / -1; color: var(--pm-muted); font-size: .93rem; margin: 0; max-width: 60ch; }
-.pm-voce__meta { grid-column: 1 / -1; display: flex; flex-wrap: wrap; gap: 6px 10px; font-size: .78rem; color: var(--pm-muted); }
-.pm-voce__meta i { font-style: normal; display: inline-grid; place-items: center; min-width: 20px; height: 20px; padding: 0 5px; border-radius: 999px; border: 1px solid var(--pm-linea); font-size: .7rem; margin-left: 3px; }
-.pm-tag--top { color: var(--pm-accento-forte, var(--pm-accento)); font-weight: 600; }
+.pm-voce__nome { font: 500 1.32rem/1.2 var(--pm-titoli); min-width: 0; text-wrap: balance; }
+.pm-voce__prezzo { font-variant-numeric: tabular-nums; font-weight: 600; font-size: .98rem; white-space: nowrap; color: var(--pm-oro); text-align: right; padding-top: 2px; }
+.pm-voce__prezzo small { display: block; font-weight: 400; font-size: .74rem; color: var(--pm-muted); }
+.pm-voce__desc { grid-column: 1 / -1; color: var(--pm-muted); font-size: .92rem; margin: 0; max-width: 60ch; }
+.pm-voce__meta { grid-column: 1 / -1; display: flex; flex-wrap: wrap; gap: 6px 10px; font-size: .76rem; color: var(--pm-muted); margin-top: 4px; }
+.pm-voce__meta i { font-style: normal; display: inline-grid; place-items: center; min-width: 20px; height: 20px; padding: 0 5px; border-radius: 999px; border: 1px solid var(--pm-linea); font-size: .68rem; margin-left: 3px; }
+.pm-tag--top { color: var(--pm-oro); font-weight: 600; }
 .pm-varianti { grid-column: 1 / -1; display: flex; flex-wrap: wrap; gap: 6px 18px; font-size: .9rem; }
-.pm-varianti span { white-space: nowrap; }
-.pm-varianti b { font-weight: 600; color: var(--pm-accento-forte, var(--pm-accento)); font-variant-numeric: tabular-nums; margin-left: 4px; }
+.pm-varianti span { white-space: nowrap; color: var(--pm-muted); }
+.pm-varianti b { font-weight: 600; color: var(--pm-oro); font-variant-numeric: tabular-nums; margin-left: 6px; }
 
-/* Percorso degustazione */
-.pm-degu { border: 1px solid var(--pm-linea); border-radius: 22px; padding: 30px 22px; text-align: center; background: var(--pm-velo); }
-.pm-degu__prezzo { display: inline-block; margin-top: 4px; font-weight: 600; font-size: 1.2rem; color: var(--pm-accento-forte, var(--pm-accento)); font-variant-numeric: tabular-nums; }
-.pm-degu__prezzo small { font-weight: 400; color: var(--pm-muted); font-size: .85rem; margin-left: 4px; }
-.pm-degu ol { list-style: none; margin: 20px 0 0; padding: 0; }
-.pm-degu li { padding: 12px 0; border-top: 1px solid var(--pm-linea); }
-.pm-degu li b { display: block; font-family: var(--pm-titoli); font-weight: 500; font-size: 1.25rem; }
-.pm-degu li span { color: var(--pm-muted); font-size: .92rem; }
+/* Carta dei vini: colonne calice / bottiglia */
+.pm-vini { --pm-cols: 2; }
+.pm-vino { display: grid; grid-template-columns: 1fr repeat(var(--pm-cols), minmax(62px, auto)); gap: 4px 14px; align-items: baseline; padding: 15px 0; border-bottom: 1px solid var(--pm-linea); }
+.pm-vino:last-child { border-bottom: 0; }
+.pm-vino--head { padding: 14px 0 6px; border-bottom: 0; }
+.pm-vino--head .pm-vino__p { font: 600 .64rem/1 var(--pm-corpo); letter-spacing: .18em; text-transform: uppercase; color: var(--pm-muted); }
+.pm-vino__nome h3 { font: 500 1.28rem/1.22 var(--pm-titoli); text-wrap: balance; }
+.pm-vino__nome p { color: var(--pm-muted); font-size: .88rem; margin: 2px 0 0; }
+.pm-vino__p { text-align: right; font-variant-numeric: tabular-nums; font-weight: 600; font-size: .95rem; color: var(--pm-oro); white-space: nowrap; }
+.pm-vino__p em { font-style: normal; color: var(--pm-linea); font-weight: 400; }
 
-/* Informazioni */
-.pm-info { margin: 56px 0 0; padding: 34px 0 10px; border-top: 1px solid var(--pm-linea); }
-.pm-info h3 { font-family: var(--pm-titoli); font-weight: 500; font-size: 1.7rem; margin: 0 0 14px; text-align: center; }
-.pm-info__grid { display: grid; gap: 12px; }
-.pm-row { display: flex; gap: 12px; align-items: flex-start; }
-.pm-row svg { color: var(--pm-accento-forte, var(--pm-accento)); margin-top: 2px; }
-.pm-coperto, .pm-note { color: var(--pm-muted); font-size: .92rem; margin: 14px 0 0; }
-.pm-legenda { display: flex; flex-wrap: wrap; gap: 6px 14px; margin-top: 16px; font-size: .8rem; color: var(--pm-muted); }
+/* Percorso degustazione: scheda in evidenza */
+.pm-sezione--degu { padding-top: 46px; }
+.pm-degu { position: relative; text-align: center; padding: 40px 24px 34px; background: linear-gradient(170deg, var(--pm-apertura), color-mix(in oklab, var(--pm-apertura) 74%, #000)); color: var(--pm-su-apertura); }
+.pm-degu::before { content: ''; position: absolute; inset: 10px; border: 1px solid color-mix(in oklab, var(--pm-oro-apertura) 50%, transparent); pointer-events: none; }
+.pm-degu__eyebrow { display: block; font: 600 .68rem/1.2 var(--pm-corpo); letter-spacing: .26em; text-transform: uppercase; color: var(--pm-oro-apertura); }
+.pm-degu h2 { font: 500 italic clamp(2rem, 8vw, 2.7rem)/1.05 var(--pm-titoli); margin: 12px auto 0; max-width: 16ch; }
+.pm-degu__prezzo { margin: 16px 0 0; display: flex; justify-content: center; align-items: baseline; gap: 8px; }
+.pm-degu__prezzo b { font: 500 2.2rem/1 var(--pm-titoli); color: var(--pm-oro-apertura); font-variant-numeric: tabular-nums; }
+.pm-degu__prezzo small { font-size: .82rem; opacity: .8; }
+.pm-degu .pm-orn { color: var(--pm-oro-apertura); margin: 20px 0 6px; }
+.pm-degu ol { list-style: none; margin: 0 auto; padding: 0; max-width: 30ch; }
+.pm-degu li { padding: 14px 0; display: grid; gap: 2px; justify-items: center; }
+.pm-degu li + li { border-top: 1px solid color-mix(in oklab, var(--pm-su-apertura) 14%, transparent); }
+.pm-degu__n { font: 600 .64rem/1 var(--pm-corpo); letter-spacing: .2em; color: var(--pm-oro-apertura); }
+.pm-degu li b { font: 500 1.35rem/1.25 var(--pm-titoli); }
+.pm-degu li span:not(.pm-degu__n) { font-size: .88rem; opacity: .8; }
+.pm-degu__extra { margin: 18px auto 0; max-width: 30ch; padding-top: 16px; border-top: 1px solid color-mix(in oklab, var(--pm-oro-apertura) 45%, transparent); display: grid; gap: 6px; }
+.pm-degu__extra div { display: flex; justify-content: center; align-items: baseline; flex-wrap: wrap; gap: 4px 10px; }
+.pm-degu__extra span { font: italic 500 1.12rem/1.3 var(--pm-titoli); }
+.pm-degu__extra b { color: var(--pm-oro-apertura); font-variant-numeric: tabular-nums; }
+.pm-degu__extra small { font-size: .78rem; opacity: .8; }
+.pm-degu .pm-sezione__desc { color: inherit; opacity: .8; margin: 16px auto 0; font-size: 1rem; }
+
+/* Chiusura della carta */
+.pm-fine { margin-top: 40px; padding-top: 22px; border-top: 1px solid var(--pm-linea); display: grid; gap: 14px; }
+.pm-coperto { display: flex; justify-content: space-between; align-items: baseline; margin: 0; font: 500 1.15rem/1.3 var(--pm-titoli); }
+.pm-coperto b { font: 600 .98rem var(--pm-corpo); color: var(--pm-oro); font-variant-numeric: tabular-nums; }
+.pm-legenda { display: flex; flex-wrap: wrap; gap: 6px 14px; font-size: .8rem; color: var(--pm-muted); }
+.pm-legenda h4 { width: 100%; font: 600 .66rem/1 var(--pm-corpo); letter-spacing: .18em; text-transform: uppercase; }
 .pm-legenda b { margin-right: 4px; color: var(--pm-testo); }
+.pm-note { color: var(--pm-muted); font-size: .88rem; margin: 0; }
 .pm-empty { text-align: center; color: var(--pm-muted); padding: 40px 0; }
-.pm-footer { text-align: center; padding: 40px 0 calc(32px + env(safe-area-inset-bottom)); font-size: .78rem; color: var(--pm-muted); }
-.pm-footer a { font-weight: 600; text-decoration: none; }
-.pm-su { position: fixed; right: 16px; bottom: calc(18px + env(safe-area-inset-bottom)); width: 46px; height: 46px; border-radius: 50%; border: 1px solid var(--pm-linea); background: var(--pm-fondo); color: var(--pm-testo); display: grid; place-items: center; opacity: 0; pointer-events: none; transition: opacity .25s; cursor: pointer; }
+
+/* Ti aspettiamo */
+.pm-visita { margin-top: 56px; background: var(--pm-velo); border-top: 1px solid var(--pm-linea); border-bottom: 1px solid var(--pm-linea); }
+.pm-visita__in { padding: 44px 0; display: grid; gap: 22px; }
+.pm-visita .pm-eyebrow { color: var(--pm-oro); }
+.pm-visita h2 { font: 500 clamp(2rem, 8vw, 2.7rem)/1.05 var(--pm-titoli); margin-top: 8px; text-wrap: balance; }
+.pm-visita address { font-style: normal; margin-top: 12px; font-size: 1rem; }
+.pm-visita p { color: var(--pm-muted); font-size: .9rem; margin: 6px 0 0; }
+.pm-visita__azioni { display: grid; gap: 10px; }
+.pm-visita .pm-btn--linea { color: var(--pm-testo); border-color: var(--pm-linea); }
+.pm-social { display: flex; flex-wrap: wrap; gap: 8px 18px; margin-top: 4px; font-size: .9rem; }
+.pm-social a, .pm-social span { display: inline-flex; align-items: center; gap: 7px; text-decoration: none; color: var(--pm-muted); min-height: 36px; }
+.pm-social svg { color: var(--pm-oro); }
+.pm-footer { display: flex; flex-wrap: wrap; justify-content: space-between; gap: 8px; width: min(100% - 40px, 760px); margin: 0 auto; padding: 24px 0 calc(28px + env(safe-area-inset-bottom)); font-size: .76rem; color: var(--pm-muted); }
+.pm-footer a { font-weight: 600; text-decoration: none; color: var(--pm-oro); }
+.pm-su { position: fixed; right: 16px; bottom: calc(18px + env(safe-area-inset-bottom)); width: 46px; height: 46px; border-radius: 50%; border: 1px solid var(--pm-linea); background: var(--pm-fondo); color: var(--pm-testo); display: grid; place-items: center; opacity: 0; pointer-events: none; transition: opacity .25s; cursor: pointer; z-index: 40; }
 .pm-su.show { opacity: 1; pointer-events: auto; }
 .pm-su svg { width: 20px; height: 20px; }
 .pm-error { text-align: center; padding: 80px 20px; }
 
-/* ── Direzione «editoriale»: carta stampata elegante, puntini fra nome e prezzo ── */
-.pm--editoriale .pm-voce__nome::after { content: ''; flex: 1; border-bottom: 1px dotted color-mix(in oklab, var(--pm-testo) 35%, var(--pm-fondo)); transform: translateY(-4px); min-width: 24px; }
-.pm--editoriale .pm-voce { border-bottom: 0; padding: 11px 0; }
-.pm--editoriale .pm-sezione__head::after { content: '✦'; display: block; color: var(--pm-accento); font-size: .8rem; margin-top: 14px; }
+/* ── Direzione «editoriale»: carta stampata, puntini fra nome e prezzo ── */
+.pm--editoriale .pm-voce { grid-template-columns: minmax(0, max-content) minmax(18px, 1fr) auto; }
+.pm--editoriale .pm-voce::before { content: ''; grid-column: 2; grid-row: 1; align-self: end; border-bottom: 1px dotted color-mix(in oklab, var(--pm-testo) 32%, var(--pm-fondo)); margin-bottom: .45em; min-width: 18px; }
+.pm--editoriale .pm-voce__nome { grid-column: 1; grid-row: 1; }
+.pm--editoriale .pm-voce__prezzo { grid-column: 3; grid-row: 1; }
+.pm--editoriale .pm-voce > :not(.pm-voce__nome):not(.pm-voce__prezzo) { grid-column: 1 / -1; }
 .pm--editoriale .pm-voce__desc { font-style: italic; }
 
-/* ── Direzione «bistrot»: fascia di colore, sezioni incorniciate ── */
-.pm--bistrot .pm-hero { background: var(--pm-secondario); color: var(--pm-su-secondario); margin: 0 -20px; padding: 56px 20px 46px; border-radius: 0 0 28px 28px; }
-.pm--bistrot .pm-hero__eyebrow, .pm--bistrot .pm-hero__motto, .pm--bistrot .pm-hero__meta { color: color-mix(in oklab, var(--pm-su-secondario) 80%, var(--pm-secondario)); }
-.pm--bistrot .pm-hero .pm-btn { background: transparent; color: var(--pm-su-secondario); border-color: color-mix(in oklab, var(--pm-su-secondario) 35%, var(--pm-secondario)); }
-.pm--bistrot .pm-sezione__body { border: 1px solid var(--pm-linea); outline: 1px solid var(--pm-linea); outline-offset: 4px; border-radius: 6px; padding: 8px 20px; background: var(--pm-fondo); }
-.pm--bistrot .pm-sezione__head { text-align: left; display: flex; align-items: baseline; gap: 14px; }
-.pm--bistrot .pm-sezione__num { order: 2; margin: 0 0 0 auto; }
-.pm--bistrot .pm-sezione__desc { margin: 4px 0 0; }
-.pm--bistrot .pm-sezione__head > div { min-width: 0; }
+/* ── Direzione «bistrot»: sezioni incorniciate, titoli artigianali ── */
+.pm--bistrot .pm-voci, .pm--bistrot .pm-vini { border: 1px solid var(--pm-linea); outline: 1px solid var(--pm-linea); outline-offset: 4px; padding: 6px 18px; margin-top: 18px; background: var(--pm-fondo); }
+.pm--bistrot .pm-sezione__head { border-bottom: 0; padding-bottom: 0; }
+.pm--bistrot .pm-btn { border-radius: 999px; }
 
-/* ── Direzione «moderno»: copertina piena, numeri grandi, prezzi in evidenza ── */
-.pm--moderno .pm-hero { text-align: left; padding-top: 40px; }
-.pm--moderno .pm-hero__logo { margin: 0 0 22px; }
-.pm--moderno .pm-hero h1 { font-weight: 700; letter-spacing: -.03em; font-size: clamp(2.6rem, 11vw, 5rem); }
-.pm--moderno .pm-hero__motto { margin-left: 0; font-style: normal; }
-.pm--moderno .pm-hero__meta, .pm--moderno .pm-hero__actions { justify-content: flex-start; }
-.pm--moderno .pm-sezione__head { text-align: left; display: grid; grid-template-columns: auto 1fr; gap: 0 16px; align-items: end; }
-.pm--moderno .pm-sezione__num { font-size: 2.6rem; letter-spacing: -.04em; line-height: .9; margin: 0; font-family: var(--pm-titoli); font-weight: 700; grid-row: span 2; }
+/* ── Direzione «moderno»: allineato a sinistra, numeri grandi ── */
+.pm--moderno .pm-open__in { text-align: left; }
+.pm--moderno .pm-crest, .pm--moderno .pm-open__logo { margin-left: 0; }
+.pm--moderno .pm-open .pm-orn { text-align: left; text-indent: 0; }
+.pm--moderno .pm-open .pm-orn::before { display: none; }
+.pm--moderno .pm-open__motto { margin-left: 0; font-style: normal; }
+.pm--moderno .pm-open__links { justify-content: flex-start; }
+.pm--moderno .pm-open h1 { font-weight: 700; letter-spacing: -.03em; }
+.pm--moderno .pm-sezione__num { font: 700 2.2rem/1 var(--pm-titoli); letter-spacing: -.04em; }
 .pm--moderno .pm-sezione h2 { font-weight: 700; letter-spacing: -.02em; }
-.pm--moderno .pm-sezione__desc { margin: 4px 0 0; font-style: normal; }
-.pm--moderno .pm-voce__prezzo { background: var(--pm-velo); padding: 4px 10px; border-radius: 999px; align-self: start; }
-.pm--moderno .pm-degu { text-align: left; }
+.pm--moderno .pm-voce__nome, .pm--moderno .pm-vino__nome h3 { font-family: var(--pm-corpo); font-weight: 600; font-size: 1.05rem; }
 
 @media (min-width: 900px) {
-  .pm-wrap { width: min(100% - 64px, 980px); }
-  .pm--bistrot .pm-voci { display: grid; grid-template-columns: 1fr 1fr; column-gap: 40px; }
-  .pm--bistrot .pm-voci:has(> .pm-voce:only-child) { grid-template-columns: 1fr; }
-  .pm--bistrot .pm-voce:nth-last-child(2):nth-child(odd) { border-bottom: 0; }
-  .pm--bistrot .pm-hero { margin: 0; border-radius: 0 0 28px 28px; }
-  .pm--editoriale .pm-wrap, .pm--editoriale.pm-wrap { width: min(100% - 64px, 720px); }
+  .pm-wrap, .pm-footer { width: min(100% - 64px, 860px); }
+  .pm-open__in { padding: 84px 0 76px; }
+  .pm-visita__in { grid-template-columns: 1.2fr 1fr; align-items: end; }
 }
 @media (prefers-reduced-motion: no-preference) {
   .pm-sezione.pm-in { animation: pm-in .6s ease both; }
-  @keyframes pm-in { from { opacity: 0; transform: translateY(14px); } to { opacity: 1; transform: none; } }
+  .pm-open__in > * { animation: pm-in .8s ease both; }
+  .pm-open__in > :nth-child(2) { animation-delay: .08s; } .pm-open__in > :nth-child(3) { animation-delay: .16s; } .pm-open__in > :nth-child(n+4) { animation-delay: .24s; }
+  @keyframes pm-in { from { opacity: 0; transform: translateY(12px); } to { opacity: 1; transform: none; } }
 }
-.pm-degu__extra { display: block; font-style: normal; font-size: .85rem; color: var(--pm-muted); margin-top: 2px; font-variant-numeric: tabular-nums; }

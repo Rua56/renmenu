@@ -54,16 +54,27 @@
     up: svg('<path d="m6 14 6-6 6 6"/>')
   };
   const T = {
-    it: { benvenuti: 'Benvenuti', cerca: 'Cerca nel menù…', nessuno: 'Nessun piatto trovato.', info: 'Informazioni', allergeni: 'Allergeni', coperto: 'Coperto', chiama: 'Chiama', mappa: 'Mappa', oggi: 'Oggi', persona: 'a persona', powered: 'Menù digitale realizzato con', su: 'Torna su', vai: 'Vai al menù', sito: 'Sito' },
-    en: { benvenuti: 'Welcome', cerca: 'Search the menu…', nessuno: 'No dishes found.', info: 'Information', allergeni: 'Allergens', coperto: 'Cover charge', chiama: 'Call', mappa: 'Map', oggi: 'Today', persona: 'per person', powered: 'Digital menu made with', su: 'Back to top', vai: 'Skip to menu', sito: 'Website' },
-    de: { benvenuti: 'Willkommen', cerca: 'Speisekarte durchsuchen…', nessuno: 'Keine Gerichte gefunden.', info: 'Informationen', allergeni: 'Allergene', coperto: 'Gedeck', chiama: 'Anrufen', mappa: 'Karte', oggi: 'Heute', persona: 'pro Person', powered: 'Digitale Speisekarte erstellt mit', su: 'Nach oben', vai: 'Zur Speisekarte', sito: 'Webseite' },
-    fr: { benvenuti: 'Bienvenue', cerca: 'Rechercher dans le menu…', nessuno: 'Aucun plat trouvé.', info: 'Informations', allergeni: 'Allergènes', coperto: 'Couvert', chiama: 'Appeler', mappa: 'Plan', oggi: "Aujourd'hui", persona: 'par personne', powered: 'Menu numérique réalisé avec', su: 'Haut de page', vai: 'Aller au menu', sito: 'Site' },
-    es: { benvenuti: 'Bienvenidos', cerca: 'Buscar en el menú…', nessuno: 'No se encontraron platos.', info: 'Información', allergeni: 'Alérgenos', coperto: 'Cubierto', chiama: 'Llamar', mappa: 'Mapa', oggi: 'Hoy', persona: 'por persona', powered: 'Menú digital creado con', su: 'Volver arriba', vai: 'Ir al menú', sito: 'Web' },
-    sl: { benvenuti: 'Dobrodošli', cerca: 'Iskanje po meniju…', nessuno: 'Ni najdenih jedi.', info: 'Informacije', allergeni: 'Alergeni', coperto: 'Pogrinjek', chiama: 'Pokliči', mappa: 'Zemljevid', oggi: 'Danes', persona: 'na osebo', powered: 'Digitalni meni izdelal', su: 'Na vrh', vai: 'Na meni', sito: 'Spletna stran' }
+    it: { benvenuti: 'Benvenuti', cerca: 'Cerca un piatto o un vino…', nessuno: 'Nessun piatto trovato.', allergeni: 'Allergeni', coperto: 'Coperto', chiama: 'Chiama', indicazioni: 'Indicazioni', oggi: 'Oggi', persona: 'a persona', powered: 'Menù digitale curato da', su: 'Torna su', vai: 'Vai al menù', sito: 'Sito', sfoglia: 'Sfoglia il menù', cucina: 'La cucina', vini: 'I vini', bere: 'Da bere', intavola: 'In tavola', ilmenu: 'Il menù', allergie: 'Allergie o intolleranze? Chiedi al personale prima di ordinare.', percorso: 'Percorso degustazione', aspettiamo: 'Ti aspettiamo', ciVediamo: 'Ci vediamo', a: 'a', legenda: 'Legenda allergeni', menu: 'Menù', carta: 'Carta dei vini' },
+    en: { benvenuti: 'Welcome', cerca: 'Search a dish or a wine…', nessuno: 'No dishes found.', allergeni: 'Allergens', coperto: 'Cover charge', chiama: 'Call', indicazioni: 'Directions', oggi: 'Today', persona: 'per person', powered: 'Digital menu by', su: 'Back to top', vai: 'Skip to menu', sito: 'Website', sfoglia: 'Browse the menu', cucina: 'Food', vini: 'Wines', bere: 'Drinks', intavola: 'At the table', ilmenu: 'The menu', allergie: 'Allergies or intolerances? Please ask our staff before ordering.', percorso: 'Tasting menu', aspettiamo: 'Visit us', ciVediamo: 'See you', a: 'in', legenda: 'Allergen key', menu: 'Menu', carta: 'Wine list' },
+    de: { benvenuti: 'Willkommen', cerca: 'Gericht oder Wein suchen…', nessuno: 'Keine Gerichte gefunden.', allergeni: 'Allergene', coperto: 'Gedeck', chiama: 'Anrufen', indicazioni: 'Route', oggi: 'Heute', persona: 'pro Person', powered: 'Digitale Speisekarte von', su: 'Nach oben', vai: 'Zur Speisekarte', sito: 'Webseite', sfoglia: 'Zur Speisekarte', cucina: 'Küche', vini: 'Weine', bere: 'Getränke', intavola: 'Bei Tisch', ilmenu: 'Die Speisekarte', allergie: 'Allergien oder Unverträglichkeiten? Bitte fragen Sie vor der Bestellung.', percorso: 'Degustationsmenü', aspettiamo: 'Besuchen Sie uns', ciVediamo: 'Bis bald', a: 'in', legenda: 'Allergene', menu: 'Speisekarte', carta: 'Weinkarte' },
+    fr: { benvenuti: 'Bienvenue', cerca: 'Chercher un plat ou un vin…', nessuno: 'Aucun plat trouvé.', allergeni: 'Allergènes', coperto: 'Couvert', chiama: 'Appeler', indicazioni: 'Itinéraire', oggi: "Aujourd'hui", persona: 'par personne', powered: 'Menu numérique par', su: 'Haut de page', vai: 'Aller au menu', sito: 'Site', sfoglia: 'Voir le menu', cucina: 'La cuisine', vini: 'Les vins', bere: 'Boissons', intavola: 'À table', ilmenu: 'Le menu', allergie: 'Allergies ou intolérances ? Demandez au personnel avant de commander.', percorso: 'Menu dégustation', aspettiamo: 'Nous vous attendons', ciVediamo: 'À bientôt', a: 'à', legenda: 'Allergènes', menu: 'Menu', carta: 'Carte des vins' },
+    es: { benvenuti: 'Bienvenidos', cerca: 'Buscar un plato o un vino…', nessuno: 'No se encontraron platos.', allergeni: 'Alérgenos', coperto: 'Cubierto', chiama: 'Llamar', indicazioni: 'Cómo llegar', oggi: 'Hoy', persona: 'por persona', powered: 'Menú digital de', su: 'Volver arriba', vai: 'Ir al menú', sito: 'Web', sfoglia: 'Ver el menú', cucina: 'La cocina', vini: 'Los vinos', bere: 'Bebidas', intavola: 'En la mesa', ilmenu: 'El menú', allergie: '¿Alergias o intolerancias? Pregunte al personal antes de pedir.', percorso: 'Menú degustación', aspettiamo: 'Te esperamos', ciVediamo: 'Nos vemos', a: 'en', legenda: 'Alérgenos', menu: 'Menú', carta: 'Carta de vinos' },
+    sl: { benvenuti: 'Dobrodošli', cerca: 'Poišči jed ali vino…', nessuno: 'Ni najdenih jedi.', allergeni: 'Alergeni', coperto: 'Pogrinjek', chiama: 'Pokliči', indicazioni: 'Navodila', oggi: 'Danes', persona: 'na osebo', powered: 'Digitalni meni', su: 'Na vrh', vai: 'Na meni', sito: 'Spletna stran', sfoglia: 'Odpri meni', cucina: 'Kuhinja', vini: 'Vina', bere: 'Pijače', intavola: 'Pri mizi', ilmenu: 'Meni', allergie: 'Alergije ali intolerance? Pred naročilom vprašajte osebje.', percorso: 'Degustacijski meni', aspettiamo: 'Pričakujemo vas', ciVediamo: 'Se vidimo', a: 'v', legenda: 'Alergeni', menu: 'Meni', carta: 'Vinska karta' }
   };
   const ROMAN = ['I', 'II', 'III', 'IV', 'V', 'VI', 'VII', 'VIII', 'IX', 'X', 'XI', 'XII', 'XIII', 'XIV', 'XV'];
   // Immagini: solo indirizzi https o file del sito (nessun altro schema).
   const safeImg = (src) => { const s = String(src || '').trim(); return /^https:\/\//i.test(s) || /^(?:\.\.\/|\/)?[A-Za-z0-9_./-]+\.(?:webp|png|jpe?g|svg|avif)$/i.test(s) ? s : ''; };
+  // Tipo di locale scritto all'inizio del nome («Enoteca Isonzo» → Enoteca / Isonzo).
+  const TIPI = /^(Enoteca|Trattoria|Osteria|Ristorante|Pizzeria|Bistrot|Locanda|Agriturismo|Bar|Caffè|Caffe|Cantina|Vineria|Birreria|Pub|Hostaria|Taverna|Gastronomia)\s+(.+)$/i;
+  const DRINK = /\bvin[io]?\b|vini|wine|wein|bollicin|spumant|prosecco|champagne|franciacorta|cantina|calice|bottigli|mescita|cocktail|aperitiv|spritz|birr|beer|bier|bevand|bibit|drink|getränk|amari\b|distillat|grapp|liquor/i;
+  const WINE = /\bvin[io]?\b|vini|wine|wein|bollicin|spumant|prosecco|champagne|franciacorta|cantina|calice|bottigli|mescita/i;
+
+  /** Città dall'indirizzo: «Via Rastello 12, 34170 Gorizia (GO)» → Gorizia. */
+  function cityOf(address) {
+    const parts = String(address || '').split(',').map((p) => p.replace(/\((?:[A-Z]{2}|esempio)\)/gi, '').replace(/\b\d{5}\b/g, '').trim()).filter(Boolean);
+    const last = parts.length > 1 ? parts[parts.length - 1] : '';
+    return /^[\p{L}' .-]{2,40}$/u.test(last) && !/^(via|viale|piazza|corso|borgo|largo|strada|vicolo)\b/i.test(last) ? last : '';
+  }
 
   function render(menu, { lang: startLang, R = {}, params = new URLSearchParams() } = {}) {
     const premium = menu.premium || {};
@@ -81,11 +92,17 @@
     document.head.appendChild(link);
     document.documentElement.removeAttribute('data-theme');
     const body = document.body;
-    body.className = `pm pm--${style.direzione}`;
     const c = style.colori;
-    Object.entries({ '--pm-fondo': c.fondo, '--pm-testo': c.testo, '--pm-accento': c.accento, '--pm-accento-forte': style.accentoForte, '--pm-secondario': c.secondario, '--pm-su-secondario': style.suSecondario, '--pm-titoli': font.titoli, '--pm-corpo': font.corpo })
+    const dark = lum(c.fondo) < 0.2;
+    body.className = `pm pm--${style.direzione}${dark ? ' pm--scuro' : ''}`;
+    // Fascia d'apertura: sempre leggibile sul colore secondario.
+    const apertura = dark ? mix(c.secondario, c.fondo, 0.35) : c.secondario;
+    const suApertura = contrast('#ffffff', apertura) >= 4.5 ? '#fbf7f0' : '#141414';
+    const oroApertura = readable(c.accento, apertura, 3);
+    Object.entries({ '--pm-fondo': c.fondo, '--pm-testo': c.testo, '--pm-accento': c.accento, '--pm-accento-forte': style.accentoForte, '--pm-secondario': c.secondario, '--pm-su-secondario': style.suSecondario,
+      '--pm-apertura': apertura, '--pm-su-apertura': suApertura, '--pm-oro-apertura': oroApertura, '--pm-su-accento': contrast('#ffffff', c.accento) >= 3 ? '#ffffff' : '#141414', '--pm-titoli': font.titoli, '--pm-corpo': font.corpo })
       .forEach(([k, v]) => body.style.setProperty(k, v));
-    document.querySelectorAll('meta[name="theme-color"]').forEach((m) => { m.content = style.direzione === 'bistrot' ? c.secondario : c.fondo; m.removeAttribute('media'); });
+    document.querySelectorAll('meta[name="theme-color"]').forEach((m) => { m.content = c.fondo; m.removeAttribute('media'); });
 
     const logo = safeImg(premium.logo), cover = safeImg(premium.copertina);
     const tel = menu.telefono ? String(menu.telefono).replace(/\s/g, '') : '';
@@ -93,81 +110,123 @@
     const fbRaw = menu.facebook ? String(menu.facebook).trim() : '';
     const fb = !fbRaw ? '' : /^https?:\/\//i.test(fbRaw) ? fbRaw : /^[A-Za-z0-9.]{3,50}$/.test(fbRaw) ? `https://www.facebook.com/${fbRaw}` : `https://www.facebook.com/search/top?q=${encodeURIComponent(fbRaw)}`;
     const site = /^https:\/\//i.test(String(menu.sito || menu.website || menu.url || '')) ? String(menu.sito || menu.website || menu.url) : '';
+    const nome = String(menu.nome || '');
+    const tipoMatch = ((m) => (m && /^\p{Lu}/u.test(m[2]) ? m : null))(TIPI.exec(nome));
+    const tipo = tipoMatch ? tipoMatch[1] : '', nomeProprio = tipoMatch ? tipoMatch[2] : nome;
+    const citta = cityOf(menu.indirizzo);
+    const maps = menu.maps || (menu.indirizzo ? `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(`${nome} ${menu.indirizzo}`)}` : '');
+    const iniziale = (nomeProprio.match(/\p{L}/u) || ['R'])[0].toUpperCase();
+
+    // Cucina e bevande in due carte separate (come una carta dei vini vera).
+    const sezioni = (menu.sezioni || []).map((s, i) => {
+      const n = Object.values(typeof s.nome === 'string' ? { it: s.nome } : s.nome || {}).join(' ');
+      const varianti = (s.voci || []).length && (s.voci || []).every((v) => Array.isArray(v.prezzi) && v.prezzi.length);
+      const bere = s.tipo !== 'degustazione' && (DRINK.test(n) || varianti);
+      return { s, i, bere, vino: bere && (WINE.test(n) || varianti) };
+    });
+    const haBere = sezioni.some((x) => x.bere), haCucina = sezioni.some((x) => !x.bere);
+    const labelBere = sezioni.some((x) => x.vino) ? 'vini' : 'bere';
+    let view = params.get('view') === 'wine' && haBere ? 'bere' : haCucina ? 'cucina' : 'bere';
     let query = '';
 
-    const price = (p) => (p ? `€ ${esc(p)}` : '');
-    function voce(v) {
+    const price = (p) => (p ? `€\u00a0${esc(p)}` : '');
+    function meta(v) {
       const tags = (v.tag || []).map((k) => (R.tags?.[k] ? `<span class="${k === 'top' ? 'pm-tag--top' : ''}">${R.tags[k].icon} ${esc(R.tags[k][lang] || R.tags[k].it)}</span>` : '')).join('');
       const all = (v.allergeni || []).length ? `<span>${S().allergeni}${v.allergeni.map((k) => `<i>${esc(k)}</i>`).join('')}</span>` : '';
+      return tags || all ? `<div class="pm-voce__meta">${tags}${all}</div>` : '';
+    }
+    function voce(v) {
       const varianti = Array.isArray(v.prezzi) && v.prezzi.length ? `<div class="pm-varianti">${v.prezzi.map((p) => `<span>${esc(t(p.etichetta))}<b>${price(p.prezzo)}</b></span>`).join('')}</div>` : '';
       const p = !varianti && v.prezzo ? `<div class="pm-voce__prezzo">${price(v.prezzo)}${v.unita ? `<small>${esc(t(v.unita))}</small>` : ''}</div>` : '<div></div>';
-      return `<article class="pm-voce"><div class="pm-voce__nome"><span>${esc(t(v.nome))}</span></div>${p}${v.descrizione && t(v.descrizione) ? `<p class="pm-voce__desc">${esc(t(v.descrizione))}</p>` : ''}${varianti}${tags || all ? `<div class="pm-voce__meta">${tags}${all}</div>` : ''}</article>`;
+      return `<article class="pm-voce"><h3 class="pm-voce__nome">${esc(t(v.nome))}</h3>${p}${v.descrizione && t(v.descrizione) ? `<p class="pm-voce__desc">${esc(t(v.descrizione))}</p>` : ''}${varianti}${meta(v)}</article>`;
     }
-    function sezione(s, i, voci) {
-      const num = style.direzione === 'moderno' ? String(i + 1).padStart(2, '0') : ROMAN[i] || String(i + 1);
+    // Carta dei vini: colonne «Calice / Bottiglia» allineate.
+    function cartaVini(voci) {
+      const cols = [];
+      for (const v of voci) for (const p of v.prezzi || []) { const l = t(p.etichetta); if (l && !cols.includes(l)) cols.push(l); }
+      if (!cols.length || cols.length > 3) return `<div class="pm-voci">${voci.map(voce).join('')}</div>`;
+      const row = (v) => {
+        const by = Object.fromEntries((v.prezzi || []).map((p) => [t(p.etichetta), p.prezzo]));
+        const cells = cols.map((l, k) => `<span class="pm-vino__p">${by[l] ? price(by[l]) : (k === cols.length - 1 && v.prezzo && !(v.prezzi || []).length ? price(v.prezzo) : '<em>—</em>')}</span>`).join('');
+        return `<div class="pm-vino"><div class="pm-vino__nome"><h3>${esc(t(v.nome))}</h3>${v.descrizione && t(v.descrizione) ? `<p>${esc(t(v.descrizione))}</p>` : ''}${meta(v)}</div>${cells}</div>`;
+      };
+      return `<div class="pm-vini" style="--pm-cols:${cols.length}"><div class="pm-vino pm-vino--head" aria-hidden="true"><span></span>${cols.map((l) => `<span class="pm-vino__p">${esc(l)}</span>`).join('')}</div>${voci.map(row).join('')}</div>`;
+    }
+    function sezione({ s, i, vino }, voci, n) {
+      const num = String(n + 1).padStart(2, '0');
       const desc = s.descrizione && t(s.descrizione) ? `<p class="pm-sezione__desc">${esc(t(s.descrizione))}</p>` : '';
       if (s.tipo === 'degustazione') {
-        const pp = s.prezzo ? `<span class="pm-degu__prezzo">${price(s.prezzo)}<small>${esc(t(s.unita) || S().persona)}</small></span>` : '';
-        return `<section class="pm-sezione" id="pm-sez-${i}"><div class="pm-degu"><span class="pm-sezione__num">${num}</span><h2>${esc(t(s.nome))}</h2>${desc}${pp}<ol>${voci.map((v) => `<li><b>${esc(t(v.nome))}</b>${v.descrizione && t(v.descrizione) ? `<span>${esc(t(v.descrizione))}</span>` : ''}${v.prezzo ? `<em class="pm-degu__extra">+ ${price(v.prezzo)}</em>` : ''}</li>`).join('')}</ol></div></section>`;
+        const titolo = t(s.nome).replace(/^(?:percorso\s+(?:di\s+)?degustazione|menu\s+degustazione|tasting\s+menu)\s*/i, '').replace(/^[«"“]\s*|\s*[»"”]$/g, '').trim() || t(s.nome);
+        const portate = voci.filter((v) => !v.prezzo), extra = voci.filter((v) => v.prezzo);
+        const pp = s.prezzo ? `<p class="pm-degu__prezzo"><b>${price(s.prezzo)}</b><small>${esc(t(s.unita) || S().persona)}</small></p>` : '';
+        return `<section class="pm-sezione pm-sezione--degu" id="pm-sez-${i}"><div class="pm-degu"><span class="pm-degu__eyebrow">${S().percorso}</span><h2>${esc(titolo)}</h2>${pp}<span class="pm-orn" aria-hidden="true">✦</span>
+          <ol>${portate.map((v, k) => `<li><span class="pm-degu__n">${ROMAN[k] || k + 1}</span><b>${esc(t(v.nome))}</b>${v.descrizione && t(v.descrizione) ? `<span>${esc(t(v.descrizione))}</span>` : ''}</li>`).join('')}</ol>
+          ${extra.length ? `<div class="pm-degu__extra">${extra.map((v) => `<div><span>${esc(t(v.nome))}</span><b>+ ${price(v.prezzo)}</b>${v.unita ? `<small>${esc(t(v.unita))}</small>` : ''}</div>`).join('')}</div>` : ''}
+          ${desc}</div></section>`;
       }
-      const head = style.direzione === 'bistrot' ? `<div class="pm-sezione__head"><div><h2>${esc(t(s.nome))}</h2>${desc}</div><span class="pm-sezione__num">${num}</span></div>`
-        : `<div class="pm-sezione__head"><span class="pm-sezione__num">${num}</span><h2>${esc(t(s.nome))}</h2>${desc}</div>`;
-      return `<section class="pm-sezione" id="pm-sez-${i}">${head}<div class="pm-sezione__body"><div class="pm-voci">${voci.map(voce).join('')}</div></div></section>`;
+      return `<section class="pm-sezione" id="pm-sez-${i}"><header class="pm-sezione__head"><span class="pm-sezione__num">${num}</span><h2>${esc(t(s.nome))}</h2></header>${desc}${vino ? cartaVini(voci) : `<div class="pm-voci">${voci.map(voce).join('')}</div>`}</section>`;
     }
 
     function draw() {
       document.documentElement.lang = lang;
-      document.title = `${menu.nome} — Menù`;
+      document.title = `${nome} — ${S().menu}`;
       const q = query.trim().toLowerCase();
       const match = (v) => !q || `${t(v.nome)} ${t(v.descrizione)}`.toLowerCase().includes(q);
-      const blocks = (menu.sezioni || []).map((s, i) => ({ s, i, voci: (s.voci || []).filter(match) })).filter((b) => b.voci.length);
-      const actions = [tel ? `<a class="pm-btn" href="tel:${esc(tel)}">${ICON.tel}${S().chiama}</a>` : '', menu.maps ? `<a class="pm-btn" href="${esc(menu.maps)}" target="_blank" rel="noopener">${ICON.map}${S().mappa}</a>` : '',
-        ig ? `<a class="pm-btn" href="https://instagram.com/${esc(ig)}" target="_blank" rel="noopener">${ICON.ig}Instagram</a>` : '', fb ? `<a class="pm-btn" href="${esc(fb)}" target="_blank" rel="noopener">${ICON.fb}Facebook</a>` : ''].join('');
+      const visibili = sezioni.filter((x) => q || (view === 'bere') === x.bere);
+      const blocks = visibili.map((x) => ({ x, voci: (x.s.voci || []).filter(match) })).filter((b) => b.voci.length);
       const usedAll = new Set((menu.sezioni || []).flatMap((s) => (s.voci || []).flatMap((v) => v.allergeni || [])));
+      const switcher = haBere && haCucina ? `<div class="pm-switch" role="group" aria-label="${S().menu}"><button type="button" data-view="cucina" aria-pressed="${view === 'cucina'}">${S().cucina}</button><button type="button" data-view="bere" aria-pressed="${view === 'bere'}">${S()[labelBere]}</button></div>` : '';
+      const langBtns = langs.length > 1 ? `<div class="pm-lang" role="group" aria-label="Lingua">${langs.map((l) => `<button type="button" data-lang="${l}" aria-pressed="${l === lang}">${l}</button>`).join('')}</div>` : '';
+      const motto = t(premium.motto) || t(menu.sottotitolo);
+      const eyebrow = [citta, tipo].filter(Boolean).join(' · ') || S().benvenuti;
       body.innerHTML = `<a class="pm-skip" href="#pm-carta">${S().vai}</a>
-      <header class="pm-bar"><div class="pm-wrap"><div class="pm-bar__row"><span class="pm-bar__name">${esc(menu.nome)}</span>${langs.length > 1 ? `<div class="pm-lang" role="group" aria-label="Lingua">${langs.map((l) => `<button type="button" data-lang="${l}" aria-pressed="${l === lang}">${l}</button>`).join('')}</div>` : ''}</div>
-      <nav class="pm-nav" aria-label="Sezioni">${(menu.sezioni || []).map((s, i) => `<a href="#pm-sez-${i}" data-i="${i}">${esc(t(s.nome))}</a>`).join('')}</nav></div></header>
-      <main class="pm-wrap" id="pm-carta">
-        <section class="pm-hero">
-          ${logo ? `<img class="pm-hero__logo" src="${esc(logo)}" alt="${esc(menu.nome)}">` : `<span class="pm-hero__eyebrow">${S().benvenuti}</span>`}
-          <h1>${esc(menu.nome)}</h1>
-          ${t(premium.motto) || t(menu.sottotitolo) ? `<p class="pm-hero__motto">${esc(t(premium.motto) || t(menu.sottotitolo))}</p>` : ''}
-          ${menu.orari && t(menu.orari) ? `<div class="pm-hero__meta"><span>${esc(t(menu.orari))}</span></div>` : ''}
-          ${actions ? `<div class="pm-hero__actions">${actions}</div>` : ''}
+      <header class="pm-bar"><div class="pm-wrap pm-bar__row"><a class="pm-id" href="#pm-top">${tipo ? `<small>${esc(tipo)}</small>` : ''}<span>${esc(nomeProprio)}</span></a>${langBtns}</div></header>
+      <main id="pm-top">
+        <section class="pm-open"><div class="pm-wrap pm-open__in">
+          <span class="pm-eyebrow">${esc(eyebrow)}</span>
+          ${logo ? `<img class="pm-open__logo" src="${esc(logo)}" alt="${esc(nome)}">` : `<span class="pm-crest" aria-hidden="true"><svg viewBox="0 0 120 120"><circle cx="60" cy="60" r="57" fill="none" stroke="currentColor" stroke-width="1"/><circle cx="60" cy="60" r="50" fill="none" stroke="currentColor" stroke-width=".6" stroke-dasharray="1.5 3"/></svg><b>${esc(iniziale)}</b></span>`}
+          <h1>${tipo ? `<small>${esc(tipo)}</small>` : ''}${esc(nomeProprio)}</h1>
+          <span class="pm-orn" aria-hidden="true">✦</span>
+          ${motto ? `<p class="pm-open__motto">${esc(motto)}</p>` : ''}
+          ${menu.orari && t(menu.orari) ? `<p class="pm-open__orari">${ICON.clock}<span>${esc(t(menu.orari))}</span></p>` : ''}
+          <div class="pm-open__links"><a class="pm-btn pm-btn--pieno" href="#pm-carta" data-go="cucina">${S().sfoglia}</a>${haBere && haCucina ? `<a class="pm-btn pm-btn--linea" href="#pm-carta" data-go="bere">${labelBere === 'vini' ? S().carta : S().bere}</a>` : ''}</div>
+        </div></section>
+        ${cover ? `<figure class="pm-wrap pm-cover"><img src="${esc(cover)}" alt="" loading="eager"></figure>` : ''}
+        ${t(premium.storia) ? `<p class="pm-wrap pm-storia">${esc(t(premium.storia))}</p>` : ''}
+        ${menu.avviso && t(menu.avviso) ? `<div class="pm-wrap"><div class="pm-avviso"><b>${S().oggi}</b>${esc(t(menu.avviso)).replace(/^Oggi:\s*|^Today:\s*/i, '')}</div></div>` : ''}
+        <section class="pm-wrap pm-carta" id="pm-carta">
+          <div class="pm-carta__intro"><span class="pm-eyebrow pm-eyebrow--scuro">${S().intavola}</span><h2>${S().ilmenu}</h2><p>${S().allergie}</p></div>
+          <div class="pm-tools">${switcher}<div class="pm-search">${ICON.search}<input id="pm-q" type="search" placeholder="${S().cerca}" aria-label="${S().cerca}" value="${esc(query)}" autocomplete="off"></div></div>
+          ${q ? '' : `<nav class="pm-nav" aria-label="Sezioni">${visibili.map((x, n) => `<a href="#pm-sez-${x.i}" data-i="${x.i}"><i>${String(n + 1).padStart(2, '0')}</i>${esc(x.s.tipo === 'degustazione' ? S().percorso : t(x.s.nome))}</a>`).join('')}</nav>`}
+          ${blocks.map((b, n) => sezione(b.x, b.voci, n)).join('') || `<p class="pm-empty">${S().nessuno}</p>`}
+          ${menu.coperto || (usedAll.size && R.allergeni) || (menu.note && t(menu.note)) ? `<div class="pm-fine">
+            ${menu.coperto ? `<p class="pm-coperto"><span>${S().coperto}</span><b>${price(menu.coperto)}</b></p>` : ''}
+            ${usedAll.size && R.allergeni ? `<div class="pm-legenda"><h4>${S().legenda}</h4>${[...usedAll].sort((a, b) => a - b).map((k) => (R.allergeni[k] ? `<span><b>${esc(k)}</b>${esc(R.allergeni[k][lang] || R.allergeni[k].it)}</span>` : '')).join('')}</div>` : ''}
+            ${menu.note && t(menu.note) ? `<p class="pm-note">${esc(t(menu.note))}</p>` : ''}</div>` : ''}
         </section>
-        ${cover ? `<figure class="pm-cover"><img src="${esc(cover)}" alt="" loading="eager"></figure>` : ''}
-        ${t(premium.storia) ? `<p class="pm-storia">${esc(t(premium.storia))}</p>` : ''}
-        ${menu.avviso && t(menu.avviso) ? `<div class="pm-avviso"><b>${S().oggi}</b>${esc(t(menu.avviso)).replace(/^Oggi:\s*|^Today:\s*/i, '')}</div>` : ''}
-        <div class="pm-search">${ICON.search}<input id="pm-q" type="search" placeholder="${S().cerca}" aria-label="${S().cerca}" value="${esc(query)}" autocomplete="off"></div>
-        ${blocks.map((b) => sezione(b.s, b.i, b.voci)).join('') || `<p class="pm-empty">${S().nessuno}</p>`}
-        <section class="pm-info"><h3>${S().info}</h3><div class="pm-info__grid">
-          ${menu.indirizzo ? `<div class="pm-row">${ICON.map}<span>${esc(menu.indirizzo)}${menu.maps ? ` · <a href="${esc(menu.maps)}" target="_blank" rel="noopener">${S().mappa}</a>` : ''}</span></div>` : ''}
-          ${menu.orari && t(menu.orari) ? `<div class="pm-row">${ICON.clock}<span>${esc(t(menu.orari))}</span></div>` : ''}
-          ${tel ? `<div class="pm-row">${ICON.tel}<a href="tel:${esc(tel)}">${esc(menu.telefono)}</a></div>` : ''}
-          ${ig ? `<div class="pm-row">${ICON.ig}<a href="https://instagram.com/${esc(ig)}" target="_blank" rel="noopener">@${esc(ig)}</a></div>` : ''}
-          ${fb ? `<div class="pm-row">${ICON.fb}<a href="${esc(fb)}" target="_blank" rel="noopener">Facebook</a></div>` : ''}
-          ${site ? `<div class="pm-row">${ICON.web}<a href="${esc(site)}" target="_blank" rel="noopener">${S().sito}</a></div>` : ''}
-          ${menu.wifi ? `<div class="pm-row">${ICON.wifi}<span>Wi-Fi: ${esc(menu.wifi)}</span></div>` : ''}
-        </div>
-        ${menu.coperto ? `<p class="pm-coperto">${S().coperto}: € ${esc(menu.coperto)}</p>` : ''}
-        ${usedAll.size && R.allergeni ? `<div class="pm-legenda">${[...usedAll].sort((a, b) => a - b).map((k) => (R.allergeni[k] ? `<span><b>${esc(k)}</b>${esc(R.allergeni[k][lang] || R.allergeni[k].it)}</span>` : '')).join('')}</div>` : ''}
-        ${menu.note && t(menu.note) ? `<p class="pm-note">${esc(t(menu.note))}</p>` : ''}
-        </section>
+        <section class="pm-visita"><div class="pm-wrap pm-visita__in">
+          <div><span class="pm-eyebrow">${S().aspettiamo}</span><h2>${citta ? `${S().ciVediamo} ${S().a} ${esc(citta)}.` : esc(nome)}</h2>${menu.indirizzo ? `<address>${esc(menu.indirizzo)}</address>` : ''}${menu.orari && t(menu.orari) ? `<p>${esc(t(menu.orari))}</p>` : ''}</div>
+          <div class="pm-visita__azioni">
+            ${tel ? `<a class="pm-btn pm-btn--pieno" href="tel:${esc(tel)}">${ICON.tel}${S().chiama}: ${esc(menu.telefono)}</a>` : ''}
+            ${maps ? `<a class="pm-btn pm-btn--linea" href="${esc(maps)}" target="_blank" rel="noopener">${ICON.map}${S().indicazioni} ↗</a>` : ''}
+            <div class="pm-social">${ig ? `<a href="https://instagram.com/${esc(ig)}" target="_blank" rel="noopener">${ICON.ig}@${esc(ig)}</a>` : ''}${fb ? `<a href="${esc(fb)}" target="_blank" rel="noopener">${ICON.fb}Facebook</a>` : ''}${site ? `<a href="${esc(site)}" target="_blank" rel="noopener">${ICON.web}${S().sito}</a>` : ''}${menu.wifi ? `<span>${ICON.wifi}Wi-Fi: ${esc(menu.wifi)}</span>` : ''}</div>
+          </div>
+        </div></section>
       </main>
-      <footer class="pm-footer">${S().powered} <a href="../index.html">RenMenu</a></footer>
+      <footer class="pm-footer"><span>${esc(nome)}${citta ? ` · ${esc(citta)}` : ''}</span><span>${S().powered} <a href="../index.html">RenMenu</a></span></footer>
       <button class="pm-su" type="button" aria-label="${S().su}">${ICON.up}</button>`;
       wire();
     }
 
+    const goTo = (el) => { if (el) window.scrollTo({ top: el.getBoundingClientRect().top + window.scrollY - (body.querySelector('.pm-bar').offsetHeight + 8), behavior: 'smooth' }); };
     function wire() {
       body.querySelectorAll('.pm-lang button').forEach((b) => b.addEventListener('click', () => { lang = b.dataset.lang; draw(); }));
+      body.querySelectorAll('.pm-switch button').forEach((b) => b.addEventListener('click', () => { view = b.dataset.view; draw(); goTo(document.getElementById('pm-carta')); }));
+      body.querySelectorAll('[data-go]').forEach((a) => a.addEventListener('click', (e) => { e.preventDefault(); if (haBere && haCucina) view = a.dataset.go; draw(); goTo(document.getElementById('pm-carta')); }));
+      body.querySelector('.pm-id').addEventListener('click', (e) => { e.preventDefault(); window.scrollTo({ top: 0, behavior: 'smooth' }); });
       const input = body.querySelector('#pm-q');
       input.addEventListener('input', () => { const pos = input.selectionStart; query = input.value; draw(); const n = body.querySelector('#pm-q'); n.focus(); n.setSelectionRange(pos, pos); });
-      body.querySelectorAll('.pm-nav a').forEach((a) => a.addEventListener('click', (e) => {
-        e.preventDefault();
-        const el = document.getElementById(a.getAttribute('href').slice(1));
-        if (el) window.scrollTo({ top: el.getBoundingClientRect().top + window.scrollY - (body.querySelector('.pm-bar').offsetHeight + 8), behavior: 'smooth' });
-      }));
+      body.querySelectorAll('.pm-nav a').forEach((a) => a.addEventListener('click', (e) => { e.preventDefault(); goTo(document.getElementById(a.getAttribute('href').slice(1))); }));
       body.querySelector('.pm-su').addEventListener('click', () => window.scrollTo({ top: 0, behavior: 'smooth' }));
       if ('IntersectionObserver' in window) {
         const io = new IntersectionObserver((es) => es.forEach((e) => { if (e.isIntersecting) { e.target.classList.add('pm-in'); io.unobserve(e.target); } }), { rootMargin: '0px 0px -6% 0px' });
@@ -180,11 +239,11 @@
     function onScroll() {
       const bar = body.querySelector('.pm-bar');
       if (!bar) return;
-      bar.classList.toggle('scrolled', window.scrollY > 160);
+      bar.classList.toggle('scrolled', window.scrollY > 120);
       body.querySelector('.pm-su')?.classList.toggle('show', window.scrollY > 700);
       const secs = [...body.querySelectorAll('.pm-sezione')];
       if (!secs.length) return;
-      const line = bar.offsetHeight + 24;
+      const line = bar.offsetHeight + 40;
       let cur = secs[0];
       for (const s of secs) if (s.getBoundingClientRect().top <= line) cur = s;
       const i = cur.id.replace('pm-sez-', '');
@@ -192,12 +251,10 @@
       active = i;
       const links = [...body.querySelectorAll('.pm-nav a')];
       links.forEach((l) => l.setAttribute('aria-current', String(l.dataset.i === i)));
-      const a = links.find((l) => l.dataset.i === i);
-      if (a) a.parentElement.scrollTo({ left: a.offsetLeft - (a.parentElement.clientWidth - a.offsetWidth) / 2, behavior: 'smooth' });
     }
     window.addEventListener('scroll', () => { onScroll(); }, { passive: true });
     draw();
   }
 
-  window.RenMenuPremium = { render, resolveStyle, contrast, DIREZIONI, CARATTERI: Object.keys(CARATTERI) };
+  window.RenMenuPremium = { render, resolveStyle, contrast, cityOf, DIREZIONI, CARATTERI: Object.keys(CARATTERI) };
 })();
