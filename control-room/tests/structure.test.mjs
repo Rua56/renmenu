@@ -186,3 +186,18 @@ describe('Numeri degli allergeni scritti sotto i piatti', () => {
     assert.equal(notes.filter((n) => n.kind === 'allergeni').length, 1);
   });
 });
+
+describe('Pagina «Mescita — by the glass» (foto reale «Il Culo di Alex»)', () => {
+  it('prezzo singolo al calice: la sezione dei vini lo dice, i nomi restano come scritti', () => {
+    const first = '# Mescita — by the glass\n# Bollicine\nRodaro Brut Nature — 7\n# Vini Bianchi\nErmacora Friulano 2024 — 4.5\nAquila Del Torre Torre Bianco (Sauvignon, Friulano) 2022 — 5\n# Vini Rossi\nPetrussa Merlot 2023 — 5.5';
+    const second = '# MESCITA\n— by the glass —\n# BOLLICINE\nRodaro Brut Nature — 7\n# VINI BIANCHI\nErmacora Friulano 2024 — 4.5\nAquila del Torre Torre Bianco (Sauvignon, Friulano) 2022 — 5\n# VINI ROSSI\nPetrussa Merlot 2023 — 5.5';
+    const c = combineReadings(first, second);
+    assert.equal(c.agreed, 4);
+    const r = read(c.text);
+    assert.deepEqual(r.menu.sezioni.map((s) => [s.nome.it, s.descrizione?.it]), [['Bollicine', 'Al calice'], ['Vini Bianchi', 'Al calice'], ['Vini Rossi', 'Al calice']]);
+    assert.deepEqual(r.menu.sezioni[1].voci.map((v) => [v.nome.it, v.prezzo]), [['Ermacora Friulano 2024', '4,50'], ['Aquila Del Torre Torre Bianco (Sauvignon, Friulano) 2022', '5,00']]);
+    // Le sezioni di cibo dopo la pagina dei vini non diventano «al calice».
+    const mixed = read('# Vini al calice\n# Vini bianchi\nFriulano — 5\n# Primi\nGnocchi — 12');
+    assert.deepEqual(mixed.menu.sezioni.map((s) => s.descrizione?.it || ''), ['Al calice', '']);
+  });
+});

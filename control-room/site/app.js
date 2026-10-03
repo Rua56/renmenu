@@ -616,7 +616,7 @@ function jarvisMissionPanel(draft) {
 }
 // Materiali arrivati dopo la bozza (es. altre foto da Telegram): la bozza si può rifare con tutti.
 function rebuildPanel(draft) {
-  if (!['bozza', 'revisione'].includes(draft?.status) || missionFor(draft)) return '';
+  if (!['bozza', 'revisione'].includes(draft?.status) || (missionFor(draft) && !['ferma', 'annullata'].includes(missionFor(draft).status))) return '';
   const later = (state.materials || []).filter((m) => m.requestId === draft.requestId && !m.archivedAt && String(m.createdAt || '') > String(draft.createdAt || ''));
   return `<form data-form="rebuild-draft" class="panel spaced-top-small"><input type="hidden" name="draftId" value="${escapeHtml(draft.id)}"><p class="eyebrow">RIFAI LA BOZZA</p>${later.length ? `<p class="notice warning small">${later.length} file arrivati dopo questa bozza (${later.map((m) => escapeHtml(m.filename)).join(', ')}): non sono nella bozza.</p>` : ''}<p class="small muted">Jarvis rilegge tutti i materiali della pratica e rifà la bozza da capo. Le modifiche fatte qui si perdono.</p><div class="button-row"><button class="button secondary" type="submit">Rifai la bozza con tutti i materiali</button></div></form>`;
 }
