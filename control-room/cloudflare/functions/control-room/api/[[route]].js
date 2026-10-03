@@ -19,6 +19,7 @@ import { applyExtras, proposeSourceExtras } from '../../_lib/extras.js';
 import { autopilotMessage, autopilotPreview } from '../../_lib/autopilot.js';
 import { createMissions } from '../../_lib/missions.js';
 import { noteStatement } from '../../_lib/memory.js';
+import { THEMES, proposeTheme } from '../../_lib/themes.js';
 import { getMe, randomToken, sendTelegram, sendVoice, setWebhook, telegramReady } from '../../_lib/telegram.js';
 import { ACTIVATIONS, approvalEvidence, approvalState, assessReply, previewEmail, previewUrl, proposeReplyChanges, referenceCode, sha256Hex } from '../../_lib/approvals.js';
 const headers = { 'Cache-Control': 'private, no-store', 'Content-Type': 'application/json; charset=utf-8' };
@@ -472,6 +473,12 @@ export async function action(db, type, input, env = {}) {
       extraction.translation = { translated: translation.translated, total: translation.total, skipped: translation.skipped };
       const note = translationSummary(translation);
       if (note) extraction.warnings.push(note);
+    }
+    // Menu nuovo: Jarvis propone il tema grafico Standard (gli aggiornamenti mantengono quello online).
+    if (!['aggiornamento', 'sostituzione'].includes(extraction.mode) && !extraction.menu.tema) {
+      const theme = proposeTheme(venue, combinedSource);
+      extraction.menu.tema = theme.tema;
+      extraction.warnings.push(`Tema grafico proposto: ${THEMES[theme.tema]} (${theme.why}). Puoi cambiarlo in Revisione.`);
     }
     const id = uid(), timestamp = now(), menuJson = JSON.stringify(extraction.menu);
     await auditedBatch(db, [
