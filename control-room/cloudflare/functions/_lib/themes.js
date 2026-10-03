@@ -28,3 +28,28 @@ export function proposeTheme(venue, sourceText = '') {
   if (explicit) return { tema: explicit[0], why: 'dal testo della richiesta' };
   return { tema: 'bordeaux', why: 'tema predefinito' };
 }
+
+// Richiesta esplicita di colori/tema («tema blu mare», «sui toni del verde», «colori più scuri»).
+// Serve una parola di contesto (tema, colori, toni, grafica…) per non confondere «salsa verde» con un tema.
+const THEME_WORDS = [
+  ['mare', /blu|azzurr|celest|mare|marin|oceano/],
+  ['trattoria', /verd|oliva|salvia|bosco|trattoria/],
+  ['terracotta', /terracott|arancio|aranci|mattone|ruggine|rame/],
+  ['notte', /ner[oia]|scur|elegant|notte|nero e oro|oro/],
+  ['sole', /ocra|giall|sole|senape|caff/],
+  ['bordeaux', /bordeaux|bordo|rosso|vino|amaranto|classic/]
+];
+const CONTEXT = /\b(tema|temi|color[ei]|colorazion\w*|ton[oi]|tonalita|tinta|grafica|palette|sfondo|stile|look|aspetto)\b/;
+const NAMED = /\b(?:tema|stile)\s+(bordeaux|trattoria|mare|terracotta|notte|sole)\b/;
+export function themeFromText(text) {
+  const lines = norm(text).split(/\r?\n|(?<=[.!?;])\s+/);
+  for (const line of lines) {
+    const named = line.match(NAMED);
+    if (named) return { tema: named[1], source: line.trim().slice(0, 200) };
+    if (!CONTEXT.test(line)) continue;
+    const window = line.slice(Math.max(0, line.search(CONTEXT) - 60), line.search(CONTEXT) + 90);
+    const hit = THEME_WORDS.find(([, rx]) => rx.test(window));
+    if (hit) return { tema: hit[0], source: line.trim().slice(0, 200) };
+  }
+  return null;
+}
