@@ -17,7 +17,7 @@ with sync_playwright() as playwright:
     page.on('pageerror', lambda error: errors.append(str(error)))
     page.on('request', lambda request: external.append(request.url) if not request.url.startswith('http://127.0.0.1:8765/') else None)
     page.goto(URL)
-    page.get_by_role('heading', name='Command Center').wait_for()
+    page.get_by_role('heading', name='Buonasera, Riccardo.').wait_for()
     page.locator('#primary-nav [href="#clienti"]').click()
     form = page.locator('form[data-form="create-client"]')
     form.locator('[name="name"]').fill('Trattoria Sestante — test fittizio')
