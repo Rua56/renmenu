@@ -89,7 +89,7 @@ export function planIssues(menu, plan, checks) {
     if (extra.length) issues.push(`${rule.label}: lingue non incluse nel piano (${extra.join(', ')}). Servono Annuale o Premium.`);
   }
   if (rule.creativeApproval) {
-    if (checks?.creativeApproval !== true) issues.push('Premium: manca l’approvazione creativa di Riccardo.');
+    if (checks?.creativeApproval !== true) issues.push('Premium: manca l’approvazione creativa di Riccardo. In Revisione, in fondo: spunta «Approvazione creativa Premium», scrivi il riferimento e tocca «Registra checklist», poi affida a Jarvis.');
     else if (!evidence(checks?.creativeApprovalEvidence))
       issues.push('Premium: inserisci il riferimento all’approvazione creativa (12–500 caratteri).');
   }
