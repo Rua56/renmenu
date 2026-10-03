@@ -6,7 +6,7 @@ import { assessReply, proposeReplyChanges, sha256Hex } from './approvals.js';
 import { sendOwnerNotification } from './owner-notifications.js';
 import { briefingDue, buildBriefing, romeDay } from './briefing.js';
 import { answerCallback, clearButtons, downloadTelegramFile, sendTelegram, sendVoice, telegramReady } from './telegram.js';
-import { matchVenue, speak, transcribe, understand } from './voice.js';
+import { matchVenue, planFromText, speak, transcribe, understand, venueSaid } from './voice.js';
 import { classifyRequest } from './autopilot.js';
 
 export const PARTIAL_MARK = '[Testo parziale: leggi l’email completa in Gmail prima di decidere]';
@@ -338,7 +338,7 @@ export function createMissions(deps) {
       return;
     }
     if (/^\/aiuto\b|^\/help\b/i.test(text) || text.startsWith('/')) {
-      await sendTelegram(env, chat, 'Puoi scrivermi o mandarmi un vocale: «com’è la situazione?», «al Bakaro il frico ora costa 14», «pubblica il menu di …». Capisco anche /stato, /briefing, le foto e i PDF dei menu. Pubblicare richiede sempre il tuo SÌ col pulsante.', null, deps.fetchImpl);
+      await sendTelegram(env, chat, 'Puoi scrivermi o mandarmi un vocale: «com’è la situazione?», «al Bakaro il frico ora costa 14», «crea una nuova pratica per il locale … con piano Standard», «pubblica il menu di …». Capisco anche /stato, /briefing, le foto e i PDF dei menu. Pubblicare richiede sempre il tuo SÌ col pulsante.', null, deps.fetchImpl);
       return;
     }
     await converse(db, env, chat, text, false);
@@ -385,9 +385,35 @@ export function createMissions(deps) {
       await reply(db, env, chat, `${said}«${pick.name}» è pronto. Per sicurezza la pubblicazione la confermi tu col pulsante.`, spoken, [['SÌ, pubblica', `pub:${pick.id}`], ['Non ancora', `no:${pick.id}`]]);
       return;
     }
+    if (intent.intent === 'crea_pratica') { await reply(db, env, chat, `${said}${await voiceCreate(db, utterance, intent.locale)}`, spoken); return; }
     if (intent.intent === 'aggiorna_menu') { await reply(db, env, chat, `${said}${await voiceUpdate(db, env, utterance, intent.locale)}`, spoken); return; }
     await reply(db, env, chat, `${said}${intent.risposta || 'Non sono sicuro di aver capito, Riccardo. Puoi ripetere con altre parole?'}`, spoken);
   }
+  // Nuova pratica a voce: cliente (esistente o nuovo) + pratica «nuovo menu». Le foto e i PDF che
+  // Riccardo manda nell'ora successiva si collegano da soli a questa pratica.
+  const FOCUS_MINUTES = 60;
+  async function voiceCreate(db, utterance, spokenVenue) {
+    const venue = String(spokenVenue || '').replace(/^[«"“']|[»"”']$/g, '').trim();
+    if (!venue || !venueSaid(venue, utterance)) return 'Come si chiama il locale? Ripetimi il nome, per favore.';
+    const plan = planFromText(utterance);
+    const jarvis = jarvisDb(db);
+    const clients = await rows(db, 'SELECT id,name,menu_id FROM clients');
+    const { client: existing, candidates } = matchVenue(venue, clients.map((c) => ({ ...c, menu_id: c.menu_id || '' })));
+    const exact = existing && (existing.name || '').toLowerCase().replace(/\s+/g, ' ').trim() === venue.toLowerCase().replace(/\s+/g, ' ').trim() ? existing : null;
+    if (!exact && candidates.length) return `Esiste già un cliente simile: ${candidates.map((c) => `«${c.name}»`).join(', ')}. Se è lo stesso dimmi «nuova pratica per ${candidates[0].name}» con il nome esatto; se è un altro locale, dimmi il nome completo.`;
+    if (exact?.menu_id) return `«${exact.name}» ha già un menu online: per cambiarlo dimmi direttamente le modifiche, per esempio «al ${exact.name} il frico costa 14».`;
+    try {
+      const clientId = exact ? exact.id : (await action(jarvis, 'createClient', { name: venue, internalNotes: 'Cliente creato da Jarvis su comando vocale di Riccardo.' })).result.id;
+      const subject = `Nuovo menu ${plan ? plan[0].toUpperCase() + plan.slice(1) : '(piano da definire)'} · ${venue}`;
+      const requestId = (await action(jarvis, 'createRequest', { clientId, subject, sourceChannel: 'altro', sourceText: `Locale: ${venue}`, kind: 'nuovo',
+        ...(plan ? { category: `nuovo_${plan}`, plan } : { plan: 'da_definire' }), internalNotes: 'Pratica aperta da Jarvis su comando di Riccardo: in attesa di foto o PDF del menu.' })).result.id;
+      await putSetting(db, 'tg_focus', JSON.stringify({ requestId, subject, at: now() }));
+      return `Fatto, Riccardo. ${exact ? `Ho usato il cliente «${venue}» che avevamo già` : `Ho creato il cliente «${venue}»`} e aperto la pratica «${subject}»${plan ? '' : ': il piano lo decidiamo poi'}. Mandami pure foto o PDF del menu nella prossima ora: li collego a questa pratica, li leggo e preparo la bozza.`;
+    } catch (error) {
+      return `Non sono riuscito ad aprire la pratica: ${String(error?.message || 'errore').slice(0, 200)}`;
+    }
+  }
+
   // Modifica a voce di un menu già online: pratica + bozza dal menu su main, con le sole parole di Riccardo.
   async function voiceUpdate(db, env, utterance, spokenVenue) {
     const clients = await rows(db, "SELECT id,name,menu_id,plan FROM clients WHERE menu_id IS NOT NULL AND menu_id<>''");
@@ -420,6 +446,13 @@ export function createMissions(deps) {
     const fileId = photo ? photo.file_id : doc.file_id;
     const name = photo ? `foto-telegram-${now().slice(0, 16).replace(/[:T]/g, '-')}.jpg` : String(doc.file_name || 'menu.pdf').slice(0, 120);
     await putSetting(db, 'tg_pending_file', JSON.stringify({ fileId, mime, name, at: now() }));
+    let focus = null;
+    try { focus = JSON.parse(await setting(db, 'tg_focus') || 'null'); } catch {}
+    if (focus?.requestId && Date.now() - Date.parse(focus.at) < FOCUS_MINUTES * MINUTE) {
+      const outcome = await attachTelegramFile(db, env, focus.requestId);
+      await sendTelegram(env, chat, outcome.text.startsWith('Collegato') ? `${outcome.text} (è la pratica che mi hai appena fatto aprire).` : outcome.text, null, deps.fetchImpl);
+      return;
+    }
     const open = await rows(db, "SELECT id,subject FROM requests WHERE status NOT IN ('completata','archiviata','chiusa') ORDER BY updated_at DESC LIMIT 5");
     if (!open.length) { await sendTelegram(env, chat, 'Non ci sono pratiche aperte a cui collegare il file: crea prima la pratica nella Control Room.', null, deps.fetchImpl); return; }
     await sendTelegram(env, chat, `Ricevuto «${name}». A quale pratica lo collego? Poi lo leggo e ti dico cosa ho trovato.`,

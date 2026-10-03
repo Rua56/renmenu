@@ -8,7 +8,7 @@ import { CLOUDFLARE_FREE_MODEL } from './ai-live.js';
 import { slugify } from './menu.js';
 
 export const STT_MODEL = '@cf/openai/whisper-large-v3-turbo';
-export const INTENTS = new Set(['risposta', 'aggiorna_menu', 'pubblica', 'non_chiaro']);
+export const INTENTS = new Set(['risposta', 'aggiorna_menu', 'crea_pratica', 'pubblica', 'non_chiaro']);
 export const VOICE_PRESETS = {
   // ElevenLabs, modello multilingue: voci maschili calme e calde (la prima è la predefinita).
   elevenlabs: [['JBFqnCBsd6RMkjVDRZzb', 'George · caldo, calmo, accento britannico (stile Jarvis)'], ['onwK4e9ZLuTAKqWW03F9', 'Daniel · profondo e autorevole'], ['nPczCjzI2devNBz1zQrb', 'Brian · profondo e rassicurante']],
@@ -59,6 +59,7 @@ export async function understand(ai, utterance, context, { timeoutMs = 25_000 } 
     'intent può essere solo:',
     '- "risposta": domanda o richiesta di informazioni (situazione, pratiche, locali, scadenze, cosa fare). In "risposta" scrivi 1-3 frasi in italiano parlato, usando SOLO i DATI; se un dato non c’è dillo. Niente elenchi puntati, niente emoji.',
     '- "aggiorna_menu": Riccardo chiede di cambiare il menu online di un locale (prezzi, piatti da aggiungere o togliere). In "locale" il nome del locale così come detto. Non riscrivere le modifiche.',
+    '- "crea_pratica": chiede di aprire una nuova pratica o un nuovo cliente per un locale (anche «crea un nuovo menu per …»). In "locale" il nome del locale esattamente come detto, senza parole come «locale» o «ristorante» se non fanno parte del nome.',
     '- "pubblica": chiede di pubblicare o mettere online un menu. In "locale" il nome se detto.',
     '- "non_chiaro": non è chiaro cosa vuole. In "risposta" una breve domanda per chiarire.',
     'Non inventare mai prezzi, piatti, allergeni o numeri.'
@@ -113,4 +114,18 @@ export async function speak(settings, text, fetchImpl = globalThis.fetch, { time
     const bytes = new Uint8Array(await response.arrayBuffer());
     return bytes.length > 500 ? bytes : null;
   } catch { return null; }
+}
+
+// Piano detto esplicitamente: uno solo, altrimenti «da definire» (decide Riccardo).
+const PLAN_WORDS = [['standard', /\bstandard\b/], ['annuale', /\bannual[ei]\b/], ['premium', /\bpremium\b/]];
+export function planFromText(text) {
+  const plain = String(text || '').toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '');
+  const found = PLAN_WORDS.filter(([, pattern]) => pattern.test(plain)).map(([plan]) => plan);
+  return found.length === 1 ? found[0] : null;
+}
+// Il nome del locale deve essere davvero nelle parole di Riccardo (niente nomi inventati dal modello).
+export function venueSaid(venue, utterance) {
+  const said = `-${slugify(utterance)}-`;
+  const words = slugify(venue).split('-').filter(Boolean);
+  return words.length > 0 && words.every((w) => said.includes(`-${w}-`));
 }
