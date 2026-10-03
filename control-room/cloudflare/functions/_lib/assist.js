@@ -58,7 +58,7 @@ async function ask(ai, rows, timeoutMs) {
 export async function assistExtraction(ai, venue, source, slug, base, { timeoutMs = 20_000 } = {}) {
   if (typeof ai?.run !== 'function') return base;
   const lines = String(source || '').split(/\r?\n/);
-  const known = new Set(base.extracted.map((item) => item.line));
+  const known = new Set([...base.extracted.flatMap((item) => item.lines || [item.line]), ...(base.consumed || []), ...(base.courses || []).map((c) => c.line)]);
   // Righe non lette che contengono testo: titoli candidati e righe con almeno un numero.
   const candidates = lines.map((text, index) => ({ text: text.trim(), index }))
     .filter(({ text, index }) => text && !text.startsWith('[da verificare]') && !known.has(index + 1) && /[A-Za-zÀ-ÿ]{2}/.test(text) && text.length <= 220)

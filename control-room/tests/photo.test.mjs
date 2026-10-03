@@ -133,6 +133,58 @@ describe('Foto del menu nella pratica', () => {
       assert.equal(third[0].outcome.drafted, true, JSON.stringify(third));
       assert.deepEqual(await names(), ['Frico con polenta', 'Gubana', 'Ribolla gialla']);
       assert.equal((await db.prepare('SELECT COUNT(*) AS n FROM drafts WHERE request_id=?').bind(requestId).first()).n, 1);
+      // Riccardo modifica la bozza; poi arriva un'altra foto: la bozza NON si tocca e Jarvis lo dice.
+      const draft = await db.prepare('SELECT * FROM drafts WHERE request_id=?').bind(requestId).first();
+      const edited = JSON.parse(draft.menu_json); edited.sezioni[0].voci[0].nome.it = 'Frico croccante con polenta';
+      assert.equal((await act(db, 'saveDraft', { id: draft.id, revision: draft.revision, menu: edited, slug: draft.slug })).status, 200);
+      store.set('k4', new Uint8Array([255, 216, 255, 4])); pages.k4 = '# Vini\nRefosco — 7';
+      await add('p4', 'k4', '2026-10-03T00:09:00Z');
+      const fourth = await readPendingMaterials(db, env);
+      assert.equal(fourth[0].outcome.draftKept, true);
+      assert.deepEqual(await names(), ['Frico croccante con polenta', 'Gubana', 'Ribolla gialla']);
+      // Su sua richiesta (conferma esplicita) Jarvis rifà la bozza con TUTTI i materiali.
+      assert.equal((await act(db, 'rebuildDraft', { draftId: draft.id })).status, 403, 'senza conferma non si rifà');
+      const rebuilt = await act(db, 'rebuildDraft', { draftId: draft.id, confirmation: 'RIFAI BOZZA' });
+      assert.equal(rebuilt.status, 200, JSON.stringify(rebuilt.body));
+      assert.deepEqual(await names(), ['Frico con polenta', 'Gubana', 'Ribolla gialla', 'Refosco']);
+    } finally { db.close(); }
+  });
+
+  it('album di 4 foto da Telegram: lette una alla volta, una bozza sola con TUTTE le voci (anche con nomi e descrizioni scambiati)', async () => {
+    const db = database();
+    try {
+      await db.prepare("INSERT INTO clients (id,name,plan,internal_notes,revision,created_at,updated_at) VALUES ('c4','Il Culo di Alex','da_definire','',1,'2026-10-03','2026-10-03')").bind().run();
+      const requestId = (await act(db, 'createRequest', { clientId: 'c4', subject: 'Nuovo menu Standard · Il Culo di Alex', sourceChannel: 'altro', sourceText: 'Locale: Il Culo di Alex', category: 'nuovo_standard', plan: 'standard', kind: 'nuovo' })).body.result.id;
+      const keys = ['a1', 'a2', 'a3', 'a4'];
+      const store = new Map(keys.map((k, i) => [k, new Uint8Array([255, 216, 255, i + 1])]));
+      // Le due letture di ogni foto: il secondo modello scrive la descrizione al posto del nome.
+      const pages = {
+        a1: ['# Antipasti\nSalmone e Barbabietola — 15\n> CON BARBABIETOLA SOTTACETO, PISTACCHIO TOSTATO (7-8-12)', '# ANTIPASTI\nCON BARBABIETOLA SOTTACETO, PISTACCHIO TOSTATO (7-8-12) — 15'],
+        a2: ['# Primi\nTagliolini al ragù bianco — 16\n> CON FONDO DI VITELLO E TIMO (1-3-9)', '# PRIMI\nCON FONDO DI VITELLO E TIMO (1-3-9) — 16'],
+        a3: ['# Secondi\nGuancia di manzo — 22', '# SECONDI\nGuancia di manzo — 22'],
+        a4: ['# Vini bianchi\nRibolla Gialla — calice 5 / bottiglia 40\nFriulano — calice 6 / bottiglia 32', '# VINI BIANCHI\nRibolla Gialla — calice 5 / bottiglia 40\nFriulano — calice 6 / bottiglia 32']
+      };
+      let current = 'a1';
+      const env = testEnv(db, { BUCKET: { get: async (k) => { current = k; return { arrayBuffer: async () => store.get(k).buffer }; } },
+        AI: { run: async (model) => ({ response: pages[current][model.includes('mistral') ? 1 : 0] }) }, TRANSLATION_PROVIDER: 'disabled' });
+      const stamp = new Date().toISOString();
+      for (const [i, k] of keys.entries()) await db.prepare("INSERT INTO materials (id,request_id,r2_key,filename,mime,size,source,processing_status,text_preview,created_at) VALUES (?,?,?,?,?,?,?,?,?,?)")
+        .bind(`m${i + 1}`, requestId, k, `foto-${i + 1}.jpg`, 'image/jpeg', 4, 'telegram', 'da_trascrivere', null, stamp.replace(/\.\d+Z$/, `.${String(i).padStart(3, '0')}Z`)).run();
+      assert.deepEqual(await readPendingMaterials(db, env), [], 'album appena arrivato: aspetta');
+      const rounds = [];
+      for (let i = 0; i < 4; i += 1) rounds.push((await readPendingMaterials(db, env, { calmMs: 0 }))[0]);
+      assert.deepEqual(rounds.map((r) => r.material.filename), ['foto-1.jpg', 'foto-2.jpg', 'foto-3.jpg', 'foto-4.jpg'], 'una foto per giro, in ordine');
+      assert.deepEqual(rounds.map((r) => Boolean(r.outcome.waiting)), [true, true, true, false]);
+      assert.equal(rounds[3].outcome.drafted, true);
+      assert.equal(rounds[3].outcome.files.length, 4, 'riepilogo di tutte e 4 le foto in un solo messaggio');
+      const menu = JSON.parse((await db.prepare('SELECT menu_json FROM drafts WHERE request_id=?').bind(requestId).first()).menu_json);
+      const voci = menu.sezioni.flatMap((s) => s.voci);
+      assert.deepEqual(voci.map((v) => v.nome.it), ['Salmone e Barbabietola', 'Tagliolini al ragù bianco', 'Guancia di manzo', 'Ribolla Gialla', 'Friulano']);
+      assert.deepEqual(voci.map((v) => v.prezzo || v.prezzi.map((p) => `${p.etichetta.it} ${p.prezzo}`).join(' | ')), ['15,00', '16,00', '22,00', 'Calice 5,00 | Bottiglia 40,00', 'Calice 6,00 | Bottiglia 32,00']);
+      assert.match(voci[0].descrizione.it, /^Con barbabietola sottaceto, pistacchio tostato \(7-8-12\)$/);
+      assert.ok(voci.every((v) => !v.allergeni?.length), 'allergeni mai assegnati da soli');
+      const notes = JSON.parse((await db.prepare('SELECT review_notes_json FROM drafts WHERE request_id=?').bind(requestId).first()).review_notes_json);
+      assert.ok(notes.some((n) => n.kind === 'conferma' && /7, 8, 12/.test(n.hint)));
     } finally { db.close(); }
   });
 
@@ -158,7 +210,8 @@ describe('Foto del menu nella pratica', () => {
       assert.equal((await db.prepare('SELECT status FROM requests WHERE id=?').bind(requestId).first()).status, 'nuova', 'torna all’autopilota');
       await act(db, 'runAutopilot', {}, { BUCKET: bucket(store), AI: ai, TRANSLATION_PROVIDER: 'disabled' });
       assert.equal(await db.prepare('SELECT id FROM drafts WHERE request_id=?').bind(requestId).first(), null, 'aspetta la lettura');
-      assert.equal((await readPendingMaterials(db, env))[0].outcome.ok, true);
+      assert.deepEqual(await readPendingMaterials(db, env), [], 'file appena arrivato: Jarvis aspetta 40 secondi di calma');
+      assert.equal((await readPendingMaterials(db, env, { calmMs: 0 }))[0].outcome.ok, true);
       await act(db, 'runAutopilot', {}, { BUCKET: bucket(store), AI: ai, TRANSLATION_PROVIDER: 'disabled' });
       const draft = await db.prepare('SELECT menu_json FROM drafts WHERE request_id=?').bind(requestId).first();
       assert.ok(draft, 'bozza creata dalla foto allegata');

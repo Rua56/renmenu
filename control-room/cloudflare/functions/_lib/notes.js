@@ -78,3 +78,14 @@ export function notesSummary(notes, max = 6, { preview = false } = {}) {
   }
   return parts.join('\n\n');
 }
+
+/** Note sulle strutture lette (più prezzi, percorsi, descrizioni): cosa confermare, mai in silenzio. */
+export function structureNotes(extraction = {}) {
+  const notes = (extraction.confirm || []).map((c) => ({ kind: 'conferma', text: String(c.text || '').slice(0, 220), hint: c.hint, line: c.line ?? null }));
+  const variants = (extraction.extracted || []).filter((e) => e.variants?.length);
+  if (variants.length) notes.push({ kind: 'inserito', text: variants.slice(0, 6).map((e) => `${e.name}: ${e.variants.join(' · ')}`).join('; ') + (variants.length > 6 ? '…' : ''), hint: `Inserite ${variants.length} voci con più prezzi (es. calice e bottiglia), ogni prezzo con la sua etichetta come scritto. Controllale.`, line: variants[0].line ?? null });
+  for (const s of extraction.menu?.sezioni || []) if (s.tipo === 'degustazione') {
+    notes.push({ kind: 'inserito', text: `${s.nome.it}${s.prezzo ? ` — ${s.prezzo} €${s.unita?.it ? ` ${s.unita.it}` : ''}` : ''}`, hint: `Percorso degustazione inserito come sezione a sé: ${s.voci.filter((v) => !v.prezzo).length} portate${s.voci.some((v) => v.prezzo) ? ' e supplementi' : ''}${s.prezzo ? ', prezzo a persona come scritto' : ', PREZZO DA INSERIRE'}. Controllalo.`, line: null });
+  }
+  return notes;
+}

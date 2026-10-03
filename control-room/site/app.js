@@ -61,6 +61,12 @@ let aiBusy = false;
 const reviewEvidenceCache = new Map();
 const DEMO_PDF_ID = '5eae22bc-7a50-4bd2-8b8a-000000000403';
 
+// Prezzo mostrato in Revisione: uno solo, più prezzi con etichetta (calice / bottiglia) o portata di un percorso.
+function priceLabel(item, section, missing, euro = '') {
+  if (item.prezzi?.length) return item.prezzi.map((v) => `${escapeHtml(v.etichetta?.it || v.etichetta || '')} ${euro}${escapeHtml(v.prezzo)}`).join(' · ');
+  if (item.prezzo) return `${section?.tipo === 'degustazione' ? '+ ' : ''}${euro}${escapeHtml(item.prezzo)}`;
+  return section?.tipo === 'degustazione' ? 'portata' : missing;
+}
 function statusLabel(status) {
   return ({ nuova: 'Nuova', in_lavorazione: 'In lavorazione', in_revisione: 'In revisione', in_attesa: 'In attesa', materiale_ricevuto: 'Materiale ricevuto', in_analisi: 'In analisi', dati_da_confermare: 'Dati da confermare', bozza_pronta: 'Bozza pronta', approvata: 'Approvata nel mock', pronta_pubblicazione: 'Pronta nel mock', archiviata: 'Archiviata', chiusa: 'Chiusa', completata: 'Simulazione completata · niente online', bozza: 'Bozza mock', revisione: 'Bozza mock in revisione', pronta_pr: 'PR mock pronta', pr_simulata: 'PR mock simulata', pubblicazione_simulata: 'Pubblicazione simulata · niente online' }[status] || status || '—');
 }
@@ -210,7 +216,7 @@ function renderMaterialViewer() {
   if (materialViewerComparison) materialViewerComparison.innerHTML = draft ? `
     <p class="eyebrow">BOZZA A CONFRONTO</p><h3>${escapeHtml(draft.menu.nome?.it || draft.menu.nome)}</h3>
     <p class="muted small">${escapeHtml(draft.slug)} · revisione ${draft.revision}. La fonte a sinistra non viene estratta automaticamente né usata per inventare allergeni.</p>
-    ${draft.menu.sezioni.map((section) => `<div class="compare-section"><strong>${escapeHtml(section.nome?.it || section.nome)}</strong>${section.voci.map((item) => `<div class="compare-item"><span>${escapeHtml(item.nome?.it || item.nome)}</span><span>${item.prezzo ? escapeHtml(item.prezzo) : 'PREZZO NON CONFERMATO'}</span></div>`).join('')}</div>`).join('')}
+    ${draft.menu.sezioni.map((section) => `<div class="compare-section"><strong>${escapeHtml(section.nome?.it || section.nome)}</strong>${section.voci.map((item) => `<div class="compare-item"><span>${escapeHtml(item.nome?.it || item.nome)}</span><span>${priceLabel(item, section, 'PREZZO NON CONFERMATO')}</span></div>`).join('')}</div>`).join('')}
     <p class="notice warning">${criticalFields(draft.menu).allergensMissing.length ? 'ALLERGENI NON CONFERMATI DAL LOCALE. Non dedurre numeri dalla fonte.' : 'I numeri allergeni richiedono verifica della fonte.'}</p>
     <button class="button secondary" type="button" data-route="revisione">Apri editor e riferimenti</button>`
     : '<p class="eyebrow">BOZZA A CONFRONTO</p><p class="muted">Nessuna bozza per questa pratica. Non estrarre informazioni automaticamente dal file.</p>';
@@ -578,7 +584,7 @@ function renderPreview() {
   return `<div class="view-wrap">${header('07 / VISUALIZZAZIONE', 'Anteprima', 'Anteprima locale: il QR è scansionabile ma la sua destinazione privata non è attiva; non condividere.', `<label class="field">Pratica<select data-select-request>${requestOptions(selectedRequestId)}</select></label>`)}
     <div class="grid grid-2"><section class="panel"><p class="eyebrow">RENDERER MOCK</p><button class="button secondary small-button" type="button" data-action="preview-device">Passa a ${previewMode === 'phone' ? 'desktop' : 'telefono'}</button>
     <div class="preview-device ${previewMode === 'desktop' ? 'desktop-preview' : ''}" aria-label="Anteprima simulata menu"><div class="preview-top"><small>RENMENU · ANTEPRIMA</small><h3>${escapeHtml(draft.menu.nome?.it || draft.menu.nome)}</h3></div>
-    ${draft.menu.sezioni.map((section) => `<div class="preview-section"><h4>${escapeHtml(section.nome?.it || section.nome)}</h4>${section.voci.map((item) => `<div class="preview-item"><span>${escapeHtml(item.nome?.it || item.nome)}</span><strong>${item.prezzo ? `€ ${escapeHtml(item.prezzo)}` : 'da verificare'}</strong></div>`).join('')}</div>`).join('')}
+    ${draft.menu.sezioni.map((section) => `<div class="preview-section"><h4>${escapeHtml(section.nome?.it || section.nome)}${section.tipo === 'degustazione' ? ` <small>percorso degustazione${section.prezzo ? ` · € ${escapeHtml(section.prezzo)} ${escapeHtml(section.unita?.it || 'a persona')}` : ' · PREZZO DA INSERIRE'}</small>` : ''}</h4>${section.voci.map((item) => `<div class="preview-item"><span>${escapeHtml(item.nome?.it || item.nome)}${item.descrizione?.it ? `<br><small class="muted">${escapeHtml(item.descrizione.it)}</small>` : ''}</span><strong>${priceLabel(item, section, 'da verificare', '€ ')}</strong></div>`).join('')}</div>`).join('')}
     <div class="preview-section qr-preview"><div class="qr-real" role="img" aria-label="QR scansionabile di preview NON ATTIVA">${provisionalQrSvg(draft.slug)}</div><strong>QR DI PROVA — NON ATTIVO</strong><small>Destinazione privata non distribuita; non è il QR del locale.</small></div></div></section>
     <aside class="panel"><p class="eyebrow">LINK E QR</p><h2>Mai una pubblicazione</h2><div class="notice danger"><strong>URL del QR di prova:</strong> <span class="mono">${escapeHtml(target)}</span><br>Non è attivo e non mostra la bozza; NON distribuire. Il percorso commerciale /menu/?m= è distinto e resta invariato.</div>
     <div class="notice warning"><strong>QR provvisorio scansionabile.</strong> Generato nel browser senza servizi esterni: anche se lo scansioni, nessun menu viene pubblicato.</div><hr class="divider"><p class="eyebrow">DIFF EDITORIALE</p><h2>${diffTitle}</h2>
@@ -607,6 +613,12 @@ function jarvisMissionPanel(draft) {
   const stopped = mission?.status === 'ferma' ? `<p class="notice warning">Jarvis si era fermato: ${escapeHtml(mission.note || '')}</p>` : '';
   const planOk = request?.kind !== 'nuovo' || ['standard', 'annuale', 'premium'].includes(request?.plan);
   return `<form data-form="entrust-jarvis" class="panel spaced-top-small"><input type="hidden" name="draftId" value="${escapeHtml(draft.id)}"><input type="hidden" name="revision" value="${draft.revision}"><p class="eyebrow">AFFIDA A JARVIS</p>${stopped}<p class="small">Confermando dichiari che hai controllato la bozza: prezzi e piatti corretti, allergeni solo quelli scritti dal locale (le voci senza restano senza), inglese corretto. I dati del locale spuntati qui sopra vengono inseriti.</p>${client?.email ? `<p class="muted small">Poi Jarvis invia l’anteprima a <strong>${escapeHtml(client.email)}</strong> da renmenu1569, legge la risposta, applica da solo le modifiche chiare (prezzi, piatti, coperto) e rimanda l’anteprima. Si ferma su allergeni o risposte ambigue. Prima di pubblicare ti chiede il SÌ su Telegram.</p>` : `<p class="muted small">Il locale non ha un’email: Jarvis manda l’anteprima <strong>a te su Telegram</strong> e pubblica solo dopo il tuo SÌ. Se vuoi che la approvi il locale, aggiungi prima la sua email nella scheda cliente.</p>`}${planOk ? '' : '<p class="notice warning">Prima conferma il piano della pratica (Standard, Annuale o Premium).</p>'}<div class="form-actions spaced-top-small"><button class="button" type="submit" ${planOk && (client?.email || state.telegram?.linked) ? '' : 'disabled'}>Approva e affida a Jarvis</button></div></form>`;
+}
+// Materiali arrivati dopo la bozza (es. altre foto da Telegram): la bozza si può rifare con tutti.
+function rebuildPanel(draft) {
+  if (!['bozza', 'revisione'].includes(draft?.status) || missionFor(draft)) return '';
+  const later = (state.materials || []).filter((m) => m.requestId === draft.requestId && !m.archivedAt && String(m.createdAt || '') > String(draft.createdAt || ''));
+  return `<form data-form="rebuild-draft" class="panel spaced-top-small"><input type="hidden" name="draftId" value="${escapeHtml(draft.id)}"><p class="eyebrow">RIFAI LA BOZZA</p>${later.length ? `<p class="notice warning small">${later.length} file arrivati dopo questa bozza (${later.map((m) => escapeHtml(m.filename)).join(', ')}): non sono nella bozza.</p>` : ''}<p class="small muted">Jarvis rilegge tutti i materiali della pratica e rifà la bozza da capo. Le modifiche fatte qui si perdono.</p><div class="button-row"><button class="button secondary" type="submit">Rifai la bozza con tutti i materiali</button></div></form>`;
 }
 function sourceExtrasPanel(draft) {
   const proposals = draft?.sourceExtras || [];
@@ -658,7 +670,7 @@ function approvalPathPanel(draft) {
   let action = '';
   const mission = missionFor(draft);
   if (mission && !['completata', 'ferma', 'annullata'].includes(mission.status)) action = jarvisMissionPanel(draft);
-  else if (!internalDone) action = `${sourceExtrasPanel(draft)}${jarvisMissionPanel(draft)}<p class="notice warning"><strong>Passaggio 1.</strong> Completa la revisione interna (prezzi, allergeni, lingue) e salvala.</p><div class="button-row spaced-top-small"><button class="button secondary" type="button" data-route="revisione">Vai alla revisione</button></div>`;
+  else if (!internalDone) action = `${sourceExtrasPanel(draft)}${rebuildPanel(draft)}${jarvisMissionPanel(draft)}<p class="notice warning"><strong>Passaggio 1.</strong> Completa la revisione interna (prezzi, allergeni, lingue) e salvala.</p><div class="button-row spaced-top-small"><button class="button secondary" type="button" data-route="revisione">Vai alla revisione</button></div>`;
   else if (!usable) {
     const why = approval?.stale ? 'La bozza è cambiata dopo l’ultima anteprima: serve una nuova anteprima.' : approval?.status === 'modifiche_richieste' ? 'Il locale ha chiesto modifiche: correggi la bozza, poi prepara una nuova anteprima.' : 'Jarvis prepara il link di anteprima e il testo dell’email per il locale.';
     action = `${approval?.status === 'modifiche_richieste' ? replyChangesPanel(draft, approval) : ''}<p class="notice"><strong>Passaggio 2.</strong> ${escapeHtml(why)}</p><label class="field spaced-top-small">Email del locale<input id="preview-recipient" type="email" maxlength="254" value="${escapeHtml(approval?.recipient || client?.email || '')}" placeholder="email del locale"></label><div class="button-row spaced-top-small"><button class="button" type="button" data-action="prepare-preview" data-draft="${escapeHtml(draft.id)}" data-revision="${draft.revision}">Prepara anteprima ed email</button></div>`;
@@ -1143,6 +1155,11 @@ async function handleSubmit(event) {
   if (kind === 'create-client') { await doAction('createClient', Object.fromEntries(data), isDemoMode ? 'Cliente demo creato.' : 'Cliente creato in staging privato.'); selectedClientId = state.clients[0]?.id || selectedClientId; render(); return; }
   if (kind === 'venue-note') { await doAction('addVenueNote', { clientId: data.get('clientId'), text: data.get('text') }, 'Nota memorizzata: Jarvis la userà da ora.'); return; }
   if (kind === 'update-client') { await doAction('updateClient', { id: data.get('id'), revision: Number(data.get('revision')), patch: { plan: data.get('plan'), contactName: data.get('contactName'), contactRole: data.get('contactRole'), email: data.get('email'), phone: data.get('phone'), paymentStatus: data.get('paymentStatus'), menuId: data.get('menuId'), menuUrl: data.get('menuUrl'), trialEndsAt: data.get('trialEndsAt'), renewalAt: data.get('renewalAt'), internalNotes: data.get('internalNotes') } }, isDemoMode ? 'Scheda cliente demo aggiornata.' : 'Scheda cliente di staging aggiornata.'); return; }
+  if (kind === 'rebuild-draft') {
+    if (!confirm('Rifaccio la bozza da capo con tutti i materiali della pratica? Le modifiche fatte a questa bozza si perdono.')) return;
+    await doAction('rebuildDraft', { draftId: data.get('draftId'), confirmation: 'RIFAI BOZZA' }, 'Bozza rifatta con tutti i materiali: ricontrollala.');
+    return;
+  }
   if (kind === 'entrust-jarvis') {
     const accept = [...document.querySelectorAll('form[data-form="apply-source-extras"] input[name="accept"]:checked')].map((input) => String(input.value));
     await doAction('entrustToJarvis', { draftId: data.get('draftId'), revision: Number(data.get('revision')), accept, confirmation: 'AFFIDO A JARVIS' }, 'Pratica affidata a Jarvis: ti aggiorna lui.');

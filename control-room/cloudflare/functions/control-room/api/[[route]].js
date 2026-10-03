@@ -20,7 +20,7 @@ import { autopilotMessage, autopilotPreview } from '../../_lib/autopilot.js';
 import { createMissions } from '../../_lib/missions.js';
 import { noteStatement } from '../../_lib/memory.js';
 import { THEMES, proposeTheme, themeFromText } from '../../_lib/themes.js';
-import { notesSummary, reviewNotes } from '../../_lib/notes.js';
+import { notesSummary, reviewNotes, structureNotes } from '../../_lib/notes.js';
 import { briefLines, briefNotes, creativeBrief, premiumDirections } from '../../_lib/premium.js';
 import { applyVenueInfo, extractVenueInfo } from '../../_lib/venue-info.js';
 import { applyPriceCorrections } from '../../_lib/corrections.js';
@@ -173,9 +173,12 @@ async function discardUntouchedJarvisDraft(db, requestId) {
   await db.prepare('DELETE FROM drafts WHERE id=?').bind(draft.id).run();
   return true;
 }
-export async function readPendingMaterials(db, env = {}) {
+export async function readPendingMaterials(db, env = {}, { calmMs = 40_000 } = {}) {
   let pending = [];
-  try { pending = await rows(db, "SELECT id,request_id,filename FROM materials WHERE processing_status='da_trascrivere' AND archived_at IS NULL AND (mime='application/pdf' OR mime IN ('image/jpeg','image/png','image/webp')) AND created_at>'2026-10-02T22:30' ORDER BY created_at ASC LIMIT 1"); }
+  // Album da Telegram (più foto insieme): arrivano una alla volta in pochi secondi. Jarvis aspetta
+  // 40 secondi di calma sulla pratica, così le legge tutte (una per giro) e fa UNA bozza con tutte.
+  const calm = new Date(Date.now() - calmMs).toISOString();
+  try { pending = await rows(db, "SELECT id,request_id,filename FROM materials WHERE processing_status='da_trascrivere' AND archived_at IS NULL AND (mime='application/pdf' OR mime IN ('image/jpeg','image/png','image/webp')) AND created_at>'2026-10-02T22:30' AND NOT EXISTS (SELECT 1 FROM materials n WHERE n.request_id=materials.request_id AND n.archived_at IS NULL AND n.created_at>?) ORDER BY created_at ASC LIMIT 1", calm); }
   catch { return []; }
   const done = [];
   for (const material of pending) {
@@ -186,9 +189,15 @@ export async function readPendingMaterials(db, env = {}) {
       const request = await getOne(db, 'SELECT id,category,plan,kind,subject FROM requests WHERE id=?', material.request_id);
       const stillUnread = await getOne(db, "SELECT id FROM materials WHERE request_id=? AND processing_status='da_trascrivere' AND archived_at IS NULL", material.request_id);
       if (stillUnread) { outcome.waiting = true; done.push({ material, request, outcome }); continue; } // bozza dopo l'ultima foto
+      // Riepilogo di TUTTI i file della pratica (album da Telegram): un messaggio solo, foto per foto.
+      try {
+        const files = await rows(db, "SELECT m.filename, a.warnings_json AS w FROM materials m LEFT JOIN material_analyses a ON a.material_id=m.id WHERE m.request_id=? AND m.archived_at IS NULL AND m.processing_status IN ('letto_da_jarvis','non_leggibile') ORDER BY m.created_at ASC", material.request_id);
+        outcome.files = files.map((f) => ({ filename: f.filename, note: parseList(f.w)[0] || 'non leggibile' }));
+      } catch { outcome.files = []; }
       // Bozza preparata da Jarvis e mai toccata (né da Riccardo né in pubblicazione): la rifà con tutte le foto.
-      if (outcome.ok) await discardUntouchedJarvisDraft(db, material.request_id);
+      if (outcome.ok) outcome.redone = await discardUntouchedJarvisDraft(db, material.request_id);
       const hasDraft = await getOne(db, 'SELECT id FROM drafts WHERE request_id=?', material.request_id);
+      if (outcome.ok && hasDraft) outcome.draftKept = true; // bozza già modificata o affidata: non si tocca
       // Premium su misura: la bozza la avvia sempre Riccardo (scheda creativa + direzioni grafiche).
       if (outcome.ok && request?.category && request.category !== 'nuovo_premium' && request.plan !== 'premium' && !hasDraft) {
         try { await action(jarvis, 'generateDraft', { requestId: request.id }, env); outcome.drafted = true; outcome.notesText = notesSummary(await draftNotes(db, request.id)); }
@@ -521,6 +530,8 @@ export async function action(db, type, input, env = {}) {
     }
     // Tutto ciò che non è entrato nella bozza, riga per riga e già diviso per tipo.
     extraction.notes = reviewNotes({ sourceText: combinedSource, uncertain: extraction.uncertain, extracted: extraction.extracted, mode: extraction.mode, info: extraction.info, corrections: extraction.corrections });
+    // Etichette dedotte (calice/bottiglia), percorsi senza prezzo, numeri di allergeni: da confermare.
+    extraction.notes = [...extraction.notes, ...structureNotes(extraction)];
     if (creative) extraction.notes = [...extraction.notes.map((n) => (n.kind === 'tema' ? { ...n, hint: 'Richiesta grafica: è nella scheda creativa Premium, scegli la direzione in Revisione.' } : n)), ...briefNotes(creative.brief)];
     const id = uid(), timestamp = now(), menuJson = JSON.stringify(extraction.menu);
     await auditedBatch(db, [
@@ -636,6 +647,25 @@ export async function action(db, type, input, env = {}) {
       'approval.activation', `Attivazione registrata da Riccardo: ${ACTIVATIONS[expected]} (${date}).`, approval.request_id,
       { sql: 'SELECT 1 FROM publication_approvals WHERE id=? AND activation=?', args: [id, expected] });
     result = { id };
+  } else if (type === 'rebuildDraft') {
+    // Riccardo chiede di rifare la bozza con TUTTI i materiali (es. foto arrivate dopo): solo bozze
+    // ancora interne, mai mandate al locale né in pubblicazione. Le sue modifiche alla bozza si perdono.
+    assert(db.actor !== 'jarvis', 'Solo Riccardo può rifare una bozza.', 403);
+    assert(p.confirmation === 'RIFAI BOZZA', 'Conferma mancante.', 403);
+    const draft = await getOne(db, 'SELECT id,request_id,status FROM drafts WHERE id=?', identifier(p.draftId));
+    assert(draft, 'Bozza non trovata.', 404);
+    assert(['bozza', 'revisione'].includes(draft.status), 'La bozza è già pronta, in anteprima o in pubblicazione: non si rifà.', 409);
+    for (const table of ['pr_proposals', 'live_pr_operations', 'publication_approvals', 'jarvis_missions']) {
+      let used = null;
+      try { used = await getOne(db, `SELECT 1 AS x FROM ${table} WHERE draft_id=?`, draft.id); } catch { used = null; }
+      assert(!used, 'Bozza già affidata a Jarvis o mandata al locale: non si rifà.', 409);
+    }
+    const unread = await getOne(db, "SELECT COUNT(*) AS n FROM materials WHERE request_id=? AND processing_status='da_trascrivere' AND archived_at IS NULL", draft.request_id);
+    assert(!Number(unread?.n), 'Jarvis sta ancora leggendo dei file di questa pratica: riprova tra un minuto.', 409);
+    await auditedBatch(db, [db.prepare('DELETE FROM draft_versions WHERE draft_id=?').bind(draft.id), db.prepare('DELETE FROM drafts WHERE id=?').bind(draft.id)],
+      'draft.rebuild', 'Bozza rifatta da capo con tutti i materiali della pratica, su richiesta di Riccardo.', draft.request_id);
+    const rebuilt = await action(db, 'generateDraft', { requestId: draft.request_id }, env);
+    result = { ...rebuilt.result, rebuilt: true };
   } else if (type === 'translateDraft') {
     // Completa le voci ancora senza inglese. Non tocca prezzi/allergeni né i testi EN già presenti;
     // la checklist si azzera perché i contenuti cambiano.
@@ -1025,7 +1055,7 @@ export async function action(db, type, input, env = {}) {
           VALUES (?,?,?,?,?,?,?,?,?) ON CONFLICT(material_id) DO UPDATE SET id=excluded.id, source_sha256=excluded.source_sha256,
           source_text=excluded.source_text, provenance_json=excluded.provenance_json, warnings_json=excluded.warnings_json,
           status=excluded.status, created_at=excluded.created_at`)
-          .bind(analysisId, materialId, request.id, hash, read.text.slice(0, 50_000), JSON.stringify([{ materialId, method: read.method, reviewed: false }]), JSON.stringify(read.warnings), 'needs_review', stamp),
+          .bind(analysisId, materialId, request.id, hash, read.text.slice(0, 50_000), JSON.stringify([{ materialId, method: read.method, reviewed: false, ...(read.raw ? { raw: read.raw.map((t) => String(t || '').slice(0, 6000)) } : {}) }]), JSON.stringify(read.warnings), 'needs_review', stamp),
         db.prepare("UPDATE materials SET processing_status='letto_da_jarvis',text_preview=? WHERE id=?").bind(read.text.slice(0, 2500), materialId)
       ], 'material.read.jarvis', `Jarvis ha letto «${material.filename}»: ${read.warnings[0]}`.slice(0, 600), request.id);
       result = { ok: true, agreed: read.agreed ?? null, doubts: read.doubts ?? 0, method: read.method, warnings: read.warnings };

@@ -1,4 +1,5 @@
 import { premiumErrors } from './premium.js';
+import { WINE_SECTION, allergenNumbers, namelessVariants, columnsHeader, degustazioneHeading, degustazionePrice, descriptionLike, fmt, labelOnlyRow, labelSuffix, labeledVariants, pairingRow, unlabeledVariants } from './menu-structure.js';
 // Independent server-side rules. scripts/validate-menus.py remains the publication authority.
 const PRICE = /^\d+(?:[,.]\d{1,2})?$/;
 const TAGS = new Set(['veg', 'vegan', 'spicy', 'gf', 'new', 'top', 'frozen']);
@@ -165,6 +166,8 @@ const NUMBER_WORDS = { due: 2, tre: 3, quattro: 4, cinque: 5, sei: 6 };
 export function specialPriceRow(row) {
   if (row.startsWith('[da verificare]') || /^(?:coperto|servizio)\b/i.test(row)) return null;
   const person = row.match(PER_PERSON);
+  // «Abbiamo anche un percorso da 55 euro a persona»: una frase, non un piatto.
+  if (person && /\b(?:abbiamo|offriamo|proponiamo|facciamo|anche|nostro|nostra|vorremmo)\b/i.test(person[1])) return null;
   if (person && /[A-Za-zÀ-ÿ]{3}/.test(person[1])) {
     const min = person[1].match(MIN_PEOPLE) || row.match(MIN_PEOPLE);
     const name = person[1].replace(MIN_PEOPLE, ' ').replace(/\s{2,}/g, ' ').replace(/\s*[—–\-:,]\s*$/, '').trim();
@@ -212,78 +215,227 @@ export function sentenceCaseIfShouting(title) {
 
 export function extractMenuFromText(venue, source, requestedSlug) {
   const slug = slugify(requestedSlug || venue);
-  const items = [], unknown = [], provenance = [];
+  const items = [], unknown = [], provenance = [], consumed = [], confirm = [];
   let section = { nome: { it: 'Dal materiale ricevuto' }, voci: [] };
   const sections = [section];
   const lines = String(source || '').split(/\r?\n/);
+  // Ultima voce letta (per descrizioni e righe «calice 5» subito sotto) e riga senza prezzo in attesa.
+  let last = null, pending = null;
+  const sectionName = () => section.nome?.it || '';
+  const isWine = () => WINE_SECTION.test(sectionName()) || Boolean(section.columns);
+  const openSection = (title, lineNumber, extra = {}) => {
+    section = { nome: { it: title.slice(0, 100) }, voci: [], line: lineNumber, ...extra };
+    sections.push(section); last = null; pending = null;
+  };
+  const addItem = (item, entry) => {
+    section.voci.push(item);
+    const record = { ...entry, section: sections.indexOf(section), index: section.voci.length - 1 };
+    items.push(record);
+    last = { item, entry: record, line: entry.line }; pending = null;
+    return record;
+  };
+  const variantItem = (name, variants, lineNumber, row, how) => {
+    const item = { nome: { it: name }, prezzi: variants.map((v) => ({ etichetta: { it: v.label }, prezzo: fmt(v.amount) })) };
+    const record = addItem(item, { name, price: '', variants: item.prezzi.map((v) => `${v.etichetta.it} ${v.prezzo}`), sourceLine: row, line: lineNumber, loose: false });
+    if (how) confirm.push({ text: row, line: lineNumber, hint: how });
+    return record;
+  };
   for (let index = 0; index < lines.length; index += 1) {
     const lineNumber = index + 1;
     const row = lines[index].trim().replace(/^[-•*]\s*/, '');
-    if (!row) continue;
+    if (!row) { if (section.tipo !== 'degustazione') last = null; pending = null; continue; }
     if (VENUE_LINE.test(row)) continue; // Nome del locale: gestito dal chiamante, non è un piatto.
-    // Titolo di sezione: "# Primi" o "#Primi" (come nella demo) oppure "[Primi]".
     const nextRow = lines.slice(index + 1).find((line) => line.trim()) || '';
-    if (/^#{1,3}\s*[^\s#]/.test(row) || /^\[[^\]]+\]$/.test(row) || isPlainHeading(row, nextRow)) {
+    const nextClean = nextRow.trim().replace(/^[-•*]\s*/, '');
+    // Percorso degustazione: titolo (con o senza prezzo) seguito da portate senza prezzo.
+    const degu = row.startsWith('[da verificare]') ? null : degustazioneHeading(row);
+    if (degu && nextClean && !priceRow(nextClean) && !degustazioneHeading(nextClean)) {
+      openSection(sentenceCaseIfShouting(degu.name), lineNumber, { tipo: 'degustazione' });
+      if (degu.amount) section.prezzo = fmt(degu.amount);
+      if (degu.unit) section.unita = { it: degu.unit };
+      if (degu.ambiguous) confirm.push({ text: row, line: lineNumber, hint: 'Percorso con più prezzi nella stessa riga: scegli tu il prezzo del percorso.' });
+      continue;
+    }
+    // Intestazione di colonne («calice  bottiglia», anche dopo il titolo della sezione).
+    const columns = columnsHeader(row.replace(/^#{1,3}\s*/, ''));
+    if (columns) {
+      if (columns.title && columns.title.length <= 60) openSection(sentenceCaseIfShouting(columns.title), lineNumber, { columns: columns.columns });
+      else section.columns = columns.columns;
+      consumed.push(lineNumber);
+      continue;
+    }
+    // Titolo di sezione: "# Primi" o "#Primi" (come nella demo) oppure "[Primi]".
+    const nextIsVariantOnly = Boolean(labelOnlyRow(nextClean) || namelessVariants(nextClean));
+    const plainHeading = !nextIsVariantOnly && (isPlainHeading(row, nextRow) || (!last && !pending && isWineHeading(row, nextClean)))
+      && (section.tipo !== 'degustazione' || KNOWN_SECTION.test(row) || isShouting(row));
+    const knownHeading = section.tipo !== 'degustazione' && row.length <= 40 && !/\d/.test(row) && KNOWN_SECTION.test(row) && row.replace(/:\s*$/, '').trim().split(/\s+/).length <= 4 && !nextIsVariantOnly;
+    if (/^#{1,3}\s*[^\s#]/.test(row) || /^\[[^\]]+\]$/.test(row) || plainHeading || knownHeading) {
       const title = sentenceCaseIfShouting(row.replace(/^#{1,3}\s*|^\[|\]$/g, '').replace(/:\s*$/, '').trim());
-      if (title) {
-        section = { nome: { it: title.slice(0, 100) }, voci: [], line: lineNumber };
-        sections.push(section);
-      }
+      if (title) openSection(title, lineNumber);
       continue;
     }
     // Coperto, telefono, orari e social non sono piatti: li gestisce venue-info.js.
-    if (/^(?:il\s+)?coperto\b/i.test(row)) { unknown.push(row.slice(0, 220)); continue; }
-    if (/^(?:orari\w*|pranzo|cena|aperti|apertura|chiusi|chiuso|tutti i giorni|dal\s|lun|mar|mer|gio|ven|sab|dom)\b.*\d{1,2}(?:[:.]\d{2})?\s*[-–]\s*\d{1,2}/i.test(row)) { unknown.push(row.slice(0, 220)); continue; }
+    if (/^(?:il\s+)?coperto\b/i.test(row)) { unknown.push(row.slice(0, 220)); last = null; continue; }
+    if (/^(?:orari\w*|pranzo|cena|aperti|apertura|chiusi|chiuso|tutti i giorni|dal\s|lun|mar|mer|gio|ven|sab|dom)\b.*\d{1,2}(?:[:.]\d{2})?\s*[-–]\s*\d{1,2}/i.test(row)) { unknown.push(row.slice(0, 220)); last = null; continue; }
+    if (row.startsWith('[da verificare]')) { unknown.push(row.slice(0, 220)); last = null; continue; }
+    if (section.tipo === 'degustazione') {
+      const price = degustazionePrice(row);
+      if (price && !section.prezzo) {
+        section.prezzo = fmt(price.amount);
+        if (price.unit) section.unita = { it: price.unit };
+        consumed.push(lineNumber); section.priceLine = lineNumber;
+        continue;
+      }
+      const pairing = pairingRow(row);
+      if (pairing) { addItem({ nome: { it: pairing.name }, prezzo: fmt(pairing.amount) }, { name: pairing.name, price: fmt(pairing.amount), sourceLine: row, line: lineNumber, loose: false }); continue; }
+    }
+    // Più prezzi sulla stessa voce: con etichette scritte, o due prezzi in una sezione vini/colonne.
+    const labeled = labeledVariants(row);
+    if (labeled) { variantItem(labeled.name, labeled.variants, lineNumber, row); continue; }
+    const unlabeled = unlabeledVariants(row, { section: sectionName(), columns: section.columns });
+    if (unlabeled) {
+      variantItem(unlabeled.name, unlabeled.variants, lineNumber, row, unlabeled.inferred ? `Due prezzi senza etichetta in «${sectionName()}»: inseriti come calice ${fmt(unlabeled.variants[0].amount)} € e bottiglia ${fmt(unlabeled.variants[1].amount)} €. Conferma.` : '');
+      continue;
+    }
+    // «calice 5» / «bottiglia 40» sotto il nome del vino (o sotto la voce appena letta con varianti).
+    const only = labelOnlyRow(row);
+    if (only) {
+      if (pending && pending.line === lineNumber - 1) {
+        const p0 = pending;
+        unknown.splice(p0.unknownIndex, 1);
+        const record = variantItem(p0.row, [only], p0.line, p0.row);
+        record.lines = [p0.line, lineNumber];
+        last.line = lineNumber;
+        consumed.push(lineNumber);
+        continue;
+      }
+      if (last?.item.prezzi && last.entry.lines && last.line === lineNumber - 1 && !last.item.prezzi.some((v) => v.etichetta.it === only.label) && last.item.prezzi.every((v) => labelFamily(v.etichetta.it) === labelFamily(only.label))) {
+        last.item.prezzi.push({ etichetta: { it: only.label }, prezzo: fmt(only.amount) });
+        last.entry.variants.push(`${only.label} ${fmt(only.amount)}`);
+        last.line = lineNumber; last.entry.lines.push(lineNumber); consumed.push(lineNumber);
+        continue;
+      }
+    }
+    const nameless = namelessVariants(row);
+    if (nameless || only) {
+      if (nameless && pending && pending.line === lineNumber - 1) {
+        const p0 = pending;
+        unknown.splice(p0.unknownIndex, 1);
+        const record = variantItem(p0.row, nameless, p0.line, p0.row);
+        record.lines = [p0.line, lineNumber]; consumed.push(lineNumber); last.line = lineNumber;
+        continue;
+      }
+      // Prezzi senza il nome del piatto: non si indovina a cosa appartengono.
+      unknown.push(row.slice(0, 220)); last = null; pending = null;
+      continue;
+    }
     const special = specialPriceRow(row);
     if (special) {
       const item = { nome: { it: special.name } };
       let price = '';
-      if (special.amount) { const [w, c = ''] = special.amount.replace('.', ',').split(','); price = `${w},${c.padEnd(2, '0')}`; item.prezzo = price; }
+      if (special.amount) { price = fmt(special.amount); item.prezzo = price; }
       item.descrizione = { it: special.note };
-      section.voci.push(item);
-      items.push({ name: special.name, price, sourceLine: row, line: lineNumber, loose: false, special: special.kind, note: special.note });
+      addItem(item, { name: special.name, price, sourceLine: row, line: lineNumber, loose: false, special: special.kind, note: special.note });
       continue;
     }
     const match = priceRow(row);
     if (match) {
       const name = match.name.replace(/\s*[—–\-:]\s*$/, '').trim();
       // Solo formato: 12 -> 12,00 e 9,5 -> 9,50 (stesso valore, nessun prezzo inventato).
-      const [whole, cents = ''] = match.amount.replace('.', ',').split(',');
-      const price = `${whole},${cents.padEnd(2, '0')}`;
+      const price = fmt(match.amount);
       if (name && Number(price.replace(',', '.')) > 0) {
-        const item = { nome: { it: name }, prezzo: price };
-        section.voci.push(item);
-        items.push({ name, price, sourceLine: row, line: lineNumber, loose: match.loose });
+        // «Ribolla (calice) — 5» subito dopo «Ribolla (bottiglia) — 28»: una voce sola con due prezzi.
+        const suffix = labelSuffix(name), prev = last?.entry;
+        if (suffix && prev && last.line >= lineNumber - 2 && (prev.suffixBase === normKey(suffix.base) || (last.item.prezzi && normKey(prev.name) === normKey(suffix.base)))) {
+          if (!last.item.prezzi) {
+            last.item.nome = { it: suffix.base.length >= prev.suffixBaseRaw.length ? suffix.base : prev.suffixBaseRaw };
+            last.item.prezzi = [{ etichetta: { it: prev.suffixLabel }, prezzo: last.item.prezzo }];
+            delete last.item.prezzo;
+            prev.name = last.item.nome.it; prev.price = ''; prev.variants = [`${prev.suffixLabel} ${last.item.prezzi[0].prezzo}`];
+          }
+          if (!last.item.prezzi.some((v) => v.etichetta.it === suffix.label)) {
+            last.item.prezzi.push({ etichetta: { it: suffix.label }, prezzo: price });
+            prev.variants.push(`${suffix.label} ${price}`);
+            last.line = lineNumber; consumed.push(lineNumber);
+            continue;
+          }
+        }
+        const record = addItem({ nome: { it: name }, prezzo: price }, { name, price, sourceLine: row, line: lineNumber, loose: match.loose });
+        if (suffix) Object.assign(record, { suffixBase: normKey(suffix.base), suffixBaseRaw: suffix.base, suffixLabel: suffix.label });
         continue;
       }
     }
+    // Descrizione o portata: riga senza prezzo subito sotto una voce (o dentro un percorso).
+    const contiguous = last && last.line >= lineNumber - 1;
+    const desc = contiguous ? descriptionLike(row, { wine: isWine() }) : null;
+    if (desc && last && !last.descLocked) {
+      const item = last.item;
+      const text = sentenceCaseIfShouting(desc);
+      item.descrizione = { it: item.descrizione?.it && last.entry.special ? `${item.descrizione.it} · ${text}` : item.descrizione?.it && last.descLine ? `${item.descrizione.it} ${text}` : text };
+      last.descLine = lineNumber; last.line = lineNumber; last.entry.descriptionLine = last.entry.descriptionLine || lineNumber;
+      consumed.push(lineNumber);
+      const allergens = allergenNumbers(desc);
+      if (allergens) confirm.push({ text: row, line: lineNumber, hint: `Numeri di allergeni scritti dal locale per «${item.nome.it}» (${allergens.join(', ')}): sono rimasti nella descrizione. Se seguono la legenda UE 1–14 inseriscili negli allergeni del piatto.` });
+      continue;
+    }
+    if (section.tipo === 'degustazione' && courseLike(row)) {
+      addItem({ nome: { it: sentenceCaseIfShouting(row.replace(/^>\s*/, '')).slice(0, 150) } }, { name: row.slice(0, 150), price: '', sourceLine: row, line: lineNumber, loose: false, course: true });
+      continue;
+    }
+    pending = { row: row.replace(/[\s—–\-:]+$/, ''), line: lineNumber, unknownIndex: unknown.length };
+    last = null;
     unknown.push(row.slice(0, 220));
   }
   const kept = sections.filter((s) => s.voci.length);
+  for (const s of kept) if (s.tipo === 'degustazione') {
+    if (!s.prezzo) confirm.push({ text: s.nome.it, line: s.line, hint: `Percorso «${s.nome.it}» senza prezzo scritto: inseriscilo tu (prezzo del percorso).` });
+    if (!s.voci.some((v) => !v.prezzo)) confirm.push({ text: s.nome.it, line: s.line, hint: `Percorso «${s.nome.it}» senza portate lette: controlla il testo.` });
+  }
   // Provenienza: ogni nome e prezzo punta alla riga del testo ricevuto da cui è stato letto.
   kept.forEach((s, sectionIndex) => {
     if (s.line) provenance.push({ path: `sezioni.${sectionIndex}.nome.it`, source: `riga ${s.line}`, value: s.nome.it, status: 'confermato' });
+    if (s.prezzo) provenance.push({ path: `sezioni.${sectionIndex}.prezzo`, source: `riga ${s.priceLine || s.line}`, value: s.prezzo, status: 'confermato' });
     s.voci.forEach((item, itemIndex) => {
-      const found = items.find((entry) => entry.name === item.nome.it && entry.price === (item.prezzo || ''));
+      const found = items.find((entry) => entry.section === sections.indexOf(s) && entry.index === itemIndex);
       const where = found ? `riga ${found.line}` : 'nessuna fonte';
       provenance.push({ path: `sezioni.${sectionIndex}.voci.${itemIndex}.nome.it`, source: where, value: item.nome.it, status: 'confermato' });
       if (item.prezzo !== undefined) provenance.push({ path: `sezioni.${sectionIndex}.voci.${itemIndex}.prezzo`, source: where, value: item.prezzo, status: 'confermato' });
-      if (found?.special) provenance.push({ path: `sezioni.${sectionIndex}.voci.${itemIndex}.descrizione.it`, source: where, value: item.descrizione.it, status: 'confermato' });
+      (item.prezzi || []).forEach((v, vi) => provenance.push({ path: `sezioni.${sectionIndex}.voci.${itemIndex}.prezzi.${vi}.prezzo`, source: where, value: `${v.etichetta.it} ${v.prezzo}`, status: 'confermato' }));
+      if (item.descrizione) provenance.push({ path: `sezioni.${sectionIndex}.voci.${itemIndex}.descrizione.it`, source: found?.descriptionLine ? `riga ${found.descriptionLine}` : where, value: item.descrizione.it, status: 'confermato' });
     });
   });
-  const menu = { id: slug, nome: venue.trim(), lingue: ['it'], sezioni: kept.map(({ nome, voci }) => ({ nome, voci })) };
-  return { menu, extracted: items, uncertain: unknown, provenance, warnings: [
+  const menu = { id: slug, nome: venue.trim(), lingue: ['it'], sezioni: kept.map(({ nome, voci, tipo, prezzo, unita }) => ({ nome, ...(tipo ? { tipo } : {}), ...(prezzo ? { prezzo } : {}), ...(unita ? { unita } : {}), voci })) };
+  const variantCount = items.filter((i) => i.variants).length, courses = kept.filter((s) => s.tipo === 'degustazione');
+  return { menu, extracted: items.filter((i) => !i.course), courses: items.filter((i) => i.course), consumed, confirm, uncertain: unknown, provenance, warnings: [
     'Allergeni, ingredienti, coperto, contatti e traduzioni non sono stati dedotti.',
     ...items.filter((i) => i.special).map((i) => `«${i.name}»: ${i.special === 'variabile' ? 'senza prezzo fisso' : `${i.price} €`} con la nota «${i.note}» (dalla riga ${i.line}: “${i.sourceLine.slice(0, 90)}”). Controlla la nota.`),
+    ...(variantCount ? [`${variantCount} voci con più prezzi (es. calice e bottiglia): ${items.filter((i) => i.variants).slice(0, 4).map((i) => `«${i.name}» ${i.variants.join(' · ')}`).join('; ')}${variantCount > 4 ? '…' : ''}. Controllale.`] : []),
+    ...courses.map((s) => `Percorso degustazione «${s.nome.it}»: ${s.voci.filter((v) => !v.prezzo).length} portate${s.prezzo ? `, ${s.prezzo} €${s.unita ? ` ${s.unita.it}` : ''}` : ', prezzo da inserire'}. Controllalo.`),
     ...(items.some((i) => i.loose) ? [`${items.filter((i) => i.loose).length} prezzi scritti senza €, controlla che siano davvero prezzi: ${items.filter((i) => i.loose).map((i) => `«${i.name}» ${i.price}`).join(', ')}.`] : []),
     ...(unknown.length ? [`${unknown.length} righe senza prezzo o formato riconosciuto richiedono controllo.`] : [])
   ] };
+}
+const KNOWN_SECTION = /^(?:#\s*)?(?:(?:gli |i |le |il |la )?(?:antipasti|primi|secondi|contorni|dolci|dessert|formaggi|pizze|bevande|bibite|vini|birre|cocktail|caffetteria|amari|distillati|insalate|panini|crudi|bollicine|spumanti)\b|menu bambini|piatti del giorno)/i;
+const isShouting = (row) => { const l = row.replace(/[^A-Za-zÀ-ÿ]/g, ''); return l.length >= 4 && l === l.toUpperCase(); };
+// Etichette della stessa famiglia (vino: calice/bottiglia/caraffa; taglie: piccola/media/grande; porzioni).
+const labelFamily = (label) => (/^(?:Piccola|Media|Grande)$/.test(label) ? 'taglia' : /porzione/i.test(label) ? 'porzione' : 'vino');
+const normKey = (value) => String(value || '').toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/[^a-z0-9]+/g, ' ').trim();
+// Portata di un percorso: riga breve senza prezzo, non una frase dell'email.
+function courseLike(row) {
+  const text = row.trim();
+  return text.length >= 3 && text.length <= 150 && /[A-Za-zÀ-ÿ]{3}/.test(text) && !/[?!]$/.test(text) && !SENTENCE_WORDS.test(text) && !/\b(?:abbiamo|vorremmo|potete|grazie|saluti)\b/i.test(text);
+}
+// «VINI BIANCHI» seguito da «Friulano 5/40»: titolo anche se la riga dopo ha due prezzi.
+function isWineHeading(row, nextRow) {
+  const title = row.replace(/:\s*$/, '').trim();
+  if (title.length < 3 || title.length > 40 || title.split(/\s+/).length > 5 || /[.?!,;@\d]/.test(title) || !WINE_SECTION.test(title)) return false;
+  return Boolean(labeledVariants(nextRow) || unlabeledVariants(nextRow, { section: title }) || priceRow(nextRow));
 }
 
 export function menuDiff(before, after) {
   const index = (menu) => new Map((menu?.sezioni || []).flatMap((section) => (section.voci || []).map((item) => [
     `${typeof section.nome === 'object' ? section.nome.it : section.nome} / ${typeof item.nome === 'object' ? item.nome.it : item.nome}`,
-    String(item.prezzo ?? '')
+    item.prezzi?.length ? item.prezzi.map((v) => `${typeof v.etichetta === 'object' ? v.etichetta.it : v.etichetta} ${v.prezzo}`).join(' / ') : String(item.prezzo ?? '')
   ])));
   const previous = index(before), next = index(after), changes = [];
   for (const [name, price] of next) {
