@@ -300,25 +300,29 @@
   const top = document.querySelector('.top'), su = document.getElementById('su');
   su.setAttribute('aria-label', S().su);
   su.addEventListener('click', () => window.scrollTo({ top: 0, behavior: 'smooth' }));
-  const onScroll = () => { const y = window.scrollY; top.classList.toggle('scrolled', y > 180); su.classList.toggle('show', y > 700); };
+  const onScroll = () => { const y = window.scrollY; top.classList.toggle('scrolled', y > 180); su.classList.toggle('show', y > 700); syncChips(); };
   window.addEventListener('scroll', onScroll, { passive: true });
   onScroll();
 
-  let io;
+    // Sezione attiva = l'ultima il cui inizio ha superato la barra in alto (preciso anche scorrendo veloce).
+  let activeIdx = null;
   function observe() {
-    if (io) io.disconnect();
-    const chips = [...document.querySelectorAll('.chip')];
+    activeIdx = null;
+    syncChips();
+  }
+  function syncChips() {
     const secs = [...document.querySelectorAll('.sezione')];
     if (!secs.length) return;
-    io = new IntersectionObserver(entries => {
-      const vis = entries.filter(e => e.isIntersecting).sort((a, b) => a.boundingClientRect.top - b.boundingClientRect.top)[0];
-      if (!vis) return;
-      const i = vis.target.id.replace('sez-', '');
-      chips.forEach(c => c.setAttribute('aria-current', c.dataset.i === i));
-      const active = chips.find(c => c.dataset.i === i);
-      if (active) { const nav = active.parentElement; nav.scrollTo({ left: active.offsetLeft - (nav.clientWidth - active.offsetWidth) / 2, behavior: 'smooth' }); }
-    }, { rootMargin: '-120px 0px -60% 0px' });
-    secs.forEach(s => io.observe(s));
+    const line = (document.querySelector('.top')?.offsetHeight || 120) + 24;
+    let current = secs[0];
+    for (const sec of secs) if (sec.getBoundingClientRect().top <= line) current = sec;
+    const i = current.id.replace('sez-', '');
+    if (i === activeIdx) return;
+    activeIdx = i;
+    const chips = [...document.querySelectorAll('.chip')];
+    chips.forEach(c => c.setAttribute('aria-current', c.dataset.i === i));
+    const active = chips.find(c => c.dataset.i === i);
+    if (active) { const nav = active.parentElement; nav.scrollTo({ left: active.offsetLeft - (nav.clientWidth - active.offsetWidth) / 2, behavior: 'smooth' }); }
   }
 
   render();
