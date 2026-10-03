@@ -22,7 +22,12 @@ export function criticalFields(menu) {
       const path = `sezioni.${sectionIndex}.voci.${itemIndex}`;
       // Prezzo variabile dichiarato dal locale («secondo il pescato», «a peso»): niente importo, ma è attestato.
       const variable = /^Prezzo (?:variabile|secondo|a peso)/.test(typeof item?.descrizione === 'string' ? item.descrizione : item?.descrizione?.it || '');
-      if (!item?.prezzo && item?.prezzo !== 0 && !variable) pricesMissing.push(`${path}.prezzo`);
+      // Più prezzi con etichetta (calice / bottiglia): attestati se ogni variante ha il suo importo.
+      const variants = Array.isArray(item?.prezzi) && item.prezzi.length && item.prezzi.every((v) => v?.prezzo);
+      // Portata di un percorso degustazione: il prezzo è quello del percorso (a persona), non del piatto.
+      const course = section?.tipo === 'degustazione' && !item?.prezzo;
+      if (course) { if (!section?.prezzo && !pricesMissing.includes(`sezioni.${sectionIndex}.prezzo`)) pricesMissing.push(`sezioni.${sectionIndex}.prezzo`); }
+      else if (!item?.prezzo && item?.prezzo !== 0 && !variable && !variants) pricesMissing.push(`${path}.prezzo`);
       if (!Array.isArray(item?.allergeni) || item.allergeni.length === 0) allergensMissing.push(`${path}.allergeni`);
     }
   }

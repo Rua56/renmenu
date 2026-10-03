@@ -6,6 +6,8 @@ import { CLOUDFLARE_FREE_MODEL } from './ai-live.js';
 
 export const TRANSLATION_SOURCE = 'Traduzione automatica Jarvis (bozza)';
 const BATCH = 20;
+// Workers AI gratuito: 10.000 «neuron» al giorno, poi errore 4006 fino a mezzanotte UTC.
+const QUOTA = /\b4006\b|daily free allocation|neurons?\b.*(?:used up|exceeded)|quota/i;
 const MAX_TEXT = 400;
 const ROOT_FIELDS = ['sottotitolo', 'avviso', 'note', 'orari'];
 
@@ -98,17 +100,18 @@ export async function translateMenu(ai, menu, { lang = 'en', timeoutMs = 25_000 
   const provenance = [], skipped = [];
   if (!entries.length) return { menu: out, provenance, skipped, translated: 0, total: 0, unavailable: false };
   if (typeof ai?.run !== 'function') return { menu: out, provenance, skipped: entries.map((e) => ({ path: e.path, reason: 'servizio non configurato' })), translated: 0, total: entries.length, unavailable: true };
-  let failures = 0;
+  let failures = 0, quota = false;
   for (let start = 0; start < entries.length; start += BATCH) {
     const batch = entries.slice(start, start + BATCH);
     let results = [];
-    try { results = await runModel(ai, batch, timeoutMs); } catch { results = null; }
+    try { results = await runModel(ai, batch, timeoutMs); } catch (error) { results = null; if (QUOTA.test(String(error?.message || error))) quota = true; }
     // Un tentativo andato male (risposta tagliata, timeout): si riprova una volta a metà, così un menu lungo non resta senza inglese.
     if (!results || results.length < batch.length / 2) {
       const half = Math.ceil(batch.length / 2), merged = new Map((results || []).filter((r) => Number.isInteger(r?.id)).map((r) => [r.id, r]));
       for (const offset of [0, half]) {
         const part = batch.slice(offset, offset + half);
         if (!part.length || part.every((_, i) => merged.has(offset + i))) continue;
+        if (quota) break;
         try { for (const r of await runModel(ai, part, timeoutMs)) if (Number.isInteger(r?.id) && r.id < part.length) merged.set(offset + r.id, { ...r, id: offset + r.id }); } catch { /* resta da completare */ }
       }
       results = [...merged.values()];
@@ -129,11 +132,12 @@ export async function translateMenu(ai, menu, { lang = 'en', timeoutMs = 25_000 
     if (!langs.includes(lang)) out.lingue = [...langs, lang];
   }
   return { menu: out, provenance, skipped, translated: provenance.length, total: entries.length,
-    unavailable: failures > 0 && failures === Math.ceil(entries.length / BATCH) };
+    unavailable: failures > 0 && failures === Math.ceil(entries.length / BATCH), quota };
 }
 
 export function translationSummary(result) {
   if (!result.total) return '';
+  if (result.unavailable && result.quota) return 'Inglese non preparato: per oggi è finita la quota gratuita di Cloudflare per l’intelligenza artificiale (si azzera alle 02:00). Dopo, tocca «Traduci in inglese».';
   if (result.unavailable) return 'Traduzione inglese non riuscita (servizio non disponibile): riprova con «Traduci in inglese».';
   const base = `Inglese preparato da Jarvis per ${result.translated} di ${result.total} testi: è una bozza da verificare.`;
   return result.skipped.length ? `${base} ${result.skipped.length} da completare a mano (${[...new Set(result.skipped.map((s) => s.reason))].join(', ')}).` : base;
