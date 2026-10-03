@@ -20,7 +20,7 @@ import { autopilotMessage, autopilotPreview } from '../../_lib/autopilot.js';
 import { createMissions } from '../../_lib/missions.js';
 import { noteStatement } from '../../_lib/memory.js';
 import { THEMES, proposeTheme, themeFromText } from '../../_lib/themes.js';
-import { notesSummary, reviewNotes, structureNotes } from '../../_lib/notes.js';
+import { dropRepeatedPages, notesSummary, reviewNotes, structureNotes } from '../../_lib/notes.js';
 import { briefLines, briefNotes, creativeBrief, premiumDirections } from '../../_lib/premium.js';
 import { applyVenueInfo, extractVenueInfo } from '../../_lib/venue-info.js';
 import { applyPriceCorrections } from '../../_lib/corrections.js';
@@ -437,7 +437,8 @@ export async function action(db, type, input, env = {}) {
     if (request.kind === 'nuovo') await assertSlugFree(db, slugify(desiredSlug), requestId, request.client_id);
     // Foto e PDF già letti (da Jarvis o trascritti a mano): si aggiungono in coda al testo della
     // pratica; la provenienza indica il file e la riga, non la riga del testo combinato.
-    const analyses = await rows(db, "SELECT a.source_text AS text,a.provenance_json AS prov,m.filename FROM material_analyses a JOIN materials m ON m.id=a.material_id WHERE a.request_id=? AND m.archived_at IS NULL AND a.status IN ('needs_review','complete') AND length(a.source_text)>0 ORDER BY a.created_at", requestId);
+    const allAnalyses = await rows(db, "SELECT a.source_text AS text,a.provenance_json AS prov,m.filename FROM material_analyses a JOIN materials m ON m.id=a.material_id WHERE a.request_id=? AND m.archived_at IS NULL AND a.status IN ('needs_review','complete') AND length(a.source_text)>0 ORDER BY a.created_at", requestId);
+    const { kept: analyses, repeated: repeatedPages } = dropRepeatedPages(allAnalyses);
     let combinedSource = String(request.source_text || '');
     const segments = [];
     for (const analysis of analyses) {
@@ -532,6 +533,7 @@ export async function action(db, type, input, env = {}) {
     extraction.notes = reviewNotes({ sourceText: combinedSource, uncertain: extraction.uncertain, extracted: extraction.extracted, mode: extraction.mode, info: extraction.info, corrections: extraction.corrections });
     // Etichette dedotte (calice/bottiglia), percorsi senza prezzo, numeri di allergeni: da confermare.
     extraction.notes = [...extraction.notes, ...structureNotes(extraction)];
+    for (const r of repeatedPages) extraction.notes.push({ kind: 'conferma', text: `File «${r.filename}»`, hint: `Stessa pagina di «${r.keptFilename}»: Jarvis l’ha usata una volta sola (la lettura più chiara). Se erano pagine diverse, dimmelo.`, line: null });
     if (creative) extraction.notes = [...extraction.notes.map((n) => (n.kind === 'tema' ? { ...n, hint: 'Richiesta grafica: è nella scheda creativa Premium, scegli la direzione in Revisione.' } : n)), ...briefNotes(creative.brief)];
     const id = uid(), timestamp = now(), menuJson = JSON.stringify(extraction.menu);
     await auditedBatch(db, [

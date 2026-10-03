@@ -201,3 +201,16 @@ describe('Pagina «Mescita — by the glass» (foto reale «Il Culo di Alex»)',
     assert.deepEqual(mixed.menu.sezioni.map((s) => s.descrizione?.it || ''), ['Al calice', '']);
   });
 });
+
+describe('Stessa pagina mandata due volte', () => {
+  it('resta la lettura più pulita, pagine diverse restano tutte', async () => {
+    const { dropRepeatedPages } = await import('../cloudflare/functions/_lib/notes.js');
+    const old = { filename: 'vecchia.jpg', text: '# I Primi\n[da verificare] Fregola e Polipetti: letto 15,00\n[da verificare] Gnocchi con pan grattato: letto 14,00\nDitalini e trota — 15' };
+    const fresh = { filename: 'nuova.jpg', text: '# I Primi\nFregola e Polipetti — 15,00\n> con crema di zucchine\nGnocchi con pan grattato — 14,00\nDitalini e trota — 15' };
+    const wine = { filename: 'vini.jpg', text: '# Bollicine\nRodaro Brut Nature — 7\nRevì Trento Doc — 6,50' };
+    const out = dropRepeatedPages([old, wine, fresh]);
+    assert.deepEqual(out.kept.map((a) => a.filename), ['vini.jpg', 'nuova.jpg']);
+    assert.deepEqual(out.repeated, [{ filename: 'vecchia.jpg', keptFilename: 'nuova.jpg' }]);
+    assert.equal(dropRepeatedPages([old, wine]).kept.length, 2);
+  });
+});
