@@ -7,6 +7,7 @@ import { proposeReplyChanges } from './approvals.js';
 import { applyMenuChanges, describeChange } from './changes.js';
 import { VENUE_LINE, extractMenuFromText, menuDiff } from './menu.js';
 import { THEMES, themeFromText } from './themes.js';
+import { applyVenueInfo, extractVenueInfo, withoutVenueInfo } from './venue-info.js';
 
 const RECEIVED = /^Oggetto ricevuto:/i;
 const norm = (v) => String(v || '').toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '').trim();
@@ -34,7 +35,7 @@ function baseProvenance(menu, label) {
  * extraction ha la stessa forma di extractMenuFromText (menu, extracted, uncertain, provenance, warnings)
  * più mode ('aggiornamento' | 'sostituzione') e added (numero di piatti nuovi).
  */
-export function prepareUpdate({ slug, current, sha, sourceText, subject }) {
+function prepareUpdateCore({ slug, current, sha, sourceText, subject }) {
   const short = String(sha || '').slice(0, 7);
   const onlineLabel = `Menu online (main${short ? ` ${short}` : ''})`;
   const body = updateBody(sourceText);
@@ -85,4 +86,38 @@ export function prepareUpdate({ slug, current, sha, sourceText, subject }) {
       ...manual.map((entry) => `Da valutare a mano: «${String(entry.source).slice(0, 160)}»${entry.note ? ` (${entry.note})` : ''}.`)
     ]
   } };
+}
+
+/**
+ * Aggiornamento del menu online, con in più coperto, telefono, orari, Instagram e Facebook
+ * se l'email o la frase a voce li indicano in modo chiaro (i dubbi diventano domande).
+ * @returns {{ ok: true, extraction } | { ok: false, reason }}
+ */
+export function prepareUpdate(input) {
+  const body = updateBody(input.sourceText);
+  const found = extractVenueInfo(body);
+  const rest = withoutVenueInfo(body, found);
+  const core = prepareUpdateCore({ ...input, sourceText: Object.keys(found.found).length ? rest : input.sourceText });
+  const base = core.ok ? core.extraction.menu : { ...input.current, id: input.slug };
+  const info = applyVenueInfo(base, found, { overwrite: true });
+  if (!info.applied.length && !info.doubts.length) return core;
+  const used = new Set(info.applied.map((a) => norm(a.source)));
+  if (!core.ok) {
+    if (!info.applied.length) return { ok: false, reason: `${core.reason} ${info.warnings.join(' ')}`.trim() };
+    const short = String(input.sha || '').slice(0, 7);
+    return { ok: true, extraction: {
+      menu: info.menu, mode: 'aggiornamento', added: 0,
+      extracted: info.applied.map((a) => ({ name: a.field, price: a.value, sourceLine: a.source, line: a.line })),
+      uncertain: [], provenance: [...baseProvenance(input.current, `Menu online (main${short ? ` ${short}` : ''})`), ...info.provenance],
+      warnings: [`Aggiornamento del menu online «${input.slug}»${short ? ` (versione ${short})` : ''}: solo informazioni del locale. Piatti e prezzi invariati, stesso QR.`, ...info.warnings],
+      info: { applied: info.applied, doubts: info.doubts }
+    } };
+  }
+  const extraction = core.extraction;
+  extraction.menu = info.menu;
+  extraction.provenance = [...(extraction.provenance || []).filter((row) => !info.provenance.some((p) => p.path === row.path)), ...info.provenance];
+  extraction.uncertain = (extraction.uncertain || []).filter((row) => !used.has(norm(row)));
+  extraction.warnings = [...extraction.warnings.filter((w) => !(w.startsWith('Da valutare a mano') && [...used].some((u) => norm(w).includes(u.slice(0, 40))))), ...info.warnings];
+  extraction.info = { applied: info.applied, doubts: info.doubts };
+  return { ok: true, extraction };
 }

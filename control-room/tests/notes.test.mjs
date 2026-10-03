@@ -46,7 +46,7 @@ test('note di revisione: ogni riga non inserita è elencata e divisa per tipo', 
   assert.equal(kind(/toni del blu/), 'tema');
   assert.equal(kind(/piano da 25/), 'piano');
   assert.equal(kind(/^Buongiorno/), 'testo');
-  assert.match(notesSummary(notes), /Da sistemare a mano \(6\)/);
+  assert.match(notesSummary(notes), /Da sistemare o confermare \(6\)/);
 });
 
 test('piano citato ma non deciso: resta da confermare', () => {

@@ -87,7 +87,8 @@ describe('Autopilota di Jarvis', () => {
       assert.equal(request.plan, 'standard');
       const draft = state.drafts.find((entry) => entry.requestId === requestId);
       assert.equal(draft.slug, 'osteria-autopilota');
-      assert.deepEqual(draft.sourceExtras.map((entry) => entry.type), ['coperto', 'allergeni'], 'coperto e allergeni proposti, non inseriti');
+      assert.deepEqual(draft.sourceExtras.map((entry) => entry.type), ['allergeni'], 'allergeni proposti, non inseriti');
+      assert.ok(draft.menu.coperto, 'coperto scritto nella richiesta: inserito con la fonte');
       assert.equal(draft.checks.prices, false, 'la checklist resta a Riccardo');
       const audits = state.audit.filter((entry) => entry.requestId === requestId);
       assert.ok(audits.some((entry) => entry.action === 'draft.generate' && entry.actor === 'jarvis'));

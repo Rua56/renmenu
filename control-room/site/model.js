@@ -4,7 +4,7 @@ const ALLOWED_ALLERGENS = new Set(Array.from({ length: 14 }, (_, index) => Strin
 const ALLOWED_TAGS = new Set(['veg', 'vegan', 'spicy', 'gf', 'new', 'top', 'frozen']);
 const LEGACY_TAGS = new Set(['hot', 'riserva']);
 const PRICE_PATTERN = /^\d+(?:[,.]\d{1,2})?$/;
-const PUBLIC_ROOT = new Set(['id', 'nome', 'sottotitolo', 'indirizzo', 'telefono', 'instagram', 'maps', 'orari', 'wifi', 'avviso', 'coperto', 'note', 'tema', 'sezioni', 'lingue', 'url', 'sito', 'website']);
+const PUBLIC_ROOT = new Set(['id', 'nome', 'sottotitolo', 'indirizzo', 'telefono', 'instagram', 'facebook', 'maps', 'orari', 'wifi', 'avviso', 'coperto', 'note', 'tema', 'sezioni', 'lingue', 'url', 'sito', 'website']);
 const PUBLIC_SECTION = new Set(['nome', 'descrizione', 'voci']);
 const PUBLIC_ITEM = new Set(['nome', 'descrizione', 'prezzo', 'allergeni', 'tag']);
 
