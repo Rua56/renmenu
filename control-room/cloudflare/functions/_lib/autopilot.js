@@ -8,6 +8,7 @@ import { applyVenueInfo, extractVenueInfo } from './venue-info.js';
 import { extractMenuFromText, venueFromSource } from './menu.js';
 import { proposeSourceExtras } from './extras.js';
 import { categoryByCode } from './service-rules.js';
+import { briefLines, creativeBrief } from './premium.js';
 
 const plain = (value) => String(value || '').toLocaleLowerCase('it-IT').normalize('NFD').replace(/[\u0300-\u036f]/g, '');
 const RECEIVED_SUBJECT = /^Oggetto ricevuto:\s*/i;
@@ -79,6 +80,9 @@ export function autopilotPlan(request) {
   if (entry.kind !== 'nuovo') return { proposal, action: 'proponi', why: 'Per ora questo tipo di richiesta lo prepari tu.' };
   if (!proposal.explicitPlan) return { proposal, action: 'proponi', why: proposal.ambiguousPlan ? (proposal.hesitant ? 'Il cliente cita un piano ma non ha ancora deciso: piano da confermare.' : 'Il testo cita più piani: scegli tu.') : 'Il piano non è scritto nella richiesta: scegli tu Standard, Annuale o Premium.' };
   if (!proposal.venue) return { proposal, action: 'proponi', why: 'Manca una riga «Locale: …»: indica il nome del locale (Menu ID) e genera tu la bozza.' };
+  // Premium su misura: nessuna bozza automatica. Jarvis prepara scheda creativa e 3 direzioni
+  // grafiche quando Riccardo genera la bozza; il preventivo (totale) lo decide sempre Riccardo.
+  if (proposal.plan === 'premium') return { proposal, action: 'proponi', why: 'Premium su misura: la bozza la avvii tu. Quando la generi preparo la scheda creativa e 3 direzioni grafiche da confrontare; il totale del preventivo lo decidi tu.' };
   return { proposal, action: 'bozza', why: '' };
 }
 
@@ -95,6 +99,7 @@ export function autopilotPreview(request) {
     plan: plan.proposal.plan, venue: plan.proposal.venue, reasons: reasonText(plan.proposal),
     items: extraction.extracted.length, uncertain: extraction.uncertain.length,
     notes: reviewNotes({ sourceText: text, uncertain: extraction.uncertain, extracted: extraction.extracted, info: applyVenueInfo(extraction.menu, extractVenueInfo(text)) }),
+    brief: plan.proposal.plan === 'premium' ? briefLines(creativeBrief(text, { attachments: Number(request.attachments || 0) })) : [],
     extras: extras.filter((entry) => entry.type !== 'manuale').map((entry) => (entry.type === 'coperto' ? `coperto ${entry.value}` : `allergeni ${entry.name}`))
   };
 }
@@ -103,7 +108,8 @@ export function autopilotPreview(request) {
 export function autopilotMessage(subject, preview, outcome = preview.action) {
   const base = autopilotBase(subject, preview, outcome);
   const todo = preview.kind === 'nuovo' && Array.isArray(preview.notes) ? notesSummary(preview.notes, 6, { preview: outcome !== 'bozza' }) : '';
-  return todo ? `${base}\n\n${todo}` : base;
+  const brief = Array.isArray(preview.brief) && preview.brief.length ? `Scheda creativa (dal testo del cliente):\n${preview.brief.map((line) => `• ${line}`).join('\n')}` : '';
+  return [base, brief, todo].filter(Boolean).join('\n\n');
 }
 function autopilotBase(subject, preview, outcome) {
   const head = String(subject || 'Nuova richiesta').slice(0, 70);

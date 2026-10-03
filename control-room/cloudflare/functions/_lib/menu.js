@@ -1,11 +1,12 @@
+import { premiumErrors } from './premium.js';
 // Independent server-side rules. scripts/validate-menus.py remains the publication authority.
 const PRICE = /^\d+(?:[,.]\d{1,2})?$/;
 const TAGS = new Set(['veg', 'vegan', 'spicy', 'gf', 'new', 'top', 'frozen']);
 const LEGACY = new Set(['hot', 'riserva']);
 const LANGS = new Set(['it', 'en', 'de', 'fr', 'es']);
-const PUBLIC_ROOT = new Set(['id', 'nome', 'sottotitolo', 'indirizzo', 'telefono', 'instagram', 'facebook', 'maps', 'orari', 'wifi', 'avviso', 'coperto', 'note', 'tema', 'sezioni', 'lingue', 'url', 'sito', 'website']);
-const PUBLIC_SECTION = new Set(['nome', 'descrizione', 'voci']);
-const PUBLIC_ITEM = new Set(['nome', 'descrizione', 'prezzo', 'allergeni', 'tag']);
+const PUBLIC_ROOT = new Set(['id', 'nome', 'sottotitolo', 'indirizzo', 'telefono', 'instagram', 'facebook', 'maps', 'orari', 'wifi', 'avviso', 'coperto', 'note', 'tema', 'premium', 'sezioni', 'lingue', 'url', 'sito', 'website']);
+const PUBLIC_SECTION = new Set(['nome', 'descrizione', 'voci', 'tipo', 'prezzo', 'unita']);
+const PUBLIC_ITEM = new Set(['nome', 'descrizione', 'prezzo', 'prezzi', 'allergeni', 'tag']);
 const text = (value) => typeof value === 'string' ? value.trim() : value && typeof value === 'object' && !Array.isArray(value) ? Object.values(value).some((item) => typeof item === 'string' && item.trim()) : false;
 const localized = (value, lang) => value && typeof value === 'object' && typeof value[lang] === 'string' && value[lang].trim();
 export const slugify = (value) => String(value || '').toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '').slice(0, 64);
@@ -26,6 +27,7 @@ export function validateMenu(menu) {
   };
   allowed(menu, PUBLIC_ROOT, 'menu');
   for (const key of ['nome', 'sottotitolo', 'orari', 'avviso', 'note']) if (key in menu) publicText(menu[key], `menu.${key}`);
+  if ('premium' in menu) errors.push(...premiumErrors(menu.premium));
   if ('tema' in menu && !['bordeaux', 'trattoria', 'mare', 'terracotta', 'notte', 'sole'].includes(menu.tema)) errors.push('menu.tema: usa bordeaux, trattoria, mare, terracotta, notte o sole.');
   for (const key of ['indirizzo', 'telefono', 'instagram', 'facebook', 'maps', 'wifi', 'coperto', 'url', 'sito', 'website'])
     if (key in menu && typeof menu[key] !== 'string') errors.push(`menu.${key}: serve testo pubblico, non un oggetto tecnico.`);
@@ -68,18 +70,30 @@ export function validateMenu(menu) {
     if (!section || typeof section !== 'object' || Array.isArray(section)) { errors.push(`${sl} non valida.`); continue; }
     if (!text(section.nome)) errors.push(`${sl}: nome mancante.`);
     else essential.push([sl, section.nome]);
+    if ('tipo' in section && section.tipo !== 'degustazione') errors.push(`${sl}: tipo non supportato (consentito: degustazione).`);
+    if ('prezzo' in section && !(typeof section.prezzo === 'number' ? section.prezzo > 0 : typeof section.prezzo === 'string' && PRICE.test(section.prezzo.trim()))) errors.push(`${sl}: prezzo della sezione non valido.`);
     if (!Array.isArray(section.voci) || !section.voci.length) { errors.push(`${sl}: nessun piatto.`); continue; }
     for (const [vi, item] of section.voci.entries()) {
       const label = `${sl}, voce ${vi + 1}`;
       if (!item || typeof item !== 'object' || Array.isArray(item)) { errors.push(`${label}: voce non valida.`); continue; }
       if (!text(item.nome)) errors.push(`${label}: nome mancante.`);
       else essential.push([label, item.nome]);
+      const badPrice = (p) => typeof p === 'boolean' || (typeof p === 'number' && (!Number.isFinite(p) || p <= 0)) ||
+        (typeof p !== 'number' && (typeof p !== 'string' || !PRICE.test(p.trim()) || Number(p.replace(',', '.')) <= 0));
+      const variants = 'prezzi' in item;
+      if (variants) {
+        if (!Array.isArray(item.prezzi) || !item.prezzi.length) errors.push(`${label}: prezzi deve essere una lista di varianti.`);
+        else for (const [pi, v] of item.prezzi.entries()) {
+          if (!v || typeof v !== 'object' || Array.isArray(v) || !text(v.etichetta)) errors.push(`${label}, variante ${pi + 1}: etichetta mancante (es. calice, bottiglia).`);
+          else if (badPrice(v.prezzo)) errors.push(`${label}, variante ${pi + 1}: prezzo non valido.`);
+        }
+      }
       if ('prezzo' in item) {
         const p = item.prezzo;
         if (p === '') warnings.push(`${label}: prezzo assente; verificare la fonte.`);
         else if (typeof p === 'boolean' || (typeof p === 'number' && (!Number.isFinite(p) || p <= 0)) ||
           (typeof p !== 'number' && (typeof p !== 'string' || !PRICE.test(p.trim()) || Number(p.replace(',', '.')) <= 0))) errors.push(`${label}: prezzo non valido.`);
-      } else warnings.push(`${label}: prezzo non presente nella fonte.`);
+      } else if (!variants && section.tipo !== 'degustazione') warnings.push(`${label}: prezzo non presente nella fonte.`);
       if ('allergeni' in item) {
         if (!Array.isArray(item.allergeni) || item.allergeni.some((a) => typeof a === 'boolean' || !/^(?:[1-9]|1[0-4])$/.test(String(a)))) errors.push(`${label}: allergeni fuori dall'intervallo 1–14.`);
         else if (new Set(item.allergeni.map(String)).size !== item.allergeni.length) warnings.push(`${label}: allergeni duplicati.`);

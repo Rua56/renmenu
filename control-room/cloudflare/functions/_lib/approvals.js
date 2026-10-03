@@ -40,7 +40,7 @@ const hasAllergens = (menu) => (menu?.sezioni || []).some((section) => (section.
 export function previewEmail({ menu, code, url }) {
   const venue = venueName(menu);
   const languages = (Array.isArray(menu?.lingue) && menu.lingue.length ? menu.lingue : ['it'])
-    .map((lang) => ({ it: 'italiano', en: 'inglese', de: 'tedesco', fr: 'francese', es: 'spagnolo' }[lang] || lang));
+    .map((lang) => ({ it: 'italiano', en: 'inglese', de: 'tedesco', fr: 'francese', es: 'spagnolo', sl: 'sloveno' }[lang] || lang));
   const languageText = languages.length > 1 ? `${languages.slice(0, -1).join(', ')} e ${languages.at(-1)}` : languages[0];
   const subject = `Anteprima del vostro menu digitale RenMenu · rif. ${code}`;
   const lines = [
@@ -52,6 +52,8 @@ export function previewEmail({ menu, code, url }) {
     `Il link mostra il menu come lo vedranno i vostri clienti, in ${languageText}. Non è ancora online.`,
     'Vi chiediamo di controllare con attenzione nomi dei piatti, prezzi e traduzioni.'
   ];
+  // Premium su misura: anche la grafica va approvata; il preventivo lo manda Riccardo a parte (nessun totale qui).
+  if (menu?.premium && typeof menu.premium === 'object') lines.push('Questa è la proposta grafica su misura: guardate anche colori, caratteri e impaginazione e diteci cosa cambiare.', 'Il preventivo del lavoro su misura ve lo invio a parte.');
   if (!hasAllergens(menu)) lines.push('Gli allergeni non sono indicati perché non ci sono stati comunicati: se volete inserirli, inviateci l’elenco ufficiale.');
   lines.push('', 'Se è tutto corretto, rispondete a questa email scrivendo «Approvo».',
     'Se qualcosa va cambiato, indicatelo nella risposta: prepariamo una nuova anteprima.', '', 'Grazie,', 'Riccardo · RenMenu',

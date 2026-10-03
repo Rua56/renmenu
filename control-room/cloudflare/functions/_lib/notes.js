@@ -64,7 +64,7 @@ export function reviewNotes({ sourceText = '', uncertain = [], extracted = [], m
 }
 
 const INFO = { coperto: 'Coperto', telefono: 'Telefono', orari: 'Orari', instagram: 'Instagram', facebook: 'Facebook' };
-export const NOTE_LABELS = { inserito: 'Inserito da Jarvis', conferma: 'Da confermare', piatto: 'Righe del menu non lette', correzione: 'Correzioni da applicare', foto: 'Righe dubbie delle foto', piano: 'Piano', tema: 'Tema grafico', coperto: 'Coperto', orari: 'Orari', contatti: 'Contatti', allergeni: 'Allergeni', lingue: 'Lingue', testo: 'Altro testo dell’email' };
+export const NOTE_LABELS = { premium: 'Premium su misura', inserito: 'Inserito da Jarvis', conferma: 'Da confermare', piatto: 'Righe del menu non lette', correzione: 'Correzioni da applicare', foto: 'Righe dubbie delle foto', piano: 'Piano', tema: 'Tema grafico', coperto: 'Coperto', orari: 'Orari', contatti: 'Contatti', allergeni: 'Allergeni', lingue: 'Lingue', testo: 'Altro testo dell’email' };
 
 /** Riassunto breve per Telegram/notifiche: prima le cose che richiedono un intervento. */
 export function notesSummary(notes, max = 6, { preview = false } = {}) {
@@ -73,7 +73,7 @@ export function notesSummary(notes, max = 6, { preview = false } = {}) {
   const parts = [];
   if (done.length) parts.push(`${preview ? 'Quando generi la bozza inserisco dal testo' : 'Ho inserito dal testo'}: ${done.map((n) => n.hint.replace(/^Inserito nel menu: /, '').replace(/\. Controlla\.$/, '')).join('; ')}.`);
   if (urgent.length) {
-    const shown = urgent.slice(0, max).map((n) => `• ${[n.kind, ...(n.also || [])].map((k) => NOTE_LABELS[k]).join(' e ')}: «${n.text.slice(0, 80)}»${n.kind === 'conferma' ? ` — ${n.hint.slice(0, 140)}` : ''}`);
+    const shown = urgent.slice(0, max).map((n) => `• ${[n.kind, ...(n.also || [])].map((k) => NOTE_LABELS[k]).join(' e ')}: «${n.text.slice(0, 80)}»${['conferma', 'premium'].includes(n.kind) ? ` — ${n.hint.slice(0, 140)}` : ''}`);
     parts.push(`Da sistemare o confermare (${urgent.length}):\n${shown.join('\n')}${urgent.length > max ? `\n…e altre ${urgent.length - max} in Revisione.` : ''}`);
   }
   return parts.join('\n\n');

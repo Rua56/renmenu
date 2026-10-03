@@ -21,6 +21,7 @@ import { createMissions } from '../../_lib/missions.js';
 import { noteStatement } from '../../_lib/memory.js';
 import { THEMES, proposeTheme, themeFromText } from '../../_lib/themes.js';
 import { notesSummary, reviewNotes } from '../../_lib/notes.js';
+import { briefLines, briefNotes, creativeBrief, premiumDirections } from '../../_lib/premium.js';
 import { applyVenueInfo, extractVenueInfo } from '../../_lib/venue-info.js';
 import { applyPriceCorrections } from '../../_lib/corrections.js';
 async function draftNotes(db, requestId) {
@@ -121,13 +122,18 @@ async function approvalFor(db, draft, requestKind) {
   return { approval, ...approvalState(approval, await sha256Hex(draft.menu_json), requestKind) };
 }
 const autoTranslationReady = (env) => typeof env?.AI?.run === 'function' && String(env?.TRANSLATION_PROVIDER || 'workers_ai') !== 'disabled';
+const parseCreative = (json) => { try { const value = JSON.parse(json || 'null'); return value && typeof value === 'object' ? value : null; } catch { return null; } };
 const DRAFTS_SQL = 'SELECT id,request_id AS requestId,slug,menu_json AS menuJson,status,checks_json AS checksJson,revision,created_at AS createdAt,updated_at AS updatedAt FROM drafts ORDER BY created_at DESC LIMIT 500';
 // Fallback finche la migrazione 0005 (colonna provenance_json) non e applicata allo staging D1.
 async function draftRows(db) {
-  try { return await rows(db, DRAFTS_SQL.replace('checks_json AS checksJson,', 'checks_json AS checksJson,provenance_json AS provenanceJson,review_notes_json AS reviewNotesJson,')); }
+  try { return await rows(db, DRAFTS_SQL.replace('checks_json AS checksJson,', 'checks_json AS checksJson,provenance_json AS provenanceJson,review_notes_json AS reviewNotesJson,creative_json AS creativeJson,')); }
   catch (error) {
     if (!/no such column/i.test(String(error?.message))) throw error;
-    return rows(db, DRAFTS_SQL);
+    try { return await rows(db, DRAFTS_SQL.replace('checks_json AS checksJson,', 'checks_json AS checksJson,provenance_json AS provenanceJson,review_notes_json AS reviewNotesJson,')); }
+    catch (inner) {
+      if (!/no such column/i.test(String(inner?.message))) throw inner;
+      return rows(db, DRAFTS_SQL);
+    }
   }
 }
 const parseList = (json) => { try { const value = JSON.parse(json || '[]'); return Array.isArray(value) ? value : []; } catch { return []; } };
@@ -183,7 +189,8 @@ export async function readPendingMaterials(db, env = {}) {
       // Bozza preparata da Jarvis e mai toccata (né da Riccardo né in pubblicazione): la rifà con tutte le foto.
       if (outcome.ok) await discardUntouchedJarvisDraft(db, material.request_id);
       const hasDraft = await getOne(db, 'SELECT id FROM drafts WHERE request_id=?', material.request_id);
-      if (outcome.ok && request?.category && !hasDraft) {
+      // Premium su misura: la bozza la avvia sempre Riccardo (scheda creativa + direzioni grafiche).
+      if (outcome.ok && request?.category && request.category !== 'nuovo_premium' && request.plan !== 'premium' && !hasDraft) {
         try { await action(jarvis, 'generateDraft', { requestId: request.id }, env); outcome.drafted = true; outcome.notesText = notesSummary(await draftNotes(db, request.id)); }
         catch (error) { outcome.draftError = String(error?.message || 'errore').slice(0, 240); }
       }
@@ -242,7 +249,7 @@ export async function state(db, env = {}) {
   return {
     githubMode: String(env?.GITHUB_PROVIDER || 'mock').trim() === 'live' ? 'live' : 'mock',
     clients, requests, materials,
-    drafts: rawDrafts.map(({ menuJson, checksJson, provenanceJson, reviewNotesJson, ...draft }) => ({ ...draft, menu: JSON.parse(menuJson), checks: JSON.parse(checksJson), provenance: parseList(provenanceJson), notes: parseList(reviewNotesJson),
+    drafts: rawDrafts.map(({ menuJson, checksJson, provenanceJson, reviewNotesJson, creativeJson, ...draft }) => ({ ...draft, creative: parseCreative(creativeJson), menu: JSON.parse(menuJson), checks: JSON.parse(checksJson), provenance: parseList(provenanceJson), notes: parseList(reviewNotesJson),
       versions: versions.filter((version) => version.draftId === draft.id).map(({ menuJson: json, ...v }) => ({ ...v, menu: JSON.parse(json) })),
       sourceExtras: ['bozza', 'revisione', 'pronta_pr'].includes(draft.status)
         ? proposeSourceExtras(requests.find((entry) => entry.id === draft.requestId)?.sourceText, JSON.parse(menuJson)) : [] })),
@@ -481,8 +488,22 @@ export async function action(db, type, input, env = {}) {
       const note = translationSummary(translation);
       if (note) extraction.warnings.push(note);
     }
+    // Premium su misura (menu nuovo): niente tema Standard. Scheda creativa dal testo del cliente e
+    // 3 direzioni grafiche; la prima entra nella bozza, le altre si confrontano in Revisione.
+    let creative = null;
+    if (request.plan === 'premium' && !['aggiornamento', 'sostituzione'].includes(extraction.mode)) {
+      const images = await getOne(db, "SELECT COUNT(*) AS n FROM materials WHERE request_id=? AND archived_at IS NULL AND mime LIKE 'image/%'", requestId);
+      const brief = creativeBrief(request.source_text, { attachments: Number(images?.n || 0) });
+      const directions = premiumDirections(brief);
+      delete extraction.menu.tema;
+      extraction.menu.premium = structuredClone(directions[0].premium);
+      creative = { brief, directions, lines: briefLines(brief) };
+      extraction.warnings.push(`Premium su misura: ${directions.length} direzioni grafiche pronte (${directions.map((d) => d.label).join(', ')}); nella bozza c’è «${directions[0].label}» (${directions[0].why}). Confrontale in Revisione: la grafica va approvata da te prima della pubblicazione.`);
+      const extra = brief.lingue.filter((code) => code !== 'en');
+      if (extra.length) extraction.warnings.push(`Lingue richieste oltre all’inglese: ${extra.join(', ')}. Per ora Jarvis traduce solo in inglese: le altre restano da preparare (bozza da verificare) prima di aggiungerle al menu.`);
+    }
     // Menu nuovo: Jarvis propone il tema grafico Standard (gli aggiornamenti mantengono quello online).
-    if (!['aggiornamento', 'sostituzione'].includes(extraction.mode) && !extraction.menu.tema) {
+    if (!creative && !['aggiornamento', 'sostituzione'].includes(extraction.mode) && !extraction.menu.tema) {
       const asked = themeFromText(combinedSource);
       const theme = asked ? { tema: asked.tema, why: `richiesto dal cliente: «${asked.source.slice(0, 100)}» — da confermare` } : proposeTheme(venue, combinedSource);
       extraction.menu.tema = theme.tema;
@@ -500,10 +521,14 @@ export async function action(db, type, input, env = {}) {
     }
     // Tutto ciò che non è entrato nella bozza, riga per riga e già diviso per tipo.
     extraction.notes = reviewNotes({ sourceText: combinedSource, uncertain: extraction.uncertain, extracted: extraction.extracted, mode: extraction.mode, info: extraction.info, corrections: extraction.corrections });
+    if (creative) extraction.notes = [...extraction.notes.map((n) => (n.kind === 'tema' ? { ...n, hint: 'Richiesta grafica: è nella scheda creativa Premium, scegli la direzione in Revisione.' } : n)), ...briefNotes(creative.brief)];
     const id = uid(), timestamp = now(), menuJson = JSON.stringify(extraction.menu);
     await auditedBatch(db, [
-      db.prepare('INSERT INTO drafts (id,request_id,slug,menu_json,status,checks_json,provenance_json,review_notes_json,revision,created_at,updated_at) SELECT ?,id,?,?,?,?,?,?,?,?,? FROM requests WHERE id=? AND revision=?')
-        .bind(id, extraction.menu.id, menuJson, 'bozza', JSON.stringify(checksDefault()), JSON.stringify(extraction.provenance || []), JSON.stringify(extraction.notes), 1, timestamp, timestamp, requestId, request.revision),
+      (creative
+        ? db.prepare('INSERT INTO drafts (id,request_id,slug,menu_json,status,checks_json,provenance_json,review_notes_json,creative_json,revision,created_at,updated_at) SELECT ?,id,?,?,?,?,?,?,?,?,?,? FROM requests WHERE id=? AND revision=?')
+          .bind(id, extraction.menu.id, menuJson, 'bozza', JSON.stringify(checksDefault()), JSON.stringify(extraction.provenance || []), JSON.stringify(extraction.notes), JSON.stringify(creative), 1, timestamp, timestamp, requestId, request.revision)
+        : db.prepare('INSERT INTO drafts (id,request_id,slug,menu_json,status,checks_json,provenance_json,review_notes_json,revision,created_at,updated_at) SELECT ?,id,?,?,?,?,?,?,?,?,? FROM requests WHERE id=? AND revision=?')
+        .bind(id, extraction.menu.id, menuJson, 'bozza', JSON.stringify(checksDefault()), JSON.stringify(extraction.provenance || []), JSON.stringify(extraction.notes), 1, timestamp, timestamp, requestId, request.revision)),
       db.prepare('INSERT INTO draft_versions (id,draft_id,revision,menu_json,actor,created_at) VALUES (?,?,?,?,?,?)')
         .bind(uid(), id, 1, menuJson, extraction.mode === 'aggiornamento' || extraction.mode === 'sostituzione' ? `menu_online_${extraction.mode}` : 'estrazione_deterministica', timestamp),
       db.prepare("UPDATE requests SET status='in_revisione',plan=COALESCE(?,plan),revision=revision+1,updated_at=? WHERE id=? AND revision=? AND EXISTS (SELECT 1 FROM drafts WHERE id=?)")
