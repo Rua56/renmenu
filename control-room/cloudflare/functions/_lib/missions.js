@@ -6,7 +6,7 @@ import { assessReply, proposeReplyChanges, sha256Hex } from './approvals.js';
 import { sendOwnerNotification } from './owner-notifications.js';
 import { briefingDue, buildBriefing, romeDay } from './briefing.js';
 import { answerCallback, clearButtons, downloadTelegramFile, sendTelegram, sendVoice, telegramReady } from './telegram.js';
-import { matchVenue, planFromText, speak, transcribe, understand, venueSaid } from './voice.js';
+import { CHAT_MODEL, chat as freeChat, matchVenue, planFromText, speak, transcribe, understand, venueSaid } from './voice.js';
 import { classifyRequest } from './autopilot.js';
 import { findDishes, findLocales, guessIntent, hintsText } from './understanding.js';
 import { memoryContext, memoryFor, menuStatements, noteStatement } from './memory.js';
@@ -462,9 +462,10 @@ export function createMissions(deps) {
     let pending = null; try { pending = JSON.parse(await setting(db, 'tg_pending') || 'null'); } catch {}
     const fresh = pending && Date.now() - Date.parse(pending.at) < PENDING_MINUTES * MINUTE;
     const utterance = fresh ? `${pending.text}\n${said0}` : said0;
-    let history = []; try { history = JSON.parse(await setting(db, 'tg_history') || '[]').filter((h) => Date.now() - Date.parse(h.at) < 30 * MINUTE); } catch {}
+    let history = []; try { history = JSON.parse(await setting(db, 'tg_history') || '[]').filter((h) => Date.now() - Date.parse(h.at) < 180 * MINUTE); } catch {}
     const clues = await readClues(db, utterance);
-    const understood = await understand(env.AI, utterance, await voiceContext(db, env, clues, history.map((h) => `${h.who}: ${h.text}`).join('\n')));
+    const context = await voiceContext(db, env, clues, history.slice(-8).map((h) => `${h.who}: ${String(h.text).slice(0, 300)}`).join('\n'));
+    const understood = await understand(env.AI, utterance, context);
     // Se il modello non è sicuro (o risponde a parole a un ordine) ma le parole chiave indicano un compito chiaro, Jarvis procede.
     const fallbackUsed = (understood.intent === 'non_chiaro' || (understood.intent === 'risposta' && !fresh)) && !['non_chiaro', 'ambiguo', 'risposta'].includes(clues.guess.intent);
     const intent = fallbackUsed ? { ...understood, intent: clues.guess.intent, locale: understood.locale || clues.guess.locale } : understood;
@@ -474,13 +475,19 @@ export function createMissions(deps) {
       intent.risposta = `Vuoi che modifichi ${dish ? `«${dish}» nel` : 'il'} menu di «${venue}», o ti serve un’informazione?`;
     }
     await auditedBatch(jarvisDb(db), [], 'jarvis.conversation', `Comando ${spoken ? 'vocale' : 'scritto'}: ${intent.intent}${fallbackUsed ? ' (da parole chiave)' : ''}${fresh ? ' (con chiarimento)' : ''}${understood.why ? ` (${understood.why})` : ''}.`, null).catch(() => {});
-    const answer = async (text, buttons = null) => {
-      const asks = /\?\s*$/.test(String(text)) && !buttons;
+    const answer = async (text, buttons = null, { keep = true } = {}) => {
+      const asks = keep && /\?\s*$/.test(String(text)) && !buttons;
       await putSetting(db, 'tg_pending', asks ? JSON.stringify({ text: utterance.slice(-1200), at: now() }) : 'null').catch(() => {});
-      await putSetting(db, 'tg_history', JSON.stringify([...history, { who: 'Riccardo', text: said0.slice(0, 400), at: now() }, { who: 'Jarvis', text: String(text).slice(0, 400), at: now() }].slice(-8))).catch(() => {});
+      await putSetting(db, 'tg_history', JSON.stringify([...history, { who: 'Riccardo', text: said0.slice(0, 1200), at: now() }, { who: 'Jarvis', text: String(text).slice(0, 1200), at: now() }].slice(-16))).catch(() => {});
       await reply(db, env, chat, `${said}${text}`, spoken, buttons);
     };
-    if (intent.intent === 'risposta' && intent.risposta) { await answer(intent.risposta); return; }
+    // Domande e conversazione libera: risponde il modello grande, con tutta la memoria della chat.
+    if (intent.intent === 'risposta' || (intent.intent === 'non_chiaro' && clues.guess.intent === 'non_chiaro')) {
+      const talk = await freeChat(env.AI, { utterance: said0, context, history: fresh ? [...history, { who: 'Riccardo', text: pending.text }] : history, spoken });
+      await auditedBatch(jarvisDb(db), [], 'jarvis.chat', `Conversazione libera: ${talk.ok ? (talk.model === CHAT_MODEL ? 'GPT-OSS 120B' : 'modello di riserva') : 'nessuna risposta'}.`, null).catch(() => {});
+      const text = talk.ok ? talk.text : intent.risposta;
+      if (text) { await answer(text, null, { keep: !talk.ok }); return; }
+    }
     if (intent.intent === 'pubblica') {
       const waiting = await rows(db, "SELECT m.id,d.menu_json,d.slug FROM jarvis_missions m JOIN drafts d ON d.id=m.draft_id WHERE m.status='attesa_si' ORDER BY m.updated_at DESC LIMIT 10");
       const named = waiting.map((m) => { let name = m.slug; try { name = JSON.parse(m.menu_json).nome || name; } catch {} return { ...m, name, menu_id: m.slug }; });

@@ -61,7 +61,7 @@ export async function understand(ai, utterance, context, { timeoutMs = 25_000 } 
     'Se nomina un piatto o un prezzo e chiede di cambiare, togliere, aggiungere, mettere o sistemare qualcosa, è "aggiorna_menu" anche senza la parola «menu». Agisci quando il compito è ragionevolmente chiaro; usa "non_chiaro" solo se mancano informazioni indispensabili, e allora fai UNA domanda precisa che proponga l’opzione più probabile.',
     'Rispondi SOLO con un oggetto JSON: {"intent": "...", "locale": "...", "risposta": "..."}.',
     'intent può essere solo:',
-    '- "risposta": domanda o richiesta di informazioni (situazione, pratiche, locali, scadenze, cosa fare). In "risposta" scrivi 1-3 frasi in italiano parlato, usando SOLO i DATI; se un dato non c’è dillo. Niente elenchi puntati, niente emoji.',
+    '- "risposta": domanda, saluto, chiacchiera, opinione o richiesta di informazioni su qualsiasi argomento, anche non legato a RenMenu (situazione, pratiche, locali, scadenze, cosa fare). In "risposta" scrivi 1-3 frasi in italiano parlato, usando SOLO i DATI; se un dato non c’è dillo. Niente elenchi puntati, niente emoji.',
     '- "aggiorna_menu": Riccardo chiede di cambiare il menu online di un locale (prezzi, piatti da aggiungere o togliere). In "locale" il nome del locale così come detto. Non riscrivere le modifiche.',
     '- "crea_pratica": chiede di aprire una nuova pratica o un nuovo cliente per un locale (anche «crea un nuovo menu per …»). In "locale" il nome del locale esattamente come detto, senza parole come «locale» o «ristorante» se non fanno parte del nome.',
     '- "pubblica": chiede di pubblicare o mettere online un menu. In "locale" il nome se detto.',
@@ -134,4 +134,52 @@ export function venueSaid(venue, utterance) {
   const said = `-${slugify(utterance)}-`;
   const words = slugify(venue).split('-').filter(Boolean);
   return words.length > 0 && words.every((w) => said.includes(`-${w}-`));
+}
+
+/* Conversazione libera: un modello più capace (GPT-OSS 120B su Cloudflare, nella quota gratuita
+ * giornaliera) per parlare di tutto con Riccardo in modo naturale. Non esegue azioni: quelle
+ * passano sempre da understand() e dai flussi con bozza, Revisione e SÌ. Se il modello grande non
+ * risponde, Jarvis usa quello di sempre. */
+export const CHAT_MODEL = '@cf/openai/gpt-oss-120b';
+
+/** Testo della risposta da formati diversi (chat completions, responses, testo semplice). */
+export function chatText(out) {
+  if (!out) return '';
+  if (typeof out === 'string') return out;
+  if (typeof out.response === 'string') return out.response;
+  const choice = out.choices?.[0]?.message?.content;
+  if (typeof choice === 'string') return choice;
+  if (typeof out.output_text === 'string') return out.output_text;
+  for (const item of Array.isArray(out.output) ? out.output : []) {
+    if (item?.type !== 'message') continue;
+    const text = (item.content || []).filter((c) => c?.type === 'output_text' || typeof c?.text === 'string').map((c) => c.text).join('');
+    if (text) return text;
+  }
+  return '';
+}
+const tidy = (text) => String(text || '').replace(/<think>[\s\S]*?<\/think>/g, '').replace(/\*\*|__|^#+\s*|^[-*•]\s+/gm, '').replace(/[\u{1F300}-\u{1FAFF}\u{2600}-\u{27BF}]/gu, '').replace(/\n{3,}/g, '\n\n').trim();
+
+export async function chat(ai, { utterance, context, history = [], spoken = false }, { timeoutMs = 30_000 } = {}) {
+  if (typeof ai?.run !== 'function') return { ok: false, text: '' };
+  const system = [
+    'Sei J.A.R.V.I.S., l’assistente personale di Riccardo Iuran, creatore di RenMenu (menu digitali QR per ristoranti e bar, base a Gorizia). Ispirato al Jarvis di Iron Man: calmo, caldo, elegante, con un filo di ironia garbata. Dai del tu a Riccardo e ogni tanto lo chiami per nome.',
+    'Parli in italiano naturale, come in una conversazione vera: niente elenchi puntati, niente titoli, niente emoji, niente markdown.',
+    spoken ? 'La risposta verrà letta ad alta voce: al massimo 4-5 frasi brevi, scorrevoli da ascoltare.' : 'Risposta scritta su Telegram: chiara e completa ma non prolissa (di solito 2-6 frasi; di più solo se Riccardo chiede spiegazioni o idee).',
+    'Puoi parlare di qualsiasi argomento con le tue conoscenze generali: consigli di lavoro, marketing per locali, idee, spiegazioni, curiosità.',
+    'Per tutto ciò che riguarda RenMenu (locali, menu, prezzi, pratiche, scadenze) usa SOLO i DATI forniti: se un dato non c’è, dillo. Non inventare mai prezzi, piatti, allergeni, ingredienti o numeri.',
+    'Piani RenMenu: Standard 25 €/mese con 30 giorni gratis; Annuale 249 €/anno; Premium 490 € di acconto + 39 €/mese.',
+    'Non navighi su internet: per meteo, notizie o fatti di oggi dillo con semplicità.',
+    'In questa conversazione non esegui azioni. Se Riccardo vuole che tu faccia qualcosa (modificare un menu, creare una pratica, ricordare una nota, pubblicare), invitalo a dirtelo direttamente, per esempio «cambia il prezzo del frico a 15».'
+  ].join('\n');
+  const messages = [{ role: 'system', content: `${system}\n\nDATI DELLA CONTROL ROOM:\n${String(context || '').slice(0, 12_000)}` },
+    ...history.slice(-12).map((h) => ({ role: h.who === 'Jarvis' ? 'assistant' : 'user', content: String(h.text).slice(0, 1200) })),
+    { role: 'user', content: String(utterance).slice(0, 2000) }];
+  for (const [model, options] of [[CHAT_MODEL, { max_tokens: 2500 }], [CLOUDFLARE_FREE_MODEL, { max_tokens: 700, temperature: 0.6 }]]) {
+    try {
+      const out = await withTimeout(Promise.resolve().then(() => ai.run(model, { messages, ...options })), timeoutMs);
+      const text = tidy(chatText(out));
+      if (text) return { ok: true, text: text.slice(0, spoken ? 900 : 3000), model };
+    } catch {}
+  }
+  return { ok: false, text: '' };
 }
