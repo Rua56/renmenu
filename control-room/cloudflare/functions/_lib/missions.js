@@ -146,7 +146,7 @@ export function createMissions(deps) {
     const request = await getOne(db, 'SELECT kind,plan FROM requests WHERE id=?', mission.request_id);
     const activation = request.kind === 'nuovo' ? `\nAl SÌ attivo: ${PLAN_LABEL[request.plan]} da oggi (${romeDate()}).` : '';
     const next = await move(db, mission, 'attesa_si', `Anteprima ${prepared.referenceCode} mandata a Riccardo su Telegram (il locale non ha email): attendo il suo SÌ.`);
-    await tell(db, env, next, 'anteprima da approvare', `Ecco l’anteprima di «${menu.nome || 'menu'}» (rif. ${prepared.referenceCode}):\n${prepared.previewUrl}\n\nIl locale non ha un’email, quindi l’approvazione è tua.${activation}\nSe va bene pubblico; se c’è da correggere tocca «Non ancora», sistemala in Revisione e affidamela di nuovo.`,
+    await tell(db, env, next, 'anteprima da approvare', `Ecco l’anteprima di «${menu.nome || 'menu'}» (rif. ${prepared.referenceCode}):\n${String(env.JARVIS_ORIGIN || 'https://renmenu-jarvis-stage.pages.dev').replace(/\/+$/, '')}/jarvis-hook/anteprima/${prepared.referenceCode}\n\nIl locale non ha un’email, quindi l’approvazione è tua.${activation}\nSe va bene pubblico; se c’è da correggere tocca «Non ancora», sistemala in Revisione e affidamela di nuovo.`,
       [['SÌ, pubblica', `pub:${mission.id}`], ['Non ancora', `no:${mission.id}`]], 'importante');
     return next;
   }

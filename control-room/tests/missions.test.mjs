@@ -166,7 +166,15 @@ describe('Jarvis autonomo: dalla bozza affidata alla pubblicazione', () => {
       assert.equal(entrusted.body.result.status, 'attesa_si');
       assert.equal(await outbox(db), null, 'nessuna email a nessuno');
       const message = telegramCalls.find((c) => c.method === 'sendMessage' && /anteprima/.test(c.body.text));
-      assert.match(message.body.text, /https:\/\/\S+/, 'link dell’anteprima su Telegram');
+      const link = message.body.text.match(/https:\/\/\S+/)[0];
+      assert.ok(link.length < 120, 'link breve, non tagliato da Telegram');
+      const { onRequest: hook } = await import('../cloudflare/functions/jarvis-hook/[[route]].js');
+      const opened = await hook({ request: new Request(link), env: { DB: db } });
+      assert.equal(opened.status, 302);
+      const full = opened.headers.get('Location');
+      assert.match(full, /^https:\/\/renmenu\.pages\.dev\/menu\/\?lang=it#data=/);
+      assert.equal(JSON.parse(Buffer.from(full.split('#data=')[1].replace(/-/g, '+').replace(/_/g, '/'), 'base64').toString()).id, draft.slug || JSON.parse(Buffer.from(full.split('#data=')[1].replace(/-/g, '+').replace(/_/g, '/'), 'base64').toString()).id);
+      assert.equal((await hook({ request: new Request(link.replace(/RM-\w+/, 'RM-ZZZZZZ')), env: { DB: db } })).status, 404);
       assert.match(JSON.stringify(message.body.reply_markup), /pub:/);
       let state = entrusted.body.state;
       assert.equal(state.approvals[0].recipient, 'telegram:riccardo');
