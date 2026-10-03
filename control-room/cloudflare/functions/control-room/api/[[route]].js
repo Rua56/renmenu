@@ -143,6 +143,20 @@ export const receivePendingMail = async (db, env, payload) => {
   return { ok: outcome.ok, stored: outcome.stored ?? 0, skipped: outcome.skipped?.length ?? 0, error: outcome.error };
 };
 export const linkPendingMailFiles = (db, env) => linkMailFiles(db, env, { now, uid, auditedBatch });
+async function discardUntouchedJarvisDraft(db, requestId) {
+  const draft = await getOne(db, "SELECT id FROM drafts WHERE request_id=? AND status='bozza' AND revision=1", requestId);
+  if (!draft) return false;
+  const history = await rows(db, "SELECT action,actor FROM audit_events WHERE request_id=? AND (action LIKE 'draft.%' OR action LIKE 'preview.%' OR action LIKE 'publication.%' OR action LIKE 'pr.%' OR action LIKE 'mission.%')", requestId);
+  if (!history.length || history.some((h) => h.action !== 'draft.generate' || h.actor !== 'jarvis')) return false;
+  for (const table of ['pr_proposals', 'live_pr_operations', 'publication_approvals', 'jarvis_missions']) {
+    let used = null;
+    try { used = await getOne(db, `SELECT 1 AS x FROM ${table} WHERE draft_id=?`, draft.id); } catch { used = null; }
+    if (used) return false;
+  }
+  await db.prepare('DELETE FROM draft_versions WHERE draft_id=?').bind(draft.id).run();
+  await db.prepare('DELETE FROM drafts WHERE id=?').bind(draft.id).run();
+  return true;
+}
 export async function readPendingMaterials(db, env = {}) {
   let pending = [];
   try { pending = await rows(db, "SELECT id,request_id,filename FROM materials WHERE processing_status='da_trascrivere' AND archived_at IS NULL AND (mime='application/pdf' OR mime IN ('image/jpeg','image/png','image/webp')) AND created_at>'2026-10-02T22:30' ORDER BY created_at ASC LIMIT 1"); }
@@ -154,6 +168,10 @@ export async function readPendingMaterials(db, env = {}) {
       const outcome = (await action(jarvis, 'readMaterial', { materialId: material.id }, env)).result;
       // Pratica già classificata e senza bozza (es. foto aggiunta da Telegram): Jarvis prepara la bozza.
       const request = await getOne(db, 'SELECT id,category,plan,kind,subject FROM requests WHERE id=?', material.request_id);
+      const stillUnread = await getOne(db, "SELECT id FROM materials WHERE request_id=? AND processing_status='da_trascrivere' AND archived_at IS NULL", material.request_id);
+      if (stillUnread) { outcome.waiting = true; done.push({ material, request, outcome }); continue; } // bozza dopo l'ultima foto
+      // Bozza preparata da Jarvis e mai toccata (né da Riccardo né in pubblicazione): la rifà con tutte le foto.
+      if (outcome.ok) await discardUntouchedJarvisDraft(db, material.request_id);
       const hasDraft = await getOne(db, 'SELECT id FROM drafts WHERE request_id=?', material.request_id);
       if (outcome.ok && request?.category && !hasDraft) {
         try { await action(jarvis, 'generateDraft', { requestId: request.id }, env); outcome.drafted = true; }

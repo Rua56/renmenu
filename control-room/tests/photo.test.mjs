@@ -108,6 +108,32 @@ describe('Foto del menu nella pratica', () => {
     } finally { db.close(); }
   });
 
+  it('più foto nella stessa pratica: bozza dopo l’ultima, e quella di Jarvis non toccata si rifà con tutte', async () => {
+    const db = database();
+    try {
+      await db.prepare("INSERT INTO clients (id,name,plan,internal_notes,revision,created_at,updated_at) VALUES ('c1','Trattoria Tre Foto','da_definire','',1,'2026-10-03','2026-10-03')").bind().run();
+      const requestId = (await act(db, 'createRequest', { clientId: 'c1', subject: 'Nuovo menu Standard · Trattoria Tre Foto', sourceChannel: 'altro', sourceText: 'Locale: Trattoria Tre Foto', category: 'nuovo_standard', plan: 'standard', kind: 'nuovo' })).body.result.id;
+      const store = new Map([['k1', new Uint8Array([255, 216, 255, 1])], ['k2', new Uint8Array([255, 216, 255, 2])], ['k3', new Uint8Array([255, 216, 255, 3])]]);
+      const add = (id, key, at) => db.prepare("INSERT INTO materials (id,request_id,r2_key,filename,mime,size,source,processing_status,text_preview,created_at) VALUES (?,?,?,?,?,?,?,?,?,?)")
+        .bind(id, requestId, key, `${id}.jpg`, 'image/jpeg', 4, 'telegram', 'da_trascrivere', null, at).run();
+      await add('p1', 'k1', '2026-10-03T00:01:00Z'); await add('p2', 'k2', '2026-10-03T00:02:00Z');
+      const pages = { k1: '# Antipasti\nFrico con polenta — 12', k2: '# Dolci\nGubana — 5', k3: '# Vini\nRibolla gialla — 6' };
+      let current = 'k1';
+      const env = testEnv(db, { BUCKET: { get: async (k) => { current = k; return store.has(k) ? { arrayBuffer: async () => store.get(k).buffer } : null; } }, AI: { run: async () => ({ response: pages[current] }) }, TRANSLATION_PROVIDER: 'disabled' });
+      const first = await readPendingMaterials(db, env);
+      assert.equal(first[0].outcome.waiting, true, JSON.stringify(first));
+      assert.equal(await db.prepare('SELECT id FROM drafts WHERE request_id=?').bind(requestId).first(), null, 'aspetta la seconda foto');
+      assert.equal((await readPendingMaterials(db, env))[0].outcome.drafted, true);
+      const names = async () => JSON.parse((await db.prepare('SELECT menu_json FROM drafts WHERE request_id=?').bind(requestId).first()).menu_json).sezioni.flatMap((s) => s.voci.map((v) => v.nome.it));
+      assert.deepEqual(await names(), ['Frico con polenta', 'Gubana']);
+      await add('p3', 'k3', '2026-10-03T00:05:00Z');
+      const third = await readPendingMaterials(db, env);
+      assert.equal(third[0].outcome.drafted, true, JSON.stringify(third));
+      assert.deepEqual(await names(), ['Frico con polenta', 'Gubana', 'Ribolla gialla']);
+      assert.equal((await db.prepare('SELECT COUNT(*) AS n FROM drafts WHERE request_id=?').bind(requestId).first()).n, 1);
+    } finally { db.close(); }
+  });
+
   it('allegati dell’email: collegati alla pratica dello stesso mittente, letti, poi bozza in automatico', async () => {
     const db = database();
     try {
