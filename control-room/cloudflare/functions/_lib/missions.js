@@ -349,7 +349,8 @@ export function createMissions(deps) {
     return { provider: await setting(db, 'voice_provider'), apiKey: await setting(db, 'voice_api_key'), voiceId: await setting(db, 'voice_id') };
   }
   async function reply(db, env, chat, text, spoken, buttons = null) {
-    const audio = spoken ? await speak(await voiceSettings(db), text, deps.fetchImpl) : null;
+    // La trascrizione di ciò che ha detto Riccardo resta solo scritta: a voce Jarvis dice solo la risposta.
+    const audio = spoken ? await speak(await voiceSettings(db), String(text).replace(/^«[\s\S]*?»\n\n/, ''), deps.fetchImpl) : null;
     if (audio && !buttons) { const sent = await sendVoice(env, chat, audio, text, deps.fetchImpl); if (sent?.ok) return; }
     if (audio && buttons) await sendVoice(env, chat, audio, '', deps.fetchImpl);
     await sendTelegram(env, chat, text, buttons, deps.fetchImpl);
