@@ -93,3 +93,28 @@ export function structureNotes(extraction = {}) {
   }
   return notes;
 }
+
+/** Stessa pagina mandata due volte (es. Riccardo rimanda le foto): resta una sola lettura, la più pulita
+ * (meno righe «[da verificare]»; a parità la più recente). Mai fondere pagine diverse. */
+const pageNames = (text) => new Set(String(text || '').split(/\r?\n/).map((row) => row.trim())
+  .filter((row) => row && !/^[#>]/.test(row))
+  .map((row) => row.replace(/^\[da verificare\]\s*/i, '').split(/\s+[—–-]\s+|:\s/)[0].toLocaleLowerCase('it-IT').normalize('NFD').replace(/[^a-z0-9]+/g, ' ').trim())
+  .filter((name) => name.length >= 3));
+const doubtCount = (text) => (String(text || '').match(/^\[da verificare\]/gim) || []).length;
+export function dropRepeatedPages(analyses) {
+  const info = analyses.map((a, index) => ({ a, index, names: pageNames(a.text), doubts: doubtCount(a.text) }));
+  const dropped = new Map();
+  for (const x of info) for (const y of info) {
+    if (x.index >= y.index || dropped.has(x.index) || dropped.has(y.index)) continue;
+    const small = Math.min(x.names.size, y.names.size);
+    if (small < 2) continue;
+    const common = [...x.names].filter((n) => y.names.has(n)).length;
+    if (common / small < 0.8) continue;
+    const loser = x.doubts < y.doubts ? y : x; // a parità vince la più recente (y)
+    dropped.set(loser.index, loser === x ? y : x);
+  }
+  return {
+    kept: info.filter((i) => !dropped.has(i.index)).map((i) => i.a),
+    repeated: [...dropped.entries()].map(([index, winner]) => ({ filename: analyses[index].filename, keptFilename: winner.a.filename }))
+  };
+}
