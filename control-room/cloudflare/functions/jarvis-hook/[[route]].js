@@ -4,6 +4,7 @@
 // Nessun dato viene restituito: solo esiti sintetici.
 import { linkPendingMailFiles, missions, readPendingMaterials, receivePendingMail, runAutopilot } from '../control-room/api/[[route]].js';
 import { sameSecret, sendTelegram, telegramReady } from '../_lib/telegram.js';
+import { chat } from '../_lib/voice.js';
 
 const reply = (body, status = 200) => new Response(JSON.stringify(body), { status, headers: { 'Content-Type': 'application/json', 'Cache-Control': 'no-store' } });
 
@@ -36,6 +37,12 @@ export async function onRequest(context) {
       const payload = await request.json().catch(() => null);
       const outcome = await receivePendingMail(env.DB, env, payload);
       return reply(outcome, outcome.ok ? 200 : 400);
+    }
+    if (path === '/jarvis-hook/probe-ai') {
+      // Collaudo del modello di conversazione: domanda fissa, nessun dato della Control Room.
+      if (!sameSecret(request.headers.get('X-Jarvis-Clock'), env.JARVIS_CLOCK_SECRET)) return reply({ ok: false }, 403);
+      const talk = await chat(env.AI, { utterance: 'Ciao Jarvis, presentati in due frasi e dimmi un consiglio per far crescere un servizio di menu digitali.', context: 'Nessun dato: collaudo.' });
+      return reply({ ok: talk.ok, model: talk.model || null, text: talk.text });
     }
     if (path === '/jarvis-hook/tick') {
       if (!sameSecret(request.headers.get('X-Jarvis-Clock'), env.JARVIS_CLOCK_SECRET)) return reply({ ok: false }, 403);
