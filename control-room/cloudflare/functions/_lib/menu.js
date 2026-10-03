@@ -223,8 +223,15 @@ export function extractMenuFromText(venue, source, requestedSlug) {
   let last = null, pending = null;
   const sectionName = () => section.nome?.it || '';
   const isWine = () => WINE_SECTION.test(sectionName()) || Boolean(section.columns);
+  // Titolo di pagina «Mescita — by the glass», «Vini al calice» senza voci sotto: le sezioni dei vini
+  // che seguono (Bollicine, Vini bianchi…) sono al calice. Diventa la descrizione della sezione.
+  let glassPage = false;
   const openSection = (title, lineNumber, extra = {}) => {
+    if (!section.voci.length && /\bmescita\b|by the glass|\bal calice\b|\bal bicchiere\b/i.test(section.nome?.it || '')) glassPage = true;
+    else if (section.voci.length && !WINE_SECTION.test(section.nome?.it || '')) glassPage = false;
     section = { nome: { it: title.slice(0, 100) }, voci: [], line: lineNumber, ...extra };
+    if (glassPage && WINE_SECTION.test(title) && !/calice|bicchiere|mescita|bottiglia/i.test(title)) section.descrizione = { it: 'Al calice' };
+    else if (glassPage && !WINE_SECTION.test(title)) glassPage = false;
     sections.push(section); last = null; pending = null;
   };
   const addItem = (item, entry) => {
@@ -404,7 +411,7 @@ export function extractMenuFromText(venue, source, requestedSlug) {
       if (item.descrizione) provenance.push({ path: `sezioni.${sectionIndex}.voci.${itemIndex}.descrizione.it`, source: found?.descriptionLine ? `riga ${found.descriptionLine}` : where, value: item.descrizione.it, status: 'confermato' });
     });
   });
-  const menu = { id: slug, nome: venue.trim(), lingue: ['it'], sezioni: kept.map(({ nome, voci, tipo, prezzo, unita }) => ({ nome, ...(tipo ? { tipo } : {}), ...(prezzo ? { prezzo } : {}), ...(unita ? { unita } : {}), voci })) };
+  const menu = { id: slug, nome: venue.trim(), lingue: ['it'], sezioni: kept.map(({ nome, voci, tipo, prezzo, unita, descrizione }) => ({ nome, ...(descrizione ? { descrizione } : {}), ...(tipo ? { tipo } : {}), ...(prezzo ? { prezzo } : {}), ...(unita ? { unita } : {}), voci })) };
   const variantCount = items.filter((i) => i.variants).length, courses = kept.filter((s) => s.tipo === 'degustazione');
   return { menu, extracted: items.filter((i) => !i.course), courses: items.filter((i) => i.course), consumed, confirm, uncertain: unknown, provenance, warnings: [
     'Allergeni, ingredienti, coperto, contatti e traduzioni non sono stati dedotti.',

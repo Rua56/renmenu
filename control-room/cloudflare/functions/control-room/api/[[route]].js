@@ -655,14 +655,22 @@ export async function action(db, type, input, env = {}) {
     const draft = await getOne(db, 'SELECT id,request_id,status FROM drafts WHERE id=?', identifier(p.draftId));
     assert(draft, 'Bozza non trovata.', 404);
     assert(['bozza', 'revisione'].includes(draft.status), 'La bozza è già pronta, in anteprima o in pubblicazione: non si rifà.', 409);
-    for (const table of ['pr_proposals', 'live_pr_operations', 'publication_approvals', 'jarvis_missions']) {
+    // Si rifà anche dopo un «Non ancora»: missione ferma e anteprima mai approvata né mandata al locale.
+    for (const table of ['pr_proposals', 'live_pr_operations']) {
       let used = null;
       try { used = await getOne(db, `SELECT 1 AS x FROM ${table} WHERE draft_id=?`, draft.id); } catch { used = null; }
-      assert(!used, 'Bozza già affidata a Jarvis o mandata al locale: non si rifà.', 409);
+      assert(!used, 'Bozza già in pubblicazione: non si rifà.', 409);
     }
+    const safe = async (sql, ...args) => { try { return await getOne(db, sql, ...args); } catch { return null; } };
+    const activeMission = await safe("SELECT id FROM jarvis_missions WHERE draft_id=? AND status NOT IN ('ferma','annullata','completata')", draft.id);
+    assert(!activeMission, 'Jarvis sta seguendo questa bozza: fermalo prima («Non ancora»), poi rifalla.', 409);
+    const sentOut = await safe("SELECT id FROM publication_approvals WHERE draft_id=? AND (approved_at IS NOT NULL OR activation_at IS NOT NULL OR recipient NOT LIKE 'telegram:%')", draft.id);
+    assert(!sentOut, 'Anteprima già mandata al locale o approvata: non si rifà.', 409);
     const unread = await getOne(db, "SELECT COUNT(*) AS n FROM materials WHERE request_id=? AND processing_status='da_trascrivere' AND archived_at IS NULL", draft.request_id);
     assert(!Number(unread?.n), 'Jarvis sta ancora leggendo dei file di questa pratica: riprova tra un minuto.', 409);
-    await auditedBatch(db, [db.prepare('DELETE FROM draft_versions WHERE draft_id=?').bind(draft.id), db.prepare('DELETE FROM drafts WHERE id=?').bind(draft.id)],
+    await auditedBatch(db, [db.prepare('DELETE FROM jarvis_outbox WHERE mission_id IN (SELECT id FROM jarvis_missions WHERE draft_id=?)').bind(draft.id),
+      db.prepare('DELETE FROM jarvis_missions WHERE draft_id=?').bind(draft.id), db.prepare('DELETE FROM publication_approvals WHERE draft_id=?').bind(draft.id),
+      db.prepare('DELETE FROM draft_versions WHERE draft_id=?').bind(draft.id), db.prepare('DELETE FROM drafts WHERE id=?').bind(draft.id)],
       'draft.rebuild', 'Bozza rifatta da capo con tutti i materiali della pratica, su richiesta di Riccardo.', draft.request_id);
     const rebuilt = await action(db, 'generateDraft', { requestId: draft.request_id }, env);
     result = { ...rebuilt.result, rebuilt: true };
@@ -1245,6 +1253,7 @@ export async function onRequest(context) {
     if (error instanceof SyntaxError) return failure(400, 'JSON non valido.');
     if (error?.status) return failure(error.status, error.message);
     // Internal details and data are deliberately not returned to clients or console logs.
+    if (globalThis.process?.env?.JARVIS_DEBUG) console.error(error);
     return failure(500, 'Errore interno. Nessuna azione esterna è stata eseguita.');
   }
 }

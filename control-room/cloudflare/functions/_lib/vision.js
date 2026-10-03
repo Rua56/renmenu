@@ -15,7 +15,8 @@ export const DOUBT = '[da verificare]';
 const PROMPT = [
   'Sei un trascrittore. Trascrivi ESATTAMENTE il testo di questa foto di un menu di un locale italiano, nell’ordine in cui appare.',
   'Regole:',
-  '- i titoli delle sezioni su una riga a sé, preceduti da "# " (es. # Primi);',
+  '- i titoli delle sezioni su una riga a sé, preceduti da "# " (es. # Primi); anche il titolo della pagina con il suo sottotitolo (es. # Mescita — by the glass);',
+  '- simboli o icone accanto al nome (foglia, spiga barrata, peperoncino…) NON vanno scritti nel nome;',
   '- un piatto o una bevanda per riga, nel formato: Nome — prezzo (il prezzo è il numero scritto accanto o allineato a destra, senza simbolo €);',
   '- la descrizione o gli ingredienti scritti sotto o accanto al nome vanno nella riga SUBITO DOPO, che inizia con "> " (es. > con burro e salvia (1-7)); il nome del piatto resta nella riga col prezzo;',
   '- se una voce ha più prezzi (es. calice e bottiglia, piccola e grande) scrivili sulla stessa riga con le etichette: Nome — calice 5 / bottiglia 40; se le etichette sono in testa alle colonne (es. "calice  bottiglia") usa quelle;',
@@ -75,7 +76,8 @@ function parse(text) {
     sections.push({ name: s.nome.it, tipo: s.tipo || '', prezzo: s.prezzo || '', unita: s.unita?.it || '', index: si });
     s.voci.forEach((v, vi) => items.push({ section: si, index: vi, tipo: s.tipo || '', name: v.nome.it, prezzo: v.prezzo, prezzi: v.prezzi, descr: v.descrizione?.it || '', course: s.tipo === 'degustazione' && !v.prezzo }));
   });
-  return { items, sections, doubts, other: extraction.uncertain };
+  const titles = rows.filter((r) => /^#{1,3}\s*\S/.test(r) && /\bmescita\b|by the glass|\bal calice\b|\bal bicchiere\b/i.test(r)).map((r) => r.replace(/^#{1,3}\s*/, '').trim());
+  return { items, sections, doubts, other: extraction.uncertain, titles };
 }
 // Compatibilità con i test e con la diagnosi: le voci con prezzo di una lettura.
 export function readingItems(text) { return parse(text).items.filter((i) => !i.course); }
@@ -106,6 +108,8 @@ export function combineReadings(first, second) {
       }
     } else if (s.name !== 'Dal materiale ricevuto') lines.push(`# ${s.name}`);
   };
+  // Titolo di pagina senza voci («Mescita — by the glass»): letto da entrambe → resta, serve a capire i prezzi.
+  for (const title of A.titles) if (single || B.titles.some((t) => /mescita|glass|calice|bicchiere/i.test(t))) { lines.push(`# ${title}`); break; }
   for (const row of A.items) {
     if (single) { doubts.push(`${DOUBT} ${row.name}${row.course ? ' (portata)' : ` — ${priceText(row)}`} (letto una sola volta)`); continue; }
     const candidates = B.items.map((other, index) => ({ other, index })).filter(({ index }) => !used.has(index));

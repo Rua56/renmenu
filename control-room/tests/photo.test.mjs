@@ -144,9 +144,19 @@ describe('Foto del menu nella pratica', () => {
       assert.deepEqual(await names(), ['Frico croccante con polenta', 'Gubana', 'Ribolla gialla']);
       // Su sua richiesta (conferma esplicita) Jarvis rifà la bozza con TUTTI i materiali.
       assert.equal((await act(db, 'rebuildDraft', { draftId: draft.id })).status, 403, 'senza conferma non si rifà');
+      // Anteprima mandata al locale per email: non si rifà. Solo a Riccardo su Telegram + «Non ancora»: si rifà.
+      const t = '2026-10-03T00:10:00Z';
+      await db.prepare("INSERT INTO publication_approvals (id,draft_id,request_id,reference_code,snapshot_sha,status,recipient,preview_url,email_subject,email_body,prepared_at,revision,created_at,updated_at) VALUES ('ap1',?,?,'RM-TEST1','x','anteprima_inviata','locale@example.com','u','s','b',?,1,?,?)").bind(draft.id, requestId, t, t, t).run();
+      await db.prepare("INSERT INTO jarvis_missions (id,request_id,draft_id,status,step_started_at,created_at,updated_at) VALUES ('m1',?,?,'attesa_cliente',?,?,?)").bind(requestId, draft.id, t, t, t).run();
+      assert.equal((await act(db, 'rebuildDraft', { draftId: draft.id, confirmation: 'RIFAI BOZZA' })).status, 409, 'Jarvis la sta seguendo');
+      await db.prepare("UPDATE jarvis_missions SET status='ferma' WHERE id='m1'").bind().run();
+      assert.equal((await act(db, 'rebuildDraft', { draftId: draft.id, confirmation: 'RIFAI BOZZA' })).status, 409, 'anteprima già dal locale');
+      await db.prepare("UPDATE publication_approvals SET recipient='telegram:riccardo' WHERE id='ap1'").bind().run();
       const rebuilt = await act(db, 'rebuildDraft', { draftId: draft.id, confirmation: 'RIFAI BOZZA' });
       assert.equal(rebuilt.status, 200, JSON.stringify(rebuilt.body));
       assert.deepEqual(await names(), ['Frico con polenta', 'Gubana', 'Ribolla gialla', 'Refosco']);
+      assert.equal((await db.prepare('SELECT COUNT(*) AS n FROM jarvis_missions WHERE request_id=?').bind(requestId).first()).n, 0);
+      assert.equal((await db.prepare('SELECT COUNT(*) AS n FROM publication_approvals WHERE request_id=?').bind(requestId).first()).n, 0);
     } finally { db.close(); }
   });
 
