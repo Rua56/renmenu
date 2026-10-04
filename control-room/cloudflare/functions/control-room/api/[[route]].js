@@ -22,7 +22,7 @@ import { createMissions } from '../../_lib/missions.js';
 import { noteStatement } from '../../_lib/memory.js';
 import { THEMES, proposeTheme, themeFromText } from '../../_lib/themes.js';
 import { dropRepeatedPages, notesSummary, reviewNotes, structureNotes } from '../../_lib/notes.js';
-import { briefLines, briefNotes, creativeBrief, premiumDirections } from '../../_lib/premium.js';
+import { briefLines, briefNotes, creativeBrief, premiumDirections, storyFromSource } from '../../_lib/premium.js';
 import { applyVenueInfo, extractVenueInfo } from '../../_lib/venue-info.js';
 import { applyPriceCorrections } from '../../_lib/corrections.js';
 async function draftNotes(db, requestId) {
@@ -536,6 +536,11 @@ export async function action(db, type, input, env = {}) {
       const directions = premiumDirections(brief);
       delete extraction.menu.tema;
       extraction.menu.premium = structuredClone(directions[0].premium);
+      const story = storyFromSource(request.source_text);
+      if (story) {
+        extraction.menu.premium.storia = { it: story };
+        extraction.warnings.push('«La nostra storia»: testo preso parola per parola dall’email del cliente. Controllalo; la versione inglese è da preparare.');
+      }
       creative = { brief, directions, lines: briefLines(brief) };
       extraction.warnings.push(`Premium su misura: ${directions.length} direzioni grafiche pronte (${directions.map((d) => d.label).join(', ')}); nella bozza c’è «${directions[0].label}» (${directions[0].why}). Confrontale in Revisione: la grafica va approvata da te prima della pubblicazione.`);
       const extra = brief.lingue.filter((code) => code !== 'en');

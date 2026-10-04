@@ -263,3 +263,17 @@ describe('Foto per il menu · flusso nella Control Room', () => {
     }
   });
 });
+
+import { storyFromSource } from '../cloudflare/functions/_lib/premium.js';
+import { parseClassification as parseCls } from '../cloudflare/functions/_lib/media.js';
+describe('Premium · storia del cliente ed etichette in maiuscolo', () => {
+  it('prende «La nostra storia: …» fino alla riga vuota, unendo gli a capo dell’email; senza storia niente testo', () => {
+    assert.equal(storyFromSource('Buongiorno\n\nLa nostra storia: l\'enoteca è nata nel 1987, in una\nvecchia cantina.\n\nANTIPASTI\nFrico — 12'), 'L\'enoteca è nata nel 1987, in una vecchia cantina.');
+    assert.equal(storyFromSource('ANTIPASTI\nFrico — 12'), '');
+    assert.equal(storyFromSource('Storia: breve'), '');
+  });
+  it('«COLLIO» diventa «Collio», DOC resta in maiuscolo, il testo già normale non si tocca', () => {
+    const r = parseCls('{"tipo":"bottiglia","etichetta":{"nome":"RIBOLLA GIALLA","denominazione":"FRIULI COLLI ORIENTALI DOC","cantina":"Cantina di Prova"}}');
+    assert.deepEqual(r.label, { nome: 'Ribolla Gialla', denominazione: 'Friuli Colli Orientali DOC', cantina: 'Cantina di Prova' });
+  });
+});
