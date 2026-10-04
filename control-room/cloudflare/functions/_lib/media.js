@@ -69,9 +69,7 @@ export function parseClassification(raw) {
       const value = cut(data.etichetta[key], 80);
       if (value && !/^(?:n\/?a|non\s+(?:leggibile|visibile|indicat\w*)|sconosciut\w*|\?+|-+)$/i.test(value)) label[key] = value;
     }
-    // Etichette scritte in maiuscolo («COLLIO»): nella scheda vanno in forma normale («Collio»).
-    for (const key of Object.keys(label)) if (/[A-ZÀ-Ý]{3}/.test(label[key]) && label[key] === label[key].toUpperCase())
-      label[key] = label[key].toLowerCase().replace(/(^|[\s'’(-])(\p{L})/gu, (m, sep, ch) => sep + ch.toUpperCase()).replace(/\b(Di|Del|Della|Dei|Delle|Dal|Da|E|D'|Doc|Docg|Igt)\b/g, (w) => (/^(Doc|Docg|Igt)$/.test(w) ? w.toUpperCase() : w.toLowerCase()));
+    tidyLabel(label);
     if (label.annata && !/^(?:19|20)\d{2}$/.test(label.annata)) delete label.annata;
     if (label.gradazione && !/\d/.test(label.gradazione)) delete label.gradazione;
   }
@@ -268,7 +266,14 @@ export function reapplyConfirmed(menu, mediaRows) {
 }
 
 export function parseLabel(json) {
-  try { const v = JSON.parse(json || '{}'); return v && typeof v === 'object' && !Array.isArray(v) ? v : {}; } catch { return {}; }
+  try { const v = JSON.parse(json || '{}'); return v && typeof v === 'object' && !Array.isArray(v) ? tidyLabel(v) : {}; } catch { return {}; }
+}
+
+// Etichette scritte in maiuscolo («COLLIO»): nella scheda vanno in forma normale («Collio»).
+function tidyLabel(label) {
+  for (const key of Object.keys(label)) if (typeof label[key] === 'string' && /[A-ZÀ-Ý]{3}/.test(label[key]) && label[key] === label[key].toUpperCase())
+    label[key] = label[key].toLowerCase().replace(/(^|[\s'’(-])(\p{L})/gu, (m, sep, ch) => sep + ch.toUpperCase()).replace(/\b(Di|Del|Della|Dei|Delle|Dal|Da|E|D'|Doc|Docg|Igt)\b/g, (w) => (/^(Doc|Docg|Igt)$/.test(w) ? w.toUpperCase() : w.toLowerCase()));
+  return label;
 }
 
 /** JPEG/PNG/WebP vero, non troppo grande. */
