@@ -229,7 +229,7 @@
   if (menu.premium && typeof menu.premium === 'object' && params.get('standard') !== '1') {
     const load = (tag, attrs) => new Promise((ok, ko) => { const el = Object.assign(document.createElement(tag), attrs); el.onload = ok; el.onerror = ko; document.head.appendChild(el); });
     try {
-      await Promise.all([load('link', { rel: 'stylesheet', href: 'premium.css?v=2' }), load('script', { src: 'premium.js?v=2' })]);
+      await Promise.all([load('link', { rel: 'stylesheet', href: 'premium.css?v=3' }), load('script', { src: 'premium.js?v=3' })]);
       window.RenMenuPremium.render(menu, { lang, R, params });
       return;
     } catch (e) { /* se il Premium non si carica, resta la versione Standard */ }
