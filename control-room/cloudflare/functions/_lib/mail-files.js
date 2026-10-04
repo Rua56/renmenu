@@ -67,7 +67,7 @@ export async function linkMailFiles(db, env, { now, uid, auditedBatch }) {
       continue;
     }
     const count = (await db.prepare('SELECT COUNT(*) AS n FROM materials WHERE request_id=?').bind(file.request_id).first())?.n || 0;
-    if (count >= 12) { await db.prepare("UPDATE mail_files SET material_id='scartato' WHERE id=?").bind(file.id).run(); continue; }
+    if (count >= 20) { await db.prepare("UPDATE mail_files SET material_id='scartato' WHERE id=?").bind(file.id).run(); continue; }
     const materialId = uid();
     await auditedBatch({ prepare: (sql) => db.prepare(sql), batch: (s) => db.batch(s), actor: 'jarvis' }, [
       db.prepare('INSERT INTO materials (id,request_id,r2_key,filename,mime,size,source,processing_status,text_preview,created_at) VALUES (?,?,?,?,?,?,?,?,?,?)')

@@ -7,7 +7,27 @@ const LEGACY = new Set(['hot', 'riserva']);
 const LANGS = new Set(['it', 'en', 'de', 'fr', 'es']);
 const PUBLIC_ROOT = new Set(['id', 'nome', 'sottotitolo', 'indirizzo', 'telefono', 'instagram', 'facebook', 'maps', 'orari', 'wifi', 'avviso', 'coperto', 'note', 'tema', 'premium', 'sezioni', 'lingue', 'url', 'sito', 'website']);
 const PUBLIC_SECTION = new Set(['nome', 'descrizione', 'voci', 'tipo', 'prezzo', 'unita']);
-const PUBLIC_ITEM = new Set(['nome', 'descrizione', 'prezzo', 'prezzi', 'allergeni', 'tag']);
+const PUBLIC_ITEM = new Set(['nome', 'descrizione', 'prezzo', 'prezzi', 'allergeni', 'tag', 'foto', 'scheda']);
+// Foto e scheda (sommelier o piatto) dei menu su misura: stesse regole di scripts/validate-menus.py.
+const ITEM_IMAGE = /^(?:\.\.\/|\/)?[a-z0-9_./-]+\.(?:webp|png|jpe?g|svg|avif)$/i;
+const SCHEDA_TEXT = new Set(['cantina', 'territorio', 'vitigno', 'annata', 'gradazione', 'temperatura', 'affinamento', 'colore', 'profumo', 'gusto', 'abbinamenti', 'nota']);
+const SCHEDA_PROFILE = new Set(['aromi', 'struttura', 'acidita', 'dolcezza', 'corpo']);
+const filledText = (v) => (typeof v === 'string' ? Boolean(v.trim()) : Boolean(v && typeof v === 'object' && !Array.isArray(v) && Object.values(v).some((s) => typeof s === 'string' && s.trim())));
+export function itemExtrasErrors(item, path) {
+  const errors = [];
+  if ('foto' in item && !(typeof item.foto === 'string' && (item.foto.startsWith('https://') || ITEM_IMAGE.test(item.foto)))) errors.push(`${path}.foto: serve un indirizzo https o un file immagine del sito.`);
+  if (!('scheda' in item)) return errors;
+  const sheet = item.scheda;
+  if (!sheet || typeof sheet !== 'object' || Array.isArray(sheet)) return [...errors, `${path}.scheda: deve essere un oggetto.`];
+  for (const [key, val] of Object.entries(sheet)) {
+    if (key === 'profilo') {
+      if (!val || typeof val !== 'object' || Array.isArray(val)) { errors.push(`${path}.scheda.profilo: deve essere un oggetto.`); continue; }
+      for (const [pk, pv] of Object.entries(val)) if (!SCHEDA_PROFILE.has(pk) || !Number.isInteger(pv) || pv < 0 || pv > 100) errors.push(`${path}.scheda.profilo.${pk}: valore intero da 0 a 100.`);
+    } else if (!SCHEDA_TEXT.has(key)) errors.push(`${path}.scheda: campo «${key}» non previsto.`);
+    else if (!filledText(val)) errors.push(`${path}.scheda.${key}: testo vuoto.`);
+  }
+  return errors;
+}
 const text = (value) => typeof value === 'string' ? value.trim() : value && typeof value === 'object' && !Array.isArray(value) ? Object.values(value).some((item) => typeof item === 'string' && item.trim()) : false;
 const localized = (value, lang) => value && typeof value === 'object' && typeof value[lang] === 'string' && value[lang].trim();
 export const slugify = (value) => String(value || '').toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '').slice(0, 64);
@@ -38,8 +58,10 @@ export function validateMenu(menu) {
       for (const key of ['nome', 'descrizione']) if (key in section) publicText(section[key], `sezioni.${si}.${key}`);
       for (const [vi, item] of (Array.isArray(section.voci) ? section.voci : []).entries()) {
         allowed(item, PUBLIC_ITEM, `sezioni.${si}.voci.${vi}`);
-        if (item && typeof item === 'object' && !Array.isArray(item))
+        if (item && typeof item === 'object' && !Array.isArray(item)) {
           for (const key of ['nome', 'descrizione']) if (key in item) publicText(item[key], `sezioni.${si}.voci.${vi}.${key}`);
+          errors.push(...itemExtrasErrors(item, `sezioni.${si}.voci.${vi}`));
+        }
       }
     }
   }
