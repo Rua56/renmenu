@@ -17,7 +17,7 @@ import { purgePublishedEmail } from '../../_lib/email-retention.js';
 import { resolveCategory, draftBlocker, PLAN_RULES } from '../../_lib/service-rules.js';
 import { translateMenu, translationEntries, translationSummary } from '../../_lib/translate.js';
 import { allExtras, applyExtras, proposeSourceExtras } from '../../_lib/extras.js';
-import { autopilotMessage, autopilotPreview } from '../../_lib/autopilot.js';
+import { autopilotMessage, autopilotPreview, classifyRequest } from '../../_lib/autopilot.js';
 import { createMissions } from '../../_lib/missions.js';
 import { noteStatement } from '../../_lib/memory.js';
 import { THEMES, proposeTheme, themeFromText } from '../../_lib/themes.js';
@@ -1091,8 +1091,11 @@ export async function action(db, type, input, env = {}) {
     // bottiglie, piatti e locale non sono pagine di menu: vanno tra le «Foto per il menu», da
     // confermare in Revisione, e non consumano la lettura doppia. Nel dubbio si legge come menu.
     if (material.mime !== 'application/pdf' && p.asMenu !== true) {
-      const owner = await getOne(db, 'SELECT r.plan,r.category,c.plan AS client_plan FROM requests r LEFT JOIN clients c ON c.id=r.client_id WHERE r.id=?', request.id);
-      const premium = owner && (owner.plan === 'premium' || owner.category === 'nuovo_premium' || owner.client_plan === 'premium');
+      const owner = await getOne(db, 'SELECT r.plan,r.category,r.subject,r.source_text,c.plan AS client_plan FROM requests r LEFT JOIN clients c ON c.id=r.client_id WHERE r.id=?', request.id);
+      // Anche una pratica appena arrivata, non ancora classificata, se il testo chiede chiaramente il
+      // Premium (un solo piano, senza esitazioni): le foto restano comunque proposte da confermare.
+      const premium = owner && (owner.plan === 'premium' || owner.category === 'nuovo_premium' || owner.client_plan === 'premium'
+        || (!['standard', 'annuale'].includes(owner.plan) && classifyRequest(owner.subject, owner.source_text).plan === 'premium'));
       if (premium) {
         const seen = await classifyPhoto(env.AI, bytes, material.mime);
         if (seen.ok && !isMenuPhotoKind(seen.kind)) {

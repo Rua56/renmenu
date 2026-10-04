@@ -235,6 +235,19 @@ describe('Foto per il menu · flusso nella Control Room', () => {
     } finally { db.close(); }
   });
 
+  it('Email appena arrivata (piano da definire) che chiede chiaramente il Premium: le foto si riconoscono subito', async () => {
+    const db = await setup('da_definire');
+    try {
+      await db.prepare("UPDATE requests SET subject='Nuovo menu Premium su misura · Enoteca Foto Test', source_text='Vorremmo il Premium su misura.\\nLocale: Enoteca Foto Test' WHERE id='r1'").bind().run();
+      const calls = [];
+      const ai = { run: async (model) => { calls.push(model); return { response: '{"tipo":"logo","descrizione":"logo dorato"}' }; } };
+      const read = await act(db, 'readMaterial', { materialId: 'm1' }, { BUCKET: bucket(new Map([['private/mail/x/1', JPEG]])), AI: ai });
+      assert.equal(read.status, 200, JSON.stringify(read.body));
+      assert.equal(read.body.result.media, true);
+      assert.equal(calls.length, 1);
+    } finally { db.close(); }
+  });
+
   it('Premium: pagina di menu o risposta incomprensibile → lettura doppia di sempre', async () => {
     for (const answer of ['{"tipo":"menu","descrizione":"lista di vini"}', 'boh']) {
       const db = await setup();
