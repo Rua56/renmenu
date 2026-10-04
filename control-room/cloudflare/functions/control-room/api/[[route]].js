@@ -1347,7 +1347,7 @@ async function downloadMaterial(context, id) {
 }
 
 // Copia ridotta (fatta dal telefono di Riccardo, ~1600 px) di una foto per il menu. Resta privata
-// finché Riccardo non la conferma in un posto: /media/<sha> serve solo le foto confermate.
+// finché Riccardo non la conferma in un posto: /jarvis-hook/media/<sha> serve solo le foto confermate.
 async function uploadMediaImage(context, id) {
   const { env, request } = context, db = env.DB;
   assert(env.BUCKET?.put, 'Archivio privato non configurato.', 503);
@@ -1362,7 +1362,7 @@ async function uploadMediaImage(context, id) {
   const sha = [...new Uint8Array(await crypto.subtle.digest('SHA-256', bytes))].map((b) => b.toString(16).padStart(2, '0')).join('');
   const key = `public/media/${sha}.${PUBLIC_EXT[mime]}`;
   await env.BUCKET.put(key, bytes, { httpMetadata: { contentType: mime } });
-  const url = `${new URL(request.url).origin}/media/${sha}.${PUBLIC_EXT[mime]}`;
+  const url = `${new URL(request.url).origin}/jarvis-hook/media/${sha}.${PUBLIC_EXT[mime]}`;
   await auditedBatch(db, [db.prepare('UPDATE media_items SET public_key=?,public_sha=?,public_url=?,updated_at=? WHERE id=?').bind(key, sha, url, now(), media.id)],
     'media.upload', `Copia ridotta pronta (${Math.round(bytes.length / 1024)} KB), ancora privata finché non la confermi.`, media.request_id);
   return { id: media.id, publicUrl: url, size: bytes.length };

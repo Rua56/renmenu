@@ -3,7 +3,7 @@ import { after, describe, it } from 'node:test';
 import { readFileSync } from 'node:fs';
 import { DatabaseSync } from 'node:sqlite';
 import { onRequest } from "../cloudflare/functions/control-room/api/[[route]].js";
-import { onRequest as publicMedia } from "../cloudflare/functions/media/[file].js";
+import { onRequest as publicHook } from "../cloudflare/functions/jarvis-hook/[[route]].js";
 import { applyMedia, parseClassification, proposeTargets, reapplyConfirmed, removeMedia } from "../cloudflare/functions/_lib/media.js";
 import { validateMenu } from "../cloudflare/functions/_lib/menu.js";
 
@@ -189,9 +189,9 @@ describe('Foto per il menu · flusso nella Control Room', () => {
       const up = await onRequest({ request: new Request(`${base}media/${media.id}`, { method: 'POST', headers: { ...credentials, Origin: 'https://renmenu.pages.dev', 'Content-Type': 'image/jpeg', 'Content-Length': String(JPEG.length) }, body: JPEG }), env: testEnv(db, env), params: { route: ['media', media.id] } });
       const upBody = await up.json();
       assert.equal(up.status, 200, JSON.stringify(upBody));
-      assert.match(upBody.result.publicUrl, /^https:\/\/renmenu\.pages\.dev\/media\/[0-9a-f]{64}\.jpg$/);
+      assert.match(upBody.result.publicUrl, /^https:\/\/renmenu\.pages\.dev\/jarvis-hook\/media\/[0-9a-f]{64}\.jpg$/);
       const file = upBody.result.publicUrl.split('/').pop();
-      const pub = (name) => publicMedia({ request: new Request(`https://renmenu.pages.dev/media/${name}`), env: { DB: db, BUCKET: bucket(store) }, params: { file: name } });
+      const pub = (name) => publicHook({ request: new Request(`https://renmenu.pages.dev/jarvis-hook/media/${name}`), env: { DB: db, BUCKET: bucket(store) }, params: {} });
       assert.equal((await pub(file)).status, 404, 'non confermata: non pubblica');
       const stale = await act(db, 'mediaPlace', { mediaId: media.id, revision: 2, target: 'voce:1:0' }, env);
       assert.equal(stale.status, 409, 'revisione vecchia');
@@ -206,7 +206,8 @@ describe('Foto per il menu · flusso nella Control Room', () => {
       const served = await pub(file);
       assert.equal(served.status, 200);
       assert.equal(served.headers.get('content-type'), 'image/jpeg');
-      assert.equal((await pub('../private.jpg')).status, 404);
+      assert.equal((await pub('..%2Fprivate.jpg')).status, 404);
+      assert.equal((await pub(file.replace('.jpg', '.png'))).status, 404, 'estensione diversa: non trovata');
       // Sposta su un altro vino, poi togli: torna da sistemare e non è più pubblica.
       const moved = await act(db, 'mediaPlace', { mediaId: media.id, revision: 4, target: 'voce:1:1' }, env);
       assert.equal(moved.status, 200, JSON.stringify(moved.body));

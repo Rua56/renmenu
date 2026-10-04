@@ -1,5 +1,5 @@
 {
   "version": 1,
-  "include": ["/control-room", "/control-room/*", "/hooks/gmail", "/hooks/whatsapp", "/jarvis-hook/*", "/media/*"],
+  "include": ["/control-room", "/control-room/*", "/hooks/gmail", "/hooks/whatsapp", "/jarvis-hook/*"],
   "exclude": []
 }
