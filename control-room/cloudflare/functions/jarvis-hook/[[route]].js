@@ -5,6 +5,7 @@
 import { linkPendingMailFiles, missions, readPendingMaterials, receivePendingMail, runAutopilot } from '../control-room/api/[[route]].js';
 import { sameSecret, sendTelegram, telegramReady } from '../_lib/telegram.js';
 import { chat } from '../_lib/voice.js';
+import { serveMedia } from '../_lib/public-media.js';
 
 const reply = (body, status = 200) => new Response(JSON.stringify(body), { status, headers: { 'Content-Type': 'application/json', 'Cache-Control': 'no-store' } });
 
@@ -19,6 +20,9 @@ export async function onRequest(context) {
     if (!row?.preview_url) return new Response('Anteprima non più disponibile.', { status: 404, headers: { 'Content-Type': 'text/plain; charset=utf-8', 'Cache-Control': 'no-store' } });
     return new Response(null, { status: 302, headers: { Location: row.preview_url, 'Cache-Control': 'no-store', 'Referrer-Policy': 'no-referrer' } });
   }
+  // Foto del menu Premium confermate da Riccardo (servono all'anteprima e al menu).
+  const media = path.match(/^\/jarvis-hook\/media\/([^/]+)$/);
+  if (media) return serveMedia(request, env, media[1]);
   if (request.method !== 'POST' || !env.DB?.prepare) return reply({ ok: false }, 404);
   try {
     if (path === '/jarvis-hook/telegram') {
