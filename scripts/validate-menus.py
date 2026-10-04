@@ -23,7 +23,9 @@ SUPPORTED_UI_LANGUAGES = {"it", "en", "de", "fr", "es"}
 PREMIUM_DIRECTIONS = {"editoriale", "bistrot", "moderno"}
 PREMIUM_FONTS = {"classico", "moderno", "artigianale"}
 PREMIUM_COLORS = {"fondo", "testo", "accento", "secondario"}
-PREMIUM_KEYS = {"direzione", "caratteri", "colori", "logo", "copertina", "motto", "storia"}
+PREMIUM_KEYS = {"direzione", "caratteri", "colori", "logo", "copertina", "motto", "storia", "firma", "galleria"}
+SCHEDA_TEXT_KEYS = {"cantina", "territorio", "vitigno", "annata", "gradazione", "temperatura", "affinamento", "colore", "profumo", "gusto", "abbinamenti", "nota"}
+SCHEDA_PROFILE_KEYS = {"aromi", "struttura", "acidita", "dolcezza", "corpo"}
 HEX_COLOR = re.compile(r"^#[0-9a-fA-F]{6}$")
 IMAGE_PATH = re.compile(r"^(?:\.\./|/)?[A-Za-z0-9_./-]+\.(?:webp|png|jpe?g|svg|avif)$", re.IGNORECASE)
 PRICE_PATTERN = re.compile(r"^\d+(?:[,.]\d{1,2})?$")
@@ -215,6 +217,34 @@ def validate_translations(essential_values: list[tuple[str, object]], languages:
         )
 
 
+def is_image(src: object) -> bool:
+    return isinstance(src, str) and (src.startswith("https://") or bool(IMAGE_PATH.match(src)))
+
+
+def validate_item_extras(item: Mapping[str, object], label: str, report: Report) -> None:
+    """Foto e scheda (sommelier o piatto) dei menu su misura."""
+    if "foto" in item and not is_image(item["foto"]):
+        report.error(f"{label}.foto: serve un indirizzo https o un file immagine del sito.")
+    if "scheda" not in item:
+        return
+    sheet = item["scheda"]
+    if not isinstance(sheet, Mapping):
+        report.error(f"{label}.scheda deve essere un oggetto.")
+        return
+    for key, val in sheet.items():
+        if key == "profilo":
+            if not isinstance(val, Mapping):
+                report.error(f"{label}.scheda.profilo deve essere un oggetto.")
+                continue
+            for pk, pv in val.items():
+                if pk not in SCHEDA_PROFILE_KEYS or not isinstance(pv, int) or isinstance(pv, bool) or not 0 <= pv <= 100:
+                    report.error(f"{label}.scheda.profilo.{pk}: valore da 0 a 100 ({', '.join(sorted(SCHEDA_PROFILE_KEYS))}).")
+        elif key not in SCHEDA_TEXT_KEYS:
+            report.error(f"{label}.scheda: campo '{key}' non previsto.")
+        elif not non_empty_text(val):
+            report.error(f"{label}.scheda.{key}: testo vuoto.")
+
+
 def validate_premium(value: object, report: Report) -> None:
     """Blocco «premium» (menu su misura): solo aspetto, mai dati del menu."""
     if not isinstance(value, Mapping):
@@ -237,8 +267,19 @@ def validate_premium(value: object, report: Report) -> None:
     for key in ("logo", "copertina"):
         if key in value:
             src = value[key]
-            if not isinstance(src, str) or not (src.startswith("https://") or IMAGE_PATH.match(src)):
+            if not is_image(src):
                 report.error(f"premium.{key}: serve un indirizzo https o un file immagine del sito.")
+    if "firma" in value and not (isinstance(value["firma"], str) and 0 < len(value["firma"].strip()) <= 80):
+        report.error("premium.firma: testo breve (massimo 80 caratteri).")
+    if "galleria" in value:
+        gallery = value["galleria"]
+        if not isinstance(gallery, list) or len(gallery) > 8:
+            report.error("premium.galleria: elenco di massimo 8 foto.")
+        else:
+            for n, photo in enumerate(gallery, start=1):
+                src = photo.get("src") if isinstance(photo, Mapping) else photo
+                if not is_image(src):
+                    report.error(f"premium.galleria, foto {n}: serve un indirizzo https o un file immagine del sito.")
 
 
 def validate_menu(path: Path, report: Report) -> None:
@@ -328,6 +369,7 @@ def validate_menu(path: Path, report: Report) -> None:
             else:
                 essential_values.append((f"{item_label}.nome", item_name))
 
+            validate_item_extras(item, item_label, report)
             if "prezzo" in item:
                 validate_price(item["prezzo"], item_label, report)
             if "prezzi" in item:

@@ -86,6 +86,17 @@
   const ICON_STAR = svg('<path d="m12 3 2.6 5.6 6 .7-4.5 4.1 1.2 6L12 16.4 6.7 19.4l1.2-6L3.4 9.3l6-.7Z"/>');
   const ROMAN = ['I', 'II', 'III', 'IV', 'V', 'VI', 'VII', 'VIII', 'IX', 'X', 'XI', 'XII', 'XIII', 'XIV', 'XV'];
   // Immagini: solo indirizzi https o file del sito (nessun altro schema).
+  // Testi delle schede (pannello che si apre dal basso, storia del locale, scheda sommelier).
+  const T2 = {
+    it: { scopri: 'Scopri', somm: 'Scheda sommelier', chiudi: 'Chiudi', storia: 'La nostra storia', leggi: 'Leggi la nostra storia', foto: 'Foto', profilo: { aromi: 'Aromi', struttura: 'Struttura', acidita: 'Acidità', dolcezza: 'Dolcezza', corpo: 'Corpo' }, campi: { cantina: 'Cantina', territorio: 'Territorio', vitigno: 'Vitigno', annata: 'Annata', gradazione: 'Gradazione', temperatura: 'Servire a', affinamento: 'Affinamento', colore: 'Colore', profumo: 'Profumo', gusto: 'Gusto', abbinamenti: 'Abbinamenti' } },
+    en: { scopri: 'Discover', somm: 'Sommelier notes', chiudi: 'Close', storia: 'Our story', leggi: 'Read our story', foto: 'Photo', profilo: { aromi: 'Aromas', struttura: 'Structure', acidita: 'Acidity', dolcezza: 'Sweetness', corpo: 'Body' }, campi: { cantina: 'Winery', territorio: 'Region', vitigno: 'Grape', annata: 'Vintage', gradazione: 'Alcohol', temperatura: 'Serve at', affinamento: 'Ageing', colore: 'Colour', profumo: 'Nose', gusto: 'Palate', abbinamenti: 'Pairings' } },
+    de: { scopri: 'Entdecken', somm: 'Sommelier-Notiz', chiudi: 'Schließen', storia: 'Unsere Geschichte', leggi: 'Unsere Geschichte lesen', foto: 'Foto', profilo: { aromi: 'Aromen', struttura: 'Struktur', acidita: 'Säure', dolcezza: 'Süße', corpo: 'Körper' }, campi: { cantina: 'Weingut', territorio: 'Gebiet', vitigno: 'Rebsorte', annata: 'Jahrgang', gradazione: 'Alkohol', temperatura: 'Trinktemperatur', affinamento: 'Ausbau', colore: 'Farbe', profumo: 'Duft', gusto: 'Geschmack', abbinamenti: 'Passt zu' } },
+    fr: { scopri: 'Découvrir', somm: 'Fiche du sommelier', chiudi: 'Fermer', storia: 'Notre histoire', leggi: 'Lire notre histoire', foto: 'Photo', profilo: { aromi: 'Arômes', struttura: 'Structure', acidita: 'Acidité', dolcezza: 'Douceur', corpo: 'Corps' }, campi: { cantina: 'Domaine', territorio: 'Terroir', vitigno: 'Cépage', annata: 'Millésime', gradazione: 'Degré', temperatura: 'Servir à', affinamento: 'Élevage', colore: 'Robe', profumo: 'Nez', gusto: 'Bouche', abbinamenti: 'Accords' } },
+    es: { scopri: 'Descubrir', somm: 'Ficha del sumiller', chiudi: 'Cerrar', storia: 'Nuestra historia', leggi: 'Leer nuestra historia', foto: 'Foto', profilo: { aromi: 'Aromas', struttura: 'Estructura', acidita: 'Acidez', dolcezza: 'Dulzor', corpo: 'Cuerpo' }, campi: { cantina: 'Bodega', territorio: 'Territorio', vitigno: 'Uva', annata: 'Añada', gradazione: 'Graduación', temperatura: 'Servir a', affinamento: 'Crianza', colore: 'Color', profumo: 'Nariz', gusto: 'Boca', abbinamenti: 'Maridajes' } },
+    sl: { scopri: 'Odkrij', somm: 'Sommelierjev opis', chiudi: 'Zapri', storia: 'Naša zgodba', leggi: 'Preberi našo zgodbo', foto: 'Foto', profilo: { aromi: 'Arome', struttura: 'Struktura', acidita: 'Kislost', dolcezza: 'Sladkost', corpo: 'Telo' }, campi: { cantina: 'Klet', territorio: 'Okoliš', vitigno: 'Sorta', annata: 'Letnik', gradazione: 'Alkohol', temperatura: 'Postrezi pri', affinamento: 'Zorenje', colore: 'Barva', profumo: 'Vonj', gusto: 'Okus', abbinamenti: 'Kombinacije' } }
+  };
+  const PROFILO = ['aromi', 'struttura', 'acidita', 'dolcezza', 'corpo'];
+  const TESSERE = ['temperatura', 'abbinamenti', 'colore', 'profumo', 'gusto', 'territorio', 'vitigno', 'affinamento', 'gradazione', 'annata'];
   const safeImg = (src) => { const s = String(src || '').trim(); return /^https:\/\//i.test(s) || /^(?:\.\.\/|\/)?[A-Za-z0-9_./-]+\.(?:webp|png|jpe?g|svg|avif)$/i.test(s) ? s : ''; };
   // Tipo di locale scritto all'inizio del nome («Enoteca Isonzo» → Enoteca / Isonzo).
   const TIPI = /^(Enoteca|Trattoria|Osteria|Ristorante|Pizzeria|Bistrot|Locanda|Agriturismo|Bar|Caffè|Caffe|Cantina|Vineria|Birreria|Pub|Hostaria|Taverna|Gastronomia)\s+(.+)$/i;
@@ -106,7 +117,7 @@
     let lang = langs.includes(startLang) ? startLang : langs[0] || 'it';
     const esc = (s) => String(s ?? '').replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
     const t = (v) => (v == null ? '' : typeof v === 'string' ? v : (v[lang] || v.it || Object.values(v)[0] || ''));
-    const S = () => T[lang] || T.it;
+    const S = () => ({ ...(T[lang] || T.it), ...(T2[lang] || T2.it) });
 
     // Caratteri e colori
     const font = CARATTERI[style.caratteri];
@@ -128,6 +139,9 @@
     document.querySelectorAll('meta[name="theme-color"]').forEach((m) => { m.content = c.fondo; m.removeAttribute('media'); });
 
     const logo = safeImg(premium.logo), cover = safeImg(premium.copertina);
+    const galleria = (Array.isArray(premium.galleria) ? premium.galleria : []).map((g) => (typeof g === 'string' ? { src: g } : g || {})).map((g) => ({ src: safeImg(g.src), alt: g.alt })).filter((g) => g.src).slice(0, 8);
+    const firma = String(premium.firma || '').trim().slice(0, 80);
+    let schede = [];
     const tel = menu.telefono ? String(menu.telefono).replace(/\s/g, '') : '';
     const ig = menu.instagram ? String(menu.instagram).replace(/^@/, '') : '';
     const fbRaw = menu.facebook ? String(menu.facebook).trim() : '';
@@ -158,11 +172,85 @@
       const all = (v.allergeni || []).length ? `<span>${S().allergeni}${v.allergeni.map((k) => `<i>${esc(k)}</i>`).join('')}</span>` : '';
       return tags || all ? `<div class="pm-voce__meta">${tags}${all}</div>` : '';
     }
-    function voce(v) {
-      const varianti = Array.isArray(v.prezzi) && v.prezzi.length ? `<div class="pm-pills">${v.prezzi.map((p) => `<span class="pm-pill"><small>${esc(t(p.etichetta))}</small>${price(p.prezzo)}</span>`).join('')}</div>` : '';
-      const p = !varianti && v.prezzo ? `<span class="pm-pill pm-pill--solo">${price(v.prezzo)}${v.unita ? `<small>${esc(t(v.unita))}</small>` : ''}</span>` : '';
-      return `<article class="pm-card"><div class="pm-card__top"><h3 class="pm-card__nome">${esc(t(v.nome))}</h3>${p}</div>${v.descrizione && t(v.descrizione) ? `<p class="pm-card__desc">${esc(t(v.descrizione))}</p>` : ''}${varianti}${meta(v)}</article>`;
+    const sch = (v) => (v.scheda && typeof v.scheda === 'object' ? v.scheda : {});
+    const haScheda = (v) => PROFILO.some((k) => Number.isFinite(sch(v).profilo?.[k])) || TESSERE.some((k) => t(sch(v)[k])) || !!t(sch(v).nota);
+    function pills(v) {
+      return Array.isArray(v.prezzi) && v.prezzi.length ? `<div class="pm-pills">${v.prezzi.map((p) => `<span class="pm-pill"><small>${esc(t(p.etichetta))}</small>${price(p.prezzo)}</span>`).join('')}</div>` : '';
     }
+    function voce(v, vino) {
+      const varianti = pills(v);
+      const p = !varianti && v.prezzo ? `<span class="pm-pill pm-pill--solo">${price(v.prezzo)}${v.unita ? `<small>${esc(t(v.unita))}</small>` : ''}</span>` : '';
+      const foto = safeImg(v.foto), scheda = haScheda(v);
+      const apri = !!(foto || scheda);
+      const k = apri ? schede.push({ v, vino }) - 1 : -1;
+      const terr = t(sch(v).territorio), cantina = t(sch(v).cantina);
+      const badge = vino && (terr || cantina) ? `<p class="pm-card__orig">${terr ? `<span class="pm-badge">${esc(terr)}</span>` : ''}${cantina ? `<span>${esc(cantina)}</span>` : ''}</p>` : '';
+      const cta = apri ? `<span class="pm-card__cta">${scheda && vino ? S().somm : S().scopri}<svg viewBox="0 0 24 24" aria-hidden="true"><path d="m9 6 6 6-6 6"/></svg></span>` : '';
+      const img = foto ? `<span class="pm-card__img${vino ? ' pm-card__img--bott' : ''}"><img src="${esc(foto)}" alt="" loading="lazy" decoding="async"></span>` : '';
+      return `<article class="pm-card${foto ? ' pm-card--foto' : ''}${apri ? ' pm-card--apri' : ''}"${apri ? ` data-k="${k}" role="button" tabindex="0" aria-haspopup="dialog" aria-label="${esc(t(v.nome))} — ${esc(scheda && vino ? S().somm : S().scopri)}"` : ''}>${img}<div class="pm-card__body">${badge}<div class="pm-card__top"><h3 class="pm-card__nome">${esc(t(v.nome))}</h3>${p}</div>${v.descrizione && t(v.descrizione) ? `<p class="pm-card__desc">${esc(t(v.descrizione))}</p>` : ''}${varianti}${meta(v)}${cta}</div></article>`;
+    }
+    // Pannello dal basso: foto grande, racconto e scheda sommelier.
+    function schedaHtml({ v, vino }) {
+      const s = sch(v), foto = safeImg(v.foto);
+      const p = pills(v) || (v.prezzo ? `<div class="pm-pills"><span class="pm-pill pm-pill--solo">${price(v.prezzo)}${v.unita ? `<small>${esc(t(v.unita))}</small>` : ''}</span></div>` : '');
+      const testo = t(s.nota) || t(v.descrizione);
+      const barre = PROFILO.filter((k) => Number.isFinite(s.profilo?.[k])).map((k) => { const n = Math.max(0, Math.min(100, Math.round(s.profilo[k]))); return `<div class="pm-barra"><span>${S().profilo[k]}</span><i><b style="--w:${n}%"></b></i><em>${n}</em></div>`; }).join('');
+      const tessere = TESSERE.filter((k) => t(s[k])).map((k) => `<div class="pm-tessera${k === 'temperatura' ? ' pm-tessera--temp' : ''}"><span>${S().campi[k]}</span><p>${esc(t(s[k]))}</p></div>`).join('');
+      return `${foto ? `<figure class="pm-sheet__foto${vino ? ' pm-sheet__foto--bott' : ''}"><img src="${esc(foto)}" alt="${esc(t(v.nome))}"></figure>` : ''}
+        <div class="pm-sheet__in">
+          ${t(s.territorio) || t(s.cantina) ? `<p class="pm-card__orig">${t(s.territorio) ? `<span class="pm-badge">${esc(t(s.territorio))}</span>` : ''}${t(s.cantina) ? `<span>${esc(t(s.cantina))}</span>` : ''}</p>` : ''}
+          <h2 id="pm-sheet-t">${esc(t(v.nome))}</h2>${p}
+          ${testo ? `<blockquote class="pm-sheet__quote">${esc(testo)}</blockquote>` : ''}
+          ${barre ? `<div class="pm-profilo">${barre}</div>` : ''}
+          ${tessere ? `${vino && haScheda(v) ? `<p class="pm-sheet__label">${S().somm}</p>` : ''}<div class="pm-tessere">${tessere}</div>` : ''}
+          ${meta(v)}
+        </div>`;
+    }
+    function storiaHtml() {
+      const par = t(premium.storia).split(/\n{2,}|\n/).map((x) => x.trim()).filter(Boolean);
+      return `${galleria.length ? `<div class="pm-galleria" tabindex="0" aria-label="${S().foto}">${galleria.map((g) => `<figure><img src="${esc(g.src)}" alt="${esc(t(g.alt))}" loading="lazy"></figure>`).join('')}</div>${galleria.length > 1 ? `<div class="pm-punti" aria-hidden="true">${galleria.map((_, n) => `<i${n ? '' : ' class="on"'}></i>`).join('')}</div>` : ''}` : ''}
+        <div class="pm-sheet__in pm-sheet__in--storia"><span class="pm-eyebrow pm-eyebrow--scuro">${esc(nome)}</span><h2 id="pm-sheet-t">${S().storia}</h2>${par.map((x) => `<p>${esc(x)}</p>`).join('')}${firma ? `<p class="pm-firma">— ${esc(firma)}</p>` : ''}</div>`;
+    }
+    let lastFocus = null;
+    function openSheet(html) {
+      closeSheet(true);
+      lastFocus = document.activeElement;
+      const wrap = document.createElement('div');
+      wrap.className = 'pm-sheet-wrap';
+      wrap.innerHTML = `<div class="pm-sheet__velo" data-close></div><section class="pm-sheet" role="dialog" aria-modal="true" aria-labelledby="pm-sheet-t"><div class="pm-sheet__maniglia" aria-hidden="true"><i></i></div><button class="pm-sheet__x" type="button" data-close aria-label="${S().chiudi}"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 6l12 12M18 6 6 18"/></svg></button><div class="pm-sheet__scroll">${html}</div></section>`;
+      document.body.appendChild(wrap);
+      document.documentElement.classList.add('pm-lock');
+      requestAnimationFrame(() => requestAnimationFrame(() => wrap.classList.add('open')));
+      wrap.querySelectorAll('[data-close]').forEach((b) => b.addEventListener('click', () => closeSheet()));
+      wrap.querySelector('.pm-sheet__x').focus({ preventScroll: true });
+      const gal = wrap.querySelector('.pm-galleria');
+      if (gal) gal.addEventListener('scroll', () => { const n = Math.round(gal.scrollLeft / gal.clientWidth); wrap.querySelectorAll('.pm-punti i').forEach((d, j) => d.classList.toggle('on', j === n)); }, { passive: true });
+      // Trascina in giù la maniglia per chiudere.
+      const sheet = wrap.querySelector('.pm-sheet'), grip = wrap.querySelector('.pm-sheet__maniglia');
+      let y0 = null;
+      grip.addEventListener('touchstart', (e) => { y0 = e.touches[0].clientY; sheet.style.transition = 'none'; }, { passive: true });
+      grip.addEventListener('touchmove', (e) => { if (y0 == null) return; const dy = Math.max(0, e.touches[0].clientY - y0); sheet.style.transform = `translateY(${dy}px)`; }, { passive: true });
+      grip.addEventListener('touchend', (e) => { const dy = e.changedTouches[0].clientY - (y0 ?? 0); y0 = null; sheet.style.transition = ''; sheet.style.transform = ''; if (dy > 90) closeSheet(); });
+    }
+    function closeSheet(now) {
+      const wrap = document.querySelector('.pm-sheet-wrap');
+      if (!wrap) return;
+      document.documentElement.classList.remove('pm-lock');
+      if (now) { wrap.remove(); return; }
+      wrap.classList.remove('open');
+      setTimeout(() => wrap.remove(), 320);
+      if (lastFocus && document.contains(lastFocus)) lastFocus.focus({ preventScroll: true });
+    }
+    document.addEventListener('keydown', (e) => {
+      const wrap = document.querySelector('.pm-sheet-wrap');
+      if (!wrap) return;
+      if (e.key === 'Escape') { closeSheet(); return; }
+      if (e.key === 'Tab') { // il focus resta nel pannello
+        const f = [...wrap.querySelectorAll('button, [href], [tabindex]:not([tabindex="-1"])')];
+        if (!f.length) return;
+        if (e.shiftKey && document.activeElement === f[0]) { e.preventDefault(); f[f.length - 1].focus(); } else if (!e.shiftKey && document.activeElement === f[f.length - 1]) { e.preventDefault(); f[0].focus(); }
+      }
+    });
     // Carta dei vini: colonne «Calice / Bottiglia» allineate.
     function cartaVini(voci) {
       const cols = [];
@@ -188,10 +276,12 @@
           ${desc}</div></section>`;
       }
       const conta = `${voci.length} ${voci.length === 1 ? (vino ? S().vino1 : S().piatto1) : (vino ? S().viniN : S().piattiN)}`;
-      return `<section class="pm-sezione" id="pm-sez-${i}"><div class="pm-pannello"><header class="pm-sezione__head"><span class="pm-medaglia" aria-hidden="true">${iconFor(s)}</span><div class="pm-sezione__tit"><span class="pm-sezione__num">${num} · ${conta}</span><h2>${esc(t(s.nome))}</h2></div></header>${desc}<div class="pm-voci">${voci.map(voce).join('')}</div></div></section>`;
+      return `<section class="pm-sezione" id="pm-sez-${i}"><div class="pm-pannello"><header class="pm-sezione__head"><span class="pm-medaglia" aria-hidden="true">${iconFor(s)}</span><div class="pm-sezione__tit"><span class="pm-sezione__num">${num} · ${conta}</span><h2>${esc(t(s.nome))}</h2></div></header>${desc}<div class="pm-voci">${voci.map((v) => voce(v, vino)).join('')}</div></div></section>`;
     }
 
     function draw() {
+      schede = [];
+      closeSheet(true);
       document.documentElement.lang = lang;
       document.title = `${nome} — ${S().menu}`;
       const q = query.trim().toLowerCase();
@@ -209,14 +299,14 @@
         <section class="pm-open"><div class="pm-wrap pm-open__in">
           <span class="pm-eyebrow">${esc(eyebrow)}</span>
           ${logo ? `<img class="pm-open__logo" src="${esc(logo)}" alt="${esc(nome)}">` : `<span class="pm-crest" aria-hidden="true"><svg viewBox="0 0 120 120"><circle cx="60" cy="60" r="57" fill="none" stroke="currentColor" stroke-width="1"/><circle cx="60" cy="60" r="50" fill="none" stroke="currentColor" stroke-width=".6" stroke-dasharray="1.5 3"/></svg><b>${esc(iniziale)}</b></span>`}
-          <h1>${tipo ? `<small>${esc(tipo)}</small>` : ''}${esc(nomeProprio)}</h1>
+          <h1${logo ? ' class="pm-vh"' : ''}>${tipo ? `<small>${esc(tipo)}</small>` : ''}${esc(nomeProprio)}</h1>
           <span class="pm-orn" aria-hidden="true">✦</span>
           ${motto ? `<p class="pm-open__motto">${esc(motto)}</p>` : ''}
           ${menu.orari && t(menu.orari) ? `<p class="pm-open__orari">${ICON.clock}<span>${esc(t(menu.orari))}</span></p>` : ''}
           <div class="pm-open__links"><a class="pm-btn pm-btn--pieno" href="#pm-carta" data-go="cucina">${S().sfoglia}</a>${haBere && haCucina ? `<a class="pm-btn pm-btn--linea" href="#pm-carta" data-go="bere">${labelBere === 'vini' ? S().carta : S().bere}</a>` : ''}</div>
         </div></section>
         ${cover ? `<figure class="pm-wrap pm-cover"><img src="${esc(cover)}" alt="" loading="eager"></figure>` : ''}
-        ${t(premium.storia) ? `<p class="pm-wrap pm-storia">${esc(t(premium.storia))}</p>` : ''}
+        ${t(premium.storia) || galleria.length ? `<section class="pm-wrap pm-racconto"><button type="button" class="pm-racconto__card" data-storia aria-haspopup="dialog">${galleria[0] ? `<span class="pm-racconto__img"><img src="${esc(galleria[0].src)}" alt="" loading="lazy"></span>` : ''}<span class="pm-racconto__txt"><span class="pm-eyebrow pm-eyebrow--scuro">${S().storia}</span>${t(premium.storia) ? `<span class="pm-racconto__p">${esc(t(premium.storia).split(/\n/)[0])}</span>` : ''}${firma ? `<span class="pm-firma">— ${esc(firma)}</span>` : ''}<span class="pm-card__cta">${t(premium.storia) ? S().leggi : S().foto}<svg viewBox="0 0 24 24" aria-hidden="true"><path d="m9 6 6 6-6 6"/></svg></span></span></button>${galleria.length > 2 ? `<div class="pm-racconto__strip" style="--n:${Math.min(3, galleria.length - 1)}" aria-hidden="true">${galleria.slice(1, 4).map((g) => `<img src="${esc(g.src)}" alt="" loading="lazy">`).join('')}</div>` : ''}</section>` : ''}
         ${menu.avviso && t(menu.avviso) ? `<div class="pm-wrap"><div class="pm-avviso"><b>${S().oggi}</b>${esc(t(menu.avviso)).replace(/^Oggi:\s*|^Today:\s*/i, '')}</div></div>` : ''}
         <section class="pm-wrap pm-carta" id="pm-carta">
           <div class="pm-carta__intro"><span class="pm-eyebrow pm-eyebrow--scuro">${S().intavola}</span><h2>${S().ilmenu}</h2><p>${S().allergie}</p></div>
@@ -252,6 +342,12 @@
       input.addEventListener('input', () => { const pos = input.selectionStart; query = input.value; draw(); const n = body.querySelector('#pm-q'); n.focus(); n.setSelectionRange(pos, pos); });
       body.querySelectorAll('.pm-nav a').forEach((a) => a.addEventListener('click', (e) => { e.preventDefault(); goTo(document.getElementById(a.getAttribute('href').slice(1))); }));
       body.querySelector('.pm-su').addEventListener('click', () => window.scrollTo({ top: 0, behavior: 'smooth' }));
+      body.querySelectorAll('.pm-card--apri').forEach((c) => {
+        const go = () => { const x = schede[Number(c.dataset.k)]; if (x) openSheet(schedaHtml(x)); };
+        c.addEventListener('click', go);
+        c.addEventListener('keydown', (e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); go(); } });
+      });
+      body.querySelector('[data-storia]')?.addEventListener('click', () => openSheet(storiaHtml()));
       if ('IntersectionObserver' in window) {
         const io = new IntersectionObserver((es) => es.forEach((e) => { if (e.isIntersecting) { e.target.classList.add('pm-in'); io.unobserve(e.target); } }), { rootMargin: '0px 0px -6% 0px' });
         body.querySelectorAll('.pm-sezione').forEach((s) => io.observe(s));
@@ -278,6 +374,21 @@
     }
     window.addEventListener('scroll', () => { onScroll(); }, { passive: true });
     draw();
+    // Apertura animata con il logo (una volta per visita; mai con «riduci movimento»).
+    (function intro() {
+      const forza = params.get('intro') === '1';
+      if (!forza && window.matchMedia?.('(prefers-reduced-motion: reduce)').matches) return;
+      const key = `pm-intro-${menu.id || nome}`;
+      try { if (!forza && sessionStorage.getItem(key)) return; sessionStorage.setItem(key, '1'); } catch { /* navigazione privata */ }
+      const el = document.createElement('div');
+      el.className = 'pm-intro';
+      el.setAttribute('aria-hidden', 'true');
+      el.innerHTML = `<div class="pm-intro__in">${logo ? `<img src="${esc(logo)}" alt="">` : `<span class="pm-crest"><svg viewBox="0 0 120 120"><circle cx="60" cy="60" r="57" fill="none" stroke="currentColor" stroke-width="1"/><circle cx="60" cy="60" r="50" fill="none" stroke="currentColor" stroke-width=".6" stroke-dasharray="1.5 3"/></svg><b>${esc(iniziale)}</b></span>`}<span class="pm-intro__nome">${tipo ? `<small>${esc(tipo)}</small>` : ''}${esc(nomeProprio)}</span><i class="pm-intro__luce"></i></div>`;
+      document.body.appendChild(el);
+      const via = () => { el.classList.add('via'); setTimeout(() => el.remove(), 700); };
+      el.addEventListener('click', via);
+      setTimeout(via, 2300);
+    })();
   }
 
   window.RenMenuPremium = { render, resolveStyle, contrast, cityOf, DIREZIONI, CARATTERI: Object.keys(CARATTERI) };

@@ -1,0 +1,463 @@
+{
+  "id": "isonzo-prova",
+  "nome": "Enoteca Isonzo Test",
+  "lingue": [
+    "it"
+  ],
+  "sezioni": [
+    {
+      "nome": {
+        "it": "Antipasti"
+      },
+      "voci": [
+        {
+          "nome": {
+            "it": "Crudo di San Daniele 24 mesi"
+          },
+          "prezzo": "14,00",
+          "descrizione": {
+            "it": "con gnocco fritto e giardiniera della casa"
+          }
+        },
+        {
+          "nome": {
+            "it": "Frico croccante"
+          },
+          "prezzo": "12,00",
+          "descrizione": {
+            "it": "con polenta morbida e cipolla rossa caramellata"
+          },
+          "foto": "../menus/media/isonzo-prova/piatto-frico.webp"
+        },
+        {
+          "nome": {
+            "it": "Tartare di manzo"
+          },
+          "prezzo": "16,00",
+          "descrizione": {
+            "it": "con tuorlo marinato, senape antica e crostini"
+          }
+        }
+      ]
+    },
+    {
+      "nome": {
+        "it": "Primi"
+      },
+      "voci": [
+        {
+          "nome": {
+            "it": "Cjarsons della Carnia"
+          },
+          "prezzo": "15,00",
+          "descrizione": {
+            "it": "ripieni di patate, uvetta e cannella, con burro fuso e ricotta affumicata"
+          },
+          "foto": "../menus/media/isonzo-prova/piatto-cjarsons.webp"
+        },
+        {
+          "nome": {
+            "it": "Risotto al Collio bianco"
+          },
+          "prezzo": "16,00",
+          "descrizione": {
+            "it": "con mantecatura al Montasio stravecchio (minimo per due persone)"
+          }
+        },
+        {
+          "nome": {
+            "it": "Tagliolini al ragù bianco di cervo"
+          },
+          "prezzo": "17,00"
+        }
+      ]
+    },
+    {
+      "nome": {
+        "it": "Secondi"
+      },
+      "voci": [
+        {
+          "nome": {
+            "it": "Guancia di manzo al Refosco"
+          },
+          "prezzo": "22,00",
+          "descrizione": {
+            "it": "con purè di patate e cavolo cappuccio"
+          }
+        },
+        {
+          "nome": {
+            "it": "Filetto di branzino"
+          },
+          "prezzo": "24,00",
+          "descrizione": {
+            "it": "con verdure dell'orto e salsa al limone"
+          }
+        }
+      ]
+    },
+    {
+      "nome": {
+        "it": "Dolci"
+      },
+      "voci": [
+        {
+          "nome": {
+            "it": "Gubana con grappa"
+          },
+          "prezzo": "7,00"
+        },
+        {
+          "nome": {
+            "it": "Tiramisù della casa"
+          },
+          "prezzo": "6,00"
+        }
+      ]
+    },
+    {
+      "nome": {
+        "it": "Percorso degustazione «Terre dell'Isonzo»"
+      },
+      "descrizione": {
+        "it": "Il percorso è servito per tutto il tavolo."
+      },
+      "tipo": "degustazione",
+      "prezzo": "55,00",
+      "unita": {
+        "it": "a persona"
+      },
+      "voci": [
+        {
+          "nome": {
+            "it": "Frico croccante"
+          }
+        },
+        {
+          "nome": {
+            "it": "Cjarsons della Carnia"
+          }
+        },
+        {
+          "nome": {
+            "it": "Guancia di manzo al Refosco"
+          }
+        },
+        {
+          "nome": {
+            "it": "Gubana con grappa"
+          }
+        },
+        {
+          "nome": {
+            "it": "Abbinamento vini"
+          },
+          "prezzo": "25,00"
+        }
+      ]
+    },
+    {
+      "nome": {
+        "it": "Vini bianchi"
+      },
+      "voci": [
+        {
+          "nome": {
+            "it": "Ribolla Gialla Collio 2024"
+          },
+          "prezzi": [
+            {
+              "etichetta": {
+                "it": "Calice"
+              },
+              "prezzo": "5,00"
+            },
+            {
+              "etichetta": {
+                "it": "Bottiglia"
+              },
+              "prezzo": "28,00"
+            }
+          ],
+          "scheda": {
+            "territorio": "Collio",
+            "vitigno": "Ribolla Gialla",
+            "annata": "2024",
+            "temperatura": "8–10 °C",
+            "colore": {
+              "it": "Giallo paglierino con riflessi verdolini"
+            },
+            "profumo": {
+              "it": "Mela verde, agrumi, fiori bianchi"
+            },
+            "abbinamenti": {
+              "it": "Antipasti, crudo, pesce"
+            },
+            "nota": {
+              "it": "Fresca e tesa, con un finale sapido che invita al secondo sorso. Il bianco simbolo del Collio."
+            },
+            "profilo": {
+              "aromi": 55,
+              "struttura": 40,
+              "acidita": 80,
+              "dolcezza": 15,
+              "corpo": 35
+            }
+          },
+          "foto": "../menus/media/isonzo-prova/vino-ribolla.webp"
+        },
+        {
+          "nome": {
+            "it": "Friulano Colli Orientali 2023"
+          },
+          "prezzi": [
+            {
+              "etichetta": {
+                "it": "Calice"
+              },
+              "prezzo": "6,00"
+            },
+            {
+              "etichetta": {
+                "it": "Bottiglia"
+              },
+              "prezzo": "32,00"
+            }
+          ],
+          "scheda": {
+            "territorio": "Colli Orientali",
+            "vitigno": "Friulano",
+            "annata": "2023",
+            "temperatura": "10–12 °C",
+            "colore": {
+              "it": "Giallo paglierino"
+            },
+            "profumo": {
+              "it": "Mandorla, fieno, pera"
+            },
+            "abbinamenti": {
+              "it": "Crudo di San Daniele, frico"
+            },
+            "nota": {
+              "it": "Morbido e avvolgente, chiude con la classica nota di mandorla amara."
+            },
+            "profilo": {
+              "aromi": 60,
+              "struttura": 55,
+              "acidita": 55,
+              "dolcezza": 20,
+              "corpo": 55
+            }
+          }
+        },
+        {
+          "nome": {
+            "it": "Malvasia Istriana 2022"
+          },
+          "prezzi": [
+            {
+              "etichetta": {
+                "it": "Calice"
+              },
+              "prezzo": "6,50"
+            },
+            {
+              "etichetta": {
+                "it": "Bottiglia"
+              },
+              "prezzo": "35,00"
+            }
+          ],
+          "scheda": {
+            "territorio": "Friuli Venezia Giulia",
+            "vitigno": "Malvasia Istriana",
+            "annata": "2022",
+            "temperatura": "10–12 °C",
+            "profumo": {
+              "it": "Erbe aromatiche, pesca, salvia"
+            },
+            "abbinamenti": {
+              "it": "Pesce, risotti"
+            },
+            "profilo": {
+              "aromi": 70,
+              "struttura": 50,
+              "acidita": 60,
+              "dolcezza": 20,
+              "corpo": 50
+            }
+          }
+        }
+      ]
+    },
+    {
+      "nome": {
+        "it": "Vini rossi"
+      },
+      "voci": [
+        {
+          "nome": {
+            "it": "Refosco dal Peduncolo Rosso 2022"
+          },
+          "prezzi": [
+            {
+              "etichetta": {
+                "it": "Calice"
+              },
+              "prezzo": "6,00"
+            },
+            {
+              "etichetta": {
+                "it": "Bottiglia"
+              },
+              "prezzo": "34,00"
+            }
+          ],
+          "scheda": {
+            "territorio": "Friuli Venezia Giulia",
+            "vitigno": "Refosco dal Peduncolo Rosso",
+            "annata": "2022",
+            "temperatura": "16–18 °C",
+            "colore": {
+              "it": "Rosso rubino intenso con riflessi violacei"
+            },
+            "profumo": {
+              "it": "Mora, prugna, pepe"
+            },
+            "abbinamenti": {
+              "it": "Guancia, carni rosse, formaggi stagionati"
+            },
+            "nota": {
+              "it": "Rosso autoctono di carattere: frutto scuro, tannino vivace e una piacevole nota amarognola."
+            },
+            "profilo": {
+              "aromi": 60,
+              "struttura": 70,
+              "acidita": 60,
+              "dolcezza": 10,
+              "corpo": 70
+            }
+          },
+          "foto": "../menus/media/isonzo-prova/vino-refosco.webp"
+        },
+        {
+          "nome": {
+            "it": "Schioppettino di Prepotto 2021"
+          },
+          "prezzi": [
+            {
+              "etichetta": {
+                "it": "Calice"
+              },
+              "prezzo": "7,00"
+            },
+            {
+              "etichetta": {
+                "it": "Bottiglia"
+              },
+              "prezzo": "42,00"
+            }
+          ],
+          "scheda": {
+            "territorio": "Colli Orientali",
+            "vitigno": "Schioppettino",
+            "annata": "2021",
+            "temperatura": "16–18 °C",
+            "profumo": {
+              "it": "Pepe verde, ciliegia, viola"
+            },
+            "abbinamenti": {
+              "it": "Selvaggina, ragù di cervo"
+            },
+            "profilo": {
+              "aromi": 75,
+              "struttura": 60,
+              "acidita": 55,
+              "dolcezza": 10,
+              "corpo": 60
+            }
+          }
+        }
+      ]
+    },
+    {
+      "nome": {
+        "it": "Bollicine"
+      },
+      "voci": [
+        {
+          "nome": {
+            "it": "Ribolla Gialla Spumante Brut"
+          },
+          "prezzi": [
+            {
+              "etichetta": {
+                "it": "Calice"
+              },
+              "prezzo": "6,00"
+            },
+            {
+              "etichetta": {
+                "it": "Bottiglia"
+              },
+              "prezzo": "30,00"
+            }
+          ]
+        },
+        {
+          "nome": {
+            "it": "Franciacorta Satèn"
+          },
+          "prezzi": [
+            {
+              "etichetta": {
+                "it": "Bottiglia"
+              },
+              "prezzo": "48,00"
+            }
+          ]
+        }
+      ]
+    }
+  ],
+  "premium": {
+    "direzione": "editoriale",
+    "caratteri": "classico",
+    "colori": {
+      "fondo": "#121212",
+      "testo": "#f3eee6",
+      "accento": "#a67c2e",
+      "secondario": "#6e1f2b"
+    },
+    "logo": "../menus/media/isonzo-prova/logo.webp",
+    "motto": {
+      "it": "Vini del Collio e cucina di confine"
+    },
+    "storia": {
+      "it": "L'Enoteca Isonzo nasce nel 2009 in una vecchia bottega di via Rastello, a due passi dal castello di Gorizia. Volevamo un posto dove il vino del nostro confine — Collio, Isonzo, Carso, Brda — si potesse assaggiare con calma, accanto ai piatti di casa.\n\nLa carta l'abbiamo costruita cantina per cantina, conoscendo di persona chi fa il vino. In cucina la tradizione friulana: frico, cjarsons, gubana, preparati ogni giorno con i prodotti del territorio.\n\n(Testo di esempio per la prova: per un locale vero lo scrive il cliente o lo approva Riccardo.)"
+    },
+    "firma": "La famiglia Isonzo",
+    "galleria": [
+      {
+        "src": "../menus/media/isonzo-prova/locale-sala.webp",
+        "alt": {
+          "it": "La sala"
+        }
+      },
+      {
+        "src": "../menus/media/isonzo-prova/locale-cantina.webp",
+        "alt": {
+          "it": "La cantina"
+        }
+      }
+    ]
+  },
+  "instagram": "enotecaisonzotest",
+  "telefono": "0481 555 123",
+  "coperto": "3,00",
+  "indirizzo": "Via Rastello 12, Gorizia",
+  "orari": {
+    "it": "Da martedì a domenica, 18:00 - 24:00, Lunedì chiuso"
+  }
+}
