@@ -59,6 +59,14 @@ export async function uploadFile(requestId, file) {
   return parseResponse(response);
 }
 
+/** Copia ridotta di una foto per il menu (fatta nel browser): resta privata finché non la confermi. */
+export async function uploadMediaImage(mediaId, blob) {
+  requireAuthorizedHost();
+  if (isDemoMode) throw new Error('La demo non carica foto.');
+  const response = await fetch(`/control-room/api/media/${encodeURIComponent(mediaId)}`, { method: 'POST', credentials: 'same-origin', headers: { 'Content-Type': blob.type, Accept: 'application/json' }, body: blob });
+  return parseResponse(response);
+}
+
 /** A mock must not expose a pseudo URL for a material. */
 export function getMaterialUrl(id) {
   if (!isAuthorizedHost) return null;

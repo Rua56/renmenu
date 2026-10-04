@@ -3,6 +3,7 @@ import { applyMenuChanges } from '../../_lib/changes.js';
 import { prepareUpdate } from '../../_lib/update.js';
 import { PHOTO_TYPES, readMenuPdf, readMenuPhoto } from '../../_lib/vision.js';
 import { linkMailFiles, receiveMailFiles } from '../../_lib/mail-files.js';
+import { MEDIA_KINDS, PUBLIC_EXT, applyMedia, classifyPhoto, isMenuPhotoKind, parseLabel, proposeTargets, publicImageOk, reapplyConfirmed, removeMedia, resolveTarget, targetLabel } from '../../_lib/media.js';
 import { speak } from '../../_lib/voice.js';
 import { OWNER_REVIEW } from '../../_lib/missions.js';
 import { readCurrentMenu } from '../../_lib/github-live.js';
@@ -191,8 +192,8 @@ export async function readPendingMaterials(db, env = {}, { calmMs = 40_000 } = {
       if (stillUnread) { outcome.waiting = true; done.push({ material, request, outcome }); continue; } // bozza dopo l'ultima foto
       // Riepilogo di TUTTI i file della pratica (album da Telegram): un messaggio solo, foto per foto.
       try {
-        const files = await rows(db, "SELECT m.filename, a.warnings_json AS w FROM materials m LEFT JOIN material_analyses a ON a.material_id=m.id WHERE m.request_id=? AND m.archived_at IS NULL AND m.processing_status IN ('letto_da_jarvis','non_leggibile') ORDER BY m.created_at ASC", material.request_id);
-        outcome.files = files.map((f) => ({ filename: f.filename, note: parseList(f.w)[0] || 'non leggibile' }));
+        const files = await rows(db, "SELECT m.filename, m.processing_status AS st, m.text_preview AS tp, a.warnings_json AS w FROM materials m LEFT JOIN material_analyses a ON a.material_id=m.id WHERE m.request_id=? AND m.archived_at IS NULL AND m.processing_status IN ('letto_da_jarvis','non_leggibile','foto_per_il_menu') ORDER BY m.created_at ASC", material.request_id);
+        outcome.files = files.map((f) => ({ filename: f.filename, note: f.st === 'foto_per_il_menu' ? String(f.tp || 'foto per il menu') : parseList(f.w)[0] || 'non leggibile' }));
       } catch { outcome.files = []; }
       // Bozza preparata da Jarvis e mai toccata (né da Riccardo né in pubblicazione): la rifà con tutte le foto.
       if (outcome.ok) outcome.redone = await discardUntouchedJarvisDraft(db, material.request_id);
@@ -255,6 +256,7 @@ export async function state(db, env = {}) {
     rows(db, "SELECT id,request_id AS requestId,recipient,status,provider_id AS providerId,created_at AS createdAt,updated_at AS updatedAt FROM outbound_deliveries WHERE channel='email' AND recipient='renmenu1569@gmail.com' ORDER BY created_at DESC LIMIT 300"),
     approvalRows(db)
   ]);
+  const media = await mediaRows(db, rawDrafts);
   return {
     githubMode: String(env?.GITHUB_PROVIDER || 'mock').trim() === 'live' ? 'live' : 'mock',
     clients, requests, materials,
@@ -270,7 +272,7 @@ export async function state(db, env = {}) {
     proposals: proposals.map(({ diffJson, ...p }) => ({ ...p, diff: JSON.parse(diffJson) })),
     analyses: rawAnalyses.map(({ provenanceJson, warningsJson, ...entry }) => ({ ...entry,
       provenance: JSON.parse(provenanceJson), warnings: JSON.parse(warningsJson) })),
-    livePrs, ownerDeliveries,
+    livePrs, ownerDeliveries, media,
     approvals: await Promise.all(rawApprovals.map(async (approval) => {
       const draft = rawDrafts.find((entry) => entry.id === approval.draft_id);
       const request = requests.find((entry) => entry.id === approval.request_id);
@@ -288,6 +290,30 @@ export async function state(db, env = {}) {
           ? proposeReplyChanges(approval.reply_text, JSON.parse(draft.menuJson)) : [] };
     }))
   };
+}
+
+// Foto per il menu (Premium): riconoscimento di Jarvis + proposta di posto calcolata sulla bozza attuale.
+async function mediaRows(db, rawDrafts) {
+  let list = [];
+  try { list = await rows(db, 'SELECT m.*, x.filename FROM media_items m JOIN materials x ON x.id=m.material_id WHERE x.archived_at IS NULL ORDER BY m.created_at ASC LIMIT 400'); }
+  catch { return []; }
+  const byRequest = new Map();
+  for (const raw of list) { const row = { ...raw, label: parseLabel(raw.label_json) }; byRequest.set(row.request_id, [...(byRequest.get(row.request_id) || []), row]); }
+  const out = [];
+  for (const [requestId, group] of byRequest) {
+    const draft = rawDrafts.find((d) => d.requestId === requestId);
+    const menu = draft ? JSON.parse(draft.menuJson) : null;
+    const proposals = menu ? proposeTargets(menu, group) : new Map();
+    for (const row of group) {
+      const proposal = proposals.get(row.id) || null;
+      const placed = row.status === 'confermata' && menu ? resolveTarget(menu, row.target, row.target_name) : null;
+      out.push({ id: row.id, requestId, materialId: row.material_id, filename: row.filename, kind: row.kind, description: row.description || '',
+        label: parseLabel(row.label_json), status: row.status, target: placed || row.target, targetLabel: menu && (placed || row.target) ? targetLabel(menu, placed || row.target) : '',
+        withLabel: Boolean(row.with_label), publicUrl: row.public_url || '', uploaded: Boolean(row.public_url),
+        proposal: proposal && { target: proposal.target, label: menu && proposal.target ? targetLabel(menu, proposal.target) : '', why: proposal.why, score: proposal.score } });
+    }
+  }
+  return out;
 }
 
 // Jarvis autonomo: missioni affidate da Riccardo (vedi _lib/missions.js).
@@ -538,6 +564,13 @@ export async function action(db, type, input, env = {}) {
     extraction.notes = [...extraction.notes, ...structureNotes(extraction)];
     for (const r of repeatedPages) extraction.notes.push({ kind: 'conferma', text: `File «${r.filename}»`, hint: `Stessa pagina di «${r.keptFilename}»: Jarvis l’ha usata una volta sola (la lettura più chiara). Se erano pagine diverse, dimmelo.`, line: null });
     if (creative) extraction.notes = [...extraction.notes.map((n) => (n.kind === 'tema' ? { ...n, hint: 'Richiesta grafica: è nella scheda creativa Premium, scegli la direzione in Revisione.' } : n)), ...briefNotes(creative.brief)];
+    // Bozza rifatta: le foto già confermate da Riccardo tornano al loro posto (ritrovato per nome).
+    let lostMedia = [];
+    try {
+      const confirmed = await rows(db, "SELECT * FROM media_items WHERE request_id=? AND status='confermata'", requestId);
+      if (confirmed.length) { const again = reapplyConfirmed(extraction.menu, confirmed); if (!validateMenu(again.menu).errors.length) { extraction.menu = again.menu; lostMedia = again.lost; } else lostMedia = confirmed; }
+    } catch { lostMedia = []; }
+    if (lostMedia.length) await db.prepare(`UPDATE media_items SET status='proposta',target=NULL,target_name=NULL WHERE id IN (${lostMedia.map(() => '?').join(',')})`).bind(...lostMedia.map((m) => m.id)).run();
     const id = uid(), timestamp = now(), menuJson = JSON.stringify(extraction.menu);
     await auditedBatch(db, [
       (creative
@@ -1054,8 +1087,35 @@ export async function action(db, type, input, env = {}) {
     assert(object?.arrayBuffer, 'File originale privato non disponibile.', 404);
     const bytes = new Uint8Array(await object.arrayBuffer());
     const hash = [...new Uint8Array(await crypto.subtle.digest('SHA-256', bytes))].map((byte) => byte.toString(16).padStart(2, '0')).join('');
+    // Premium su misura: prima Jarvis guarda che cosa mostra la foto (una lettura sola). Logo,
+    // bottiglie, piatti e locale non sono pagine di menu: vanno tra le «Foto per il menu», da
+    // confermare in Revisione, e non consumano la lettura doppia. Nel dubbio si legge come menu.
+    if (material.mime !== 'application/pdf' && p.asMenu !== true) {
+      const owner = await getOne(db, 'SELECT r.plan,r.category,c.plan AS client_plan FROM requests r LEFT JOIN clients c ON c.id=r.client_id WHERE r.id=?', request.id);
+      const premium = owner && (owner.plan === 'premium' || owner.category === 'nuovo_premium' || owner.client_plan === 'premium');
+      if (premium) {
+        const seen = await classifyPhoto(env.AI, bytes, material.mime);
+        if (seen.ok && !isMenuPhotoKind(seen.kind)) {
+          const stamp = now();
+          const NAMES = { logo: 'logo del locale', bottiglia: 'bottiglia', piatto: 'piatto', locale: 'foto del locale' };
+          const note = `Foto per il menu: ${NAMES[seen.kind]}${seen.description ? ` («${seen.description}»)` : ''}${seen.kind === 'bottiglia' && Object.keys(seen.label).length ? ` — etichetta: ${Object.values(seen.label).join(', ')}` : ''}`.slice(0, 400);
+          let stored = true;
+          try {
+            await auditedBatch(db, [
+              db.prepare(`INSERT INTO media_items (id,request_id,material_id,kind,description,label_json,status,created_at,updated_at) VALUES (?,?,?,?,?,?,'proposta',?,?)
+                ON CONFLICT(material_id) DO UPDATE SET kind=excluded.kind, description=excluded.description, label_json=excluded.label_json, status='proposta', target=NULL, target_name=NULL, updated_at=excluded.updated_at`)
+                .bind(uid(), request.id, materialId, seen.kind, seen.description, JSON.stringify(seen.label), stamp, stamp),
+              db.prepare("UPDATE materials SET processing_status='foto_per_il_menu',text_preview=? WHERE id=?").bind(note, materialId)
+            ], 'material.media.jarvis', `Jarvis ha riconosciuto «${material.filename}»: ${note}. Da confermare in Revisione.`.slice(0, 600), request.id);
+          } catch { stored = false; } // tabella non ancora creata: si legge come prima
+          if (stored) { result = { ok: true, media: true, kind: seen.kind, description: seen.description, label: seen.label, warnings: [note] }; return { state: await state(db, env), result }; }
+        }
+      }
+    }
     const read = material.mime === 'application/pdf' ? await readMenuPdf(env.AI, bytes, material.filename) : await readMenuPhoto(env.AI, bytes, material.mime);
     const stamp = now();
+    // Letta come pagina di menu (anche su richiesta di Riccardo): non è più una «foto per il menu».
+    if (read.ok && material.mime !== 'application/pdf') { try { await db.prepare("UPDATE media_items SET status='scartata',updated_at=? WHERE material_id=? AND status<>'confermata'").bind(stamp, materialId).run(); } catch { /* tabella assente */ } }
     if (!read.ok) {
       await auditedBatch(db, [db.prepare("UPDATE materials SET processing_status='non_leggibile' WHERE id=?").bind(materialId)],
         'material.read.failed', `Jarvis non è riuscito a leggere «${material.filename}»: ${read.reason}.`.slice(0, 600), request.id);
@@ -1073,6 +1133,59 @@ export async function action(db, type, input, env = {}) {
       ], 'material.read.jarvis', `Jarvis ha letto «${material.filename}»: ${read.warnings[0]}`.slice(0, 600), request.id);
       result = { ok: true, agreed: read.agreed ?? null, doubts: read.doubts ?? 0, method: read.method, warnings: read.warnings };
     }
+  } else if (type === 'mediaPlace' || type === 'mediaRemove') {
+    // Foto per il menu: Riccardo conferma il posto proposto da Jarvis (o ne sceglie un altro), la
+    // toglie o la scarta. Solo lui: Jarvis propone e basta. La foto ridotta è già stata caricata
+    // dal telefono (POST media/<id>); qui si scrive nella bozza, con revisione e audit.
+    assert(db.actor !== 'jarvis', 'Solo Riccardo conferma le foto del menu.', 403);
+    const media = await getOne(db, 'SELECT * FROM media_items WHERE id=?', identifier(p.mediaId));
+    assert(media, 'Foto non trovata.', 404);
+    const draft = await getOne(db, 'SELECT * FROM drafts WHERE request_id=?', media.request_id);
+    const revision = Number(p.revision);
+    let menu = draft ? JSON.parse(draft.menu_json) : null;
+    if (draft) {
+      assert(Number.isInteger(revision) && revision === draft.revision, 'Bozza modificata da un’altra sessione. Ricarica.', 409);
+      assert(['bozza', 'revisione', 'pronta_pr'].includes(draft.status), 'Bozza già in pubblicazione: le foto non si cambiano più.', 409);
+    }
+    const material = await getOne(db, 'SELECT filename FROM materials WHERE id=?', media.material_id);
+    const label = parseLabel(media.label_json);
+    if (media.status === 'confermata' && menu && media.public_url) menu = removeMedia(menu, { target: resolveTarget(menu, media.target, media.target_name) || media.target, url: media.public_url });
+    let target = null, summary, status;
+    if (type === 'mediaPlace') {
+      assert(draft, 'Prima genera la bozza: la foto va messa nel menu.', 409);
+      assert(media.public_url && media.public_sha, 'La foto ridotta non è ancora caricata: riprova.', 409);
+      target = resolveTarget(menu, String(p.target || ''), null);
+      assert(target, 'Scegli dove mettere la foto.', 422);
+      if (target === 'galleria') assert((menu.premium?.galleria || []).length < 8, 'La «Storia» ha già 8 foto: togline una prima.', 422);
+      // Una foto per voce: quella già confermata lì torna «da sistemare».
+      const others = await rows(db, "SELECT * FROM media_items WHERE request_id=? AND status='confermata' AND id<>?", media.request_id, media.id);
+      const displaced = target === 'galleria' ? [] : others.filter((o) => resolveTarget(menu, o.target, o.target_name) === target);
+      for (const o of displaced) menu = removeMedia(menu, { target, url: o.public_url });
+      const withLabel = p.withLabel === true && media.kind === 'bottiglia' && target.startsWith('voce:');
+      menu = applyMedia(menu, { target, url: media.public_url, label, withLabel, alt: media.description });
+      status = 'confermata';
+      summary = `Foto «${material?.filename || 'foto'}» → ${targetLabel(menu, target)}${withLabel ? ' (con i dati dell’etichetta nella scheda)' : ''}.`;
+      media._displaced = displaced; media._withLabel = withLabel;
+    } else {
+      status = p.discard === true ? 'scartata' : 'proposta';
+      summary = `Foto «${material?.filename || 'foto'}» ${status === 'scartata' ? 'scartata' : 'tolta dal menu (torna da sistemare)'}.`;
+    }
+    const timestamp = now();
+    const writes = [];
+    if (draft && JSON.stringify(menu) !== draft.menu_json) {
+      const validation = validateMenu(menu);
+      assert(!validation.errors.length, `Menù non valido con questa foto: ${validation.errors.slice(0, 3).join(' ')}`);
+      const menuJson = JSON.stringify(menu);
+      writes.push(db.prepare('UPDATE drafts SET menu_json=?,provenance_json=?,revision=revision+1,updated_at=? WHERE id=? AND revision=?')
+        .bind(menuJson, JSON.stringify(keepProvenance(parseList(draft.provenance_json), menu)), timestamp, draft.id, revision),
+      db.prepare('INSERT INTO draft_versions (id,draft_id,revision,menu_json,actor,created_at) SELECT ?,id,?,?,?,? FROM drafts WHERE id=? AND revision=?')
+        .bind(uid(), revision + 1, menuJson, 'owner_foto', timestamp, draft.id, revision + 1));
+    }
+    writes.push(db.prepare('UPDATE media_items SET status=?,target=?,target_name=?,with_label=?,updated_at=? WHERE id=?')
+      .bind(status, target, target && target.startsWith('voce:') ? (targetLabel(menu, target).split(' › ').pop() || null) : null, media._withLabel ? 1 : 0, timestamp, media.id));
+    for (const o of media._displaced || []) writes.push(db.prepare("UPDATE media_items SET status='proposta',target=NULL,target_name=NULL,updated_at=? WHERE id=?").bind(timestamp, o.id));
+    await auditedBatch(db, writes, type === 'mediaPlace' ? 'media.place' : 'media.remove', summary, media.request_id);
+    result = { id: media.id, status, target };
   } else if (type === 'addVenueNote') {
     const clientId = identifier(p.clientId);
     const client = await getOne(db, 'SELECT name FROM clients WHERE id=?', clientId);
@@ -1195,7 +1308,7 @@ async function uploadMaterial(context) {
   const linkedDraft = await getOne(context.env.DB, 'SELECT status FROM drafts WHERE request_id=?', requestId);
   assert(!linkedDraft || !['pr_simulata', 'pubblicazione_simulata'].includes(linkedDraft.status), 'PR già preparata: apri una nuova pratica.', 409);
   const count = await getOne(context.env.DB, 'SELECT COUNT(*) AS n FROM materials WHERE request_id=?', requestId);
-  assert(count.n < 12, 'Massimo 12 materiali per pratica.');
+  assert(count.n < 20, 'Massimo 20 materiali per pratica.');
   const file = form.get('file');
   assert(file instanceof File && file.size > 0 && file.size <= 10_000_000 && allowedTypes.has(file.type), 'Formato o dimensione del file non supportati.');
   const name = clean(file.name, 180, 'Nome file');
@@ -1233,6 +1346,28 @@ async function downloadMaterial(context, id) {
   } });
 }
 
+// Copia ridotta (fatta dal telefono di Riccardo, ~1600 px) di una foto per il menu. Resta privata
+// finché Riccardo non la conferma in un posto: /media/<sha> serve solo le foto confermate.
+async function uploadMediaImage(context, id) {
+  const { env, request } = context, db = env.DB;
+  assert(env.BUCKET?.put, 'Archivio privato non configurato.', 503);
+  const media = await getOne(db, 'SELECT m.*, r.status AS request_status FROM media_items m JOIN requests r ON r.id=m.request_id WHERE m.id=?', identifier(id));
+  assert(media, 'Foto non trovata.', 404);
+  assert(!['completata', 'archiviata', 'chiusa'].includes(media.request_status), 'Pratica chiusa.', 409);
+  const mime = String(request.headers.get('content-type') || '').split(';')[0].trim();
+  assert(PUBLIC_EXT[mime], 'Serve una foto JPG, PNG o WebP.', 415);
+  assert(Number(request.headers.get('content-length') || 0) <= 900_000, 'Foto ridotta ancora troppo grande (oltre 900 KB).', 413);
+  const bytes = new Uint8Array(await request.arrayBuffer());
+  assert(publicImageOk(bytes, mime), 'File non valido o troppo grande (massimo 900 KB).', 422);
+  const sha = [...new Uint8Array(await crypto.subtle.digest('SHA-256', bytes))].map((b) => b.toString(16).padStart(2, '0')).join('');
+  const key = `public/media/${sha}.${PUBLIC_EXT[mime]}`;
+  await env.BUCKET.put(key, bytes, { httpMetadata: { contentType: mime } });
+  const url = `${new URL(request.url).origin}/media/${sha}.${PUBLIC_EXT[mime]}`;
+  await auditedBatch(db, [db.prepare('UPDATE media_items SET public_key=?,public_sha=?,public_url=?,updated_at=? WHERE id=?').bind(key, sha, url, now(), media.id)],
+    'media.upload', `Copia ridotta pronta (${Math.round(bytes.length / 1024)} KB), ancora privata finché non la confermi.`, media.request_id);
+  return { id: media.id, publicUrl: url, size: bytes.length };
+}
+
 export async function onRequest(context) {
   try {
     if (!await verifyOwner(context.request, context.env)) return failure(403, 'Area riservata. Accesso negato.');
@@ -1245,6 +1380,7 @@ export async function onRequest(context) {
     if (method === 'POST') {
       assert(isSameOriginWrite(request), 'Origine non autorizzata.', 403);
       if (segments.join('/') === 'material') return uploadMaterial(context);
+      if (segments[0] === 'media' && segments.length === 2) return answer({ result: await uploadMediaImage(context, segments[1]) });
       if (segments.join('/') === 'actions') {
         assert(request.headers.get('content-type')?.startsWith('application/json'), 'Serve application/json.', 415);
         assert(Number(request.headers.get('content-length') || 0) <= 300_000, 'Payload troppo grande.');

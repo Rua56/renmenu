@@ -6,9 +6,11 @@ const LEGACY_TAGS = new Set(['hot', 'riserva']);
 const PRICE_PATTERN = /^\d+(?:[,.]\d{1,2})?$/;
 const PUBLIC_ROOT = new Set(['id', 'nome', 'sottotitolo', 'indirizzo', 'telefono', 'instagram', 'facebook', 'maps', 'orari', 'wifi', 'avviso', 'coperto', 'note', 'tema', 'premium', 'sezioni', 'lingue', 'url', 'sito', 'website']);
 const PUBLIC_SECTION = new Set(['nome', 'descrizione', 'voci', 'tipo', 'prezzo', 'unita']);
-const PUBLIC_ITEM = new Set(['nome', 'descrizione', 'prezzo', 'prezzi', 'allergeni', 'tag']);
+const PUBLIC_ITEM = new Set(['nome', 'descrizione', 'prezzo', 'prezzi', 'allergeni', 'tag', 'foto', 'scheda']);
+const SCHEDA_TEXT = new Set(['cantina', 'territorio', 'vitigno', 'annata', 'gradazione', 'temperatura', 'affinamento', 'colore', 'profumo', 'gusto', 'abbinamenti', 'nota']);
+const SCHEDA_PROFILE = new Set(['aromi', 'struttura', 'acidita', 'dolcezza', 'corpo']);
 // Blocco «premium» (menu su misura): stesse regole di _lib/premium.js e scripts/validate-menus.py.
-const PREMIUM_KEYS = new Set(['direzione', 'caratteri', 'colori', 'logo', 'copertina', 'motto', 'storia']);
+const PREMIUM_KEYS = new Set(['direzione', 'caratteri', 'colori', 'logo', 'copertina', 'motto', 'storia', 'firma', 'galleria']);
 const PREMIUM_IMAGE = /^(?:\.\.\/|\/)?[a-z0-9_./-]+\.(?:webp|png|jpe?g|svg|avif)$/i;
 
 const isObject = (value) => value !== null && typeof value === 'object' && !Array.isArray(value);
@@ -82,6 +84,11 @@ export function validateMenu(menu) {
       }
       for (const key of ['logo', 'copertina']) if (key in pm && !(typeof pm[key] === 'string' && (pm[key].startsWith('https://') || PREMIUM_IMAGE.test(pm[key])))) add('error', `menu.premium.${key}`, 'Serve un indirizzo https o un file immagine del sito.');
       for (const key of ['motto', 'storia']) if (key in pm) publicText(pm[key], `menu.premium.${key}`);
+      if ('firma' in pm && !(typeof pm.firma === 'string' && pm.firma.trim() && pm.firma.trim().length <= 80)) add('error', 'menu.premium.firma', 'Testo breve (massimo 80 caratteri).');
+      if ('galleria' in pm) {
+        if (!Array.isArray(pm.galleria) || pm.galleria.length > 8) add('error', 'menu.premium.galleria', 'Elenco di massimo 8 foto.');
+        else pm.galleria.forEach((g, n) => { const src = isObject(g) ? g.src : g; if (!(typeof src === 'string' && (src.startsWith('https://') || PREMIUM_IMAGE.test(src)))) add('error', `menu.premium.galleria.${n}`, 'Serve un indirizzo https o un file immagine del sito.'); });
+      }
     }
   }
   for (const key of ['indirizzo', 'telefono', 'instagram', 'maps', 'wifi', 'coperto', 'url', 'sito', 'website'])
@@ -136,6 +143,15 @@ export function validateMenu(menu) {
       const itemPath = `${sectionPath}.voci.${itemIndex}`;
       if (!isObject(item)) { add('error', itemPath, 'La voce deve essere un oggetto JSON.'); return; }
       allowed(item, PUBLIC_ITEM, itemPath);
+      if ('foto' in item && !(typeof item.foto === 'string' && (item.foto.startsWith('https://') || PREMIUM_IMAGE.test(item.foto)))) add('error', `${itemPath}.foto`, 'Serve un indirizzo https o un file immagine del sito.');
+      if ('scheda' in item) {
+        if (!isObject(item.scheda)) add('error', `${itemPath}.scheda`, 'La scheda deve essere un oggetto.');
+        else for (const [key, val] of Object.entries(item.scheda)) {
+          if (key === 'profilo') { if (!isObject(val) || Object.entries(val).some(([pk, pv]) => !SCHEDA_PROFILE.has(pk) || !Number.isInteger(pv) || pv < 0 || pv > 100)) add('error', `${itemPath}.scheda.profilo`, 'Valori interi da 0 a 100 (aromi, struttura, acidita, dolcezza, corpo).'); }
+          else if (!SCHEDA_TEXT.has(key)) add('error', `${itemPath}.scheda.${key}`, 'Campo della scheda non previsto.');
+          else if (!nonEmptyText(val)) add('error', `${itemPath}.scheda.${key}`, 'Testo vuoto.');
+        }
+      }
       for (const key of ['nome', 'descrizione']) if (key in item) publicText(item[key], `${itemPath}.${key}`);
       if (!nonEmptyText(item.nome)) add('error', `${itemPath}.nome`, 'Manca un nome della voce.');
       else essential.push([`${itemPath}.nome`, item.nome]);

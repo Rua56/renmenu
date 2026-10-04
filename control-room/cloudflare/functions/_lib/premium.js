@@ -15,7 +15,7 @@ export const DIREZIONI = {
 };
 export const CARATTERI = ['classico', 'moderno', 'artigianale'];
 const PALETTE_KEYS = ['fondo', 'testo', 'accento', 'secondario'];
-const PREMIUM_KEYS = new Set(['direzione', 'caratteri', 'colori', 'logo', 'copertina', 'motto', 'storia']);
+const PREMIUM_KEYS = new Set(['direzione', 'caratteri', 'colori', 'logo', 'copertina', 'motto', 'storia', 'firma', 'galleria']);
 const HEX = /^#[0-9a-f]{6}$/i;
 const IMAGE = /^(?:\.\.\/|\/)?[a-z0-9_./-]+\.(?:webp|png|jpe?g|svg|avif)$/i;
 // Lingue con testi d'interfaccia nel template Premium.
@@ -161,6 +161,15 @@ export function premiumErrors(value) {
     const v = value[key];
     const ok = typeof v === 'string' || (v && typeof v === 'object' && !Array.isArray(v) && Object.entries(v).every(([k, s]) => /^[a-z]{2}$/.test(k) && typeof s === 'string'));
     if (!ok) errors.push(`menu.premium.${key}: serve testo o traduzioni per lingua.`);
+  }
+  if ('firma' in value && !(typeof value.firma === 'string' && value.firma.trim() && value.firma.trim().length <= 80)) errors.push('menu.premium.firma: testo breve (massimo 80 caratteri).');
+  if ('galleria' in value) {
+    const gallery = value.galleria;
+    if (!Array.isArray(gallery) || gallery.length > 8) errors.push('menu.premium.galleria: elenco di massimo 8 foto.');
+    else gallery.forEach((photo, n) => {
+      const src = photo && typeof photo === 'object' ? photo.src : photo;
+      if (!(typeof src === 'string' && (src.startsWith('https://') || IMAGE.test(src)))) errors.push(`menu.premium.galleria, foto ${n + 1}: serve un indirizzo https o un file immagine del sito.`);
+    });
   }
   return errors;
 }

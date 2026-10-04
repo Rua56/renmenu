@@ -586,7 +586,7 @@ export function createMissions(deps) {
     if (!request) return { text: 'Pratica non trovata o chiusa.' };
     if (!env.BUCKET?.put) return { text: 'Archivio privato non configurato.' };
     const count = (await getOne(db, 'SELECT COUNT(*) AS n FROM materials WHERE request_id=?', request.id))?.n || 0;
-    if (count >= 12) return { text: 'Questa pratica ha già 12 file: archiviane qualcuno nella Control Room.' };
+    if (count >= 20) return { text: 'Questa pratica ha già 20 file: archiviane qualcuno nella Control Room.' };
     const file = await downloadTelegramFile(env, pending.fileId, deps.fetchImpl);
     if (!file?.bytes?.length) return { text: 'Non riesco a scaricare il file da Telegram: riprova.' };
     const id = uid(), key = `private/requests/${request.id}/${id}`;

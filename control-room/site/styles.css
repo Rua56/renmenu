@@ -1027,3 +1027,16 @@ h1, h2, .view-header h1 { font-family: var(--serif); font-weight: 600; letter-sp
 .pm-dir__sw { display: flex; gap: 6px; }
 .pm-dir__sw span { width: 24px; height: 24px; border-radius: 7px; box-shadow: inset 0 0 0 1px rgba(127,127,127,.35); }
 .pm-dir__actions { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 4px; }
+
+/* Foto per il menu (Premium, Fase 2) */
+.media-grid { display: grid; gap: 12px; grid-template-columns: repeat(auto-fill, minmax(300px, 1fr)); margin-top: 12px; }
+.media-card { border: 1px solid var(--line); border-radius: 14px; overflow: hidden; display: grid; grid-template-columns: 104px minmax(0, 1fr); align-items: start; background: var(--panel, transparent); }
+.media-thumb { width: 104px; height: 104px; object-fit: cover; display: block; background: rgba(127, 127, 127, .12); }
+.media-thumb.is-contain { object-fit: contain; padding: 6px; }
+.media-actions { grid-column: 1 / -1; padding: 0 12px 12px; display: grid; gap: 8px; }
+.media-actions .button-row { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+.media-actions .button-row .button:first-child { grid-column: 1 / -1; }
+.media-actions select { width: 100%; }
+.media-body { padding: 10px 12px 12px; display: grid; gap: 6px; align-content: start; min-width: 0; }
+.media-body p { margin: 0; overflow-wrap: anywhere; }
+.media-body select { width: 100%; }
