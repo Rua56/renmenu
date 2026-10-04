@@ -69,6 +69,9 @@ export function parseClassification(raw) {
       const value = cut(data.etichetta[key], 80);
       if (value && !/^(?:n\/?a|non\s+(?:leggibile|visibile|indicat\w*)|sconosciut\w*|\?+|-+)$/i.test(value)) label[key] = value;
     }
+    // Etichette scritte in maiuscolo («COLLIO»): nella scheda vanno in forma normale («Collio»).
+    for (const key of Object.keys(label)) if (/[A-ZÀ-Ý]{3}/.test(label[key]) && label[key] === label[key].toUpperCase())
+      label[key] = label[key].toLowerCase().replace(/(^|[\s'’(-])(\p{L})/gu, (m, sep, ch) => sep + ch.toUpperCase()).replace(/\b(Di|Del|Della|Dei|Delle|Dal|Da|E|D'|Doc|Docg|Igt)\b/g, (w) => (/^(Doc|Docg|Igt)$/.test(w) ? w.toUpperCase() : w.toLowerCase()));
     if (label.annata && !/^(?:19|20)\d{2}$/.test(label.annata)) delete label.annata;
     if (label.gradazione && !/\d/.test(label.gradazione)) delete label.gradazione;
   }

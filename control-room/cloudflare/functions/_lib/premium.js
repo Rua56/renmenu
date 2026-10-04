@@ -205,3 +205,15 @@ export function briefNotes(brief) {
   if (brief.preventivo) notes.push({ kind: 'premium', text: brief.preventivo.fonte, hint: 'Preventivo: acconto 490 € + 39 €/mese; il totale lo decidi tu, Jarvis non lo scrive.' });
   return notes;
 }
+
+/** La storia del locale come l'ha scritta il cliente («La nostra storia: …» fino alla riga vuota).
+ *  Testo del cliente, parola per parola (solo gli a capo dell'email diventano spazi): niente invenzioni. */
+export function storyFromSource(text) {
+  const lines = String(text || '').replace(/\r\n?/g, '\n').split('\n');
+  const start = lines.findIndex((line) => /^\s*(?:la\s+nostra\s+storia|la\s+storia(?:\s+del\s+locale)?|chi\s+siamo)\s*[:\-–—]/i.test(line));
+  if (start < 0) return '';
+  const parts = [lines[start].replace(/^\s*[^:\-–—]+[:\-–—]\s*/, '')];
+  for (let i = start + 1; i < lines.length && lines[i].trim(); i += 1) parts.push(lines[i].trim());
+  const story = parts.join(' ').replace(/\s+/g, ' ').trim();
+  return story.length >= 20 ? (story[0].toUpperCase() + story.slice(1)).slice(0, 900) : '';
+}
