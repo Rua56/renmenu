@@ -22,6 +22,27 @@ export const DATABASE_ID = 'be94eb32-dad9-48c5-92b3-c3bf58565c8d'; // renmenu_ja
 const PLACEHOLDER_CLIENT = 'Nuovo contatto email';
 const controlChars = /[\u0000-\u001f\u007f]/g;
 
+// Email inoltrate da Riccardo (es. la richiesta di un locale arrivata su un altro indirizzo):
+// via il prefisso «I:/Fwd:» dall'oggetto e l'intestazione dell'inoltro (Da/Data/Oggetto/A) dal
+// corpo, così Jarvis legge solo il messaggio del locale. Le righe scritte sopra da Riccardo restano.
+const FORWARD_MARK = /^\s*(?:-{2,}\s*(?:forwarded message|messaggio inoltrato|original message|messaggio originale)\s*-{2,}|inizio messaggio inoltrato:?|begin forwarded message:?)\s*$/i;
+const FORWARD_HEADER = /^\s*(?:da|from|data|date|inviato|sent|oggetto|subject|a|to|cc|ccn|bcc|rispondi a|reply-to)\s*:/i;
+export function unforwardSubject(subject) {
+  return String(subject || '').replace(/^\s*(?:(?:fwd?|i|inoltro|tr|wg|r|re|ris)\s*:\s*)+/i, '').trim();
+}
+export function unforwardText(text) {
+  const lines = String(text || '').replace(/\r\n?/g, '\n').split('\n');
+  const out = [];
+  for (let i = 0; i < lines.length; i += 1) {
+    if (!FORWARD_MARK.test(lines[i])) { out.push(lines[i]); continue; }
+    let j = i + 1;
+    while (j < lines.length && !lines[j].trim()) j += 1;
+    while (j < lines.length && (FORWARD_HEADER.test(lines[j]) || (!lines[j].trim() && j + 1 < lines.length && FORWARD_HEADER.test(lines[j + 1])))) j += 1;
+    i = j - 1;
+  }
+  return out.join('\n').replace(/\n{3,}/g, '\n\n').trim();
+}
+
 export function validateEvent(e) {
   if (!e || typeof e !== 'object') return 'INVALID_INPUT';
   if (String(e.to || '').toLowerCase() !== BUSINESS_INBOX) return 'NOT_BUSINESS_INBOX';
@@ -40,8 +61,8 @@ export function buildImportBatch(e, stamp = new Date().toISOString()) {
   if (error) return { error };
   const from = e.from.toLowerCase();
   const receivedAt = new Date(e.receivedAt).toISOString();
-  const subject = String(e.subject || '').replace(controlChars, ' ').slice(0, 180) || 'Richiesta email da verificare';
-  const raw = e.relevant ? String(e.text || '') : ''; // irrilevanti: il corpo non lascia la sandbox
+  const subject = unforwardSubject(String(e.subject || '').replace(controlChars, ' ')).slice(0, 180) || 'Richiesta email da verificare';
+  const raw = e.relevant ? unforwardText(e.text) : ''; // irrilevanti: il corpo non lascia la sandbox
   const rawBytes = Buffer.from(raw, 'utf8');
   const clipped = rawBytes.subarray(0, 7000).toString('utf8').replace(/\uFFFD$/, '');
   const names = e.attachmentNames.filter((n) => typeof n === 'string' && n.length <= 255).map((n) => n.replace(controlChars, ' '));
@@ -151,9 +172,10 @@ export async function jarvisNote(event, plan, row) {
     }
     if (row?.status !== 'imported' || !event.relevant) return {};
     const { autopilotMessage, autopilotPreview } = await lib('autopilot.js');
-    const source = `Oggetto ricevuto: ${event.subject}\n\n${event.text}`;
-    const preview = autopilotPreview({ subject: event.subject, source_text: source });
-    const message = autopilotMessage(event.subject, preview);
+    const subject = unforwardSubject(event.subject), text = unforwardText(event.text);
+    const source = `Oggetto ricevuto: ${subject}\n\n${text}`;
+    const preview = autopilotPreview({ subject, source_text: source });
+    const message = autopilotMessage(subject, preview);
     return { jarvis: preview.action === 'bozza' ? message.replace('bozza pronta per', 'all’apertura della Control Room preparo la bozza per').replace(' Apri Revisione per controllarla.', '') : message };
   } catch { return {}; }
 }

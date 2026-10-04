@@ -82,3 +82,16 @@ describe('Import automatico Gmail → D1 staging', () => {
     assert.equal(buildReplyBatch({ ...reply, messageId: 'reply3' }, db.prepare(APPROVAL_SQL).get('RM-ABC234')).error, 'REPLY_NOT_EXPECTED');
   });
 });
+
+import { unforwardSubject, unforwardText } from '../staging/gmail-import.mjs';
+describe('Email inoltrate da Riccardo', () => {
+  it('toglie prefisso e intestazione dell’inoltro (Gmail, Mail di iPhone), tiene il messaggio e le note sopra', () => {
+    assert.equal(unforwardSubject('I: Fwd: Nuovo menu Premium · Enoteca'), 'Nuovo menu Premium · Enoteca');
+    assert.equal(unforwardSubject('Nuovo menu'), 'Nuovo menu');
+    const iphone = 'Guarda questa\n\nInizio messaggio inoltrato:\n\nDa: Jarvis <renmenu1569@gmail.com>\nData: 4 ottobre 2026 alle ore 19:55:12 CEST\nA: iuran56@gmail.com\nOggetto: Nuovo menu\n\nBuongiorno,\nFrico croccante — 12';
+    assert.equal(unforwardText(iphone), 'Guarda questa\n\nBuongiorno,\nFrico croccante — 12');
+    const gmail = '---------- Forwarded message ---------\nFrom: Marta <m@x.it>\nDate: Sun, Oct 4, 2026 at 7:55 PM\nSubject: Menu\nTo: <a@b.it>\n\n\nANTIPASTI\nFrico — 12';
+    assert.equal(unforwardText(gmail), 'ANTIPASTI\nFrico — 12');
+    assert.equal(unforwardText('Vini\nA: calice 5'), 'Vini\nA: calice 5', 'senza inoltro non si tocca nulla');
+  });
+});
