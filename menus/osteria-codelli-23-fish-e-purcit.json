@@ -1,0 +1,323 @@
+{
+  "id": "osteria-codelli-23-fish-e-purcit",
+  "nome": "Osteria Codelli 23 Fish e Purcit",
+  "lingue": [
+    "it",
+    "en"
+  ],
+  "sezioni": [
+    {
+      "nome": {
+        "it": "Antipasti di Carne",
+        "en": "Meat starters"
+      },
+      "voci": [
+        {
+          "nome": {
+            "it": "Kipfel",
+            "en": "Kipfel"
+          },
+          "prezzo": "7,00"
+        },
+        {
+          "nome": {
+            "it": "Vitello tonnato con la sua salsa",
+            "en": "Vitello tonnato with its sauce"
+          },
+          "prezzo": "13,50"
+        },
+        {
+          "nome": {
+            "it": "Lonza marinata alla barbabietola con scaglie di formaggio",
+            "en": "Beetroot-marinated loin with cheese shavings"
+          },
+          "prezzo": "14,50"
+        }
+      ]
+    },
+    {
+      "nome": {
+        "it": "Antipasti di Pesce",
+        "en": "Fish starters"
+      },
+      "voci": [
+        {
+          "nome": {
+            "it": "Antipasto misto di pesce",
+            "en": "Mixed fish starter"
+          },
+          "prezzo": "20,00"
+        },
+        {
+          "nome": {
+            "it": "Polpo arrosto con cavolo cappuccio e stracciatella",
+            "en": "Roast octopus with cabbage and stracciatella"
+          },
+          "prezzo": "17,50"
+        }
+      ]
+    },
+    {
+      "nome": {
+        "it": "Primi di Carne",
+        "en": "Meat first courses"
+      },
+      "voci": [
+        {
+          "nome": {
+            "it": "Zlikrofi con prosciutto crudo e pepe nero",
+            "en": "Zlikrofi with raw ham and black pepper"
+          },
+          "prezzo": "12,00"
+        },
+        {
+          "nome": {
+            "it": "Ravioli di parmigiana su crema di pomodoro",
+            "en": "Parmigiana ravioli on tomato cream"
+          },
+          "prezzo": "11,00"
+        },
+        {
+          "nome": {
+            "it": "Maccheroncini con sugo di faraona",
+            "en": "Maccheroncini with guinea fowl sauce"
+          },
+          "prezzo": "12,50"
+        }
+      ]
+    },
+    {
+      "nome": {
+        "it": "Primi di Pesce",
+        "en": "Fish first courses"
+      },
+      "voci": [
+        {
+          "nome": {
+            "it": "Spaghetti con lupini",
+            "en": "Spaghetti with lupins"
+          },
+          "prezzo": "14,50"
+        },
+        {
+          "nome": {
+            "it": "Tagliolini con ragù di pesce",
+            "en": "Tagliolini with fish ragù"
+          },
+          "prezzo": "12,00"
+        },
+        {
+          "nome": {
+            "it": "Canederli con alici, pesto di rucola e nocciola",
+            "en": "Canederli with anchovies, rocket pesto and hazelnut"
+          },
+          "prezzo": "12,50"
+        },
+        {
+          "nome": {
+            "it": "Ravioli di gambero con la sua salsa",
+            "en": "Prawn ravioli with its sauce"
+          },
+          "prezzo": "14,00"
+        }
+      ]
+    },
+    {
+      "nome": {
+        "it": "Secondi di Carne",
+        "en": "Meat main courses"
+      },
+      "voci": [
+        {
+          "nome": {
+            "it": "Cuberoll ai ferri con contorno di patate al forno",
+            "en": "Grilled cuberoll with roasted potato side"
+          },
+          "prezzo": "21,00"
+        },
+        {
+          "nome": {
+            "it": "Sovracoscia di pollo cotta a bassa temperatura con verdure spadellate",
+            "en": "Low-temperature cooked chicken thigh with sautéed vegetables"
+          },
+          "prezzo": "15,50"
+        }
+      ]
+    },
+    {
+      "nome": {
+        "it": "Secondi di Pesce",
+        "en": "Fish main courses"
+      },
+      "voci": [
+        {
+          "nome": {
+            "it": "Filetto di branzino con caponata",
+            "en": "Sea bass fillet with caponata"
+          },
+          "prezzo": "17,50"
+        },
+        {
+          "nome": {
+            "it": "Tagliata di tonno con cavolo capuccio",
+            "en": "Tuna steak with cabbage"
+          },
+          "prezzo": "21,00"
+        },
+        {
+          "nome": {
+            "it": "Fritto misto del giorno",
+            "en": "Mixed fry of the day"
+          },
+          "prezzo": "19,50"
+        }
+      ]
+    },
+    {
+      "nome": {
+        "it": "Contorni",
+        "en": "Sides"
+      },
+      "voci": [
+        {
+          "nome": {
+            "it": "Verdure in tecia",
+            "en": "Vegetables in tecia"
+          },
+          "prezzo": "4,00"
+        },
+        {
+          "nome": {
+            "it": "Insalata mista",
+            "en": "Mixed salad"
+          },
+          "prezzo": "4,00"
+        }
+      ]
+    },
+    {
+      "nome": {
+        "it": "Grappa",
+        "en": "Grappa"
+      },
+      "voci": [
+        {
+          "nome": {
+            "it": "Grappa bianca friulana",
+            "en": "Friulian white grappa"
+          },
+          "prezzo": "3,80"
+        },
+        {
+          "nome": {
+            "it": "Val di rose",
+            "en": "Val di rose"
+          },
+          "prezzo": "4,50"
+        },
+        {
+          "nome": {
+            "it": "Bonaventura prime uve",
+            "en": "Bonaventura prime uve"
+          },
+          "prezzo": "4,50"
+        }
+      ]
+    },
+    {
+      "nome": {
+        "it": "Digestivi",
+        "en": "Digestifs"
+      },
+      "voci": [
+        {
+          "nome": {
+            "it": "Pelinkovac",
+            "en": "Pelinkovac"
+          },
+          "prezzo": "4,00"
+        },
+        {
+          "nome": {
+            "it": "Montenegro",
+            "en": "Montenegro"
+          },
+          "prezzo": "4,00"
+        },
+        {
+          "nome": {
+            "it": "Amaro del capo",
+            "en": "Amaro del capo"
+          },
+          "prezzo": "4,00"
+        }
+      ]
+    },
+    {
+      "nome": {
+        "it": "Drink",
+        "en": "Drink"
+      },
+      "voci": [
+        {
+          "nome": {
+            "it": "Americano",
+            "en": "Americano"
+          },
+          "prezzo": "7,00"
+        },
+        {
+          "nome": {
+            "it": "Spritz aperol",
+            "en": "Spritz Aperol"
+          },
+          "prezzo": "4,00"
+        },
+        {
+          "nome": {
+            "it": "Spritz campari",
+            "en": "Spritz Campari"
+          },
+          "prezzo": "4,00"
+        }
+      ]
+    },
+    {
+      "nome": {
+        "it": "Coperto",
+        "en": "Cover charge"
+      },
+      "voci": [
+        {
+          "nome": {
+            "it": "Acqua",
+            "en": "Water"
+          },
+          "prezzo": "2,80"
+        },
+        {
+          "nome": {
+            "it": "Bibite",
+            "en": "Drinks"
+          },
+          "prezzo": "3,00"
+        },
+        {
+          "nome": {
+            "it": "Caffe'",
+            "en": "Coffee"
+          },
+          "prezzo": "1,50"
+        },
+        {
+          "nome": {
+            "it": "Caffe' macchiato",
+            "en": "Macchiato"
+          },
+          "prezzo": "1,80"
+        }
+      ]
+    }
+  ],
+  "tema": "trattoria"
+}
