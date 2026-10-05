@@ -175,10 +175,22 @@ async function discardUntouchedJarvisDraft(db, requestId) {
   return true;
 }
 export async function readPendingMaterials(db, env = {}, { calmMs = 40_000 } = {}) {
-  let pending = [];
   // Album da Telegram (più foto insieme): arrivano una alla volta in pochi secondi. Jarvis aspetta
   // 40 secondi di calma sulla pratica, così le legge tutte (una per giro) e fa UNA bozza con tutte.
   const calm = new Date(Date.now() - calmMs).toISOString();
+  // Un giro alla volta: l'orologio bussa ogni minuto, ma una lettura può durare 2-3 minuti. Senza questo
+  // blocco due giri leggevano la stessa foto in parallelo (doppio consumo e letture annullate).
+  try {
+    const stamp = new Date().toISOString(), stale = new Date(Date.now() - 6 * 60_000).toISOString();
+    await db.prepare("INSERT OR IGNORE INTO jarvis_settings (key,value,updated_at) VALUES ('read_lock','',?)").bind('1970-01-01T00:00:00.000Z').run();
+    const got = await db.prepare("UPDATE jarvis_settings SET value='busy',updated_at=? WHERE key='read_lock' AND (value<>'busy' OR updated_at<?)").bind(stamp, stale).run();
+    if (got?.meta && got.meta.changes === 0) return [];
+  } catch { /* tabella assente nei test vecchi: si procede */ }
+  try { return await readPendingInner(db, env, calm); }
+  finally { try { await db.prepare("UPDATE jarvis_settings SET value='',updated_at=? WHERE key='read_lock'").bind(new Date().toISOString()).run(); } catch { /* il blocco scade da solo dopo 6 minuti */ } }
+}
+async function readPendingInner(db, env, calm) {
+  let pending = [];
   try { pending = await rows(db, "SELECT id,request_id,filename FROM materials WHERE processing_status='da_trascrivere' AND archived_at IS NULL AND (mime='application/pdf' OR mime IN ('image/jpeg','image/png','image/webp')) AND created_at>'2026-10-02T22:30' AND NOT EXISTS (SELECT 1 FROM materials n WHERE n.request_id=materials.request_id AND n.archived_at IS NULL AND n.created_at>?) ORDER BY created_at ASC LIMIT 1", calm); }
   catch { return []; }
   const done = [];

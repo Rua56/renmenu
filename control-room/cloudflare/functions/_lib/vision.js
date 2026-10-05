@@ -209,7 +209,9 @@ export function combineReadings(first, second) {
 }
 
 /** Foto di un menu → testo fonte con le sole voci concordi tra due modelli. Non lancia mai. */
-export async function readMenuPhoto(ai, bytes, mime, { timeoutMs = 45_000 } = {}) {
+// Menu lunghi (70 voci): un modello può metterci più di un minuto. Se Jarvis smette di aspettare, la
+// richiesta viene annullata (su Cloudflare risulta errore 5026) e resta una lettura sola.
+export async function readMenuPhoto(ai, bytes, mime, { timeoutMs = 110_000 } = {}) {
   if (typeof ai?.run !== 'function') return { ok: false, reason: 'lettura delle foto non disponibile in questo ambiente' };
   if (!PHOTO_TYPES.has(mime)) return { ok: false, reason: `formato ${mime} non leggibile: manda la foto in JPG o PNG` };
   if (bytes.length > MAX_IMAGE_BYTES) return { ok: false, reason: 'foto troppo grande (oltre 4,5 MB): mandala da Telegram o in qualità ridotta' };
