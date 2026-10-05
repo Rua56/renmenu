@@ -66,3 +66,13 @@ describe('Lettura delle foto: due letture, entrano solo le voci concordi', () =>
     assert.equal((await readMenuPdf({ toMarkdown: async () => [{ data: '## Contents\n### Page 1\n' }] }, new Uint8Array(4))).ok, false);
   });
 });
+
+describe('Sezioni meno sicure della foto', () => {
+  it('conta per sezione le voci confermate dalle due letture', async () => {
+    const { combineReadings } = await import('../cloudflare/functions/_lib/vision.js');
+    const a = '# Primi\nSpaghetti — 7,00\nRisotto — 8,00\nGnocchi — 8,00\n# Dolci\nStrudel — 5,00\nTiramisù — 5,00\nSorbetto — 3,00';
+    const b = '# Primi\nSpaghetti — 3,00\nRisotto — 9,00\nGnocchi — 8,00\n# Dolci\nStrudel — 5,00\nTiramisù — 5,00\nSorbetto — 3,00';
+    const r = combineReadings(a, b);
+    assert.deepEqual(r.sections.map((s) => [s.name, s.ok, s.total]), [['Primi', 1, 3], ['Dolci', 3, 3]]);
+  });
+});

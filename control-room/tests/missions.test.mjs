@@ -235,6 +235,9 @@ describe('Jarvis autonomo: dalla bozza affidata alla pubblicazione', () => {
       assert.equal(telegramCalls.length, before, 'chat estranea ignorata');
       await missions.telegramUpdate(db, env, { message: { chat: { id: 42, type: 'private' }, text: '/stato' } });
       assert.match(telegramCalls.at(-1).body.text, /Nessuna pratica affidata/);
+      assert.match(telegramCalls.at(-1).body.text, /Foto lette oggi: 0/);
+      await missions.telegramUpdate(db, env, { message: { chat: { id: 42, type: 'private' }, text: 'Jarvis, stato?' } });
+      assert.match(telegramCalls.at(-1).body.text, /Nessun file in attesa di lettura/);
     } finally { db.close(); }
   });
 });

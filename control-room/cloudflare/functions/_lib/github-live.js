@@ -135,6 +135,34 @@ async function githubRequest(env, path, { method = 'GET', body, allowStatuses = 
   return { status: response.status, data: payload, headers: response.headers };
 }
 
+// Fase 2c: le foto dei menu Premium (servite dallo staging di Jarvis per l'anteprima) entrano nella stessa PR
+// del menu come file menus/media/<sha256>.<ext>, così il sito pubblico non dipende più da Jarvis.
+export const STAGE_MEDIA_URL = /^https:\/\/renmenu-jarvis-stage\.pages\.dev\/jarvis-hook\/media\/([a-f0-9]{64})\.(jpg|webp|png)$/;
+export function menuMediaFiles(menu) {
+  const found = new Map();
+  const walk = (value) => {
+    if (typeof value === 'string') { const m = STAGE_MEDIA_URL.exec(value.trim()); if (m) found.set(m[1], { sha: m[1], ext: m[2], path: `menus/media/${m[1]}.${m[2]}` }); }
+    else if (Array.isArray(value)) value.forEach(walk);
+    else if (value && typeof value === 'object') Object.values(value).forEach(walk);
+  };
+  walk(menu);
+  return [...found.values()];
+}
+
+async function writeMediaFiles(env, branch, media, options) {
+  for (const file of media || []) {
+    if (!/^menus\/media\/[a-f0-9]{64}\.(?:jpg|webp|png)$/.test(file?.path || '') || typeof file.base64 !== 'string' || !file.base64.length) fail('INVALID_MEDIA', 'Foto del menu non valida.', { status: 422 });
+    const endpoint = `/contents/${file.path}`;
+    const existing = await githubRequest(env, `${endpoint}?ref=${encodeURIComponent(branch)}`, { ...options, allowStatuses: [404] });
+    if (existing.status === 200) continue; // stesso nome = stesso contenuto (sha256): già presente
+    const put = await githubRequest(env, endpoint, { ...options, method: 'PUT', allowStatuses: [409, 422],
+      body: { message: `Foto del menu ${file.path.slice(13, 25)}`, content: file.base64, branch } });
+    if (put.status === 200 || put.status === 201) continue;
+    const again = await githubRequest(env, `${endpoint}?ref=${encodeURIComponent(branch)}`, { ...options, allowStatuses: [404] });
+    if (again.status !== 200) fail('MEDIA_WRITE_CONFLICT', `GitHub non ha salvato la foto ${file.path}.`, { status: put.status });
+  }
+}
+
 function contentPath(slug) {
   return `menus/${slug}.json`;
 }
@@ -423,6 +451,8 @@ export async function openApprovedMenuPr(env, approvedSnapshot, options = {}) {
     isNew: snapshot.isNew
   });
   const branch = branchFor(slug, operationKey);
+  // Le foto si controllano prima di toccare GitHub: un percorso sbagliato non deve lasciare branch a metà.
+  for (const f of snapshot.media || []) if (!/^menus\/media\/[a-f0-9]{64}\.(?:jpg|webp|png)$/.test(f?.path || '') || typeof f.base64 !== 'string' || !f.base64.length) fail('INVALID_MEDIA', 'Foto del menu non valida.', { status: 422 });
 
   // Idempotency is checked before optimistic-concurrency checks: a completed
   // PR is returned even if main has since moved.
@@ -432,6 +462,7 @@ export async function openApprovedMenuPr(env, approvedSnapshot, options = {}) {
     if (!existingMenu.exists || !sameMenu(existingMenu.menu, local.menu)) {
       fail('OPERATION_COLLISION', 'La chiave idempotente è già associata a un contenuto diverso.', { status: 409 });
     }
+    await writeMediaFiles(env, branch, snapshot.media, options);
     return { branch, filePath: local.filePath, changes: local.changes, reused: true, wrote: false, pr: prSummary(existingPr) };
   }
 
@@ -453,6 +484,7 @@ export async function openApprovedMenuPr(env, approvedSnapshot, options = {}) {
   if (prepared.mode === 'update') assertExpectedCurrent(snapshot, prepared);
 
   const branchResult = await recoverOrWriteBranch(env, prepared, branch, baseSha, options);
+  await writeMediaFiles(env, branch, snapshot.media, options);
   const prResult = await createOrRecoverPr(env, prepared, branch, options);
   return {
     branch,
