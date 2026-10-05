@@ -325,3 +325,92 @@ describe('Dubbi della foto su Telegram, uno alla volta', () => {
     } finally { db.close?.(); }
   });
 });
+
+describe('Correzioni dettate alla bozza su Telegram', () => {
+  const aiFor = (operazioni, dubbio = '') => ({ run: async (model, input) => {
+    const schema = input?.response_format?.json_schema;
+    if (schema?.properties?.operazioni) return { response: { operazioni, dubbio } };
+    if (schema?.properties?.intent) return { response: { intent: 'aggiorna_menu', locale: '', risposta: '' } };
+    return { response: 'ok' };
+  } });
+  const lastSent = () => telegramCalls.filter((c) => c.method === 'sendMessage').at(-1);
+  const say = (db, env2, text) => missions.telegramUpdate(db, env2, { message: { chat: { id: 42, type: 'private' }, text } });
+  async function draftDb() {
+    const db = database();
+    await missions.putSetting(db, 'telegram_chat_id', '42');
+    await run(db, buildImportBatch(event('e1', 'Nuovo menu', SOURCE)));
+    await action(db, 'runAutopilot', {});
+    return db;
+  }
+
+  it('cambia un prezzo nella bozza, azzera la checklist, e Annulla ripristina', async () => {
+    const db = await draftDb();
+    try {
+      const before = await db.prepare('SELECT id,menu_json,revision FROM drafts').bind().first();
+      const frico = JSON.parse(before.menu_json).sezioni[0].voci.findIndex((v) => /frico/i.test(v.nome.it));
+      const env2 = { ...env, AI: aiFor([{ tipo: 'prezzo', si: 0, vi: frico, prezzo: '14' }]) };
+      await say(db, env2, 'il frico con polenta costa 14 euro');
+      const after = await db.prepare('SELECT menu_json,revision,status FROM drafts').bind().first();
+      assert.equal(JSON.parse(after.menu_json).sezioni[0].voci[frico].prezzo, '14,00');
+      assert.equal(after.revision, before.revision + 1);
+      assert.equal(after.status, 'revisione');
+      const msg = lastSent();
+      assert.match(msg.body.text, /Fatto, bozza di .* aggiornata/);
+      assert.match(msg.body.text, /12,00 → 14,00/);
+      assert.ok(JSON.stringify(msg.body.reply_markup).includes(`undo:${before.id}`), 'pulsante Annulla');
+      assert.equal((await db.prepare("SELECT count(*) n FROM audit_events WHERE action='draft.telegram_edit'").bind().first()).n, 1);
+      await missions.telegramUpdate(db, env2, { callback_query: { id: 'u1', data: `undo:${before.id}`, message: { chat: { id: 42 }, message_id: 5 } } });
+      const undone = await db.prepare('SELECT menu_json,revision FROM drafts').bind().first();
+      assert.equal(JSON.parse(undone.menu_json).sezioni[0].voci[frico].prezzo, JSON.parse(before.menu_json).sezioni[0].voci[frico].prezzo);
+      assert.equal(undone.revision, before.revision + 2);
+      assert.match(lastSent().body.text, /Annullato/);
+    } finally { db.close?.(); }
+  });
+
+  it('un prezzo mai detto non entra: la bozza resta com’è', async () => {
+    const db = await draftDb();
+    try {
+      const before = await db.prepare('SELECT menu_json,revision FROM drafts').bind().first();
+      const env2 = { ...env, AI: aiFor([{ tipo: 'prezzo', si: 0, vi: 0, prezzo: '99' }]) };
+      await say(db, env2, 'il frico con polenta costa 14 euro');
+      const after = await db.prepare('SELECT menu_json,revision FROM drafts').bind().first();
+      assert.equal(after.revision, before.revision);
+      assert.equal(after.menu_json, before.menu_json);
+      assert.match(lastSent().body.text, /non applico nulla/);
+    } finally { db.close?.(); }
+  });
+
+  it('Annulla non cancella il lavoro fatto dopo la modifica', async () => {
+    const db = await draftDb();
+    try {
+      const d = await db.prepare('SELECT id FROM drafts').bind().first();
+      const env2 = { ...env, AI: aiFor([{ tipo: 'prezzo', si: 0, vi: 0, prezzo: '14' }]) };
+      const name = JSON.parse((await db.prepare('SELECT menu_json FROM drafts').bind().first()).menu_json).sezioni[0].voci[0].nome.it;
+      await say(db, env2, `${name} costa 14 euro`);
+      await db.prepare('UPDATE drafts SET revision=revision+1').bind().run();
+      await missions.telegramUpdate(db, env2, { callback_query: { id: 'u2', data: `undo:${d.id}`, message: { chat: { id: 42 }, message_id: 6 } } });
+      assert.match(lastSent().body.text, /è cambiata ancora/);
+    } finally { db.close?.(); }
+  });
+});
+
+describe('Rilettura di tutti i file di una pratica', () => {
+  it('rimette in coda foto e PDF già letti o falliti, non le foto per il menu né gli archiviati; «rileggi» da Telegram la chiede', async () => {
+    const db = database();
+    try {
+      await missions.putSetting(db, 'telegram_chat_id', '42');
+      await db.prepare("INSERT INTO clients (id,name,plan,internal_notes,revision,created_at,updated_at) VALUES ('c1','Trattoria Rilettura','standard','',1,'2026-10-05','2026-10-05')").bind().run();
+      await db.prepare("INSERT INTO requests (id,client_id,subject,source_channel,source_text,kind,status,plan,category,internal_notes,revision,created_at,updated_at) VALUES ('r1','c1','Nuovo menu Standard · Trattoria Rilettura','telegram','x','nuovo','in_revisione','standard','nuovo_standard','',1,'2026-10-05','2026-10-05')").bind().run();
+      const mat = (id, st, mime = 'image/png', archived = null) => db.prepare("INSERT INTO materials (id,request_id,r2_key,filename,mime,size,source,processing_status,created_at,archived_at) VALUES (?,'r1',?,'f.png',?,8,'telegram',?,'2026-10-05',?)").bind(id, 'private/'+id, mime, st, archived).run();
+      await mat('m1', 'letto_da_jarvis'); await mat('m2', 'non_leggibile'); await mat('m3', 'foto_per_il_menu'); await mat('m4', 'letto_da_jarvis', 'image/png', '2026-10-05'); await mat('m5', 'letto_da_jarvis', 'text/plain');
+      await missions.putSetting(db, 'tg_checks', JSON.stringify({ requestId: 'r1', queue: [], k: 0 }));
+      const sent = () => telegramCalls.filter((c) => c.method === 'sendMessage').at(-1).body.text;
+      await missions.telegramUpdate(db, env, { message: { chat: { id: 42, type: 'private' }, text: 'Jarvis, rileggi le foto di Trattoria Rilettura' } });
+      const status = Object.fromEntries((await db.prepare('SELECT id,processing_status s FROM materials').bind().all()).results.map((r) => [r.id, r.s]));
+      assert.deepEqual(status, { m1: 'da_trascrivere', m2: 'da_trascrivere', m3: 'foto_per_il_menu', m4: 'letto_da_jarvis', m5: 'letto_da_jarvis' });
+      assert.match(sent(), /Rimetto in coda 2 file di «Trattoria Rilettura»/);
+      assert.equal(await missions.setting(db, 'tg_checks'), 'null', 'i dubbi vecchi non valgono più');
+      assert.equal((await db.prepare("SELECT count(*) n FROM audit_events WHERE action='material.reread'").bind().first()).n, 1);
+    } finally { db.close?.(); }
+  });
+});
