@@ -1141,6 +1141,15 @@ export async function action(db, type, input, env = {}) {
     }
     const read = material.mime === 'application/pdf' ? await readMenuPdf(env.AI, bytes, material.filename) : await readMenuPhoto(env.AI, bytes, material.mime);
     const stamp = now();
+    // Contatore delle letture del giorno (per «stato» e la quota gratuita): resta anche se la pratica viene eliminata.
+    if (material.mime !== 'application/pdf') {
+      try {
+        const day = new Date().toISOString().slice(0, 10); // giorno della quota di Cloudflare (UTC)
+        let count = { day, n: 0, failed: 0 }; try { const c = JSON.parse(await missions.setting(db, 'reads_day') || 'null'); if (c?.day === day) count = c; } catch {}
+        count.n += 1; if (!read.ok) count.failed += 1;
+        await missions.putSetting(db, 'reads_day', JSON.stringify(count));
+      } catch { /* il contatore non deve mai bloccare la lettura */ }
+    }
     // Letta come pagina di menu (anche su richiesta di Riccardo): non è più una «foto per il menu».
     if (read.ok && material.mime !== 'application/pdf') { try { await db.prepare("UPDATE media_items SET status='scartata',updated_at=? WHERE material_id=? AND status<>'confermata'").bind(stamp, materialId).run(); } catch { /* tabella assente */ } }
     if (!read.ok) {

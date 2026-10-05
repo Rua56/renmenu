@@ -238,6 +238,9 @@ describe('Jarvis autonomo: dalla bozza affidata alla pubblicazione', () => {
       assert.match(telegramCalls.at(-1).body.text, /Foto lette oggi: 0/);
       await missions.telegramUpdate(db, env, { message: { chat: { id: 42, type: 'private' }, text: 'Jarvis, stato?' } });
       assert.match(telegramCalls.at(-1).body.text, /Nessun file in attesa di lettura/);
+      await missions.putSetting(db, 'reads_day', JSON.stringify({ day: new Date().toISOString().slice(0, 10), n: 3, failed: 1 }));
+      await missions.telegramUpdate(db, env, { message: { chat: { id: 42, type: 'private' }, text: 'jarvis stato.' } });
+      assert.match(telegramCalls.at(-1).body.text, /Foto lette oggi: 3 \(1 non riuscite\)/);
     } finally { db.close(); }
   });
 });
