@@ -8,6 +8,9 @@
 import { extractMenuFromText } from './menu.js';
 
 export const VISION_MODELS = ['@cf/meta/llama-4-scout-17b-16e-instruct', '@cf/mistralai/mistral-small-3.1-24b-instruct'];
+// Se uno dei due non risponde (es. errore 5026 su una certa foto), un terzo modello diverso fa la seconda lettura:
+// così il controllo incrociato resta a DUE letture indipendenti e la bozza non resta vuota.
+export const VISION_FALLBACK = '@cf/google/gemma-4-26b-a4b-it';
 export const PHOTO_TYPES = new Set(['image/jpeg', 'image/png', 'image/webp']);
 const MAX_IMAGE_BYTES = 4_500_000;
 export const DOUBT = '[da verificare]';
@@ -57,7 +60,7 @@ async function transcribe(ai, model, dataUrl, timeoutMs) {
   try {
     const result = await Promise.race([Promise.resolve().then(() => ai.run(model, payload)), timeout]);
     const text = result?.response ?? result?.choices?.[0]?.message?.content ?? '';
-    return String(typeof text === 'string' ? text : JSON.stringify(text)).replace(/```[a-z]*\n?|```/g, '').trim();
+    return String(typeof text === 'string' ? text : JSON.stringify(text)).replace(/<think>[\s\S]*?<\/think>/gi, '').replace(/```[a-z]*\n?|```/g, '').trim();
   } finally { clearTimeout(timer); }
 }
 
@@ -215,11 +218,16 @@ export async function readMenuPhoto(ai, bytes, mime, { timeoutMs = 45_000 } = {}
   const once = (model) => transcribe(ai, model, dataUrl, timeoutMs).catch((error) => (/tempo scaduto/.test(String(error?.message)) ? Promise.reject(error) : transcribe(ai, model, dataUrl, timeoutMs)));
   const reads = await Promise.allSettled(VISION_MODELS.map((model) => once(model)));
   const texts = reads.map((r) => (r.status === 'fulfilled' ? r.value : ''));
+  const failed = texts.findIndex((t) => !t || !readingItems(t).length);
+  let fallbackUsed = false;
+  if (failed >= 0 && texts.some((t) => t && readingItems(t).length)) {
+    try { texts[failed] = await transcribe(ai, VISION_FALLBACK, dataUrl, timeoutMs); fallbackUsed = Boolean(texts[failed]); } catch { /* resta una lettura sola */ }
+  }
   const good = texts.filter((t) => t && readingItems(t).length);
   if (!good.length) return { ok: false, reason: 'non riesco a leggere piatti e prezzi in questa foto: prova con una foto più nitida, dritta e senza riflessi', raw: texts };
   const combined = combineReadings(good[0], good[1]);
   const warnings = [good.length === 2
-    ? `Foto letta da Jarvis due volte con modelli diversi: ${combined.agreed} voci concordi${combined.doubts ? `, ${combined.doubts} righe da verificare sulla foto` : ''}.`
+    ? `Foto letta da Jarvis due volte con modelli diversi${fallbackUsed ? ' (uno di riserva, il primo non rispondeva)' : ''}: ${combined.agreed} voci concordi${combined.doubts ? `, ${combined.doubts} righe da verificare sulla foto` : ''}.`
     : 'Foto letta una sola volta (il secondo modello non ha risposto): tutte le voci restano da verificare sulla foto.'];
   return { ok: true, text: combined.text, agreed: combined.agreed, doubts: combined.doubts, method: good.length === 2 ? 'jarvis_foto_doppia_lettura' : 'jarvis_foto_lettura_singola', warnings, raw: texts };
 }
