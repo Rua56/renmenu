@@ -56,6 +56,8 @@ function toBase64(bytes) {
 
 async function transcribe(ai, model, dataUrl, timeoutMs) {
   const payload = { messages: [{ role: 'user', content: [{ type: 'text', text: PROMPT }, { type: 'image_url', image_url: { url: dataUrl } }] }], temperature: 0, max_tokens: 3500 };
+  // Gemma 4 ragiona prima di rispondere: senza questo spende i token nel ragionamento e la trascrizione resta vuota.
+  if (model.includes('gemma')) Object.assign(payload, { max_completion_tokens: 4000, chat_template_kwargs: { enable_thinking: false } });
   let timer;
   const timeout = new Promise((_, reject) => { timer = setTimeout(() => reject(new Error('tempo scaduto')), timeoutMs); });
   try {
@@ -247,9 +249,9 @@ export async function readMenuPhoto(ai, bytes, mime, { timeoutMs = 110_000 } = {
   // Molte voci in disaccordo (menu lunghi, scritte piccole): una terza lettura con un altro modello fa da arbitro.
   let thirdText = '';
   if (good.length === 2 && !fallbackUsed && combined.doubts >= 10 && combined.agreed < 0.8 * readingItems(good[0]).length) {
-    try { thirdText = await transcribe(ai, VISION_FALLBACK, dataUrl, timeoutMs); } catch { thirdText = ''; }
+    try { thirdText = await transcribe(ai, VISION_FALLBACK, dataUrl, timeoutMs); } catch (error) { thirdText = ''; texts.push(`[terza lettura non riuscita] ${String(error?.message || 'errore').slice(0, 200)}`); }
     if (thirdText && readingItems(thirdText).length) combined = combineReadings(good[0], good[1], thirdText);
-    else thirdText = '';
+    else { texts.push(`[terza lettura senza voci] ${String(thirdText || '(vuota)').slice(0, 1500)}`); thirdText = ''; }
   }
   const warnings = [good.length === 2
     ? `Foto letta da Jarvis ${thirdText ? 'tre volte con tre modelli diversi' : 'due volte con modelli diversi'}${fallbackUsed ? ' (uno di riserva, il primo non rispondeva)' : ''}: ${combined.agreed} voci concordi${thirdText && combined.byThird ? ` (${combined.byThird} confermate dalla terza lettura)` : ''}${combined.doubts ? `, ${combined.doubts} righe da verificare sulla foto` : ''}.`
