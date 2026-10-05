@@ -243,18 +243,28 @@ export function combineReadings(first, second, third = '') {
 // risponde (quota finita, errore), Jarvis torna da solo ai modelli di Cloudflare.
 export const GEMINI_PREFERRED = ['gemini-2.5-flash', 'gemini-3-flash-preview', 'gemini-3.5-flash', 'gemini-3.1-flash-lite', 'gemini-2.5-flash-lite', 'gemini-3.5-flash-lite'];
 export async function transcribeGemini({ key, model, fetchImpl = globalThis.fetch }, bytes, mime, timeoutMs = 110_000) {
-  const body = { contents: [{ role: 'user', parts: [{ text: PROMPT }, { inline_data: { mime_type: mime, data: toBase64(bytes) } }] }],
-    generationConfig: { temperature: 0, maxOutputTokens: 12000, ...(/^gemini-2\.5/.test(model) ? { thinkingConfig: { thinkingBudget: 0 } } : {}) } };
-  const controller = typeof AbortController === 'function' ? new AbortController() : null;
-  const timer = setTimeout(() => controller?.abort(), timeoutMs);
-  try {
-    const response = await fetchImpl(`https://generativelanguage.googleapis.com/v1beta/models/${encodeURIComponent(model)}:generateContent`, {
-      method: 'POST', headers: { 'Content-Type': 'application/json', 'x-goog-api-key': key }, body: JSON.stringify(body), signal: controller?.signal });
-    const data = await response.json().catch(() => ({}));
-    if (!response.ok) throw new Error(`Gemini ${response.status}${data?.error?.status ? ` ${data.error.status}` : ''}`);
-    const text = (data?.candidates?.[0]?.content?.parts || []).filter((part) => !part.thought).map((part) => part.text || '').join('');
-    return String(text).replace(/```[a-z]*\n?|```/g, '').trim();
-  } finally { clearTimeout(timer); }
+  // Trascrivere non richiede ragionamento lungo: pensiero al minimo (nomi dei campi cambiati tra 2.5 e 3).
+  // Se Google rifiuta l'impostazione del pensiero (400), si riprova senza: mai una lettura persa per questo.
+  const thinking = /^gemini-2\.5/.test(model) ? { thinkingBudget: 0 } : { thinkingLevel: 'low' };
+  const ask = async (withThinking) => {
+    const body = { contents: [{ role: 'user', parts: [{ text: PROMPT }, { inline_data: { mime_type: mime, data: toBase64(bytes) } }] }],
+      generationConfig: { temperature: 0, maxOutputTokens: 24000, ...(withThinking ? { thinkingConfig: thinking } : {}) } };
+    const controller = typeof AbortController === 'function' ? new AbortController() : null;
+    const timer = setTimeout(() => controller?.abort(), timeoutMs);
+    try {
+      const response = await fetchImpl(`https://generativelanguage.googleapis.com/v1beta/models/${encodeURIComponent(model)}:generateContent`, {
+        method: 'POST', headers: { 'Content-Type': 'application/json', 'x-goog-api-key': key }, body: JSON.stringify(body), signal: controller?.signal });
+      const data = await response.json().catch(() => ({}));
+      return { response, data };
+    } finally { clearTimeout(timer); }
+  };
+  let { response, data } = await ask(true);
+  if (response.status === 400) ({ response, data } = await ask(false));
+  if (!response.ok) throw new Error(`Gemini ${response.status}${data?.error?.status ? ` ${data.error.status}` : ''}`);
+  const candidate = data?.candidates?.[0];
+  const text = (candidate?.content?.parts || []).filter((part) => !part.thought).map((part) => part.text || '').join('');
+  if (!text && candidate?.finishReason) throw new Error(`Gemini senza testo (${candidate.finishReason})`);
+  return String(text).replace(/```[a-z]*\n?|```/g, '').trim();
 }
 
 export async function readMenuPhoto(ai, bytes, mime, { timeoutMs = 110_000, gemini = null } = {}) {
