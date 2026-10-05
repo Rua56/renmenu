@@ -6,6 +6,7 @@ import { linkPendingMailFiles, missions, readPendingMaterials, receivePendingMai
 import { sameSecret, sendTelegram, telegramReady } from '../_lib/telegram.js';
 import { chat } from '../_lib/voice.js';
 import { serveMedia } from '../_lib/public-media.js';
+import { previewUrl } from '../_lib/approvals.js';
 
 const reply = (body, status = 200) => new Response(JSON.stringify(body), { status, headers: { 'Content-Type': 'application/json', 'Cache-Control': 'no-store' } });
 
@@ -20,6 +21,20 @@ export async function onRequest(context) {
     if (!row?.preview_url) return new Response('Anteprima non più disponibile.', { status: 404, headers: { 'Content-Type': 'text/plain; charset=utf-8', 'Cache-Control': 'no-store' } });
     return new Response(null, { status: 302, headers: { Location: row.preview_url, 'Cache-Control': 'no-store', 'Referrer-Policy': 'no-referrer' } });
   }
+  // Link breve di sola visione alla bozza («mostrami l'anteprima di X»): vale 24 ore, non approva né pubblica nulla.
+  const peek = path.match(/^\/jarvis-hook\/bozza\/(BZ-[A-Z0-9]{8,12})$/);
+  if (request.method === 'GET' && peek && env.DB?.prepare) {
+    let target = null;
+    try {
+      const saved = JSON.parse(await missions.setting(env.DB, `peek_${peek[1]}`) || 'null');
+      if (saved?.draftId && saved.exp > new Date().toISOString()) {
+        const row = await env.DB.prepare('SELECT menu_json FROM drafts WHERE id=?').bind(saved.draftId).first();
+        if (row?.menu_json) target = previewUrl(JSON.parse(row.menu_json), 'it');
+      }
+    } catch { target = null; }
+    if (!target) return new Response('Anteprima non più disponibile.', { status: 404, headers: { 'Content-Type': 'text/plain; charset=utf-8', 'Cache-Control': 'no-store' } });
+    return new Response(null, { status: 302, headers: { Location: target, 'Cache-Control': 'no-store', 'Referrer-Policy': 'no-referrer' } });
+  }
   // Foto del menu Premium confermate da Riccardo (servono all'anteprima e al menu).
   const media = path.match(/^\/jarvis-hook\/media\/([^/]+)$/);
   if (media) return serveMedia(request, env, media[1]);
@@ -32,6 +47,14 @@ export async function onRequest(context) {
       const update = await request.json().catch(() => null);
       if (update) await missions.telegramUpdate(env.DB, env, update);
       return reply({ ok: true });
+    }
+    if (path === '/jarvis-hook/probe-intent') {
+      // Solo diagnostica: stesso segreto del bot; restituisce l'intenzione capita, non esegue nulla.
+      const expected = await missions.setting(env.DB, 'telegram_webhook_secret');
+      if (!sameSecret(request.headers.get('X-Telegram-Bot-Api-Secret-Token'), expected)) return reply({ ok: false }, 403);
+      const body = await request.json().catch(() => null);
+      const phrases = Array.isArray(body?.phrases) ? body.phrases.map((p) => String(p).slice(0, 400)).filter(Boolean) : [];
+      return reply({ ok: true, results: await missions.probeIntents(env.DB, env, phrases, ['auto', 'gemini', 'cloudflare'].includes(body?.engine) ? body.engine : 'auto') });
     }
     if (path === '/jarvis-hook/mail-files') {
       // Script Google dell'account renmenu1569: foto e PDF allegati alle email dei clienti.

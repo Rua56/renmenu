@@ -599,7 +599,9 @@ export function createMissions(deps) {
     let history = []; try { history = JSON.parse(await setting(db, 'tg_history') || '[]').filter((h) => Date.now() - Date.parse(h.at) < 180 * MINUTE); } catch {}
     const clues = await readClues(db, utterance);
     const context = await voiceContext(db, env, clues, history.slice(-8).map((h) => `${h.who}: ${String(h.text).slice(0, 300)}`).join('\n'));
-    const understood = await understand(env.AI, utterance, context);
+    const gem = await geminiFor(db, env);
+    const understood = await understand(env.AI, utterance, context, { gemini: gem });
+    if (understood.modelName) await putSetting(db, 'gemini_good', JSON.stringify([understood.modelName])).catch(() => {});
     // Se il modello non è sicuro (o risponde a parole a un ordine) ma le parole chiave indicano un compito chiaro, Jarvis procede.
     const fallbackUsed = (understood.intent === 'non_chiaro' || (understood.intent === 'risposta' && !fresh)) && !['non_chiaro', 'ambiguo', 'risposta'].includes(clues.guess.intent);
     const intent = fallbackUsed ? { ...understood, intent: clues.guess.intent, locale: understood.locale || clues.guess.locale } : understood;
@@ -608,7 +610,7 @@ export function createMissions(deps) {
       const dish = clues.dishes[0]?.dish?.name;
       intent.risposta = `Vuoi che modifichi ${dish ? `«${dish}» nel` : 'il'} menu di «${venue}», o ti serve un’informazione?`;
     }
-    await auditedBatch(jarvisDb(db), [], 'jarvis.conversation', `Comando ${spoken ? 'vocale' : 'scritto'}: ${intent.intent}${fallbackUsed ? ' (da parole chiave)' : ''}${fresh ? ' (con chiarimento)' : ''}${understood.why ? ` (${understood.why})` : ''}.`, null).catch(() => {});
+    await auditedBatch(jarvisDb(db), [], 'jarvis.conversation', `Comando ${spoken ? 'vocale' : 'scritto'}: ${intent.intent}${intent.dettaglio ? `/${intent.dettaglio}` : ''} [${understood.engine || 'nessun modello'}]${fallbackUsed ? ' (da parole chiave)' : ''}${fresh ? ' (con chiarimento)' : ''}${understood.why ? ` (${understood.why})` : ''}.`, null).catch(() => {});
     const answer = async (text, buttons = null, { keep = true } = {}) => {
       const asks = keep && /\?\s*$/.test(String(text)) && !buttons;
       await putSetting(db, 'tg_pending', asks ? JSON.stringify({ text: utterance.slice(-1200), at: now() }) : 'null').catch(() => {});
@@ -631,6 +633,8 @@ export function createMissions(deps) {
       const text = talk.ok ? talk.text : intent.risposta;
       if (text) { await answer(text, null, { keep: !talk.ok }); return; }
     }
+    if (intent.intent === 'stato') { await answer(await statusReport(db, env, intent.dettaglio || (/\b(dettagli\w*|complet\w*|report|resoconto|riepilogo|tutto)\b/i.test(said0) ? 'completo' : /buone\s+notizie|novit/i.test(said0) ? 'buone_notizie' : 'breve')), null, { keep: false }); return; }
+    if (intent.intent === 'anteprima') { const shown = await voiceShowPreview(db, env, intent.locale, clues, utterance); await answer(shown.text, shown.buttons || null, { keep: shown.keep }); return; }
     if (intent.intent === 'pubblica') {
       const waiting = await rows(db, "SELECT m.id,d.menu_json,d.slug FROM jarvis_missions m JOIN drafts d ON d.id=m.draft_id WHERE m.status='attesa_si' ORDER BY m.updated_at DESC LIMIT 10");
       const named = waiting.map((m) => { let name = m.slug; try { name = JSON.parse(m.menu_json).nome || name; } catch {} return { ...m, name, menu_id: m.slug }; });
@@ -641,7 +645,7 @@ export function createMissions(deps) {
       return;
     }
     if (intent.intent === 'ricorda') { await answer(await voiceRemember(db, utterance, intent.locale, clues)); return; }
-    if (intent.intent === 'crea_pratica') { await answer(await voiceCreate(db, utterance, intent.locale)); return; }
+    if (intent.intent === 'crea_pratica') { await answer(await voiceCreate(db, utterance, intent.locale, intent.urgente === true || /\b(in\s+fretta|subito|urgent\w*|di\s+corsa)\b/i.test(said0))); return; }
     if (intent.intent === 'aggiorna_menu') {
       const target = await draftTarget(db, intent.locale, clues, utterance);
       if (target?.ask) { await answer(target.ask); return; }
@@ -794,7 +798,91 @@ export function createMissions(deps) {
   // Nuova pratica a voce: cliente (esistente o nuovo) + pratica «nuovo menu». Le foto e i PDF che
   // Riccardo manda nell'ora successiva si collegano da soli a questa pratica.
   const FOCUS_MINUTES = 60;
-  async function voiceCreate(db, utterance, spokenVenue) {
+  // ——— Punto della situazione: scritto da dati certi del database, mai inventato dal modello ———
+  const MISSION_LABEL = { affidata: 'la sto preparando io', attesa_cliente: 'anteprima inviata, aspetto la risposta del locale', attesa_invio: 'anteprima in coda per Gmail', attesa_si: 'aspetta il tuo SÌ per pubblicare', ferma: 'ferma, serve il tuo intervento', pubblicazione: 'in pubblicazione', verifica: 'in verifica dopo la pubblicazione' };
+  async function statusReport(db, env, cut = 'breve') {
+    const safe = async (fn, fallback) => { try { return await fn(); } catch { return fallback; } };
+    const stamp = new Date(), day = stamp.toISOString().slice(0, 10), weekAgo = new Date(stamp.getTime() - 7 * 24 * 3600_000).toISOString();
+    const reqs = await safe(() => rows(db, "SELECT r.id,r.subject,r.status,r.plan,r.kind,c.name AS client FROM requests r LEFT JOIN clients c ON c.id=r.client_id WHERE r.status NOT IN ('completata','archiviata','chiusa') ORDER BY r.updated_at DESC LIMIT 12"), []);
+    const detail = [];
+    for (const r of reqs) {
+      const mission = await safe(() => getOne(db, "SELECT status,note FROM jarvis_missions WHERE request_id=? AND status NOT IN ('completata','annullata') ORDER BY updated_at DESC LIMIT 1", r.id), null);
+      const draft = await safe(() => getOne(db, 'SELECT status,revision FROM drafts WHERE request_id=? ORDER BY created_at DESC LIMIT 1', r.id), null);
+      const files = await safe(() => rows(db, 'SELECT processing_status AS st,COUNT(*) AS n FROM materials WHERE request_id=? AND archived_at IS NULL GROUP BY processing_status', r.id), []);
+      const nFiles = files.reduce((t, f) => t + f.n, 0), toRead = files.filter((f) => f.st === 'da_trascrivere').reduce((t, f) => t + f.n, 0);
+      let phrase;
+      if (mission) phrase = `${MISSION_LABEL[mission.status] || mission.status}${mission.status === 'ferma' && mission.note ? ` (${mission.note})` : ''}`;
+      else if (draft && ['bozza', 'revisione', 'pronta_pr'].includes(draft.status)) phrase = `bozza in revisione (versione ${draft.revision}), da controllare e confermare da te`;
+      else if (toRead) phrase = `${toRead} file ${toRead === 1 ? 'da leggere' : 'da leggere'} su ${nFiles}`;
+      else if (nFiles) phrase = `${nFiles} file letti, bozza non ancora preparata`;
+      else phrase = 'in attesa di foto o PDF del menu';
+      detail.push({ name: r.client || r.subject, phrase, waitsYou: mission?.status === 'attesa_si' || mission?.status === 'ferma' || (!mission && draft && ['bozza', 'revisione', 'pronta_pr'].includes(draft.status)), stuck: mission?.status === 'ferma' });
+    }
+    const quotaDay = day;
+    let count = null; try { count = JSON.parse(await setting(db, 'reads_day') || 'null'); } catch {}
+    let gem = null; try { const g = JSON.parse(await setting(db, 'gemini_day') || 'null'); if (g?.day === quotaDay) gem = g; } catch {}
+    const failedReads = count?.day === quotaDay ? count.failed || 0 : 0, reads = count?.day === quotaDay ? count.n || 0 : 0;
+    const queued = (await safe(() => getOne(db, "SELECT COUNT(*) AS n FROM materials WHERE processing_status='da_trascrivere' AND archived_at IS NULL"), null))?.n || 0;
+    const problems = [];
+    for (const d of detail.filter((x) => x.stuck)) problems.push(`«${d.name}» è ferma e aspetta un tuo intervento`);
+    if (failedReads) problems.push(`${failedReads} ${failedReads === 1 ? 'lettura di foto non è riuscita' : 'letture di foto non sono riuscite'} oggi`);
+    if (gem?.quota) problems.push('Google ha segnalato la quota esaurita, quindi leggo con i modelli di riserva');
+    const waiting = detail.filter((d) => d.waitsYou);
+    const word = (n, one, many) => `${n} ${n === 1 ? one : many}`;
+    if (cut === 'buone_notizie') {
+      const online = (await safe(() => getOne(db, "SELECT COUNT(*) AS n FROM clients WHERE menu_id IS NOT NULL AND menu_id<>''"), null))?.n || 0;
+      const done = (await safe(() => getOne(db, "SELECT COUNT(*) AS n FROM requests WHERE status='completata' AND updated_at>=?", weekAgo), null))?.n || 0;
+      const trial = (await safe(() => getOne(db, 'SELECT COUNT(*) AS n FROM clients WHERE trial_ends_at IS NOT NULL AND trial_ends_at>=?', day), null))?.n || 0;
+      const ready = detail.filter((d) => d.phrase.startsWith('aspetta il tuo SÌ'));
+      const good = [];
+      if (online) good.push(`${word(online, 'menu è online', 'menu sono online')}`);
+      if (done) good.push(`${word(done, 'pratica chiusa', 'pratiche chiuse')} negli ultimi sette giorni`);
+      if (trial) good.push(`${word(trial, 'locale è in prova gratuita', 'locali sono in prova gratuita')}`);
+      if (ready.length) good.push(`${ready.map((d) => `«${d.name}»`).join(' e ')} ${ready.length === 1 ? 'è pronto e aspetta' : 'sono pronti e aspettano'} solo il tuo SÌ`);
+      if (reads && !failedReads) good.push(`le ${reads} letture di foto di oggi sono andate tutte a buon fine`);
+      if (!problems.length) good.push('nessun problema in vista');
+      return good.length > 1 ? `Buone notizie, Riccardo: ${good.slice(0, 5).join('; ')}.` : `Notizie clamorose non ne ho, Riccardo, ma nemmeno guai: ${good[0] || 'tutto procede con calma'}.`;
+    }
+    if (cut === 'completo') {
+      const lines = detail.map((d) => `- ${d.name}: ${d.phrase}`);
+      const base = await statusText(db).catch(() => '');
+      const brief = await buildBriefing(db, env, { fetchImpl: deps.fetchImpl }).catch(() => '');
+      return [`Resoconto completo, Riccardo.`, '', reqs.length ? `Pratiche aperte (${reqs.length}):\n${lines.join('\n')}` : 'Non ci sono pratiche aperte.',
+        waiting.length ? `\nAspettano te: ${waiting.map((d) => `«${d.name}»`).join(', ')}.` : '\nNon aspetto nulla da te per ora.',
+        problems.length ? `\nDa tenere d’occhio: ${problems.join('; ')}.` : '\nProblemi: nessuno.', '', base, brief ? `\n${brief}` : ''].filter((x) => x !== undefined).join('\n').slice(0, 3800);
+    }
+    // breve
+    const head = reqs.length ? `Hai ${word(reqs.length, 'pratica aperta', 'pratiche aperte')}: ${detail.slice(0, 4).map((d) => `«${d.name}» (${d.phrase})`).join('; ')}${detail.length > 4 ? ` e altre ${detail.length - 4}` : ''}.` : 'Non ci sono pratiche aperte.';
+    const verdict = problems.length ? `Una cosa da guardare: ${problems.join('; ')}.` : waiting.length ? `Per il resto è tutto regolare: aspettano te ${waiting.map((d) => `«${d.name}»`).join(', ')}.` : 'Per il resto è tutto regolare, non aspetto nulla da te.';
+    return `${head} ${verdict}${queued ? ` File in coda di lettura: ${queued}.` : ''}`;
+  }
+  // ——— «Mostrami l’anteprima di X»: link di sola visione alla bozza (nessuna approvazione, nessuna pubblicazione) ———
+  async function voiceShowPreview(db, env, spokenVenue, clues, utterance) {
+    const drafts = await rows(db, OPEN_DRAFTS).catch(() => []);
+    const target = await draftTarget(db, spokenVenue, clues, utterance).catch(() => null);
+    if (target?.ask) return { text: target.ask };
+    let draft = target?.draft || null;
+    if (!draft && !spokenVenue && !clues.locales.length) {
+      if (drafts.length === 1) draft = drafts[0];
+      else if (drafts.length > 1) return { text: `Di quale locale vuoi l’anteprima? Ho queste bozze aperte: ${drafts.map((d) => `«${d.client_name || d.subject}»`).join(', ')}.` };
+      else return { text: 'Non ho bozze aperte da mostrarti, Riccardo. Se ti serve un menu già online, dimmi il nome del locale.' };
+    }
+    if (!draft) {
+      const clients = await rows(db, "SELECT id,name,menu_id FROM clients WHERE menu_id IS NOT NULL AND menu_id<>''").catch(() => []);
+      const { client } = pickLocale(spokenVenue, clues, clients);
+      if (client) return { text: `«${client.name}» non ha bozze aperte, ma ha il menu online: https://renmenu.pages.dev/menu/?m=${encodeURIComponent(client.menu_id)}` };
+      return { text: `Non trovo una bozza né un menu online per «${spokenVenue || 'quel locale'}». Dimmi il nome esatto del locale.` };
+    }
+    let menu; try { menu = JSON.parse(draft.menu_json); } catch { return { text: 'La bozza non si legge: aprila in Revisione.' }; }
+    const code = `BZ-${[...crypto.getRandomValues(new Uint8Array(10))].map((b) => 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789'[b % 32]).join('')}`;
+    await Promise.resolve().then(() => db.prepare("DELETE FROM jarvis_settings WHERE key LIKE 'peek\\_%' ESCAPE '\\' AND updated_at < ?").bind(new Date(Date.now() - 2 * 24 * 3600_000).toISOString()).run()).catch(() => {});
+    await putSetting(db, `peek_${code}`, JSON.stringify({ draftId: draft.id, exp: new Date(Date.now() + 24 * 3600_000).toISOString() }));
+    const sections = (menu.sezioni || []).length, items = (menu.sezioni || []).reduce((t, s2) => t + (s2.voci || []).length, 0);
+    const checks = await Promise.resolve().then(() => getOne(db, 'SELECT checks_json FROM drafts WHERE id=?', draft.id)).then((row) => { try { return JSON.parse(row?.checks_json || '{}') || {}; } catch { return {}; } }).catch(() => ({}));
+    const origin = String(env.JARVIS_ORIGIN || 'https://renmenu-jarvis-stage.pages.dev').replace(/\/+$/, '');
+    return { text: `Ecco la bozza di «${draft.client_name || menu.nome || draft.subject}» (versione ${draft.revision}, ${items} voci in ${sections} sezioni):\n${origin}/jarvis-hook/bozza/${code}\n\nÈ solo da guardare: non è pubblicata e non è stata inviata a nessuno. Il link vale 24 ore.${['prices', 'allergens', 'languages'].every((key) => checks[key]) ? '' : ' La checklist di revisione (prezzi, allergeni, lingue) non è ancora confermata.'}`, keep: false };
+  }
+  async function voiceCreate(db, utterance, spokenVenue, urgent = false) {
     const venue = String(spokenVenue || '').replace(/^[«"“']|[»"”']$/g, '').trim();
     if (!venue || !venueSaid(venue, utterance)) return 'Come si chiama il locale? Ripetimi il nome, per favore.';
     const plan = planFromText(utterance);
@@ -808,9 +896,9 @@ export function createMissions(deps) {
       const clientId = exact ? exact.id : (await action(jarvis, 'createClient', { name: venue, internalNotes: 'Cliente creato da Jarvis su comando vocale di Riccardo.' })).result.id;
       const subject = `Nuovo menu ${plan ? plan[0].toUpperCase() + plan.slice(1) : '(piano da definire)'} · ${venue}`;
       const requestId = (await action(jarvis, 'createRequest', { clientId, subject, sourceChannel: 'altro', sourceText: `Locale: ${venue}`, kind: 'nuovo',
-        ...(plan ? { category: `nuovo_${plan}`, plan } : { plan: 'da_definire' }), internalNotes: 'Pratica aperta da Jarvis su comando di Riccardo: in attesa di foto o PDF del menu.' })).result.id;
+        ...(plan ? { category: `nuovo_${plan}`, plan } : { plan: 'da_definire' }), internalNotes: `${urgent ? 'URGENTE (Riccardo ha chiesto fretta). ' : ''}Pratica aperta da Jarvis su comando di Riccardo: in attesa di foto o PDF del menu.` })).result.id;
       await putSetting(db, 'tg_focus', JSON.stringify({ requestId, subject, at: now() }));
-      return `Fatto, Riccardo. ${exact ? `Ho usato il cliente «${venue}» che avevamo già` : `Ho creato il cliente «${venue}»`} e aperto la pratica «${subject}»${plan ? '' : ': il piano lo decidiamo poi'}. Mandami pure foto o PDF del menu nella prossima ora: li collego a questa pratica, li leggo e preparo la bozza.`;
+      return `Fatto, Riccardo. ${exact ? `Ho usato il cliente «${venue}» che avevamo già` : `Ho creato il cliente «${venue}»`} e aperto la pratica «${subject}»${plan ? '' : ': il piano lo decidiamo poi'}. ${urgent ? 'L’ho segnata come urgente. ' : ''}Mandami pure foto o PDF del menu nella prossima ora: li collego a questa pratica, li leggo e preparo la bozza${urgent ? ' appena arrivano, senza altri passaggi inutili' : ''}.`;
     } catch (error) {
       return `Non sono riuscito ad aprire la pratica: ${String(error?.message || 'errore').slice(0, 200)}`;
     }
@@ -912,5 +1000,19 @@ export function createMissions(deps) {
     if (chat && telegramReady(env)) await sendTelegram(env, chat, text, null, deps.fetchImpl);
     return { text };
   }
-  return { entrust, tick, decide, telegramUpdate, setting, putSetting, briefing, notify, startChecks, answerCheck, draftAfterChecks, translateAfterEdit, undoDraftEdit, draftTarget, voiceEditDraft };
+  // Prova di comprensione: classifica frasi senza eseguire nulla e senza scrivere sul database.
+  async function probeIntents(db, env, phrases, engine = 'auto') {
+    const out = [];
+    const gem = await geminiFor(db, env);
+    for (const phrase of phrases.slice(0, 12)) {
+      const started = Date.now();
+      const clues = await readClues(db, phrase);
+      const context = await voiceContext(db, env, clues, '');
+      const understood = await understand(env.AI, phrase, context, { gemini: gem, engine });
+      const fallbackUsed = (understood.intent === 'non_chiaro' || understood.intent === 'risposta') && !['non_chiaro', 'ambiguo', 'risposta'].includes(clues.guess.intent);
+      out.push({ phrase, intent: understood.intent, dettaglio: understood.dettaglio || '', locale: understood.locale || '', urgente: understood.urgente === true, engine: understood.engine || 'nessuno', model: understood.modelName || '', keyword: clues.guess.intent, final: fallbackUsed ? clues.guess.intent : understood.intent, ms: Date.now() - started, why: understood.why || '' });
+    }
+    return out;
+  }
+  return { entrust, tick, decide, telegramUpdate, probeIntents, setting, putSetting, briefing, notify, startChecks, answerCheck, draftAfterChecks, translateAfterEdit, undoDraftEdit, draftTarget, voiceEditDraft };
 }
