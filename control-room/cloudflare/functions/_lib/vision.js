@@ -157,7 +157,7 @@ export function combineReadings(first, second, third = '') {
   const bySection = new Map();
   const tally = (row, ok) => { const name = A.sections[row.section]?.name || 'Menu'; const t = bySection.get(name) || { name, ok: 0, total: 0 }; t.total += 1; if (ok) t.ok += 1; bySection.set(name, t); };
   const single = !second;
-  const used = new Set(), lines = [], doubts = [];
+  const used = new Set(), lines = [], doubts = [], checks = [];
   let agreed = 0, lastB = -1, currentSection = null;
   for (const d of A.doubts) doubts.push(`${DOUBT} ${d}`);
   for (const d of B.doubts) if (!A.doubts.some((x) => similar(x, d))) doubts.push(`${DOUBT} ${d} (seconda lettura)`);
@@ -199,6 +199,12 @@ export function combineReadings(first, second, third = '') {
     if (!hit) {
       const near = B.items.find((other) => similar(other.name, row.name));
       doubts.push(`${DOUBT} ${row.name}${row.course ? ' (portata del percorso)' : `: letto ${priceText(row)}`}${near ? (row.course ? '' : `, seconda lettura ${priceText(near)}`) : ', non trovato nella seconda lettura'}`);
+      // Dubbio da chiudere con un tocco (Telegram): nome, sezione e i prezzi letti.
+      if (!row.course) {
+        const third = C?.items.find((o) => similar(o.name, row.name));
+        const options = [...new Set([priceText(row), near && priceText(near), third && priceText(third)].filter(Boolean))];
+        checks.push({ line: doubts.at(-1), section: A.sections[row.section]?.name || '', name: row.name, options, descr: row.descr || '' });
+      }
       continue;
     }
     if (hit.index >= 0) { used.add(hit.index); lastB = Math.max(lastB, hit.index); }
@@ -224,45 +230,80 @@ export function combineReadings(first, second, third = '') {
     if (used.has(index) || A.items.some((row) => similar(row.name, other.name))) return;
     if (descriptionAsName(other.name) && A.items.some((row) => similar(row.descr, other.name))) return;
     doubts.push(`${DOUBT} ${other.name}${other.course ? ' (portata del percorso)' : `: letto ${priceText(other)}`} solo nella seconda lettura`);
+    if (!other.course) checks.push({ line: doubts.at(-1), section: B.sections[other.section]?.name || '', name: other.name, options: [priceText(other)], descr: other.descr || '' });
   });
-  return { text: [...lines, ...doubts].join('\n'), agreed, doubts: doubts.length, byThird, sections: [...bySection.values()] };
+  return { text: [...lines, ...doubts].join('\n'), agreed, doubts: doubts.length, byThird, sections: [...bySection.values()], checks };
 }
 
 /** Foto di un menu → testo fonte con le sole voci concordi tra due modelli. Non lancia mai. */
 // Menu lunghi (70 voci): un modello può metterci più di un minuto. Se Jarvis smette di aspettare, la
 // richiesta viene annullata (su Cloudflare risulta errore 5026) e resta una lettura sola.
-export async function readMenuPhoto(ai, bytes, mime, { timeoutMs = 110_000 } = {}) {
-  if (typeof ai?.run !== 'function') return { ok: false, reason: 'lettura delle foto non disponibile in questo ambiente' };
+// Gemini (Google AI Studio, quota gratuita): legge i menu fitti molto meglio dei modelli gratuiti di Cloudflare.
+// Se la chiave c'è, due modelli Gemini diversi leggono la foto e uno di Cloudflare fa da arbitro; se Gemini non
+// risponde (quota finita, errore), Jarvis torna da solo ai modelli di Cloudflare.
+export const GEMINI_PREFERRED = ['gemini-2.5-flash', 'gemini-3-flash-preview', 'gemini-3.5-flash', 'gemini-3.1-flash-lite', 'gemini-2.5-flash-lite', 'gemini-3.5-flash-lite'];
+export async function transcribeGemini({ key, model, fetchImpl = globalThis.fetch }, bytes, mime, timeoutMs = 110_000) {
+  const body = { contents: [{ role: 'user', parts: [{ text: PROMPT }, { inline_data: { mime_type: mime, data: toBase64(bytes) } }] }],
+    generationConfig: { temperature: 0, maxOutputTokens: 12000, ...(/^gemini-2\.5/.test(model) ? { thinkingConfig: { thinkingBudget: 0 } } : {}) } };
+  const controller = typeof AbortController === 'function' ? new AbortController() : null;
+  const timer = setTimeout(() => controller?.abort(), timeoutMs);
+  try {
+    const response = await fetchImpl(`https://generativelanguage.googleapis.com/v1beta/models/${encodeURIComponent(model)}:generateContent`, {
+      method: 'POST', headers: { 'Content-Type': 'application/json', 'x-goog-api-key': key }, body: JSON.stringify(body), signal: controller?.signal });
+    const data = await response.json().catch(() => ({}));
+    if (!response.ok) throw new Error(`Gemini ${response.status}${data?.error?.status ? ` ${data.error.status}` : ''}`);
+    const text = (data?.candidates?.[0]?.content?.parts || []).filter((part) => !part.thought).map((part) => part.text || '').join('');
+    return String(text).replace(/```[a-z]*\n?|```/g, '').trim();
+  } finally { clearTimeout(timer); }
+}
+
+export async function readMenuPhoto(ai, bytes, mime, { timeoutMs = 110_000, gemini = null } = {}) {
+  const geminiReady = Boolean(gemini?.key && gemini?.models?.length);
+  if (typeof ai?.run !== 'function' && !geminiReady) return { ok: false, reason: 'lettura delle foto non disponibile in questo ambiente' };
   if (!PHOTO_TYPES.has(mime)) return { ok: false, reason: `formato ${mime} non leggibile: manda la foto in JPG o PNG` };
   if (bytes.length > MAX_IMAGE_BYTES) return { ok: false, reason: 'foto troppo grande (oltre 9 MB): fai uno screenshot della foto e manda quello' };
   const dataUrl = `data:${mime};base64,${toBase64(bytes)}`;
   // Un errore passeggero del servizio (es. codice 5026) non deve lasciare la foto con una sola lettura: un secondo tentativo.
   const once = (model) => transcribe(ai, model, dataUrl, timeoutMs).catch((error) => (/tempo scaduto/.test(String(error?.message)) ? Promise.reject(error) : transcribe(ai, model, dataUrl, timeoutMs)));
-  const reads = await Promise.allSettled(VISION_MODELS.map((model) => once(model)));
-  const texts = reads.map((r) => (r.status === 'fulfilled' ? r.value : ''));
-  const failed = texts.findIndex((t) => !t || !readingItems(t).length);
+  const cf = (model) => ({ label: model, run: () => once(model) });
+  const gm = (model) => ({ label: model, gemini: true, run: () => transcribeGemini({ ...gemini, model }, bytes, mime, timeoutMs) });
+  const primary = geminiReady ? gemini.models.slice(0, 2).map(gm) : VISION_MODELS.map(cf);
+  if (primary.length < 2) primary.push(cf(VISION_MODELS[1]));
+  const spare = geminiReady ? [cf(VISION_MODELS[1]), cf(VISION_MODELS[0])] : [cf(VISION_FALLBACK)];
+  const used = primary.map((r) => r.label);
+  const notes = [];
+  const reads = await Promise.allSettled(primary.map((r) => r.run()));
+  const texts = reads.map((r, i) => { if (r.status !== 'fulfilled') notes.push(`${primary[i].label}: ${String(r.reason?.message || 'errore').slice(0, 120)}`); return r.status === 'fulfilled' ? r.value : ''; });
+  // Una lettura mancata (quota Gemini finita, errore): la sostituisce un modello di riserva.
   let fallbackUsed = false;
-  if (failed >= 0 && texts.some((t) => t && readingItems(t).length)) {
-    try { texts[failed] = await transcribe(ai, VISION_FALLBACK, dataUrl, timeoutMs); fallbackUsed = Boolean(texts[failed]); } catch { /* resta una lettura sola */ }
+  for (let i = 0; i < texts.length; i += 1) {
+    if (texts[i] && readingItems(texts[i]).length) continue;
+    const next = spare.shift();
+    if (!next) break;
+    try { texts[i] = await next.run(); used[i] = next.label; fallbackUsed = Boolean(texts[i]); } catch (error) { notes.push(`${next.label}: ${String(error?.message || 'errore').slice(0, 120)}`); }
   }
   // La lettura più completa fa da base (ordine e sezioni del menu), l'altra conferma.
   const good = texts.filter((t) => t && readingItems(t).length).sort((a, b) => readingItems(b).length - readingItems(a).length);
-  if (!good.length) return { ok: false, reason: 'non riesco a leggere piatti e prezzi in questa foto: prova con una foto più nitida, dritta e senza riflessi', raw: texts };
+  if (!good.length) return { ok: false, reason: 'non riesco a leggere piatti e prezzi in questa foto: prova con una foto più nitida, dritta e senza riflessi', raw: [...texts, ...notes.map((n) => `[nota] ${n}`)] };
   let combined = combineReadings(good[0], good[1]);
   // Molte voci in disaccordo (menu lunghi, scritte piccole): una terza lettura con un altro modello fa da arbitro.
   let thirdText = '';
-  if (good.length === 2 && !fallbackUsed && combined.doubts >= 10 && combined.agreed < 0.8 * readingItems(good[0]).length) {
-    try { thirdText = await transcribe(ai, VISION_FALLBACK, dataUrl, timeoutMs); } catch (error) { thirdText = ''; texts.push(`[terza lettura non riuscita] ${String(error?.message || 'errore').slice(0, 200)}`); }
+  const arbiter = spare.shift();
+  if (good.length === 2 && arbiter && combined.doubts >= (geminiReady ? 1 : 10) && combined.agreed < (geminiReady ? 1 : 0.8) * readingItems(good[0]).length) {
+    try { thirdText = await arbiter.run(); used.push(arbiter.label); } catch (error) { thirdText = ''; texts.push(`[terza lettura non riuscita] ${String(error?.message || 'errore').slice(0, 200)}`); }
     if (thirdText && readingItems(thirdText).length) combined = combineReadings(good[0], good[1], thirdText);
     else { texts.push(`[terza lettura senza voci] ${String(thirdText || '(vuota)').slice(0, 1500)}`); thirdText = ''; }
   }
   // Sezioni dove le letture non concordano: Jarvis chiede di rimandare solo quelle.
   const weakSections = (combined.sections || []).filter((t) => t.total >= 3 && t.ok < t.total * 0.6).map((t) => `${t.name} (${t.ok} su ${t.total})`);
+  const withGemini = used.some((label) => label.startsWith('gemini'));
   const warnings = [good.length === 2
-    ? `Foto letta da Jarvis ${thirdText ? 'tre volte con tre modelli diversi' : 'due volte con modelli diversi'}${fallbackUsed ? ' (uno di riserva, il primo non rispondeva)' : ''}: ${combined.agreed} voci concordi${thirdText && combined.byThird ? ` (${combined.byThird} confermate dalla terza lettura)` : ''}${combined.doubts ? `, ${combined.doubts} righe da verificare sulla foto` : ''}.`
+    ? `Foto letta da Jarvis ${thirdText ? 'tre volte con tre modelli diversi' : 'due volte con modelli diversi'}${withGemini ? ' (Gemini)' : ''}${fallbackUsed ? ' (uno di riserva, il primo non rispondeva)' : ''}: ${combined.agreed} voci concordi${thirdText && combined.byThird ? ` (${combined.byThird} confermate dalla terza lettura)` : ''}${combined.doubts ? `, ${combined.doubts} righe da verificare sulla foto` : ''}.`
     : 'Foto letta una sola volta (il secondo modello non ha risposto): tutte le voci restano da verificare sulla foto.'];
   if (good.length === 2 && weakSections.length) warnings.push(`Sezioni meno sicure: ${weakSections.join(', ')}.`);
-  return { ok: true, text: combined.text, agreed: combined.agreed, doubts: combined.doubts, method: good.length === 2 ? (thirdText ? 'jarvis_foto_tripla_lettura' : 'jarvis_foto_doppia_lettura') : 'jarvis_foto_lettura_singola', warnings, raw: thirdText ? [...texts, thirdText] : texts };
+  return { ok: true, text: combined.text, agreed: combined.agreed, doubts: combined.doubts, checks: combined.checks || [], models: used,
+    method: good.length === 2 ? (thirdText ? 'jarvis_foto_tripla_lettura' : 'jarvis_foto_doppia_lettura') : 'jarvis_foto_lettura_singola', warnings,
+    raw: [...(thirdText ? [...texts, thirdText] : texts), ...notes.map((n) => `[nota] ${n}`)] };
 }
 
 /** PDF → testo incorporato (nessuna interpretazione). */

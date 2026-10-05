@@ -63,7 +63,9 @@ export async function onRequest(context) {
         const kept = outcome?.draftKept ? ' Attenzione: c’è già una bozza che hai modificato o affidato, quindi NON l’ho cambiata e questi file non sono dentro. Se vuoi includerli: Revisione → «Rifai la bozza con tutti i materiali».' : '';
         const text = !outcome?.ok ? `Non sono riuscito a leggere «${material.filename}»: ${outcome?.reason || 'errore'}.`
           : `${head}${many ? '' : `. ${outcome.warnings?.[0] || ''}`}${kept}${weak}${outcome.drafted ? ` Bozza pronta con tutti i file della pratica: controllala in Revisione, confrontando i prezzi con le foto.${outcome.notesText ? `\n\n${outcome.notesText}` : ''}` : outcome.draftError ? ` Bozza non generata: ${outcome.draftError}` : ''}`;
-        await missions.notify(env.DB, env, material.request_id, outcome?.ok ? 'foto letta' : 'foto non leggibile', text);
+        const checks = outcome?.checks ? `\n\nVoci sicure: ${outcome.checks.sure}. Mi restano ${outcome.checks.count} dubbi sui prezzi: te li chiedo uno alla volta qui sotto, tu guarda il menu e tocca il prezzo giusto. Dopo l'ultimo preparo la bozza.` : '';
+        await missions.notify(env.DB, env, material.request_id, outcome?.ok ? 'foto letta' : 'foto non leggibile', `${text}${checks}`);
+        if (outcome?.checks) await missions.startChecks(env.DB, env, material.request_id).catch(() => 0);
       }
       const drafted = await runAutopilot(env.DB, env);
       const chat = drafted.length ? await missions.setting(env.DB, 'telegram_chat_id') : null;
