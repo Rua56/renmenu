@@ -314,6 +314,10 @@ describe('Dubbi della foto su Telegram, uno alla volta', () => {
       assert.match(text, /# Primi piatti\nRisotto — 8,00\nSpaghetti — 7,00\nGnocchi — 8,50\n# Dolci/);
       assert.match(text, /\[da verificare\] Tiramisù/, 'saltata: resta da verificare');
       assert.match(lastSent(), /Dubbi chiusi: 2 voci aggiunte/);
+      assert.match(lastSent(), /Preparo la bozza adesso/);
+      assert.equal(await db.prepare("SELECT count(*) n FROM drafts").bind().first().n ?? 0, 0, 'mai dentro la risposta a Telegram');
+      await missions.draftAfterChecks(db, env);
+      assert.match(lastSent(), /Bozza pronta/);
       const draft = await db.prepare("SELECT menu_json FROM drafts WHERE request_id='r1'").bind().first();
       assert.ok(draft, 'bozza preparata dopo l’ultimo dubbio');
       assert.match(draft.menu_json, /Spaghetti[\s\S]*7,00/);
