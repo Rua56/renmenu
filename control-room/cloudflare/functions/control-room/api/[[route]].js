@@ -196,7 +196,9 @@ async function geminiConfig(db, env) {
   try {
     const key = await readSealedSetting(env, missions.setting, missions.putSetting, db, 'gemini_api_key');
     const models = JSON.parse(await missions.setting(db, 'gemini_models') || '[]');
-    return key && models.length ? { key, models: [...new Set([...models, ...GEMINI_PREFERRED])] } : null;
+    // I modelli che hanno risposto per ultimi vanno per primi: niente attese su quelli sovraccarichi o assenti.
+    let good = []; try { good = JSON.parse(await missions.setting(db, 'gemini_good') || '[]'); } catch { /* nessuno */ }
+    return key && models.length ? { key, models: [...new Set([...good, ...models, ...GEMINI_PREFERRED])] } : null;
   } catch { return null; }
 }
 async function readPendingInner(db, env, calm) {
@@ -1242,6 +1244,10 @@ export async function action(db, type, input, env = {}) {
       await missions.putSetting(db, 'read_retries', JSON.stringify(retries));
       await auditedBatch(db, [], 'material.read.deferred', `Google non risponde: rileggo «${material.filename}» tra ${minutes} minuti (tentativo ${tries + 1} di ${RETRY_MINUTES.length}).`.slice(0, 600), request.id);
       return { state: await state(db, env), result: { ok: true, deferred: { n: tries + 1, of: RETRY_MINUTES.length, minutes } } };
+    }
+    if (read.ok && Array.isArray(read.models)) {
+      const worked = [...new Set(read.models.filter((m) => String(m).startsWith('gemini')))].slice(0, 3);
+      if (worked.length) await missions.putSetting(db, 'gemini_good', JSON.stringify(worked)).catch(() => {});
     }
     if (tries) { delete retries[materialId]; await missions.putSetting(db, 'read_retries', JSON.stringify(retries)).catch(() => {}); }
     // Contatore delle letture del giorno (per «stato» e la quota gratuita): resta anche se la pratica viene eliminata.
