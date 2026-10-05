@@ -212,6 +212,12 @@ async function readPendingInner(db, env, calm) {
       const hasDraft = await getOne(db, 'SELECT id FROM drafts WHERE request_id=?', material.request_id);
       if (outcome.ok && hasDraft) outcome.draftKept = true; // bozza già modificata o affidata: non si tocca
       // Premium su misura: la bozza la avvia sempre Riccardo (scheda creativa + direzioni grafiche).
+      // Lettura debole (le due letture concordano su meno voci di quante ne restano in dubbio): niente bozza
+      // automatica, sarebbe un menu a metà e con voci al posto sbagliato. Jarvis chiede una foto migliore.
+      const weakRows = await rows(db, "SELECT a.warnings_json AS w, a.source_text AS t FROM material_analyses a JOIN materials m ON m.id=a.material_id WHERE a.request_id=? AND m.archived_at IS NULL", material.request_id).catch(() => []);
+      const sure = weakRows.reduce((n, r) => n + String(r.t || '').split('\n').filter((l) => l.trim() && !l.startsWith('[da verificare]') && !l.startsWith('#') && !l.startsWith('>')).length, 0);
+      const unsure = weakRows.reduce((n, r) => n + String(r.t || '').split('\n').filter((l) => l.startsWith('[da verificare]')).length, 0);
+      if (outcome.ok && !hasDraft && unsure >= 10 && sure < unsure) { outcome.weak = { sure, unsure }; done.push({ material, request, outcome }); continue; }
       if (outcome.ok && request?.category && request.category !== 'nuovo_premium' && request.plan !== 'premium' && !hasDraft) {
         try { await action(jarvis, 'generateDraft', { requestId: request.id }, env); outcome.drafted = true; outcome.notesText = notesSummary(await draftNotes(db, request.id)); }
         catch (error) { outcome.draftError = String(error?.message || 'errore').slice(0, 240); }

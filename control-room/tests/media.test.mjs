@@ -292,3 +292,11 @@ describe('Foto menu · prezzo sulla riga dopo e allergeni nel nome', () => {
     assert.equal(tidyReading('# Vini\nRibolla — calice 5 / bottiglia 40\n> fresca (12)'), '# Vini\nRibolla — calice 5 / bottiglia 40\n> fresca (12)');
   });
 });
+
+import { extractVenueInfo } from '../cloudflare/functions/_lib/venue-info.js';
+describe('Informazioni del locale e righe in dubbio della foto', () => {
+  it('«[da verificare] Minestrone (oggi giovedì…)» non diventa l’orario del locale', () => {
+    const info = extractVenueInfo('[da verificare] Minestrone (oggi giovedì 1-6-7): letto 6,00 solo nella seconda lettura\nOrari: da martedì a domenica 12-15');
+    assert.doesNotMatch(JSON.stringify(info.orari || {}), /Minestrone/);
+  });
+});

@@ -12,7 +12,8 @@ export const VISION_MODELS = ['@cf/meta/llama-4-scout-17b-16e-instruct', '@cf/mi
 // così il controllo incrociato resta a DUE letture indipendenti e la bozza non resta vuota.
 export const VISION_FALLBACK = '@cf/google/gemma-4-26b-a4b-it';
 export const PHOTO_TYPES = new Set(['image/jpeg', 'image/png', 'image/webp']);
-const MAX_IMAGE_BYTES = 4_500_000;
+// Screenshot e file a piena qualità da Telegram (PNG dell'iPhone ~5 MB): più nitidi della foto compressa.
+const MAX_IMAGE_BYTES = 9_000_000;
 export const DOUBT = '[da verificare]';
 
 const PROMPT = [
@@ -217,7 +218,7 @@ export function combineReadings(first, second) {
 export async function readMenuPhoto(ai, bytes, mime, { timeoutMs = 110_000 } = {}) {
   if (typeof ai?.run !== 'function') return { ok: false, reason: 'lettura delle foto non disponibile in questo ambiente' };
   if (!PHOTO_TYPES.has(mime)) return { ok: false, reason: `formato ${mime} non leggibile: manda la foto in JPG o PNG` };
-  if (bytes.length > MAX_IMAGE_BYTES) return { ok: false, reason: 'foto troppo grande (oltre 4,5 MB): mandala da Telegram o in qualità ridotta' };
+  if (bytes.length > MAX_IMAGE_BYTES) return { ok: false, reason: 'foto troppo grande (oltre 9 MB): fai uno screenshot della foto e manda quello' };
   const dataUrl = `data:${mime};base64,${toBase64(bytes)}`;
   // Un errore passeggero del servizio (es. codice 5026) non deve lasciare la foto con una sola lettura: un secondo tentativo.
   const once = (model) => transcribe(ai, model, dataUrl, timeoutMs).catch((error) => (/tempo scaduto/.test(String(error?.message)) ? Promise.reject(error) : transcribe(ai, model, dataUrl, timeoutMs)));

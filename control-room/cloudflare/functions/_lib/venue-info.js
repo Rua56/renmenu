@@ -131,7 +131,8 @@ export function extractVenueInfo(sourceText, { protectedWords = [] } = {}) {
   lines.forEach((raw, k) => {
     const index = lineNo[k] - 1;
     const original = raw.trim().replace(/^[-•*]\s*/, '');
-    if (!original || /^>/.test(original)) return;
+    // Righe «[da verificare] …» della lettura di una foto: sono dubbi su piatti, mai informazioni del locale.
+    if (!original || /^>/.test(original) || /^\[da verificare\]/i.test(original)) return;
     const line = fixTypos(original, VOCAB, guard);
     const before = new Set(original.toLowerCase().match(/[a-zà-ÿ]+/g) || []);
     const corrected = new Set((line.toLowerCase().match(/[a-zà-ÿ]+/g) || []).filter((w) => !before.has(w)));
