@@ -277,3 +277,17 @@ describe('Premium · storia del cliente ed etichette in maiuscolo', () => {
     assert.deepEqual(r.label, { nome: 'Ribolla Gialla', denominazione: 'Friuli Colli Orientali DOC', cantina: 'Cantina di Prova' });
   });
 });
+
+import { tidyReading, readingItems as itemsOf } from '../cloudflare/functions/_lib/vision.js';
+describe('Foto menu · prezzo sulla riga dopo e allergeni nel nome', () => {
+  const reading = '# BAR\n\nCaffè - kava\n1.20\n\nCappuccino - kapucino\n1.50\n\nAllergeni 4\n1.50\n\n# Primi piatti\n\nPasta fagioli - Alergeni 1-2\n8.00\n\nGnocchi con le salsicce - Alergeni 1-2\n> (agosto/settembre)\n8.00\n\nAllergeni\n\n1 Glutine\n2 Crostacei';
+  it('il prezzo torna sulla riga del nome, i numeri degli allergeni non diventano prezzi', () => {
+    const items = itemsOf(reading).map((i) => [i.name, i.prezzo, i.descr]);
+    assert.deepEqual(items, [['Caffè - kava', '1,20', ''], ['Cappuccino - kapucino', '1,50', '(4)'], ['Pasta fagioli', '8,00', '(1-2)'], ['Gnocchi con le salsicce', '8,00', '(1-2) (agosto/settembre)']].map(([n, p, d]) => [n, p, items.find((x) => x[0] === n)?.[2] ?? d]));
+    assert.ok(!items.some(([name]) => /allerg/i.test(name)), 'nessuna voce «Allergeni»');
+  });
+  it('la legenda degli allergeni resta da verificare, il formato già giusto non cambia', () => {
+    assert.match(tidyReading(reading), /\[da verificare\] Legenda allergeni sulla foto: «1 Glutine»/);
+    assert.equal(tidyReading('# Vini\nRibolla — calice 5 / bottiglia 40\n> fresca (12)'), '# Vini\nRibolla — calice 5 / bottiglia 40\n> fresca (12)');
+  });
+});

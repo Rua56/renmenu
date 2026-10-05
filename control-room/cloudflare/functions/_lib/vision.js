@@ -67,8 +67,58 @@ const amountsKey = (item) => (item.prezzi ? item.prezzi.map((p) => p.prezzo).joi
 const priceText = (item) => (item.prezzi ? item.prezzi.map((p) => `${p.etichetta.it.toLowerCase()} ${p.prezzo}`).join(' / ') : item.prezzo);
 
 /** Una lettura → voci strutturate (sezione, nome, prezzo o prezzi, descrizione) + righe dubbie. */
+/* Alcuni modelli non seguono il formato «Nome — prezzo»: scrivono il prezzo sulla riga dopo e gli
+ * allergeni dentro il nome («Pasta corta - Allergeni 1-2» / riga «Allergeni 4»). Qui si rimette in
+ * ordine senza inventare nulla: il prezzo torna sulla riga del nome, i numeri degli allergeni
+ * diventano «> (1-2)» (da confermare dal locale, come sempre), le righe «Allergeni» senza numeri spariscono. */
+const BARE_PRICE = /^\s*(?:€\s*)?(\d{1,4}(?:[.,]\d{1,2})?)\s*(?:€|eur[o]?)?\s*$/i;
+const ALLERGEN_TAIL = /\s*[-–—,(]?\s*al+er+geni(?:\s*[:.]?\s*((?:\d{1,2}\s*[-,/]?\s*)+))?\s*\)?\s*$/i;
+const ALLERGEN_ROW = /^\s*>?\s*al+er+geni\b\s*[:.]?\s*((?:\d{1,2}\s*[-,/]?\s*)*)(?:soliti)?\s*(?:[—–-]\s*)?(\d{1,4}(?:[.,]\d{1,2})?)?\s*$/i;
+const codes = (raw) => (String(raw || '').match(/\d{1,2}/g) || []).filter((n) => Number(n) >= 1 && Number(n) <= 14).join('-');
+const hasPrice = (line) => /(?:\s[-–]|—)\s*(?:€\s*)?\d{1,4}(?:[.,]\d{1,2})?\s*(?:€)?\s*$/.test(line) || /\s\d{1,4}[.,]\d{2}\s*€?\s*$/.test(line);
+export function tidyReading(text) {
+  const out = [];
+  let item = -1; // ultima riga «voce» (non titolo, non descrizione) ancora senza prezzo o appena chiusa
+  let legend = false;
+  for (const raw of String(text || '').split(/\r?\n/)) {
+    const line = raw.trimEnd();
+    if (!line.trim()) { out.push(line); continue; }
+    if (/^#{1,3}\s/.test(line)) { out.push(line); item = -1; legend = false; continue; }
+    // Legenda finale «Allergeni / 1 Glutine …»: non sono piatti.
+    if (/^\s*al+er+geni\s*:?\s*$/i.test(line)) { legend = true; continue; }
+    if (legend && /^\s*\d{1,2}\s*[-.)]?\s*[A-Za-zÀ-ÿ]/.test(line)) { out.push(`${DOUBT} Legenda allergeni sulla foto: «${line.trim()}»`); continue; }
+    const row = line.match(ALLERGEN_ROW);
+    if (row) {
+      const list = codes(row[1]);
+      if (list && item >= 0) out.splice(item + 1, 0, `> (${list})`);
+      continue; // il prezzo ripetuto su questa riga è quello della voce sopra
+    }
+    const bare = line.match(BARE_PRICE);
+    if (bare) {
+      if (item >= 0 && !hasPrice(out[item])) out[item] = `${out[item].replace(/\s*[—–-]\s*$/, '')} — ${bare[1]}`;
+      continue;
+    }
+    if (/^\s*>/.test(line)) {
+      const tail = line.match(ALLERGEN_TAIL);
+      out.push(tail ? `${line.slice(0, tail.index).trimEnd()}${codes(tail[1]) ? ` (${codes(tail[1])})` : ''}` : line);
+      continue;
+    }
+    let name = line, list = '';
+    const tail = name.match(ALLERGEN_TAIL);
+    if (tail && !hasPrice(name)) { list = codes(tail[1]); name = name.slice(0, tail.index).trimEnd(); }
+    else if (hasPrice(name)) {
+      const m = name.match(/^(.*?)\s*[-–—,(]\s*al+er+geni\s*[:.]?\s*((?:\d{1,2}\s*[-,/]?\s*)*)\)?\s*([—–-]\s*\d.*)$/i);
+      if (m) { name = `${m[1]} ${m[3]}`; list = codes(m[2]); }
+    }
+    out.push(name);
+    item = out.length - 1;
+    if (list) out.push(`> (${list})`);
+  }
+  return out.join('\n');
+}
+
 function parse(text) {
-  const rows = String(text || '').split(/\r?\n/).map(clean);
+  const rows = tidyReading(text).split(/\r?\n/).map(clean);
   const doubts = rows.filter((r) => r.includes('[?]'));
   const extraction = extractMenuFromText('x', rows.filter((r) => !r.includes('[?]')).join('\n'), 'x');
   const items = [], sections = [];
@@ -161,7 +211,9 @@ export async function readMenuPhoto(ai, bytes, mime, { timeoutMs = 45_000 } = {}
   if (!PHOTO_TYPES.has(mime)) return { ok: false, reason: `formato ${mime} non leggibile: manda la foto in JPG o PNG` };
   if (bytes.length > MAX_IMAGE_BYTES) return { ok: false, reason: 'foto troppo grande (oltre 4,5 MB): mandala da Telegram o in qualità ridotta' };
   const dataUrl = `data:${mime};base64,${toBase64(bytes)}`;
-  const reads = await Promise.allSettled(VISION_MODELS.map((model) => transcribe(ai, model, dataUrl, timeoutMs)));
+  // Un errore passeggero del servizio (es. codice 5026) non deve lasciare la foto con una sola lettura: un secondo tentativo.
+  const once = (model) => transcribe(ai, model, dataUrl, timeoutMs).catch((error) => (/tempo scaduto/.test(String(error?.message)) ? Promise.reject(error) : transcribe(ai, model, dataUrl, timeoutMs)));
+  const reads = await Promise.allSettled(VISION_MODELS.map((model) => once(model)));
   const texts = reads.map((r) => (r.status === 'fulfilled' ? r.value : ''));
   const good = texts.filter((t) => t && readingItems(t).length);
   if (!good.length) return { ok: false, reason: 'non riesco a leggere piatti e prezzi in questa foto: prova con una foto più nitida, dritta e senza riflessi', raw: texts };

@@ -278,8 +278,11 @@ export function createMissions(deps) {
     const payment = !fresh ? client.payment_status : request.plan === 'standard' ? 'in_prova' : 'attivo';
     const trial = fresh && request.plan === 'standard' ? plusDays(30) : client.trial_ends_at;
     const renewal = fresh && request.plan === 'annuale' ? plus(12) : fresh && request.plan === 'premium' ? plus(1) : client.renewal_at;
-    await auditedBatch(jarvisDb(db), [db.prepare('UPDATE clients SET menu_id=?,menu_url=?,plan=?,payment_status=?,trial_ends_at=?,renewal_at=?,revision=revision+1,updated_at=? WHERE id=?')
-      .bind(draft.slug, publicUrl || client.menu_url, plan, payment, trial, renewal, now(), client.id)],
+    // Cliente arrivato via email senza nome del locale («Nuovo contatto email»): prende il nome del menu pubblicato.
+    let published = ''; try { published = String(JSON.parse(draft.menu_json).nome || '').trim().slice(0, 140); } catch {}
+    const name = /^nuovo contatto/i.test(client.name || '') && published ? published : client.name;
+    await auditedBatch(jarvisDb(db), [db.prepare('UPDATE clients SET name=?,menu_id=?,menu_url=?,plan=?,payment_status=?,trial_ends_at=?,renewal_at=?,revision=revision+1,updated_at=? WHERE id=?')
+      .bind(name, draft.slug, publicUrl || client.menu_url, plan, payment, trial, renewal, now(), client.id)],
     'client.publish_sync', `Scheda cliente aggiornata dopo la pubblicazione: menu ${draft.slug}${fresh ? `, piano ${PLAN_LABEL[request.plan]}` : ''}.`, request.id).catch(() => {});
     // Memoria: Jarvis ricorda com'è fatto il menu appena andato online.
     let menu = null; try { menu = JSON.parse(draft.menu_json); } catch {}
@@ -487,6 +490,9 @@ export function createMissions(deps) {
       await reply(db, env, chat, `${said}${text}`, spoken, buttons);
     };
     // Domande e conversazione libera: risponde il modello grande, con tutta la memoria della chat.
+    // «Il piano è Standard» subito dopo aver aperto una pratica: vale per QUELLA pratica, non per un menu online.
+    const planned = intent.intent === 'crea_pratica' ? null : await planForFocus(db, utterance, intent.locale);
+    if (planned) { await answer(planned); return; }
     if (intent.intent === 'risposta' || (intent.intent === 'non_chiaro' && clues.guess.intent === 'non_chiaro')) {
       const talk = await freeChat(env.AI, { utterance: said0, context, history: fresh ? [...history, { who: 'Riccardo', text: pending.text }] : history, spoken });
       await auditedBatch(jarvisDb(db), [], 'jarvis.chat', `Conversazione libera: ${talk.ok ? (talk.model === CHAT_MODEL ? 'GPT-OSS 120B' : 'modello di riserva') : 'nessuna risposta'}.`, null).catch(() => {});
@@ -507,6 +513,27 @@ export function createMissions(deps) {
     if (intent.intent === 'aggiorna_menu') { await answer(await voiceUpdate(db, env, utterance, intent.locale, clues)); return; }
     await answer(intent.risposta || 'Non ho afferrato, Riccardo: di quale locale parliamo e cosa devo fare?');
   }
+  async function planForFocus(db, utterance, spokenVenue) {
+    const plan = planFromText(utterance);
+    if (!plan || String(utterance).split(/\s+/).length > 30) return null;
+    if (/\b(?:cambia|aggiung|togli|rimuov|costa|prezzo|euro|€)/i.test(utterance)) return null;
+    let focus = null;
+    try { focus = JSON.parse(await setting(db, 'tg_focus') || 'null'); } catch {}
+    if (!focus?.requestId || Date.now() - Date.parse(focus.at) >= FOCUS_MINUTES * MINUTE) return null;
+    const request = await getOne(db, 'SELECT r.id,r.subject,r.plan,r.status,r.revision,r.kind,c.name AS client_name FROM requests r LEFT JOIN clients c ON c.id=r.client_id WHERE r.id=?', focus.requestId);
+    if (!request || ['completata', 'archiviata', 'chiusa'].includes(request.status) || request.kind !== 'nuovo') return null;
+    if (spokenVenue && !matchVenue(spokenVenue, [{ id: request.id, name: request.client_name || '', menu_id: '' }]).client) return null;
+    const label = plan[0].toUpperCase() + plan.slice(1);
+    if (request.plan === plan) return `Sì, la pratica «${request.subject}» è già sul piano ${label}.`;
+    try {
+      const subject = String(request.subject || '').replace(/^Nuovo menu (?:\(piano da definire\)|Standard|Annuale|Premium)/, `Nuovo menu ${label}`);
+      await action(jarvisDb(db), 'updateRequest', { id: request.id, revision: request.revision, patch: { plan, category: `nuovo_${plan}`, subject } });
+      return `Segnato, Riccardo: piano ${PLAN_LABEL[plan]} per la pratica «${subject}».`;
+    } catch (error) {
+      return `Non sono riuscito a segnare il piano: ${String(error?.message || 'errore').slice(0, 200)}`;
+    }
+  }
+
   // Nuova pratica a voce: cliente (esistente o nuovo) + pratica «nuovo menu». Le foto e i PDF che
   // Riccardo manda nell'ora successiva si collegano da soli a questa pratica.
   const FOCUS_MINUTES = 60;
@@ -536,6 +563,7 @@ export function createMissions(deps) {
   async function voiceUpdate(db, env, utterance, spokenVenue, clues = { locales: [], dishes: [] }) {
     const clients = await rows(db, "SELECT id,name,menu_id,plan FROM clients WHERE menu_id IS NOT NULL AND menu_id<>''");
     const { client, candidates } = pickLocale(spokenVenue, clues, clients);
+    if (client && /^nuovo contatto/i.test(client.name || '') && !(spokenVenue && matchVenue(spokenVenue, [client]).client)) return 'Su quale menu devo intervenire? Dimmi il nome del locale.';
     if (!client) return candidates.length > 1 ? `Ho trovato più locali: ${candidates.map((c) => c.name).join(', ')}. Quale intendi?` : `${spokenVenue ? `Non trovo un locale con menu online che si chiami «${spokenVenue}».` : 'Non ho capito di quale locale si tratta.'} Su quale menu devo intervenire?`;
     const proposal = classifyRequest('Richiesta a voce', utterance);
     const category = ['prezzo', 'piatto', 'vini_cocktail', 'disponibilita'].includes(proposal.category) ? proposal.category : 'piatto';
