@@ -36,7 +36,9 @@ function similar(a, b) {
   const x = words(a), y = words(b);
   if (!x.size || !y.size) return false;
   const common = [...x].filter((w) => y.has(w)).length;
-  return common / Math.max(x.size, y.size) >= 0.6 || norm(a) === norm(b);
+  // «Tirami sù» = «Tiramisù», «The» = «Tè»: stesso nome scritto in modo diverso.
+  const tight = (v) => norm(v).replace(/ /g, '').replace(/^the\b|^the(?=[^a-z]|$)/, 'te');
+  return common / Math.max(x.size, y.size) >= 0.6 || norm(a) === norm(b) || (tight(a).length >= 4 && tight(a) === tight(b));
 }
 // Un modello a volte trascrive la descrizione al posto del nome («CON BARBABIETOLA SOTTACETO, …»).
 function descriptionAsName(name) {
@@ -87,7 +89,8 @@ export function tidyReading(text) {
   let item = -1; // ultima riga «voce» (non titolo, non descrizione) ancora senza prezzo o appena chiusa
   let legend = false;
   for (const raw of String(text || '').split(/\r?\n/)) {
-    const line = raw.trimEnd();
+    // «> prosciutto cotto 5,00»: una riga col prezzo è una voce, non una descrizione.
+    const line = /^\s*>\s*.*\d[.,]\d{2}\s*(?:€|euro)?\s*$/i.test(raw) ? raw.replace(/^\s*>\s*/, '').trimEnd() : raw.trimEnd();
     if (!line.trim()) { out.push(line); continue; }
     if (/^#{1,3}\s/.test(line)) { out.push(line); item = -1; legend = false; continue; }
     // Legenda finale «Allergeni / 1 Glutine …»: non sono piatti.
@@ -260,6 +263,8 @@ export async function transcribeGemini({ key, model, fetchImpl = globalThis.fetc
   };
   let { response, data } = await ask(true);
   if (response.status === 400) ({ response, data } = await ask(false));
+  // 503 «UNAVAILABLE» (modello sovraccarico): passeggero, un secondo tentativo dopo una breve pausa.
+  if (response.status === 503 || response.status === 500) { await new Promise((r) => setTimeout(r, 2500)); ({ response, data } = await ask(true)); }
   if (!response.ok) throw new Error(`Gemini ${response.status}${data?.error?.status ? ` ${data.error.status}` : ''}`);
   const candidate = data?.candidates?.[0];
   const text = (candidate?.content?.parts || []).filter((part) => !part.thought).map((part) => part.text || '').join('');
@@ -277,12 +282,22 @@ export async function readMenuPhoto(ai, bytes, mime, { timeoutMs = 110_000, gemi
   const once = (model) => transcribe(ai, model, dataUrl, timeoutMs).catch((error) => (/tempo scaduto/.test(String(error?.message)) ? Promise.reject(error) : transcribe(ai, model, dataUrl, timeoutMs)));
   const cf = (model) => ({ label: model, run: () => once(model) });
   const gm = (model) => ({ label: model, gemini: true, run: () => transcribeGemini({ ...gemini, model }, bytes, mime, timeoutMs) });
-  const primary = geminiReady ? gemini.models.slice(0, 2).map(gm) : VISION_MODELS.map(cf);
-  if (primary.length < 2) primary.push(cf(VISION_MODELS[1]));
+  // Catena Gemini: i modelli scelti alla prova della chiave, poi gli altri gratuiti. Un modello che risponde
+  // «404» (non disponibile per questa chiave) o resta sovraccarico cede il posto al successivo.
+  const chain = geminiReady ? [...new Set([...gemini.models, ...GEMINI_PREFERRED])] : [];
+  const geminiRead = async () => {
+    while (chain.length) {
+      const model = chain.shift();
+      try { const text = await gm(model).run(); if (text && readingItems(text).length) return { text, model }; notes.push(`${model}: lettura senza voci`); }
+      catch (error) { notes.push(`${model}: ${String(error?.message || 'errore').slice(0, 120)}`); }
+    }
+    throw new Error('Gemini non disponibile');
+  };
+  const primary = geminiReady ? [0, 1].map(() => ({ label: 'gemini', gemini: true, run: async function run() { const r = await geminiRead(); this.label = r.model; return r.text; } })) : VISION_MODELS.map(cf);
   const spare = geminiReady ? [cf(VISION_MODELS[1]), cf(VISION_MODELS[0])] : [cf(VISION_FALLBACK)];
-  const used = primary.map((r) => r.label);
   const notes = [];
   const reads = await Promise.allSettled(primary.map((r) => r.run()));
+  const used = primary.map((r) => r.label);
   const texts = reads.map((r, i) => { if (r.status !== 'fulfilled') notes.push(`${primary[i].label}: ${String(r.reason?.message || 'errore').slice(0, 120)}`); return r.status === 'fulfilled' ? r.value : ''; });
   // Una lettura mancata (quota Gemini finita, errore): la sostituisce un modello di riserva.
   let fallbackUsed = false;

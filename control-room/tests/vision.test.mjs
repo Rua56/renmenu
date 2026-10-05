@@ -116,3 +116,17 @@ describe('Gemini: impostazione del pensiero rifiutata', () => {
     assert.equal(bodies.length, 2);
   });
 });
+
+describe('Gemini: modello non disponibile per la chiave', () => {
+  it('404 sul primo modello: passa al successivo della lista, sempre con Gemini', async () => {
+    const asked = [];
+    const fetchImpl = async (url) => { const model = String(url).split('/models/')[1].split(':')[0]; asked.push(model);
+      return model === 'gemini-2.5-flash' ? Response.json({ error: { status: 'NOT_FOUND' } }, { status: 404 })
+        : Response.json({ candidates: [{ content: { parts: [{ text: '# Primi\nSpaghetti — 7,00\nRisotto — 8,00' }] } }] }); };
+    const ai = { run: async () => { throw new Error('Cloudflare non dovrebbe servire'); } };
+    const r = await readMenuPhoto(ai, new Uint8Array([255, 216, 255, 1]), 'image/jpeg', { gemini: { key: 'k'.repeat(39), models: ['gemini-2.5-flash', 'gemini-3-flash-preview'], fetchImpl } });
+    assert.equal(r.agreed, 2);
+    assert.ok(r.models.every((m) => m.startsWith('gemini-') && m !== 'gemini-2.5-flash'), JSON.stringify(r.models));
+    assert.notEqual(r.models[0], r.models[1], 'due modelli diversi');
+  });
+});

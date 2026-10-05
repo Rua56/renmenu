@@ -111,3 +111,26 @@ describe('Traduzione: quota gratuita finita', () => {
     assert.match(translationSummary(out), /quota gratuita/);
   });
 });
+
+import { translateMenu as translateWithGemini } from '../cloudflare/functions/_lib/translate.js';
+describe('Traduzioni con Gemini', () => {
+  it('con la chiave traduce Gemini; «fatti in casa» non viene più scartato', async () => {
+    const menu = { lingue: ['it', 'en'], sezioni: [{ nome: { it: 'Primi' }, voci: [{ nome: { it: 'Gnocchi fatti in casa' }, prezzo: '8,00' }, { nome: { it: 'Caffè corretto' }, prezzo: '1,50' }] }] };
+    const fetchImpl = async (url, init) => { const body = JSON.parse(init.body); assert.match(body.system_instruction.parts[0].text, /bilingual/);
+      return Response.json({ candidates: [{ content: { parts: [{ text: JSON.stringify({ translations: [{ id: 0, en: 'Starters' }, { id: 1, en: 'Homemade gnocchi' }, { id: 2, en: 'Espresso with a dash of liqueur' }] }) }] } }] }); };
+    const ai = { run: async () => { throw new Error('Cloudflare non dovrebbe servire'); } };
+    const r = await translateWithGemini(ai, menu, { lang: 'en', gemini: { key: 'k', models: ['gemini-x'], fetchImpl } });
+    assert.equal(r.menu.sezioni[0].voci[0].nome.en, 'Homemade gnocchi');
+    assert.equal(r.menu.sezioni[0].voci[1].nome.en, 'Espresso with a dash of liqueur');
+  });
+});
+
+import { applyExtras as applyExtrasForTest, proposeMenuAllergens as proposeForTest } from '../cloudflare/functions/_lib/extras.js';
+describe('Allergeni dai numeri della descrizione', () => {
+  it('confermati: la descrizione «(10)» sparisce, quella vera perde solo i numeri', () => {
+    const menu = { sezioni: [{ nome: { it: 'Bar' }, voci: [{ nome: { it: 'Birra' }, prezzo: '2,00', descrizione: { it: '(10)', en: '(10)' } }, { nome: { it: 'Gnocchi' }, prezzo: '8,00', descrizione: { it: 'con burro (1-7)', en: 'with butter (1-7)' } }] }] };
+    const r = applyExtrasForTest(menu, proposeForTest(menu), () => 'x');
+    assert.deepEqual(r.menu.sezioni[0].voci[0], { nome: { it: 'Birra' }, prezzo: '2,00', allergeni: ['10'] });
+    assert.deepEqual(r.menu.sezioni[0].voci[1].descrizione, { it: 'con burro', en: 'with butter' });
+  });
+});
