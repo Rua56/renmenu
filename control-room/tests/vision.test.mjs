@@ -76,3 +76,29 @@ describe('Sezioni meno sicure della foto', () => {
     assert.deepEqual(r.sections.map((s) => [s.name, s.ok, s.total]), [['Primi', 1, 3], ['Dolci', 3, 3]]);
   });
 });
+
+describe('Lettura con Gemini', () => {
+  const menuText = '# Primi\nSpaghetti — 7,00\nRisotto — 8,00';
+  it('con la chiave leggono due modelli Gemini; la chiave va nell’intestazione, mai nell’indirizzo', async () => {
+    const seen = [];
+    const fetchImpl = async (url, init) => { seen.push({ url: String(url), key: init.headers['x-goog-api-key'], body: JSON.parse(init.body) });
+      return Response.json({ candidates: [{ content: { parts: [{ text: menuText }] } }] }); };
+    const ai = { run: async () => { throw new Error('Cloudflare non dovrebbe servire'); } };
+    const r = await readMenuPhoto(ai, new Uint8Array([255, 216, 255, 1]), 'image/jpeg', { gemini: { key: 'k'.repeat(39), models: ['gemini-2.5-flash', 'gemini-3.1-flash-lite'], fetchImpl } });
+    assert.equal(r.agreed, 2);
+    assert.deepEqual(r.models, ['gemini-2.5-flash', 'gemini-3.1-flash-lite']);
+    assert.match(r.warnings[0], /\(Gemini\)/);
+    assert.ok(seen.every((s) => !s.url.includes('key=') && s.key === 'k'.repeat(39)));
+    assert.equal(seen[0].body.generationConfig.thinkingConfig.thinkingBudget, 0);
+    assert.equal(seen[0].body.contents[0].parts[1].inline_data.mime_type, 'image/jpeg');
+  });
+  it('quota Gemini finita (429): Jarvis torna da solo ai modelli di Cloudflare', async () => {
+    const fetchImpl = async () => Response.json({ error: { status: 'RESOURCE_EXHAUSTED' } }, { status: 429 });
+    const ai = { run: async () => ({ response: menuText }) };
+    const r = await readMenuPhoto(ai, new Uint8Array([255, 216, 255, 1]), 'image/jpeg', { gemini: { key: 'k'.repeat(39), models: ['gemini-2.5-flash', 'gemini-3.1-flash-lite'], fetchImpl } });
+    assert.equal(r.ok, true);
+    assert.equal(r.agreed, 2);
+    assert.ok(r.models.every((m) => m.startsWith('@cf/')));
+    assert.ok(r.raw.some((t) => /Gemini 429 RESOURCE_EXHAUSTED/.test(t)));
+  });
+});

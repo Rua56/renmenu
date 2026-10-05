@@ -285,3 +285,39 @@ describe('Pratiche già pubblicate', () => {
     } finally { db.close(); }
   });
 });
+
+describe('Dubbi della foto su Telegram, uno alla volta', () => {
+  it('Riccardo tocca il prezzo giusto, ne scrive uno, salta; dopo l’ultimo Jarvis prepara la bozza con le voci scelte', async () => {
+    const db = database();
+    try {
+      await missions.putSetting(db, 'telegram_chat_id', '42');
+      await db.prepare("INSERT INTO clients (id,name,plan,internal_notes,revision,created_at,updated_at) VALUES ('c1','Trattoria Dubbi','standard','',1,'2026-10-05','2026-10-05')").bind().run();
+      await db.prepare("INSERT INTO requests (id,client_id,subject,source_channel,source_text,kind,status,plan,category,internal_notes,revision,created_at,updated_at) VALUES ('r1','c1','Nuovo menu Standard · Trattoria Dubbi','telegram','Locale: Trattoria Dubbi','nuovo','in_revisione','standard','nuovo_standard','',1,'2026-10-05','2026-10-05')").bind().run();
+      await db.prepare("INSERT INTO materials (id,request_id,r2_key,filename,mime,size,source,processing_status,created_at) VALUES ('m1','r1','private/tg/1','menu.png','image/png',8,'telegram','letto_da_jarvis','2026-10-05')").bind().run();
+      const { combineReadings } = await import('../cloudflare/functions/_lib/vision.js');
+      const r = combineReadings('# Primi piatti\nSpaghetti — 7,00\nRisotto — 8,00\nGnocchi — 9,00\n# Dolci\nStrudel — 5,00',
+        '# Primi piatti\nSpaghetti — 3,00\nRisotto — 8,00\nGnocchi — 6,00\n# Dolci\nStrudel — 5,00\nTiramisù — 5,00');
+      assert.equal(r.checks.length, 3);
+      await db.prepare("INSERT INTO material_analyses (id,material_id,request_id,source_sha256,source_text,provenance_json,warnings_json,status,created_at) VALUES ('a1','m1','r1','x',?,?,'[]','needs_review','2026-10-05')")
+        .bind(r.text, JSON.stringify([{ materialId: 'm1', method: 'jarvis_foto_doppia_lettura', checks: r.checks }])).run();
+      const lastSent = () => telegramCalls.filter((c) => c.method === 'sendMessage').at(-1).body.text;
+      const before = telegramCalls.length;
+      assert.equal(await missions.startChecks(db, env, 'r1'), 3);
+      assert.match(lastSent(), /Dubbio 1 di 3 · Primi piatti\n«Spaghetti»/);
+      assert.ok(telegramCalls.slice(before).every((c) => c.method !== 'sendMessage' || !/bozza pronta/i.test(c.body.text)));
+      await missions.telegramUpdate(db, env, { callback_query: { id: 'q1', data: 'chk:0:0', message: { chat: { id: 42 }, message_id: 7 } } });
+      assert.match(lastSent(), /Dubbio 2 di 3[\s\S]*«Gnocchi»/);
+      await missions.telegramUpdate(db, env, { message: { chat: { id: 42, type: 'private' }, text: '8,5' } });
+      assert.match(lastSent(), /Dubbio 3 di 3[\s\S]*«Tiramisù»/);
+      await missions.telegramUpdate(db, env, { callback_query: { id: 'q3', data: 'chk:2:s', message: { chat: { id: 42 }, message_id: 9 } } });
+      const text = (await db.prepare("SELECT source_text FROM material_analyses WHERE id='a1'").bind().first()).source_text;
+      assert.match(text, /# Primi piatti\nRisotto — 8,00\nSpaghetti — 7,00\nGnocchi — 8,50\n# Dolci/);
+      assert.match(text, /\[da verificare\] Tiramisù/, 'saltata: resta da verificare');
+      assert.match(lastSent(), /Dubbi chiusi: 2 voci aggiunte/);
+      const draft = await db.prepare("SELECT menu_json FROM drafts WHERE request_id='r1'").bind().first();
+      assert.ok(draft, 'bozza preparata dopo l’ultimo dubbio');
+      assert.match(draft.menu_json, /Spaghetti[\s\S]*7,00/);
+      assert.equal(await missions.setting(db, 'tg_checks'), 'null');
+    } finally { db.close?.(); }
+  });
+});

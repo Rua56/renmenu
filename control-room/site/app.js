@@ -323,13 +323,18 @@ function voiceForm() {
   const options = (VOICES[provider] || VOICES.elevenlabs).map(([id, label]) => `<option value="${id}" ${v.voiceId === id ? 'selected' : ''}>${escapeHtml(label)}</option>`).join('');
   return `<details class="spaced-top-small"><summary><strong>Voce di Jarvis</strong> · ${v.provider && v.hasKey ? `<span class="status good">attiva (${escapeHtml(v.provider)})</span>` : '<span class="status info">solo testo</span>'}</summary><form data-form="voice-settings" class="spaced-top-small"><label class="field">Servizio<select name="provider"><option value="elevenlabs" ${provider === 'elevenlabs' ? 'selected' : ''}>ElevenLabs (voce più naturale)</option><option value="openai" ${provider === 'openai' ? 'selected' : ''}>OpenAI</option><option value="nessuna">Nessuna voce (solo testo)</option></select></label><label class="field">Voce<select name="voiceId">${options}</select></label><label class="field">Chiave API ${v.hasKey ? '(salvata: lascia vuoto per tenerla)' : ''}<input name="apiKey" type="password" autocomplete="off" placeholder="${v.hasKey ? '••••••••' : 'incolla la chiave'}"></label><div class="button-row"><button class="button small-button" type="submit">Salva voce</button>${v.hasKey ? '<button class="button secondary small-button" type="button" data-action="voice-test">Prova voce</button>' : ''}</div><p class="muted small">Mandami un vocale su Telegram: ti rispondo a voce. Pubblicare richiede sempre il pulsante SÌ.</p></form></details>`;
 }
+// Lettura dei menu: con la chiave gratuita di Google AI Studio Jarvis legge le foto con Gemini.
+function readerForm() {
+  const r = state.reader || {};
+  return `<details class="spaced-top-small"><summary><strong>Lettura dei menu</strong> · ${r.gemini ? `<span class="status good">Gemini (${escapeHtml((r.models || []).join(' + '))})</span>` : '<span class="status info">modelli Cloudflare</span>'}</summary><form data-form="reader-settings" class="spaced-top-small"><label class="field">Chiave di Google AI Studio ${r.gemini ? '(salvata: incollane una nuova per cambiarla)' : ''}<input name="apiKey" type="password" autocomplete="off" placeholder="${r.gemini ? '••••••••' : 'AIza…'}"></label><div class="button-row"><button class="button small-button" type="submit">Salva e prova</button>${r.gemini ? '<button class="button secondary small-button" type="button" data-action="reader-remove">Torna ai modelli Cloudflare</button>' : ''}</div><p class="muted small">Crea la chiave gratis su aistudio.google.com → Get API key. Se la quota di Gemini finisce, Jarvis torna da solo ai modelli di Cloudflare.</p></form></details>`;
+}
 // Ultimi messaggi dell'autopilota: cosa ha preparato Jarvis e cosa aspetta una decisione.
 function jarvisPanel() {
   const notes = state.notifications.filter((item) => /^Jarvis · /.test(item.subject || '') && !item.readAt).slice(0, 4);
   const tg = state.telegram || {};
   const telegram = isDemoMode ? '' : !tg.configured ? '' : !tg.linked
     ? `<div class="notice spaced-top-small">${telegramLinkUrl ? `Tocca il link e poi <strong>Avvia</strong> in Telegram (valido 15 minuti): <a href="${escapeHtml(telegramLinkUrl)}" target="_blank" rel="noopener">Apri Jarvis su Telegram</a>` : 'Collega Telegram: Jarvis ti scriverà lì e ti chiederà il SÌ prima di pubblicare.'}</div><div class="button-row spaced-top-small"><button class="button" type="button" data-action="telegram-link">${telegramLinkUrl ? 'Nuovo link' : 'Collega Telegram'}</button></div>`
-    : `<div class="button-row spaced-top-small"><span class="status good">Telegram collegato</span><button class="button secondary small-button" type="button" data-action="jarvis-briefing">Briefing ora</button><button class="button secondary small-button" type="button" data-action="telegram-test">Messaggio di prova</button></div>${voiceForm()}`;
+    : `<div class="button-row spaced-top-small"><span class="status good">Telegram collegato</span><button class="button secondary small-button" type="button" data-action="jarvis-briefing">Briefing ora</button><button class="button secondary small-button" type="button" data-action="telegram-test">Messaggio di prova</button></div>${voiceForm()}${readerForm()}`;
   if (!notes.length && !autopilotRunning && !telegram) return '';
   const row = (item) => `<div class="list-row"><div class="list-main"><strong>${escapeHtml(item.subject)}</strong><small>${escapeHtml(item.body)}</small><small>${time(item.createdAt)}</small></div><div class="button-row"><button class="mini-button" type="button" data-select-request="${escapeHtml(item.requestId || '')}" data-route="${item.subject.includes('bozza pronta') ? 'revisione' : 'richieste'}">Apri</button><button class="mini-button" type="button" data-action="mark-notification" data-notification-id="${escapeHtml(item.id)}" data-read="true">Fatto</button></div></div>`;
   return `<section class="panel spaced-top-small"><p class="eyebrow">JARVIS</p>${autopilotRunning ? '<p class="notice">Jarvis sta preparando le nuove richieste…</p>' : ''}<div class="list">${notes.map(row).join('')}</div>${telegram}</section>`;
@@ -1063,6 +1068,10 @@ async function handleClick(event) {
     await doAction('jarvisBriefing', {}, 'Briefing inviato su Telegram e nel riquadro Jarvis.');
     return;
   }
+  if (action === 'reader-remove') {
+    await doAction('setReaderKey', { remove: true }, 'Lettura dei menu: tornato ai modelli di Cloudflare.');
+    return;
+  }
   if (action === 'voice-test') {
     await doAction('testVoice', {}, 'Vocale di prova inviato su Telegram.');
     return;
@@ -1256,6 +1265,10 @@ async function handleSubmit(event) {
   if (kind === 'update-request-meta') { await doAction('updateRequest', { id: data.get('id'), revision: Number(data.get('revision')), patch: { ...(data.get('status') ? { status: data.get('status') } : {}), plan: data.get('plan'), contactName: data.get('contactName'), contactRole: data.get('contactRole'), contactInfo: data.get('contactInfo'), menuId: data.get('menuId'), publicUrl: data.get('publicUrl'), nextStep: data.get('nextStep'), internalNotes: data.get('internalNotes') } }, 'Pratica aggiornata.'); return; }
   if (kind === 'set-activation') { await doAction('setActivation', { id: data.get('id'), revision: Number(data.get('revision')), activation: data.get('activation'), date: data.get('date'), note: data.get('note') }, 'Attivazione registrata.'); return; }
   if (kind === 'upload-material') { const file = data.get('file'); await doUpload(selectedRequestId, file); return; }
+  if (kind === 'reader-settings') {
+    await doAction('setReaderKey', { apiKey: String(data.get('apiKey') || '') }, 'Chiave salvata: Jarvis leggerà i menu con Gemini.');
+    return;
+  }
   if (kind === 'voice-settings') {
     await doAction('setVoice', { provider: String(data.get('provider') || ''), voiceId: String(data.get('voiceId') || ''), apiKey: String(data.get('apiKey') || '') }, 'Voce di Jarvis salvata.');
     return;

@@ -1,4 +1,5 @@
 import { readSealedSetting } from './sealed.js';
+import { applyCheck, checkQuestion, normalizePrice } from './checks.js';
 import { notesSummary } from './notes.js';
 // Jarvis autonomo: una «missione» per ogni pratica che Riccardo affida a Jarvis dopo aver
 // controllato la bozza. Jarvis porta la pratica fino alla pubblicazione usando le stesse
@@ -40,6 +41,81 @@ export function createMissions(deps) {
   async function setting(db, key) {
     try { return (await getOne(db, 'SELECT value FROM jarvis_settings WHERE key=?', key))?.value ?? null; }
     catch (error) { if (/no such table/i.test(String(error?.message))) return null; throw error; }
+  }
+  // ——— Dubbi della lettura foto, uno alla volta su Telegram ———
+  async function checkQueue(db, requestId) {
+    const list = await rows(db, "SELECT a.id,a.provenance_json FROM material_analyses a JOIN materials m ON m.id=a.material_id WHERE a.request_id=? AND m.archived_at IS NULL ORDER BY m.created_at ASC", requestId).catch(() => []);
+    const queue = [];
+    for (const row of list) {
+      let prov = []; try { prov = JSON.parse(row.provenance_json || '[]'); } catch {}
+      (prov[0]?.checks || []).forEach((check, idx) => { if (check && check.resolved === undefined && check.options?.length) queue.push({ analysisId: row.id, idx }); });
+    }
+    return queue;
+  }
+  async function askCheck(db, env, chat, state) {
+    const item = state.queue[state.k];
+    const row = item && await getOne(db, 'SELECT provenance_json FROM material_analyses WHERE id=?', item.analysisId);
+    let check = null; try { check = JSON.parse(row?.provenance_json || '[]')[0]?.checks?.[item.idx]; } catch {}
+    if (!check) return finishChecks(db, env, chat, state);
+    const q = checkQuestion(check, state.k, state.queue.length);
+    await sendTelegram(env, chat, q.text, q.buttons, deps.fetchImpl, { stacked: true });
+    return null;
+  }
+  /** Dopo la lettura: se ci sono dubbi con prezzi, Jarvis li chiede uno alla volta (prima della bozza). */
+  async function startChecks(db, env, requestId) {
+    const chat = await setting(db, 'telegram_chat_id');
+    if (!chat || !telegramReady(env)) return 0;
+    const queue = await checkQueue(db, requestId);
+    if (!queue.length) return 0;
+    const state = { requestId, queue, k: 0, applied: 0, at: now() };
+    await putSetting(db, 'tg_checks', JSON.stringify(state));
+    await askCheck(db, env, chat, state);
+    return queue.length;
+  }
+  async function finishChecks(db, env, chat, state) {
+    await putSetting(db, 'tg_checks', 'null');
+    const request = await getOne(db, 'SELECT id,category,plan,subject FROM requests WHERE id=?', state.requestId);
+    const draft = await getOne(db, 'SELECT id FROM drafts WHERE request_id=?', state.requestId);
+    let text = `Dubbi chiusi: ${state.applied} voci aggiunte al menu.`;
+    if (!request) text += ' La pratica non c’è più.';
+    else if (draft) text += ' C’è già una bozza: per includerle, in Revisione tocca «Rifai la bozza con tutti i materiali».';
+    else if (request.plan === 'premium' || request.category === 'nuovo_premium') text += ' È un Premium: avvia tu la bozza dalla Control Room (scheda creativa).';
+    else if (!request.category) text += ' Manca ancora il tipo di pratica: dimmi il piano e preparo la bozza.';
+    else {
+      try { await action(jarvisDb(db), 'generateDraft', { requestId: request.id }, env); text += ` Bozza pronta per «${String(request.subject || 'la pratica').slice(0, 60)}»: controllala in Revisione. Le voci che hai saltato restano da verificare.`; }
+      catch (error) { text += ` Non sono riuscito a preparare la bozza: ${String(error?.message || 'errore').slice(0, 160)}.`; }
+    }
+    await sendTelegram(env, chat, text, null, deps.fetchImpl);
+    return { text };
+  }
+  async function answerCheck(db, env, chat, k, choice) {
+    let state = null; try { state = JSON.parse(await setting(db, 'tg_checks') || 'null'); } catch {}
+    if (!state?.queue) return { text: 'Non ho dubbi aperti in questo momento.' };
+    if (choice === 'end') { await finishChecks(db, env, chat, state); return { text: 'Va bene, preparo la bozza.', silent: true }; }
+    if (k !== state.k) return { text: 'Questo dubbio è già stato chiuso.', silent: true };
+    const item = state.queue[k];
+    const row = await getOne(db, 'SELECT id,source_text,provenance_json FROM material_analyses WHERE id=?', item.analysisId);
+    let prov = []; try { prov = JSON.parse(row?.provenance_json || '[]'); } catch {}
+    const check = prov[0]?.checks?.[item.idx];
+    if (row && check) {
+      let price;
+      if (choice === 's') price = undefined; // resta da verificare
+      else if (choice === 'n') price = null; // non è nel menu: tolta
+      else if (/^\d$/.test(choice)) price = check.options[Number(choice)];
+      else price = normalizePrice(choice);
+      if (price !== undefined) {
+        const text = applyCheck(row.source_text, check, price);
+        check.resolved = price === null ? 'tolta' : price;
+        await db.prepare('UPDATE material_analyses SET source_text=?, provenance_json=? WHERE id=?').bind(text, JSON.stringify(prov), row.id).run();
+        if (price !== null) state.applied += 1;
+      } else { check.resolved = 'saltata'; await db.prepare('UPDATE material_analyses SET provenance_json=? WHERE id=?').bind(JSON.stringify(prov), row.id).run(); }
+      await auditedBatch(jarvisDb(db), [], 'material.check', `Dubbio «${String(check.name).slice(0, 80)}»: ${price === undefined ? 'saltato' : price === null ? 'non è nel menu' : `${price} € (scelto da Riccardo)`}.`, state.requestId).catch(() => {});
+    }
+    state.k += 1; state.awaitPrice = false;
+    await putSetting(db, 'tg_checks', JSON.stringify(state));
+    if (state.k >= state.queue.length) { await finishChecks(db, env, chat, state); return { text: 'Ultimo dubbio chiuso.', silent: true }; }
+    await askCheck(db, env, chat, state);
+    return { text: 'Segnato.', silent: true };
   }
   // Punto della situazione con dati certi dal database (scritto o a voce: «Jarvis, stato»).
   async function statusText(db) {
@@ -385,7 +461,14 @@ export function createMissions(deps) {
     if (update?.callback_query) {
       const query = update.callback_query, from = String(query.message?.chat?.id || '');
       if (!chat || from !== chat) return;
-      const [verb, missionId] = String(query.data || '').split(':');
+      const [verb, missionId, extra] = String(query.data || '').split(':');
+      if (verb === 'chk') {
+        if (query.message?.message_id) await clearButtons(env, chat, query.message.message_id, deps.fetchImpl);
+        const outcome = missionId === 'end' ? await answerCheck(db, env, chat, -1, 'end') : await answerCheck(db, env, chat, Number(missionId), String(extra || ''));
+        await answerCallback(env, query.id, outcome.text, deps.fetchImpl);
+        if (!outcome.silent) await sendTelegram(env, chat, outcome.text, null, deps.fetchImpl);
+        return;
+      }
       const outcome = ['pub', 'no'].includes(verb) ? await decide(db, env, missionId, verb === 'pub')
         : verb === 'att' ? await attachTelegramFile(db, env, missionId) : verb === 'attno' ? (await putSetting(db, 'tg_pending_file', ''), { text: 'Va bene, la foto non viene usata.' }) : { text: 'Comando sconosciuto.' };
       await answerCallback(env, query.id, outcome.text, deps.fetchImpl);
@@ -410,6 +493,11 @@ export function createMissions(deps) {
       return;
     }
     if (!chat || from !== chat) return;
+    // Dubbi aperti: un prezzo scritto («7,50») risponde al dubbio in corso.
+    if (normalizePrice(text)) {
+      let open = null; try { open = JSON.parse(await setting(db, 'tg_checks') || 'null'); } catch {}
+      if (open?.queue && open.k < open.queue.length) { const outcome = await answerCheck(db, env, chat, open.k, normalizePrice(text)); if (!outcome.silent) await sendTelegram(env, chat, outcome.text, null, deps.fetchImpl); return; }
+    }
     if (/^\/briefing\b/i.test(text)) { await briefing(db, env, { force: true }); return; }
     if (/^\/stato\b/i.test(text) || STATUS_WORDS.test(text)) {
       await sendTelegram(env, chat, await statusText(db), null, deps.fetchImpl);
@@ -663,5 +751,5 @@ export function createMissions(deps) {
   }
 
   const notify = (db, env, requestId, subject, text) => tell(db, env, { request_id: requestId }, subject, text);
-  return { entrust, tick, decide, telegramUpdate, setting, putSetting, briefing, notify };
+  return { entrust, tick, decide, telegramUpdate, setting, putSetting, briefing, notify, startChecks, answerCheck };
 }

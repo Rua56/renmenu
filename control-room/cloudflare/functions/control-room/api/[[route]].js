@@ -2,7 +2,7 @@ import { seal, readSealedSetting } from '../../_lib/sealed.js';
 import { assistExtraction } from '../../_lib/assist.js';
 import { applyMenuChanges } from '../../_lib/changes.js';
 import { prepareUpdate } from '../../_lib/update.js';
-import { PHOTO_TYPES, readMenuPdf, readMenuPhoto } from '../../_lib/vision.js';
+import { GEMINI_PREFERRED, PHOTO_TYPES, readMenuPdf, readMenuPhoto } from '../../_lib/vision.js';
 import { linkMailFiles, receiveMailFiles } from '../../_lib/mail-files.js';
 import { MEDIA_KINDS, PUBLIC_EXT, applyMedia, classifyPhoto, isMenuPhotoKind, parseLabel, proposeTargets, publicImageOk, reapplyConfirmed, removeMedia, resolveTarget, targetLabel } from '../../_lib/media.js';
 import { speak } from '../../_lib/voice.js';
@@ -218,6 +218,11 @@ async function readPendingInner(db, env, calm) {
       const weakRows = await rows(db, "SELECT a.warnings_json AS w, a.source_text AS t FROM material_analyses a JOIN materials m ON m.id=a.material_id WHERE a.request_id=? AND m.archived_at IS NULL", material.request_id).catch(() => []);
       const sure = weakRows.reduce((n, r) => n + String(r.t || '').split('\n').filter((l) => l.trim() && !l.startsWith('[da verificare]') && !l.startsWith('#') && !l.startsWith('>')).length, 0);
       const unsure = weakRows.reduce((n, r) => n + String(r.t || '').split('\n').filter((l) => l.startsWith('[da verificare]')).length, 0);
+      // Dubbi con i prezzi letti: prima della bozza Jarvis li chiede a Riccardo uno alla volta su Telegram
+      // (bastano pochi tocchi). La bozza parte da sola dopo l'ultimo, o subito con «Basta, fai la bozza».
+      const openChecks = weakRows.length ? (await rows(db, "SELECT a.provenance_json AS p FROM material_analyses a JOIN materials m ON m.id=a.material_id WHERE a.request_id=? AND m.archived_at IS NULL", material.request_id).catch(() => []))
+        .reduce((n, r) => { try { return n + (JSON.parse(r.p || '[]')[0]?.checks || []).filter((c) => c.resolved === undefined).length; } catch { return n; } }, 0) : 0;
+      if (outcome.ok && !hasDraft && openChecks > 0 && env.TELEGRAM_BOT_TOKEN) { outcome.checks = { count: openChecks, sure, unsure }; done.push({ material, request, outcome }); continue; }
       if (outcome.ok && !hasDraft && unsure >= 10 && sure < unsure) { outcome.weak = { sure, unsure, sections: weakRows.flatMap((r) => { try { return JSON.parse(r.w || '[]'); } catch { return []; } }).filter((w) => /^Sezioni meno sicure: /.test(w)).map((w) => w.replace(/^Sezioni meno sicure: /, '').replace(/\.$/, '')).join(', ') }; done.push({ material, request, outcome }); continue; }
       if (outcome.ok && request?.category && request.category !== 'nuovo_premium' && request.plan !== 'premium' && !hasDraft) {
         try { await action(jarvis, 'generateDraft', { requestId: request.id }, env); outcome.drafted = true; outcome.notesText = notesSummary(await draftNotes(db, request.id)); }
@@ -287,6 +292,7 @@ export async function state(db, env = {}) {
     missions: await missionRows(db),
     venueMemory: await rows(db, 'SELECT id,client_id AS clientId,kind,text,source,created_at AS createdAt FROM venue_memory WHERE archived_at IS NULL ORDER BY created_at DESC LIMIT 400').catch(() => []),
     telegram: { configured: telegramReady(env), linked: Boolean(await missions.setting(db, 'telegram_chat_id')) },
+    reader: { gemini: Boolean(await missions.setting(db, 'gemini_api_key')), models: await missions.setting(db, 'gemini_models').then((v) => { try { return JSON.parse(v || '[]'); } catch { return []; } }) },
     voice: { provider: (await missions.setting(db, 'voice_provider')) || '', voiceId: (await missions.setting(db, 'voice_id')) || '', hasKey: Boolean(await missions.setting(db, 'voice_api_key')) },
     proposals: proposals.map(({ diffJson, ...p }) => ({ ...p, diff: JSON.parse(diffJson) })),
     analyses: rawAnalyses.map(({ provenanceJson, warningsJson, ...entry }) => ({ ...entry,
@@ -813,6 +819,27 @@ export async function action(db, type, input, env = {}) {
     }
     await auditedBatch(db, [], 'jarvis.voice_settings', `Voce di Jarvis: ${provider}${voiceId ? ` (${voiceId})` : ''}.`, null);
     result = { ok: true };
+  } else if (type === 'setReaderKey') {
+    // Chiave di Google AI Studio per Gemini: salvata cifrata, provata subito elencando i modelli disponibili.
+    assert(db.actor !== 'jarvis', 'Solo Riccardo può cambiare la chiave di lettura.', 403);
+    const apiKey = String(p.apiKey || '').trim();
+    if (p.remove === true) {
+      await missions.putSetting(db, 'gemini_api_key', ''); await missions.putSetting(db, 'gemini_models', '[]');
+      await auditedBatch(db, [], 'jarvis.reader_settings', 'Lettura dei menu: Gemini disattivato, restano i modelli di Cloudflare.', null);
+      result = { ok: true, models: [] };
+    } else {
+      assert(/^[A-Za-z0-9_\-]{30,80}$/.test(apiKey), 'Chiave non valida: incollala senza spazi.');
+      const response = await fetch('https://generativelanguage.googleapis.com/v1beta/models?pageSize=200', { headers: { 'x-goog-api-key': apiKey } }).catch(() => null);
+      const data = response ? await response.json().catch(() => ({})) : {};
+      assert(response?.ok, `Google non accetta la chiave${data?.error?.status ? ` (${data.error.status})` : ''}: controllala in AI Studio.`, 422);
+      const available = new Set((data.models || []).filter((m) => (m.supportedGenerationMethods || []).includes('generateContent')).map((m) => String(m.name || '').replace(/^models\//, '')));
+      const models = GEMINI_PREFERRED.filter((m) => available.has(m)).slice(0, 2);
+      assert(models.length, 'La chiave funziona ma non trovo modelli Gemini adatti alle foto.', 422);
+      await missions.putSetting(db, 'gemini_api_key', await seal(env, apiKey));
+      await missions.putSetting(db, 'gemini_models', JSON.stringify(models));
+      await auditedBatch(db, [], 'jarvis.reader_settings', `Lettura dei menu con Gemini: ${models.join(' + ')}.`, null);
+      result = { ok: true, models };
+    }
   } else if (type === 'testVoice') {
     const chat = await missions.setting(db, 'telegram_chat_id');
     assert(chat && telegramReady(env), 'Telegram non ancora collegato.', 409);
@@ -1139,7 +1166,14 @@ export async function action(db, type, input, env = {}) {
         }
       }
     }
-    const read = material.mime === 'application/pdf' ? await readMenuPdf(env.AI, bytes, material.filename) : await readMenuPhoto(env.AI, bytes, material.mime);
+    // Gemini (chiave salvata cifrata da Riccardo nella Control Room): lettura più affidabile dei menu fitti.
+    let gemini = null;
+    try {
+      const key = await readSealedSetting(env, missions.setting, missions.putSetting, db, 'gemini_api_key');
+      const models = JSON.parse(await missions.setting(db, 'gemini_models') || '[]');
+      if (key && models.length) gemini = { key, models };
+    } catch { gemini = null; }
+    const read = material.mime === 'application/pdf' ? await readMenuPdf(env.AI, bytes, material.filename) : await readMenuPhoto(env.AI, bytes, material.mime, { gemini });
     const stamp = now();
     // Contatore delle letture del giorno (per «stato» e la quota gratuita): resta anche se la pratica viene eliminata.
     if (material.mime !== 'application/pdf') {
@@ -1164,7 +1198,7 @@ export async function action(db, type, input, env = {}) {
           VALUES (?,?,?,?,?,?,?,?,?) ON CONFLICT(material_id) DO UPDATE SET id=excluded.id, source_sha256=excluded.source_sha256,
           source_text=excluded.source_text, provenance_json=excluded.provenance_json, warnings_json=excluded.warnings_json,
           status=excluded.status, created_at=excluded.created_at`)
-          .bind(analysisId, materialId, request.id, hash, read.text.slice(0, 50_000), JSON.stringify([{ materialId, method: read.method, reviewed: false, ...(read.raw ? { raw: read.raw.map((t) => String(t || '').slice(0, 6000)) } : {}) }]), JSON.stringify(read.warnings), 'needs_review', stamp),
+          .bind(analysisId, materialId, request.id, hash, read.text.slice(0, 50_000), JSON.stringify([{ materialId, method: read.method, reviewed: false, ...(read.models ? { models: read.models } : {}), ...(read.checks?.length ? { checks: read.checks.slice(0, 150) } : {}), ...(read.raw ? { raw: read.raw.map((t) => String(t || '').slice(0, 6000)) } : {}) }]), JSON.stringify(read.warnings), 'needs_review', stamp),
         db.prepare("UPDATE materials SET processing_status='letto_da_jarvis',text_preview=? WHERE id=?").bind(read.text.slice(0, 2500), materialId)
       ], 'material.read.jarvis', `Jarvis ha letto «${material.filename}»: ${read.warnings[0]}`.slice(0, 600), request.id);
       result = { ok: true, agreed: read.agreed ?? null, doubts: read.doubts ?? 0, method: read.method, warnings: read.warnings };
