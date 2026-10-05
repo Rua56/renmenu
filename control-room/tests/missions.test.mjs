@@ -367,6 +367,20 @@ describe('Correzioni dettate alla bozza su Telegram', () => {
     } finally { db.close?.(); }
   });
 
+  it('se la pratica aspettava un SÌ, la modifica ferma la missione: nessun anteprima vecchia resta valida', async () => {
+    const db = await draftDb();
+    try {
+      const draft = await db.prepare('SELECT id,request_id,menu_json FROM drafts').bind().first();
+      const stamp = '2026-10-05T10:00:00.000Z';
+      await db.prepare("INSERT INTO jarvis_missions (id,request_id,draft_id,status,step_started_at,created_at,updated_at) VALUES ('m1',?,?,'attesa_si',?,?,?)").bind(draft.request_id, draft.id, stamp, stamp, stamp).run();
+      const frico = JSON.parse(draft.menu_json).sezioni[0].voci.findIndex((v) => /frico/i.test(v.nome.it));
+      const env2 = { ...env, AI: aiFor([{ tipo: 'prezzo', si: 0, vi: frico, prezzo: '14' }]) };
+      await say(db, env2, 'il frico con polenta costa 14 euro');
+      assert.equal((await db.prepare("SELECT status FROM jarvis_missions WHERE id='m1'").bind().first()).status, 'annullata');
+      assert.match(lastSent().body.text, /ho fermato quella pratica/);
+    } finally { db.close?.(); }
+  });
+
   it('un prezzo mai detto non entra: la bozza resta com’è', async () => {
     const db = await draftDb();
     try {

@@ -715,10 +715,21 @@ export function createMissions(deps) {
     try { saved = (await action(jarvisDb(db), 'editDraftOps', { id: draft.id, revision: draft.revision, ops: checked.ops, source: 'Riccardo (Telegram)' }, env)).result; }
     catch (error) { return { text: `Non sono riuscito a modificare la bozza di «${name}»: ${String(error?.message || 'errore').slice(0, 200)}` }; }
     await putSetting(db, 'draft_undo', JSON.stringify({ ...snapshot, revision: saved.revision })).catch(() => {});
+    // Un'anteprima già preparata vale solo per il contenuto esatto: dopo la modifica la missione in attesa si ferma, così nessun SÌ vecchio resta in giro.
+    let paused = false;
+    try {
+      const waiting = await getOne(db, "SELECT id,revision FROM jarvis_missions WHERE draft_id=? AND status IN ('attesa_si','attesa_cliente','attesa_invio')", draft.id);
+      if (waiting) {
+        const stamp = now();
+        await auditedBatch(jarvisDb(db), [db.prepare("UPDATE jarvis_missions SET status='annullata',note='Bozza modificata da Riccardo su Telegram: serve una nuova revisione e una nuova anteprima.',revision=revision+1,updated_at=? WHERE id=? AND revision=?").bind(stamp, waiting.id, waiting.revision),
+          db.prepare("UPDATE jarvis_outbox SET status='annullata',updated_at=? WHERE mission_id=? AND status='in_coda'").bind(stamp, waiting.id)], 'jarvis.mission_paused', 'Missione fermata: la bozza è cambiata dopo l’anteprima.', draft.request_id);
+        paused = true;
+      }
+    } catch { /* se non riesce, la pubblicazione resta comunque bloccata dal controllo sul contenuto */ }
     const english = saved.needsEnglish && (menu.lingue || []).includes('en');
     if (english) await putSetting(db, 'draft_translate', JSON.stringify({ draftId: draft.id, at: now() })).catch(() => {});
     return {
-      text: `Fatto, bozza di «${name}» aggiornata:\n${checked.ops.length ? saved.summary.split(/(?<=\.)\s+/).map((line) => `• ${line}`).join('\n') : ''}\n\nLa trovi in Revisione. La checklist si è azzerata: va riconfermata prima dell’anteprima.${english ? ' L’inglese delle voci nuove lo preparo tra un minuto.' : ''}`,
+      text: `Fatto, bozza di «${name}» aggiornata:\n${checked.ops.length ? saved.summary.split(/(?<=\.)\s+/).map((line) => `• ${line}`).join('\n') : ''}\n\nLa trovi in Revisione. La checklist si è azzerata: va riconfermata prima dell’anteprima.${paused ? ' L’anteprima che avevo già preparato non vale più: ho fermato quella pratica, e dopo la revisione me la riaffidi da «Approva e affida a Jarvis».' : ''}${english ? ' L’inglese delle voci nuove lo preparo tra un minuto.' : ''}`,
       buttons: [['Annulla', `undo:${draft.id}`]]
     };
   }
@@ -811,17 +822,24 @@ export function createMissions(deps) {
     const missionOf = firstBy(await safe(() => rows(db, "SELECT request_id,status,note FROM jarvis_missions WHERE status NOT IN ('completata','annullata') ORDER BY updated_at DESC LIMIT 200"), []));
     const draftOf = firstBy(await safe(() => rows(db, 'SELECT request_id,status,revision FROM drafts ORDER BY created_at DESC LIMIT 300'), []));
     const fileRows = await safe(() => rows(db, 'SELECT request_id,processing_status AS st,COUNT(*) AS n FROM materials WHERE archived_at IS NULL GROUP BY request_id,processing_status'), []);
+    const approvalOf = new Map((await safe(() => rows(db, 'SELECT request_id,snapshot_sha FROM publication_approvals'), [])).map((a) => [a.request_id, a.snapshot_sha]));
     for (const r of reqs) {
       const mission = missionOf.get(r.id) || null, draft = draftOf.get(r.id) || null;
+      let stale = false;
+      if (mission && ['attesa_si', 'attesa_cliente', 'attesa_invio'].includes(mission.status) && approvalOf.has(r.id)) {
+        const current = await safe(() => getOne(db, 'SELECT menu_json FROM drafts WHERE request_id=? ORDER BY created_at DESC LIMIT 1', r.id), null);
+        stale = !!current && approvalOf.get(r.id) !== await sha256Hex(current.menu_json);
+      }
       const files = fileRows.filter((f) => f.request_id === r.id);
       const nFiles = files.reduce((t, f) => t + f.n, 0), toRead = files.filter((f) => f.st === 'da_trascrivere').reduce((t, f) => t + f.n, 0);
       let phrase;
-      if (mission) phrase = `${MISSION_LABEL[mission.status] || mission.status}${mission.status === 'ferma' && mission.note ? ` (${mission.note})` : ''}`;
+      if (mission && stale) phrase = 'la bozza è stata modificata dopo l’anteprima: il SÌ non vale più, serve rivedere la checklist e rifare l’anteprima';
+      else if (mission) phrase = `${MISSION_LABEL[mission.status] || mission.status}${mission.status === 'ferma' && mission.note ? ` (${mission.note})` : ''}`;
       else if (draft && ['bozza', 'revisione', 'pronta_pr'].includes(draft.status)) phrase = `bozza in revisione (versione ${draft.revision}), da controllare e confermare da te`;
       else if (toRead) phrase = `${toRead} file da leggere su ${nFiles}`;
       else if (nFiles) phrase = `${nFiles} file letti, bozza non ancora preparata`;
       else phrase = 'in attesa di foto o PDF del menu';
-      detail.push({ name: r.client || r.subject, phrase, waitsYou: mission?.status === 'attesa_si' || mission?.status === 'ferma' || (!mission && draft && ['bozza', 'revisione', 'pronta_pr'].includes(draft.status)), stuck: mission?.status === 'ferma' });
+      detail.push({ name: r.client || r.subject, phrase, waitsYou: stale || mission?.status === 'attesa_si' || mission?.status === 'ferma' || (!mission && draft && ['bozza', 'revisione', 'pronta_pr'].includes(draft.status)), stuck: mission?.status === 'ferma' });
     }
     const quotaDay = day;
     let count = null; try { count = JSON.parse(await setting(db, 'reads_day') || 'null'); } catch {}
