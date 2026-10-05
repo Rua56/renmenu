@@ -657,7 +657,9 @@ export function createMissions(deps) {
       const key = await readSealedSetting(env, setting, putSetting, db, 'gemini_api_key');
       const models = JSON.parse(await setting(db, 'gemini_models') || '[]');
       let good = []; try { good = JSON.parse(await setting(db, 'gemini_good') || '[]'); } catch {}
-      return key && models.length ? { key, models: [...new Set([...good, ...models, ...GEMINI_PREFERRED])], fetchImpl: deps.fetchImpl } : null;
+      let bad = []; try { bad = JSON.parse(await setting(db, 'gemini_bad') || '[]'); } catch {}
+      const chain = [...new Set([...good, ...models, ...GEMINI_PREFERRED])].filter((m) => good.includes(m) || !bad.includes(m));
+      return key && chain.length ? { key, models: chain, fetchImpl: deps.fetchImpl } : null;
     } catch { return null; }
   }
   const OPEN_DRAFTS = "SELECT d.id,d.request_id,d.slug,d.status,d.revision,d.menu_json,d.provenance_json,r.subject,c.id AS client_id,c.name AS client_name FROM drafts d JOIN requests r ON r.id=d.request_id LEFT JOIN clients c ON c.id=r.client_id WHERE d.status IN ('bozza','revisione','pronta_pr') AND r.status NOT IN ('completata','archiviata','chiusa') ORDER BY d.updated_at DESC LIMIT 20";
@@ -691,6 +693,14 @@ export function createMissions(deps) {
     let menu; try { menu = JSON.parse(draft.menu_json); } catch { return { text: 'La bozza non si legge: aprila in Revisione.' }; }
     const name = draft.client_name || menu.nome || draft.subject || 'la bozza';
     const plan = await proposeOps({ ai: env.AI, gemini: await geminiFor(db, env), utterance, menu });
+    // Quali modelli Gemini hanno risposto o no: gli assenti (404) non si riprovano, i guasti restano in /stato.
+    if (plan.tries?.length) {
+      try {
+        const missing = plan.tries.filter((t) => t.status === 404).map((t) => t.model);
+        if (missing.length) { let bad = []; try { bad = JSON.parse(await setting(db, 'gemini_bad') || '[]'); } catch {} await putSetting(db, 'gemini_bad', JSON.stringify([...new Set([...bad, ...missing])].slice(0, 12))); }
+        await auditedBatch(jarvisDb(db), [], 'jarvis.edit_models', `Correzione bozza: ${plan.model === 'gemini' ? `risposto ${plan.modelName}` : plan.unavailable ? 'nessun modello ha risposto' : 'ripiego su Cloudflare'}; tentativi Gemini falliti: ${plan.tries.map((t) => `${t.model} ${t.status}`).join(', ').slice(0, 300)}.`, null);
+      } catch { /* solo diagnostica */ }
+    }
     if (plan.modelName) await putSetting(db, 'gemini_good', JSON.stringify([plan.modelName])).catch(() => {});
     if (plan.unavailable) return { text: `Non riesco a interpretare la modifica adesso: i modelli non rispondono. Riprova tra qualche minuto, oppure correggi la bozza di «${name}» in Revisione.` };
     const checked = validateOps(plan.ops, menu, utterance);
