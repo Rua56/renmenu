@@ -805,15 +805,20 @@ export function createMissions(deps) {
     const stamp = new Date(), day = stamp.toISOString().slice(0, 10), weekAgo = new Date(stamp.getTime() - 7 * 24 * 3600_000).toISOString();
     const reqs = await safe(() => rows(db, "SELECT r.id,r.subject,r.status,r.plan,r.kind,c.name AS client FROM requests r LEFT JOIN clients c ON c.id=r.client_id WHERE r.status NOT IN ('completata','archiviata','chiusa') ORDER BY r.updated_at DESC LIMIT 12"), []);
     const detail = [];
+    // Poche interrogazioni raggruppate (il limite di richieste per messaggio è basso): missioni, bozze e file di tutte le pratiche aperte.
+    const ids = new Set(reqs.map((r) => r.id));
+    const firstBy = (list) => { const map = new Map(); for (const row of list) if (ids.has(row.request_id) && !map.has(row.request_id)) map.set(row.request_id, row); return map; };
+    const missionOf = firstBy(await safe(() => rows(db, "SELECT request_id,status,note FROM jarvis_missions WHERE status NOT IN ('completata','annullata') ORDER BY updated_at DESC LIMIT 200"), []));
+    const draftOf = firstBy(await safe(() => rows(db, 'SELECT request_id,status,revision FROM drafts ORDER BY created_at DESC LIMIT 300'), []));
+    const fileRows = await safe(() => rows(db, 'SELECT request_id,processing_status AS st,COUNT(*) AS n FROM materials WHERE archived_at IS NULL GROUP BY request_id,processing_status'), []);
     for (const r of reqs) {
-      const mission = await safe(() => getOne(db, "SELECT status,note FROM jarvis_missions WHERE request_id=? AND status NOT IN ('completata','annullata') ORDER BY updated_at DESC LIMIT 1", r.id), null);
-      const draft = await safe(() => getOne(db, 'SELECT status,revision FROM drafts WHERE request_id=? ORDER BY created_at DESC LIMIT 1', r.id), null);
-      const files = await safe(() => rows(db, 'SELECT processing_status AS st,COUNT(*) AS n FROM materials WHERE request_id=? AND archived_at IS NULL GROUP BY processing_status', r.id), []);
+      const mission = missionOf.get(r.id) || null, draft = draftOf.get(r.id) || null;
+      const files = fileRows.filter((f) => f.request_id === r.id);
       const nFiles = files.reduce((t, f) => t + f.n, 0), toRead = files.filter((f) => f.st === 'da_trascrivere').reduce((t, f) => t + f.n, 0);
       let phrase;
       if (mission) phrase = `${MISSION_LABEL[mission.status] || mission.status}${mission.status === 'ferma' && mission.note ? ` (${mission.note})` : ''}`;
       else if (draft && ['bozza', 'revisione', 'pronta_pr'].includes(draft.status)) phrase = `bozza in revisione (versione ${draft.revision}), da controllare e confermare da te`;
-      else if (toRead) phrase = `${toRead} file ${toRead === 1 ? 'da leggere' : 'da leggere'} su ${nFiles}`;
+      else if (toRead) phrase = `${toRead} file da leggere su ${nFiles}`;
       else if (nFiles) phrase = `${nFiles} file letti, bozza non ancora preparata`;
       else phrase = 'in attesa di foto o PDF del menu';
       detail.push({ name: r.client || r.subject, phrase, waitsYou: mission?.status === 'attesa_si' || mission?.status === 'ferma' || (!mission && draft && ['bozza', 'revisione', 'pronta_pr'].includes(draft.status)), stuck: mission?.status === 'ferma' });
@@ -846,7 +851,9 @@ export function createMissions(deps) {
     if (cut === 'completo') {
       const lines = detail.map((d) => `- ${d.name}: ${d.phrase}`);
       const base = await statusText(db).catch(() => '');
-      const brief = await buildBriefing(db, env, { fetchImpl: deps.fetchImpl }).catch(() => '');
+      const dates = await safe(() => rows(db, 'SELECT name,trial_ends_at,renewal_at FROM clients WHERE (trial_ends_at IS NOT NULL AND trial_ends_at>=?) OR (renewal_at IS NOT NULL AND renewal_at>=?) ORDER BY COALESCE(trial_ends_at,renewal_at) LIMIT 6', day, day), []);
+      const when = (iso) => new Intl.DateTimeFormat('it-IT', { timeZone: 'Europe/Rome', day: 'numeric', month: 'long' }).format(new Date(iso));
+      const brief = dates.length ? `Prossime scadenze: ${dates.map((c) => `${c.name} (${c.trial_ends_at && c.trial_ends_at >= day ? `fine prova ${when(c.trial_ends_at)}` : `rinnovo ${when(c.renewal_at)}`})`).join('; ')}.` : 'Nessuna scadenza di prova o rinnovo in vista.';
       return [`Resoconto completo, Riccardo.`, '', reqs.length ? `Pratiche aperte (${reqs.length}):\n${lines.join('\n')}` : 'Non ci sono pratiche aperte.',
         waiting.length ? `\nAspettano te: ${waiting.map((d) => `«${d.name}»`).join(', ')}.` : '\nNon aspetto nulla da te per ora.',
         problems.length ? `\nDa tenere d’occhio: ${problems.join('; ')}.` : '\nProblemi: nessuno.', '', base, brief ? `\n${brief}` : ''].filter((x) => x !== undefined).join('\n').slice(0, 3800);
