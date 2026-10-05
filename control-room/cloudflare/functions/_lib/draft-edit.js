@@ -109,8 +109,10 @@ const withTimeout = (promise, ms) => { let timer; return Promise.race([promise, 
 
 async function viaGemini(gemini, user, timeoutMs, tries = []) {
   const fetchImpl = gemini.fetchImpl || globalThis.fetch;
-  const body = { system_instruction: { parts: [{ text: SYSTEM }] }, contents: [{ role: 'user', parts: [{ text: user }] }],
-    generationConfig: { temperature: 0, maxOutputTokens: 4000, responseMimeType: 'application/json' } };
+  const bodyFor = (model, thinking) => ({ system_instruction: { parts: [{ text: SYSTEM }] }, contents: [{ role: 'user', parts: [{ text: user }] }],
+    // Pensiero al minimo (nomi dei campi diversi tra 2.5 e 3): una correzione al menu non richiede ragionamento lungo.
+    generationConfig: { temperature: 0, maxOutputTokens: 4000, responseMimeType: 'application/json',
+      ...(thinking ? { thinkingConfig: /^gemini-2\.5/.test(model) ? { thinkingBudget: 0 } : { thinkingLevel: 'low' } } : {}) } });
   const deadline = Date.now() + 28_000; // Telegram non aspetta: tutta la ricerca del modello sta in ~26 secondi
   for (const model of gemini.models) {
     const left = deadline - Date.now();
@@ -118,8 +120,10 @@ async function viaGemini(gemini, user, timeoutMs, tries = []) {
     const controller = typeof AbortController === 'function' ? new AbortController() : null;
     const timer = setTimeout(() => controller?.abort(), Math.min(timeoutMs, left));
     try {
-      const response = await fetchImpl(`https://generativelanguage.googleapis.com/v1beta/models/${encodeURIComponent(model)}:generateContent`, {
-        method: 'POST', headers: { 'Content-Type': 'application/json', 'x-goog-api-key': gemini.key }, body: JSON.stringify(body), signal: controller?.signal });
+      const ask = (thinking) => fetchImpl(`https://generativelanguage.googleapis.com/v1beta/models/${encodeURIComponent(model)}:generateContent`, {
+        method: 'POST', headers: { 'Content-Type': 'application/json', 'x-goog-api-key': gemini.key }, body: JSON.stringify(bodyFor(model, thinking)), signal: controller?.signal });
+      let response = await ask(true);
+      if (response.status === 400) response = await ask(false);
       if (!response.ok) { tries.push({ model, status: response.status }); continue; }
       const data = await response.json();
       const parsed = parseJson((data?.candidates?.[0]?.content?.parts || []).filter((part) => !part.thought).map((part) => part.text || '').join(''));
