@@ -300,6 +300,11 @@ describe('Comandi vocali di Jarvis', () => {
       assert.match(open.headers.get('Location'), /^https:\/\/renmenu\.pages\.dev\/menu\/\?lang=it#data=/);
       const wrong = await hook(new Request('https://jarvis.test/jarvis-hook/bozza/BZ-AAAAAAAAAA'), env);
       assert.equal(wrong.status, 404);
+      for (const [cut, pattern] of [['breve', /Hai 1 pratica aperta: «Trattoria Nuova» \(bozza in revisione/], ['completo', /Pratiche aperte \(1\):\n- Trattoria Nuova: bozza in revisione[\s\S]*Aspettano te: «Trattoria Nuova»/]]) {
+        const envStato = testEnv(db, { TELEGRAM_BOT_TOKEN: TOKEN, AI: aiSaying('', { intent: 'stato', locale: '', risposta: '', dettaglio: cut }) });
+        await missions.telegramUpdate(db, envStato, { message: { chat: { id: 42, type: 'private' }, text: `Jarvis stato ${cut}` } });
+        assert.match(calls.at(-1).body.text, pattern);
+      }
     } finally { globalThis.fetch = previous; db.close(); }
   });
   it('«mi serve un menu per X in fretta» → pratica segnata come urgente', async () => {
