@@ -112,6 +112,9 @@ export function tidyReading(text) {
     else if (hasPrice(name)) {
       const m = name.match(/^(.*?)\s*[-–—,(]\s*al+er+geni\s*[:.]?\s*((?:\d{1,2}\s*[-,/]?\s*)*)\)?\s*([—–-]\s*\d.*)$/i);
       if (m) { name = `${m[1]} ${m[3]}`; list = codes(m[2]); }
+      // «Goulash — Allergeni 1 10,00 €»: allergeni tra nome e prezzo, senza trattino davanti al prezzo.
+      const mid = !m && name.match(/^(.*?)\s*[-–—,(]?\s*al+er+geni\s*[:.]?\s*((?:\d{1,2}\s*[-,/]?\s*)*)(?:soliti)?\)?\s+(\d{1,4}[.,]\d{2})\s*€?\s*$/i);
+      if (mid && mid[1].trim()) { name = `${mid[1].trim()} — ${mid[3]}`; list = codes(mid[2]); }
     }
     out.push(name);
     item = out.length - 1;
