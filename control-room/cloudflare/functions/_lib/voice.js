@@ -6,9 +6,11 @@
 // Pubblicare o inviare email richiede sempre il pulsante SÌ: la voce non basta mai.
 import { CLOUDFLARE_FREE_MODEL } from './ai-live.js';
 import { slugify } from './menu.js';
+import { geminiJson } from './gemini-json.js';
 
 export const STT_MODEL = '@cf/openai/whisper-large-v3-turbo';
-export const INTENTS = new Set(['risposta', 'aggiorna_menu', 'crea_pratica', 'pubblica', 'ricorda', 'non_chiaro']);
+export const INTENTS = new Set(['risposta', 'stato', 'anteprima', 'aggiorna_menu', 'crea_pratica', 'pubblica', 'ricorda', 'non_chiaro']);
+export const STATUS_CUTS = new Set(['breve', 'completo', 'buone_notizie']);
 export const VOICE_PRESETS = {
   // ElevenLabs, modello multilingue: voci maschili calme e calde (la prima è la predefinita).
   elevenlabs: [['JBFqnCBsd6RMkjVDRZzb', 'George · caldo, calmo, accento britannico (stile Jarvis)'], ['onwK4e9ZLuTAKqWW03F9', 'Daniel · profondo e autorevole'], ['nPczCjzI2devNBz1zQrb', 'Brian · profondo e rassicurante']],
@@ -46,12 +48,12 @@ function parseJson(text) {
   try { return JSON.parse(raw.slice(start, end + 1)); } catch { return null; }
 }
 
-const SCHEMA = { type: 'object', properties: { intent: { type: 'string', enum: [...INTENTS] }, locale: { type: 'string' }, risposta: { type: 'string' } }, required: ['intent', 'locale', 'risposta'] };
+const SCHEMA = { type: 'object', properties: { intent: { type: 'string', enum: [...INTENTS] }, locale: { type: 'string' }, risposta: { type: 'string' }, dettaglio: { type: 'string', enum: ['', ...STATUS_CUTS] }, urgente: { type: 'boolean' } }, required: ['intent', 'locale', 'risposta'] };
 
 /** Capisce il comando. `context` = testo del briefing + elenco dei locali (fonte unica per le risposte). */
-export async function understand(ai, utterance, context, { timeoutMs = 25_000 } = {}) {
+export async function understand(ai, utterance, context, { timeoutMs = 25_000, gemini = null, engine = 'auto' } = {}) {
   const fallback = { intent: 'non_chiaro', locale: '', risposta: '' };
-  if (typeof ai?.run !== 'function') return fallback;
+  if (typeof ai?.run !== 'function' && !(gemini && engine !== 'cloudflare')) return fallback;
   const system = [
     'Sei Jarvis, l’assistente personale di Riccardo per RenMenu (menu digitali QR per locali). Tono calmo, caldo, cortese, conciso.',
     'Ricevi un comando di Riccardo e i DATI attuali della Control Room. Riccardo parla liberamente, in modo colloquiale, anche a frasi spezzate; il testo viene da un vocale e può contenere errori di trascrizione (nomi di locali o piatti storpiati). Capisci l’intenzione, non le parole esatte.',
@@ -61,23 +63,37 @@ export async function understand(ai, utterance, context, { timeoutMs = 25_000 } 
     'Se nomina un piatto o un prezzo e chiede di cambiare, togliere, aggiungere, mettere o sistemare qualcosa, è "aggiorna_menu" anche senza la parola «menu». Agisci quando il compito è ragionevolmente chiaro; usa "non_chiaro" solo se mancano informazioni indispensabili, e allora fai UNA domanda precisa che proponga l’opzione più probabile.',
     'Rispondi SOLO con un oggetto JSON: {"intent": "...", "locale": "...", "risposta": "..."}.',
     'intent può essere solo:',
-    '- "risposta": domanda, saluto, chiacchiera, opinione o richiesta di informazioni su qualsiasi argomento, anche non legato a RenMenu (situazione, pratiche, locali, scadenze, cosa fare). In "risposta" scrivi 1-3 frasi in italiano parlato, usando SOLO i DATI; se un dato non c’è dillo. Niente elenchi puntati, niente emoji.',
+    '- "risposta": domanda, saluto, chiacchiera, umore, battuta, richiesta di idee o di stupirlo («stupiscimi», «fammi sorridere», «mi sento creativo»), opinione o informazioni su qualsiasi argomento, anche non legato a RenMenu (locali, scadenze, cosa fare). In "risposta" scrivi 1-3 frasi in italiano parlato, usando SOLO i DATI; se un dato non c’è dillo. Niente elenchi puntati, niente emoji.',
+    '- "stato": Riccardo vuole sapere come vanno le cose: punto della situazione, pratiche, aggiornamento, «tutto a posto?», «come siamo messi?», resoconto, report, novità, «dammi buone notizie». Non scrivere la risposta: la prepara il sistema con i dati certi (lascia "risposta" vuota). In "dettaglio": "breve" per domande rapide (tutto a posto? come siamo messi? aggiornami), "completo" se chiede un resoconto, un report, il dettaglio o tutto, "buone_notizie" se chiede buone notizie, novità positive o qualcosa di bello da sapere.',
+    '- "anteprima": chiede di vedere, mostrare o mandargli l’anteprima o la bozza di un menu (solo per guardarla: non è pubblicare né inviare al cliente). In "locale" il nome così come detto.',
     '- "aggiorna_menu": Riccardo chiede di cambiare il menu online di un locale (prezzi, piatti da aggiungere o togliere, oppure il tema grafico/i colori: bordeaux, verde trattoria, blu mare, terracotta, nero elegante, ocra; oppure coperto, telefono, orari, Instagram o Facebook del locale). Capisci anche parole scritte o trascritte male (es. «copreto», «telfono», «instgram»). In "locale" il nome del locale così come detto. Non riscrivere le modifiche.',
-    '- "crea_pratica": chiede di aprire una nuova pratica o un nuovo cliente per un locale (anche «crea un nuovo menu per …»). In "locale" il nome del locale esattamente come detto, senza parole come «locale» o «ristorante» se non fanno parte del nome.',
+    '- "crea_pratica": chiede di aprire una nuova pratica o un nuovo cliente per un locale (anche «crea un nuovo menu per …», «mi serve un menu per …»; se c’è fretta o urgenza, «in fretta», «subito», «urgente», metti "urgente": true). In "locale" il nome del locale esattamente come detto, senza parole come «locale» o «ristorante» se non fanno parte del nome.',
     '- "pubblica": chiede di pubblicare o mettere online un menu. In "locale" il nome se detto.',
     '- "ricorda": chiede di ricordare, memorizzare o segnare un’informazione su un locale (orari, chiusure, preferenze, contatti, abitudini). In "locale" il nome del locale.',
     'Se nei DATI c’è una «Memoria» del locale, usala per rispondere (note di Riccardo e ultimo menu online con i prezzi).',
     '- "non_chiaro": manca un’informazione indispensabile. In "risposta" una sola domanda breve e precisa (es. «Intendi il frico di Riccardo sei il migliore?»).',
     'Non inventare mai prezzi, piatti, allergeni o numeri.'
   ].join('\n');
+  const userText = `DATI:\n${String(context || '').slice(0, 9000)}\n\nCOMANDO DI RICCARDO:\n${String(utterance).slice(0, 1500)}`;
+  const shape = (parsed, engineName) => ({ intent: parsed.intent, locale: String(parsed.locale || '').slice(0, 120), risposta: String(parsed.risposta || '').replace(/[*#•]/g, '').slice(0, 700),
+    dettaglio: STATUS_CUTS.has(parsed.dettaglio) ? parsed.dettaglio : '', urgente: parsed.urgente === true, engine: engineName, modelName: parsed.modelName });
+  // Gemini per primo (capisce meglio le frasi naturali); se non risponde in tempo, il modello gratuito di Cloudflare.
+  let geminiWhy = '';
+  if (gemini && engine !== 'cloudflare') {
+    const tries = [];
+    const out = await geminiJson(gemini, { system, user: userText, validate: (p) => INTENTS.has(p.intent), deadlineMs: 12_000, perModelMs: 7_000, maxOutputTokens: 700 }, tries);
+    if (out) return { ...shape(out, 'gemini'), tries };
+    geminiWhy = tries.length ? `Gemini: ${tries.map((t) => `${t.model} ${t.status}`).join(', ').slice(0, 160)}` : '';
+    if (engine === 'gemini') return { ...fallback, why: geminiWhy || 'Gemini non risponde', tries };
+  }
   try {
     const out = await withTimeout(Promise.resolve().then(() => ai.run(CLOUDFLARE_FREE_MODEL, { messages: [
       { role: 'system', content: system },
-      { role: 'user', content: `DATI:\n${String(context || '').slice(0, 9000)}\n\nCOMANDO DI RICCARDO:\n${String(utterance).slice(0, 1500)}` }
+      { role: 'user', content: userText }
     ], temperature: 0.2, max_tokens: 400, response_format: { type: 'json_schema', json_schema: SCHEMA } })), timeoutMs);
     const parsed = parseJson(out?.response ?? out?.choices?.[0]?.message?.content);
     if (!parsed || !INTENTS.has(parsed.intent)) return { ...fallback, why: parsed ? `intenzione «${String(parsed.intent).slice(0, 30)}»` : 'risposta non leggibile' };
-    return { intent: parsed.intent, locale: String(parsed.locale || '').slice(0, 120), risposta: String(parsed.risposta || '').replace(/[*#•]/g, '').slice(0, 700) };
+    return { ...shape(parsed, 'cloudflare'), ...(geminiWhy ? { why: geminiWhy } : {}) };
   } catch (error) { return { ...fallback, why: String(error?.message || 'errore').slice(0, 80) }; }
 }
 
@@ -168,6 +184,7 @@ export async function chat(ai, { utterance, context, history = [], spoken = fals
     'Puoi parlare di qualsiasi argomento con le tue conoscenze generali: consigli di lavoro, marketing per locali, idee, spiegazioni, curiosità.',
     'Per tutto ciò che riguarda RenMenu (locali, menu, prezzi, pratiche, scadenze) usa SOLO i DATI forniti: se un dato non c’è, dillo. Non inventare mai prezzi, piatti, allergeni, ingredienti o numeri.',
     'Piani RenMenu: Standard 25 €/mese con 30 giorni gratis; Annuale 249 €/anno; Premium 490 € di acconto + 39 €/mese.',
+    'Se Riccardo ti chiede di stupirlo, di farlo sorridere o dice di sentirsi creativo, mostra personalità: una battuta o una curiosità originale e breve, oppure due o tre idee concrete e fattibili legate ai suoi progetti (menu Premium di RenMenu, candele artigianali, giochi e video), senza mai inventare dati sui suoi locali. Chiudi con una proposta pratica o una domanda che lo faccia andare avanti.',
     'Non navighi su internet: per meteo, notizie o fatti di oggi dillo con semplicità.',
     'In questa conversazione non esegui azioni. Se Riccardo vuole che tu faccia qualcosa (modificare un menu, creare una pratica, ricordare una nota, pubblicare), invitalo a dirtelo direttamente, per esempio «cambia il prezzo del frico a 15».'
   ].join('\n');

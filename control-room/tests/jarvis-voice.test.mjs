@@ -65,6 +65,9 @@ const action = (db, type, payload) => call(db, 'actions', { type, payload });
 
 import { buildImportBatch } from '../staging/gmail-import.mjs';
 import { autopilotPreview } from '../cloudflare/functions/_lib/autopilot.js';
+import { onRequest as jarvisHook } from '../cloudflare/functions/jarvis-hook/[[route]].js';
+const hook = (request, env) => jarvisHook({ request, env });
+const SOURCE = 'Buongiorno, vorrei attivare il menu digitale Standard.\nLocale: Trattoria Nuova\n\nANTIPASTI\nFrico con polenta — 12,00\nSardoni impanati — 9,00\nCoperto 2,50 €';
 
 const email = (messageId, subject, text) => ({ messageId, from: 'locale@example.com', to: 'renmenu1569@gmail.com', subject, text,
   receivedAt: '2026-10-02T18:00:00Z', relevant: true, bodyComplete: true, hasAttachments: false, attachmentNames: [], ambiguous: false });
@@ -235,6 +238,82 @@ describe('Comandi vocali di Jarvis', () => {
       const draft = await db.prepare('SELECT menu_json FROM drafts').bind().first();
       assert.ok(draft, JSON.stringify(calls.at(-1)?.body));
       assert.equal(JSON.parse(draft.menu_json).coperto, '3,00');
+    } finally { globalThis.fetch = previous; db.close(); }
+  });
+
+  it('«tutto apposto?» → punto della situazione scritto dai dati, senza pratiche inventate', async () => {
+    const db = database();
+    const previous = globalThis.fetch;
+    globalThis.fetch = fakeFetch;
+    try {
+      calls.length = 0;
+      await missions.putSetting(db, 'telegram_chat_id', '42');
+      const env = testEnv(db, { TELEGRAM_BOT_TOKEN: TOKEN, AI: aiSaying('', { intent: 'stato', locale: '', risposta: 'INVENTATO', dettaglio: 'breve' }) });
+      await missions.telegramUpdate(db, env, { message: { chat: { id: 42, type: 'private' }, text: 'Jarvis, tutto apposto?' } });
+      const text = calls.at(-1).body.text;
+      assert.match(text, /Non ci sono pratiche aperte/);
+      assert.match(text, /tutto regolare/);
+      assert.doesNotMatch(text, /INVENTATO/);
+    } finally { globalThis.fetch = previous; db.close(); }
+  });
+  it('«dammi buone notizie» e «resoconto dettagliato» usano i dati; se il modello non risponde bastano le parole chiave', async () => {
+    const db = database();
+    const previous = globalThis.fetch;
+    globalThis.fetch = fakeFetch;
+    try {
+      calls.length = 0;
+      await db.prepare("INSERT INTO clients (id,name,email,plan,menu_id,internal_notes,revision,created_at,updated_at) VALUES ('c1','Osteria Viva',NULL,'standard','osteria-viva','',1,'2026-10-01','2026-10-01')").bind().run();
+      await missions.putSetting(db, 'telegram_chat_id', '42');
+      const down = { run: async () => { throw new Error('giù'); } };
+      const env = testEnv(db, { TELEGRAM_BOT_TOKEN: TOKEN, AI: down });
+      await missions.telegramUpdate(db, env, { message: { chat: { id: 42, type: 'private' }, text: 'Jarvis dammi buone notizie' } });
+      assert.match(calls.at(-1).body.text, /Buone notizie, Riccardo: 1 menu è online/);
+      await missions.telegramUpdate(db, env, { message: { chat: { id: 42, type: 'private' }, text: 'Jarvis ho bisogno di un resoconto dettagliato' } });
+      assert.match(calls.at(-1).body.text, /Resoconto completo, Riccardo/);
+      await missions.telegramUpdate(db, env, { message: { chat: { id: 42, type: 'private' }, text: 'Jarvis come siamo messi con le pratiche?' } });
+      assert.match(calls.at(-1).body.text, /Non ci sono pratiche aperte/);
+    } finally { globalThis.fetch = previous; db.close(); }
+  });
+  it('«mostrami anteprima di X» → link breve di sola visione alla bozza, che si apre solo con il codice', async () => {
+    const db = database();
+    const previous = globalThis.fetch;
+    globalThis.fetch = fakeFetch;
+    try {
+      calls.length = 0;
+      const stamp = '2026-10-05T10:00:00.000Z';
+      await db.prepare("INSERT INTO clients (id,name,email,plan,menu_id,internal_notes,revision,created_at,updated_at) VALUES ('c9','Trattoria Nuova',NULL,'standard','','',1,?,?)").bind(stamp, stamp).run();
+      globalThis.fetch = previous;
+      const made = await action(db, 'createRequest', { clientId: 'c9', subject: 'Nuovo menu Standard · Trattoria Nuova', sourceChannel: 'altro', sourceText: SOURCE, kind: 'nuovo', plan: 'standard', category: 'nuovo_standard' });
+      assert.equal(made.status, 200, JSON.stringify(made.body));
+      const req = made.body.id || made.body.result?.id || made.body.data?.id;
+      await action(db, 'generateDraft', { requestId: req });
+      globalThis.fetch = fakeFetch;
+      await missions.putSetting(db, 'telegram_chat_id', '42');
+      const env = testEnv(db, { TELEGRAM_BOT_TOKEN: TOKEN, JARVIS_ORIGIN: 'https://jarvis.test', AI: aiSaying('', { intent: 'anteprima', locale: 'Trattoria Nuova', risposta: '' }) });
+      await missions.telegramUpdate(db, env, { message: { chat: { id: 42, type: 'private' }, text: 'Jarvis mostrami anteprima di Trattoria Nuova' } });
+      const text = calls.at(-1).body.text;
+      const code = text.match(/jarvis-hook\/bozza\/(BZ-[A-Z0-9]{10})/)?.[1];
+      assert.ok(code, text);
+      assert.match(text, /non è pubblicata e non è stata inviata a nessuno/);
+      const open = await hook(new Request(`https://jarvis.test/jarvis-hook/bozza/${code}`), env);
+      assert.equal(open.status, 302);
+      assert.match(open.headers.get('Location'), /^https:\/\/renmenu\.pages\.dev\/menu\/\?lang=it#data=/);
+      const wrong = await hook(new Request('https://jarvis.test/jarvis-hook/bozza/BZ-AAAAAAAAAA'), env);
+      assert.equal(wrong.status, 404);
+    } finally { globalThis.fetch = previous; db.close(); }
+  });
+  it('«mi serve un menu per X in fretta» → pratica segnata come urgente', async () => {
+    const db = database();
+    const previous = globalThis.fetch;
+    globalThis.fetch = fakeFetch;
+    try {
+      calls.length = 0;
+      await missions.putSetting(db, 'telegram_chat_id', '42');
+      const env = testEnv(db, { TELEGRAM_BOT_TOKEN: TOKEN, AI: aiSaying('', { intent: 'crea_pratica', locale: 'Bar Aurora', risposta: '', urgente: true }) });
+      await missions.telegramUpdate(db, env, { message: { chat: { id: 42, type: 'private' }, text: "Jarvis mi serve un menu per il cliente Bar Aurora in fretta" } });
+      assert.match(calls.at(-1).body.text, /L’ho segnata come urgente/);
+      const note = await db.prepare('SELECT internal_notes AS n FROM requests').bind().first();
+      assert.match(note.n, /URGENTE/);
     } finally { globalThis.fetch = previous; db.close(); }
   });
 });
