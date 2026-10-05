@@ -82,8 +82,10 @@ export function createMissions(deps) {
     else if (request.plan === 'premium' || request.category === 'nuovo_premium') text += ' È un Premium: avvia tu la bozza dalla Control Room (scheda creativa).';
     else if (!request.category) text += ' Manca ancora il tipo di pratica: dimmi il piano e preparo la bozza.';
     else {
-      try { await action(jarvisDb(db), 'generateDraft', { requestId: request.id }, env); text += ` Bozza pronta per «${String(request.subject || 'la pratica').slice(0, 60)}»: controllala in Revisione. Le voci che hai saltato restano da verificare.`; }
-      catch (error) { text += ` Non sono riuscito a preparare la bozza: ${String(error?.message || 'errore').slice(0, 160)}.`; }
+      // La bozza (con traduzioni) richiede tempo: la prepara il giro dell'orologio di Jarvis, non la risposta a Telegram
+      // (che verrebbe interrotta). Al massimo pochi minuti.
+      await putSetting(db, 'draft_after_checks', JSON.stringify({ requestId: request.id, at: now() }));
+      text += ' Preparo la bozza adesso: ti scrivo appena è pronta (pochi minuti).';
     }
     await sendTelegram(env, chat, text, null, deps.fetchImpl);
     return { text };
@@ -751,5 +753,19 @@ export function createMissions(deps) {
   }
 
   const notify = (db, env, requestId, subject, text) => tell(db, env, { request_id: requestId }, subject, text);
-  return { entrust, tick, decide, telegramUpdate, setting, putSetting, briefing, notify, startChecks, answerCheck };
+  /** Bozza in coda dopo i dubbi: la prepara il giro dell'orologio. */
+  async function draftAfterChecks(db, env) {
+    let queued = null; try { queued = JSON.parse(await setting(db, 'draft_after_checks') || 'null'); } catch {}
+    if (!queued?.requestId) return null;
+    await putSetting(db, 'draft_after_checks', 'null');
+    const chat = await setting(db, 'telegram_chat_id');
+    const request = await getOne(db, 'SELECT id,subject FROM requests WHERE id=?', queued.requestId);
+    if (!request || await getOne(db, 'SELECT id FROM drafts WHERE request_id=?', request.id)) return null;
+    let text;
+    try { await action(jarvisDb(db), 'generateDraft', { requestId: request.id }, env); text = `Bozza pronta per «${String(request.subject || 'la pratica').slice(0, 60)}»: controllala in Revisione. Le voci che hai saltato restano da verificare.`; }
+    catch (error) { text = `Non sono riuscito a preparare la bozza: ${String(error?.message || 'errore').slice(0, 160)}.`; }
+    if (chat && telegramReady(env)) await sendTelegram(env, chat, text, null, deps.fetchImpl);
+    return { text };
+  }
+  return { entrust, tick, decide, telegramUpdate, setting, putSetting, briefing, notify, startChecks, answerCheck, draftAfterChecks };
 }

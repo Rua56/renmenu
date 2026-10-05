@@ -67,6 +67,7 @@ export async function onRequest(context) {
         await missions.notify(env.DB, env, material.request_id, outcome?.ok ? 'foto letta' : 'foto non leggibile', `${text}${checks}`);
         if (outcome?.checks) await missions.startChecks(env.DB, env, material.request_id).catch(() => 0);
       }
+      await missions.draftAfterChecks(env.DB, env).catch(() => null);
       const drafted = await runAutopilot(env.DB, env);
       const chat = drafted.length ? await missions.setting(env.DB, 'telegram_chat_id') : null;
       if (chat && telegramReady(env)) for (const entry of drafted) await sendTelegram(env, chat, entry.message);

@@ -40,6 +40,13 @@ function similar(a, b) {
   const tight = (v) => norm(v).replace(/ /g, '').replace(/^the\b|^the(?=[^a-z]|$)/, 'te');
   return common / Math.max(x.size, y.size) >= 0.6 || norm(a) === norm(b) || (tight(a).length >= 4 && tight(a) === tight(b));
 }
+// «Brodo: gnocchetti di semolino,» dentro «Brodo: gnocchetti di semolino, pastina fatta in casa»: la stessa voce
+// spezzata in modo diverso dalle due letture (almeno 3 parole tutte contenute nell'altra).
+function contains(a, b) {
+  const x = words(a), y = words(b);
+  const [small, big] = x.size <= y.size ? [x, y] : [y, x];
+  return small.size >= 3 && [...small].every((w) => big.has(w));
+}
 // Un modello a volte trascrive la descrizione al posto del nome («CON BARBABIETOLA SOTTACETO, …»).
 function descriptionAsName(name) {
   const text = String(name || '').trim();
@@ -124,6 +131,9 @@ export function tidyReading(text) {
       // «Goulash — Allergeni 1 10,00 €»: allergeni tra nome e prezzo, senza trattino davanti al prezzo.
       const mid = !m && name.match(/^(.*?)\s*[-–—,(]?\s*a[lf]{1,3}er+g[ei]ni\s*[:.]?\s*(\d{1,2}(?:\s*[-,/]\s*\d{1,2})*)?\s*(?:soliti|solfiti)?\)?\s+(\d{1,4}[.,]\d{2})\s*€?\s*$/i);
       if (mid && mid[1].trim()) { name = `${mid[1].trim()} — ${mid[3]}`; list = codes(mid[2]); }
+      // «Gnocchi con le susine — Allergeni 1-2 (agosto/settembre) — 9,00»: la nota resta nel nome, i numeri vanno negli allergeni.
+      const note = !m && !mid && name.match(/^(.*?)\s*[-–—,]\s*a[lf]{1,3}er+g[ei]ni\s*[:.]?\s*(\d{1,2}(?:\s*[-,/]\s*\d{1,2})*)\s+(\([^)]{2,40}\))\s*(?:[-–—]\s*)?€?\s*(\d{1,4}(?:[.,]\d{2})?)\s*€?\s*$/i);
+      if (note && note[1].trim()) { name = `${note[1].trim()} ${note[3]} — ${note[4]}`; list = codes(note[2]); }
     }
     out.push(name);
     item = out.length - 1;
@@ -193,6 +203,12 @@ export function combineReadings(first, second, third = '') {
         if (descriptionAsName(row.name) && !descriptionAsName(next.other.name)) { name = next.other.name; aNameIsDesc = true; }
       }
     }
+    // 2b) stessa voce spezzata diversamente («Brodo: gnocchetti di semolino,» / «… , pastina fatta in casa»), stessi prezzi:
+    // vale il nome più completo.
+    if (!hit && !row.course) {
+      const whole = candidates.find(({ other }) => !other.course && priceKey(other) === priceKey(row) && contains(other.name, row.name));
+      if (whole) { hit = whole; if (words(whole.other.name).size > words(row.name).size) name = whole.other.name.replace(/[,;:\s]+$/, ''); }
+    }
     // 3) Le prime due non concordano: decide la terza lettura (se c'è). Entra solo con nome e prezzi uguali: 2 letture su 3.
     if (!hit && C) {
       const ci = C.items.findIndex((other, i) => !usedC.has(i) && other.course === row.course && priceKey(other) === priceKey(row) && similar(other.name, row.name));
@@ -219,7 +235,11 @@ export function combineReadings(first, second, third = '') {
     lines.push(row.course ? name : `${name} — ${priceText(row)}`);
     // Descrizione: solo se confermata da entrambe le letture (anche quando l'altra l'ha scritta come nome).
     const descA = row.descr || (aNameIsDesc ? row.name : ''), descB = other.descr || (!aNameIsDesc && descriptionAsName(other.name) && !similar(other.name, name) ? other.name : '');
-    if (descA && descB && similar(descA, descB)) lines.push(`> ${descA.length >= descB.length ? descA : descB}`);
+    // Solo numeri di allergeni («(1)», «(1-2-4)»): bastano anche da una lettura, tanto restano una proposta da
+    // confermare con la legenda; se le letture danno numeri diversi, resta un dubbio.
+    const codesOnly = (d) => /^\(\s*\d{1,2}(?:\s*[-,/]\s*\d{1,2})*\s*\)$/.test(String(d || '').trim());
+    if ((codesOnly(descA) || codesOnly(descB)) && (!descA || !descB || norm(descA) === norm(descB)) && (codesOnly(descA || descB))) lines.push(`> ${(descA || descB).trim()}`);
+    else if (descA && descB && similar(descA, descB)) lines.push(`> ${descA.length >= descB.length ? descA : descB}`);
     else if (descA || descB) doubts.push(`${DOUBT} Descrizione di «${name}» letta una sola volta: «${(descA || descB).slice(0, 160)}»`);
   }
   // Avvisi scritti sulla foto («prodotti abbattuti a -18°», «paste fatte in casa»): mai persi, li valuta Riccardo.
@@ -230,7 +250,7 @@ export function combineReadings(first, second, third = '') {
   }
   for (const text of notes) doubts.push(`${DOUBT} Testo sulla foto (non è un piatto): «${text.slice(0, 200)}»`);
   if (!single) B.items.forEach((other, index) => {
-    if (used.has(index) || A.items.some((row) => similar(row.name, other.name))) return;
+    if (used.has(index) || A.items.some((row) => similar(row.name, other.name) || (contains(row.name, other.name) && amountsKey(row) === amountsKey(other)))) return;
     if (descriptionAsName(other.name) && A.items.some((row) => similar(row.descr, other.name))) return;
     doubts.push(`${DOUBT} ${other.name}${other.course ? ' (portata del percorso)' : `: letto ${priceText(other)}`} solo nella seconda lettura`);
     if (!other.course) checks.push({ line: doubts.at(-1), section: B.sections[other.section]?.name || '', name: other.name, options: [priceText(other)], descr: other.descr || '' });
