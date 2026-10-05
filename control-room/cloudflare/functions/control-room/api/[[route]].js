@@ -822,13 +822,14 @@ export async function action(db, type, input, env = {}) {
   } else if (type === 'setReaderKey') {
     // Chiave di Google AI Studio per Gemini: salvata cifrata, provata subito elencando i modelli disponibili.
     assert(db.actor !== 'jarvis', 'Solo Riccardo può cambiare la chiave di lettura.', 403);
-    const apiKey = String(p.apiKey || '').trim();
+    // Copiata da iPhone o dal Mac può portarsi dietro spazi, a capo o virgolette; le chiavi nuove di Google hanno anche i punti («AQ.…»).
+    const apiKey = String(p.apiKey || '').replace(/[\s"'“”‘’`]/g, '');
     if (p.remove === true) {
       await missions.putSetting(db, 'gemini_api_key', ''); await missions.putSetting(db, 'gemini_models', '[]');
       await auditedBatch(db, [], 'jarvis.reader_settings', 'Lettura dei menu: Gemini disattivato, restano i modelli di Cloudflare.', null);
       result = { ok: true, models: [] };
     } else {
-      assert(/^[A-Za-z0-9_\-]{30,80}$/.test(apiKey), 'Chiave non valida: incollala senza spazi.');
+      assert(/^[A-Za-z0-9._\-]{20,200}$/.test(apiKey), `Questa non sembra una chiave di Google (${apiKey.length} caratteri): ricopiala da AI Studio con il tasto «Copia».`);
       const response = await fetch('https://generativelanguage.googleapis.com/v1beta/models?pageSize=200', { headers: { 'x-goog-api-key': apiKey } }).catch(() => null);
       const data = response ? await response.json().catch(() => ({})) : {};
       assert(response?.ok, `Google non accetta la chiave${data?.error?.status ? ` (${data.error.status})` : ''}: controllala in AI Studio.`, 422);
