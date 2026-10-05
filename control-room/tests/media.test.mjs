@@ -288,6 +288,7 @@ describe('Foto menu · prezzo sulla riga dopo e allergeni nel nome', () => {
   });
   it('la legenda degli allergeni resta da verificare, il formato già giusto non cambia', () => {
     assert.match(tidyReading(reading), /\[da verificare\] Legenda allergeni sulla foto: «1 Glutine»/);
+    assert.equal(tidyReading('Goulash — Allergeni 1 10,00 €'), 'Goulash — 10,00\n> (1)');
     assert.equal(tidyReading('# Vini\nRibolla — calice 5 / bottiglia 40\n> fresca (12)'), '# Vini\nRibolla — calice 5 / bottiglia 40\n> fresca (12)');
   });
 });
