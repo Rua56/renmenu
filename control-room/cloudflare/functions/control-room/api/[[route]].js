@@ -190,6 +190,14 @@ export async function readPendingMaterials(db, env = {}, { calmMs = 40_000 } = {
   try { return await readPendingInner(db, env, calm); }
   finally { try { await db.prepare("UPDATE jarvis_settings SET value='',updated_at=? WHERE key='read_lock'").bind(new Date().toISOString()).run(); } catch { /* il blocco scade da solo dopo 6 minuti */ } }
 }
+// Chiave Gemini salvata cifrata da Riccardo (Control Room → Lettura dei menu): lettura foto e traduzioni.
+async function geminiConfig(db, env) {
+  try {
+    const key = await readSealedSetting(env, missions.setting, missions.putSetting, db, 'gemini_api_key');
+    const models = JSON.parse(await missions.setting(db, 'gemini_models') || '[]');
+    return key && models.length ? { key, models: [...new Set([...models, ...GEMINI_PREFERRED])] } : null;
+  } catch { return null; }
+}
 async function readPendingInner(db, env, calm) {
   let pending = [];
   try { pending = await rows(db, "SELECT id,request_id,filename FROM materials WHERE processing_status='da_trascrivere' AND archived_at IS NULL AND (mime='application/pdf' OR mime IN ('image/jpeg','image/png','image/webp')) AND created_at>'2026-10-02T22:30' AND NOT EXISTS (SELECT 1 FROM materials n WHERE n.request_id=materials.request_id AND n.archived_at IS NULL AND n.created_at>?) ORDER BY created_at ASC LIMIT 1", calm); }
@@ -518,7 +526,7 @@ export async function action(db, type, input, env = {}) {
       assert(update.ok, update.reason, 422);
       extraction = update.extraction;
       if (extraction.added && (extraction.menu.lingue || []).includes('en') && autoTranslationReady(env)) {
-        const translation = await translateMenu(env.AI, extraction.menu, { lang: 'en' });
+        const translation = await translateMenu(env.AI, extraction.menu, { lang: 'en', gemini: await geminiConfig(db, env) });
         extraction.menu = translation.menu;
         extraction.provenance = [...extraction.provenance, ...translation.provenance];
         const note = translationSummary(translation);
@@ -545,7 +553,7 @@ export async function action(db, type, input, env = {}) {
     assert(extraction.extracted.length > 0 && extraction.menu.id, 'Nessun piatto con prezzo leggibile: aggiungi il materiale o trascrivi la fonte.', 422);
     // Tutti i piani includono l'inglese: Jarvis lo prepara subito come bozza da verificare.
     if (PLAN_RULES[request.plan] && autoTranslationReady(env)) {
-      const translation = await translateMenu(env.AI, extraction.menu, { lang: 'en' });
+      const translation = await translateMenu(env.AI, extraction.menu, { lang: 'en', gemini: await geminiConfig(db, env) });
       extraction.menu = translation.menu;
       extraction.provenance = [...(extraction.provenance || []), ...translation.provenance];
       extraction.translation = { translated: translation.translated, total: translation.total, skipped: translation.skipped };
@@ -754,7 +762,7 @@ export async function action(db, type, input, env = {}) {
     const menu = JSON.parse(draft.menu_json);
     assert(translationEntries(menu, 'en').length, 'Tutti i testi hanno già l’inglese: niente da tradurre.', 422);
     const linkedRequest = await getOne(db, 'SELECT revision FROM requests WHERE id=?', draft.request_id);
-    const translation = await translateMenu(env.AI, menu, { lang: 'en' });
+    const translation = await translateMenu(env.AI, menu, { lang: 'en', gemini: await geminiConfig(db, env) });
     assert(!translation.unavailable, 'Servizio di traduzione non disponibile in questo momento: riprova tra poco.', 502);
     assert(translation.translated > 0, `Nessuna traduzione accettata: ${translationSummary(translation)}`, 422);
     const validation = validateMenu(translation.menu);
@@ -911,7 +919,7 @@ export async function action(db, type, input, env = {}) {
     let finalMenu = next, translationNote = '';
     const newProvenance = [...applied.newProvenance];
     if (added.length && (menu.lingue || []).includes('en') && autoTranslationReady(env)) {
-      const translation = await translateMenu(env.AI, next, { lang: 'en' });
+      const translation = await translateMenu(env.AI, next, { lang: 'en', gemini: await geminiConfig(db, env) });
       if (translation.translated) { finalMenu = translation.menu; newProvenance.push(...translation.provenance); }
       if (translation.skipped?.length) translationNote = ` ${translation.skipped.length} nomi da tradurre a mano.`;
     }
@@ -1168,12 +1176,7 @@ export async function action(db, type, input, env = {}) {
       }
     }
     // Gemini (chiave salvata cifrata da Riccardo nella Control Room): lettura più affidabile dei menu fitti.
-    let gemini = null;
-    try {
-      const key = await readSealedSetting(env, missions.setting, missions.putSetting, db, 'gemini_api_key');
-      const models = JSON.parse(await missions.setting(db, 'gemini_models') || '[]');
-      if (key && models.length) gemini = { key, models };
-    } catch { gemini = null; }
+    const gemini = await geminiConfig(db, env);
     const read = material.mime === 'application/pdf' ? await readMenuPdf(env.AI, bytes, material.filename) : await readMenuPhoto(env.AI, bytes, material.mime, { gemini });
     const stamp = now();
     // Contatore delle letture del giorno (per «stato» e la quota gratuita): resta anche se la pratica viene eliminata.

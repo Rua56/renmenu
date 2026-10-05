@@ -106,7 +106,14 @@ export function applyExtras(menu, selected, sourceFor) {
       next.coperto = entry.value;
       provenance.push({ path: 'coperto', source: sourceFor(entry), value: entry.value, status: 'confermato' });
     } else if (entry.type === 'allergeni' && next.sezioni?.[entry.si]?.voci?.[entry.vi]) {
-      next.sezioni[entry.si].voci[entry.vi].allergeni = entry.codes;
+      const item = next.sezioni[entry.si].voci[entry.vi];
+      item.allergeni = entry.codes;
+      // Descrizione fatta solo dei numeri («(10)», «(1-2-4)»): ora sono icone degli allergeni, il testo doppio si toglie.
+      if (entry.legend && /^\s*\(\s*\d{1,2}(?:\s*[-,/]\s*\d{1,2})*\s*\)\s*$/.test(String(item.descrizione?.it || ''))) delete item.descrizione;
+      else if (entry.legend && item.descrizione?.it) {
+        // Numeri in fondo a una descrizione vera: restano solo le parole (in ogni lingua).
+        for (const lang of Object.keys(item.descrizione)) item.descrizione[lang] = String(item.descrizione[lang]).replace(/\s*\(\s*\d{1,2}(?:\s*[-,/]\s*\d{1,2})*\s*\)\s*$/, '').trim();
+      }
       provenance.push({ path: `sezioni.${entry.si}.voci.${entry.vi}.allergeni`, source: sourceFor(entry), value: entry.codes.join(','), status: 'confermato' });
     }
   }
