@@ -97,7 +97,16 @@
   };
   const PROFILO = ['aromi', 'struttura', 'acidita', 'dolcezza', 'corpo'];
   const TESSERE = ['temperatura', 'abbinamenti', 'colore', 'profumo', 'gusto', 'territorio', 'vitigno', 'affinamento', 'gradazione', 'annata'];
-  const safeImg = (src) => { const s = String(src || '').trim(); return /^https:\/\//i.test(s) || /^(?:\.\.\/|\/)?[A-Za-z0-9_./-]+\.(?:webp|png|jpe?g|svg|avif)$/i.test(s) ? s : ''; };
+  // Foto Premium pubblicate con il menu (menus/media/<sha256>.<ext>): il sito non dipende dallo staging di Jarvis.
+  // Prima della pubblicazione (anteprima) il file non c'è ancora: l'immagine torna da sola all'indirizzo di Jarvis.
+  const STAGE_MEDIA = /^https:\/\/renmenu-jarvis-stage\.pages\.dev\/jarvis-hook\/media\/([a-f0-9]{64}\.(?:jpg|webp|png))$/;
+  document.addEventListener('error', (e) => {
+    const img = e.target;
+    if (!img || img.tagName !== 'IMG' || img.dataset.rmRetry) return;
+    const m = /(?:^|\/)menus\/media\/([a-f0-9]{64}\.(?:jpg|webp|png))$/.exec(img.getAttribute('src') || '');
+    if (m) { img.dataset.rmRetry = '1'; img.src = `https://renmenu-jarvis-stage.pages.dev/jarvis-hook/media/${m[1]}`; }
+  }, true);
+  const safeImg = (src) => { const m = STAGE_MEDIA.exec(String(src || '').trim()); if (m) return `../menus/media/${m[1]}`; const s = String(src || '').trim(); return /^https:\/\//i.test(s) || /^(?:\.\.\/|\/)?[A-Za-z0-9_./-]+\.(?:webp|png|jpe?g|svg|avif)$/i.test(s) ? s : ''; };
   // Tipo di locale scritto all'inizio del nome («Enoteca Isonzo» → Enoteca / Isonzo).
   const TIPI = /^(Enoteca|Trattoria|Osteria|Ristorante|Pizzeria|Bistrot|Locanda|Agriturismo|Bar|Caffè|Caffe|Cantina|Vineria|Birreria|Pub|Hostaria|Taverna|Gastronomia)\s+(.+)$/i;
   const DRINK = /\bvin[io]?\b|vini|wine|wein|bollicin|spumant|prosecco|champagne|franciacorta|cantina|calice|bottigli|mescita|cocktail|aperitiv|spritz|birr|beer|bier|bevand|bibit|drink|getränk|amari\b|distillat|grapp|liquor/i;
