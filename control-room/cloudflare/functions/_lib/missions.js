@@ -1,3 +1,4 @@
+import { readSealedSetting } from './sealed.js';
 import { notesSummary } from './notes.js';
 // Jarvis autonomo: una «missione» per ogni pratica che Riccardo affida a Jarvis dopo aver
 // controllato la bozza. Jarvis porta la pratica fino alla pubblicazione usando le stesse
@@ -388,11 +389,24 @@ export function createMissions(deps) {
     }
     if (!chat || from !== chat) return;
     if (/^\/briefing\b/i.test(text)) { await briefing(db, env, { force: true }); return; }
-    if (/^\/stato\b/i.test(text)) {
+    if (/^\/stato\b/i.test(text) || /^(?:jarvis[\s,!.]*)?stato[\s?!.]*$/i.test(text)) {
       const list = await rows(db, "SELECT m.status,m.note,d.menu_json FROM jarvis_missions m JOIN drafts d ON d.id=m.draft_id WHERE m.status NOT IN ('completata','annullata') ORDER BY m.updated_at DESC LIMIT 10");
       const pending = (await getOne(db, "SELECT COUNT(*) AS n FROM requests WHERE status IN ('nuova','dati_da_confermare','in_revisione')"))?.n || 0;
       const lines = list.map((row) => { let name = 'pratica'; try { name = JSON.parse(row.menu_json).nome; } catch {} return `- ${name}: ${row.status.replace('_', ' ')}${row.note ? ` (${row.note})` : ''}`; });
-      await sendTelegram(env, chat, `${lines.length ? `Pratiche affidate a me:\n${lines.join('\n')}` : 'Nessuna pratica affidata in corso.'}\nRichieste aperte nella Control Room: ${pending}.`, null, deps.fetchImpl);
+      // Salute di Jarvis: letture foto di oggi (quota gratuita di Cloudflare), ultimo file da Gmail, letture in corso.
+      const today = `${romeDate()}T00:00:00`;
+      const safe = async (sql, ...args) => { try { return await getOne(db, sql, ...args); } catch { return null; } };
+      const reads = (await safe("SELECT COUNT(*) AS n FROM audit_events WHERE action='material.read.jarvis' AND created_at>=?", today))?.n || 0;
+      const failedReads = (await safe("SELECT COUNT(*) AS n FROM audit_events WHERE action='material.read.failed' AND created_at>=?", today))?.n || 0;
+      const queued = (await safe("SELECT COUNT(*) AS n FROM materials WHERE processing_status='da_trascrivere' AND archived_at IS NULL"))?.n || 0;
+      const lastMail = (await safe('SELECT MAX(created_at) AS at FROM mail_files'))?.at;
+      const when = (iso) => new Intl.DateTimeFormat('it-IT', { timeZone: 'Europe/Rome', day: 'numeric', month: 'long', hour: '2-digit', minute: '2-digit' }).format(new Date(iso));
+      const health = [
+        `Foto lette oggi: ${reads}${failedReads ? ` (${failedReads} non riuscite)` : ''}. La quota gratuita regge circa 20 letture al giorno e si azzera alle 2 di notte.`,
+        queued ? `File in attesa di lettura: ${queued}.` : 'Nessun file in attesa di lettura.',
+        lastMail ? `Ultimo allegato arrivato da Gmail: ${when(lastMail)}.` : 'Da Gmail non è ancora arrivato nessun allegato.'
+      ];
+      await sendTelegram(env, chat, `${lines.length ? `Pratiche affidate a me:\n${lines.join('\n')}` : 'Nessuna pratica affidata in corso.'}\nRichieste aperte nella Control Room: ${pending}.\n\n${health.join('\n')}`, null, deps.fetchImpl);
       return;
     }
     if (/^\/aiuto\b|^\/help\b/i.test(text) || text.startsWith('/')) {
@@ -403,12 +417,12 @@ export function createMissions(deps) {
   }
 
   // ——— Conversazione (testo o voce) ———
-  async function voiceSettings(db) {
-    return { provider: await setting(db, 'voice_provider'), apiKey: await setting(db, 'voice_api_key'), voiceId: await setting(db, 'voice_id') };
+  async function voiceSettings(db, env) {
+    return { provider: await setting(db, 'voice_provider'), apiKey: await readSealedSetting(env, setting, putSetting, db, 'voice_api_key'), voiceId: await setting(db, 'voice_id') };
   }
   async function reply(db, env, chat, text, spoken, buttons = null) {
     // La trascrizione di ciò che ha detto Riccardo resta solo scritta: a voce Jarvis dice solo la risposta.
-    const audio = spoken ? await speak(await voiceSettings(db), String(text).replace(/^«[\s\S]*?»\n\n/, ''), deps.fetchImpl) : null;
+    const audio = spoken ? await speak(await voiceSettings(db, env), String(text).replace(/^«[\s\S]*?»\n\n/, ''), deps.fetchImpl) : null;
     if (audio && !buttons) { const sent = await sendVoice(env, chat, audio, text, deps.fetchImpl); if (sent?.ok) return; }
     if (audio && buttons) await sendVoice(env, chat, audio, '', deps.fetchImpl);
     await sendTelegram(env, chat, text, buttons, deps.fetchImpl);

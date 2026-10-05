@@ -262,3 +262,47 @@ describe('GitHub live adapter (fake fetch only)', () => {
     assert.deepEqual(merged, { merged: true, prNumber: 51, revision: 2, sha: 'merge-commit-a' });
   });
 });
+
+import { menuMediaFiles } from '../cloudflare/functions/_lib/github-live.js';
+describe('Fase 2c: foto del menu Premium nella stessa PR', () => {
+  const sha = 'a'.repeat(64);
+  const url = `https://renmenu-jarvis-stage.pages.dev/jarvis-hook/media/${sha}.jpg`;
+  it('trova solo le foto servite dallo staging di Jarvis, una volta sola', () => {
+    const m = { ...menu(), premium: { logo: url, galleria: [{ src: url }, { src: 'https://esempio.it/x.jpg' }] } };
+    assert.deepEqual(menuMediaFiles(m), [{ sha, ext: 'jpg', path: `menus/media/${sha}.jpg` }]);
+  });
+  it('scrive la foto sul branch della PR (mai su main) e non la riscrive se c’è già', async () => {
+    const puts = [];
+    let mediaExists = false;
+    const remote = fakeFetch((u, init) => {
+      if (u.pathname.endsWith('/pulls') && init.method === 'GET') return json([]);
+      if (u.pathname.endsWith('/git/ref/heads/main')) return json({ object: { sha: baseSha } });
+      if (u.pathname.endsWith('/contents/menus/trattoria-test.json') && init.method === 'GET') return json(file(menu('9,00')));
+      if (u.pathname.includes('/git/ref/heads/control-room/menu-trattoria-test-')) return json({ message: 'Not Found' }, 404);
+      if (u.pathname.endsWith('/git/refs') && init.method === 'POST') return json({ ref: JSON.parse(init.body).ref, object: { sha: baseSha } }, 201);
+      if (u.pathname.endsWith('/contents/menus/trattoria-test.json') && init.method === 'PUT') return json({ content: { sha: 'n' } }, 200);
+      if (u.pathname.endsWith(`/contents/menus/media/${sha}.jpg`)) {
+        if (init.method === 'PUT') { puts.push(JSON.parse(init.body)); mediaExists = true; return json({ content: { sha: 'm' } }, 201); }
+        return mediaExists ? json({ sha: 'm' }) : json({ message: 'Not Found' }, 404);
+      }
+      if (u.pathname.endsWith('/pulls') && init.method === 'POST') return json({ number: 18, html_url: 'https://github.com/Rua56/renmenu/pull/18', head: { ref: JSON.parse(init.body).head, sha: 'h' }, base: { ref: 'main' }, state: 'open', draft: false }, 201);
+      throw new Error(`Chiamata inattesa: ${init.method} ${u}`);
+    });
+    await openApprovedMenuPr(env(remote.fetch), approved({ menu: { ...menu('10,00'), premium: { logo: url } }, media: [{ path: `menus/media/${sha}.jpg`, base64: 'AAEC' }] }));
+    assert.equal(puts.length, 1);
+    assert.match(puts[0].branch, /^control-room\/menu-trattoria-test-/);
+    assert.equal(puts[0].content, 'AAEC');
+  });
+  it('rifiuta percorsi che non sono foto del menu', async () => {
+    const remote = fakeFetch((u, init) => {
+      if (u.pathname.endsWith('/pulls') && init.method === 'GET') return json([]);
+      if (u.pathname.endsWith('/git/ref/heads/main')) return json({ object: { sha: baseSha } });
+      if (u.pathname.endsWith('/contents/menus/trattoria-test.json') && init.method === 'GET') return json(file(menu('9,00')));
+      if (u.pathname.includes('/git/ref/heads/control-room/menu-trattoria-test-')) return json({ message: 'Not Found' }, 404);
+      if (u.pathname.endsWith('/git/refs') && init.method === 'POST') return json({ ref: JSON.parse(init.body).ref, object: { sha: baseSha } }, 201);
+      if (init.method === 'PUT' || init.method === 'POST') throw new Error('Nessuna scrittura prima del controllo delle foto');
+      throw new Error(`Non avrebbe dovuto scrivere: ${init.method} ${u}`);
+    });
+    await assert.rejects(() => openApprovedMenuPr(env(remote.fetch), approved({ media: [{ path: 'index.html', base64: 'AAEC' }] })), (e) => e.code === 'INVALID_MEDIA');
+  });
+});

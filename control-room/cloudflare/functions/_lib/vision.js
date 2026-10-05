@@ -154,6 +154,8 @@ export function combineReadings(first, second, third = '') {
   const A = parse(first), B = parse(second || ''), C = third ? parse(third) : null;
   const usedC = new Set();
   let byThird = 0;
+  const bySection = new Map();
+  const tally = (row, ok) => { const name = A.sections[row.section]?.name || 'Menu'; const t = bySection.get(name) || { name, ok: 0, total: 0 }; t.total += 1; if (ok) t.ok += 1; bySection.set(name, t); };
   const single = !second;
   const used = new Set(), lines = [], doubts = [];
   let agreed = 0, lastB = -1, currentSection = null;
@@ -193,6 +195,7 @@ export function combineReadings(first, second, third = '') {
       const ci = C.items.findIndex((other, i) => !usedC.has(i) && other.course === row.course && priceKey(other) === priceKey(row) && similar(other.name, row.name));
       if (ci >= 0) { usedC.add(ci); hit = { other: C.items[ci], index: -1 }; byThird += 1; }
     }
+    tally(row, Boolean(hit));
     if (!hit) {
       const near = B.items.find((other) => similar(other.name, row.name));
       doubts.push(`${DOUBT} ${row.name}${row.course ? ' (portata del percorso)' : `: letto ${priceText(row)}`}${near ? (row.course ? '' : `, seconda lettura ${priceText(near)}`) : ', non trovato nella seconda lettura'}`);
@@ -222,7 +225,7 @@ export function combineReadings(first, second, third = '') {
     if (descriptionAsName(other.name) && A.items.some((row) => similar(row.descr, other.name))) return;
     doubts.push(`${DOUBT} ${other.name}${other.course ? ' (portata del percorso)' : `: letto ${priceText(other)}`} solo nella seconda lettura`);
   });
-  return { text: [...lines, ...doubts].join('\n'), agreed, doubts: doubts.length, byThird };
+  return { text: [...lines, ...doubts].join('\n'), agreed, doubts: doubts.length, byThird, sections: [...bySection.values()] };
 }
 
 /** Foto di un menu → testo fonte con le sole voci concordi tra due modelli. Non lancia mai. */
@@ -253,9 +256,12 @@ export async function readMenuPhoto(ai, bytes, mime, { timeoutMs = 110_000 } = {
     if (thirdText && readingItems(thirdText).length) combined = combineReadings(good[0], good[1], thirdText);
     else { texts.push(`[terza lettura senza voci] ${String(thirdText || '(vuota)').slice(0, 1500)}`); thirdText = ''; }
   }
+  // Sezioni dove le letture non concordano: Jarvis chiede di rimandare solo quelle.
+  const weakSections = (combined.sections || []).filter((t) => t.total >= 3 && t.ok < t.total * 0.6).map((t) => `${t.name} (${t.ok} su ${t.total})`);
   const warnings = [good.length === 2
     ? `Foto letta da Jarvis ${thirdText ? 'tre volte con tre modelli diversi' : 'due volte con modelli diversi'}${fallbackUsed ? ' (uno di riserva, il primo non rispondeva)' : ''}: ${combined.agreed} voci concordi${thirdText && combined.byThird ? ` (${combined.byThird} confermate dalla terza lettura)` : ''}${combined.doubts ? `, ${combined.doubts} righe da verificare sulla foto` : ''}.`
     : 'Foto letta una sola volta (il secondo modello non ha risposto): tutte le voci restano da verificare sulla foto.'];
+  if (good.length === 2 && weakSections.length) warnings.push(`Sezioni meno sicure: ${weakSections.join(', ')}.`);
   return { ok: true, text: combined.text, agreed: combined.agreed, doubts: combined.doubts, method: good.length === 2 ? (thirdText ? 'jarvis_foto_tripla_lettura' : 'jarvis_foto_doppia_lettura') : 'jarvis_foto_lettura_singola', warnings, raw: thirdText ? [...texts, thirdText] : texts };
 }
 

@@ -1,8 +1,9 @@
 import { createAiLiveAdapter } from './ai-live.js';
 import { approvalState, sha256Hex } from './approvals.js';
-import { GitHubLiveError, MANUAL_MERGE_CONFIRMATION, getPrStatus, listPrFiles, mergeApprovedMenuPr, openApprovedMenuPr, readBaseSha, readCurrentMenu } from './github-live.js';
+import { GitHubLiveError, MANUAL_MERGE_CONFIRMATION, getPrStatus, listPrFiles, menuMediaFiles, mergeApprovedMenuPr, openApprovedMenuPr, readBaseSha, readCurrentMenu } from './github-live.js';
 import { reviewIssues } from './editorial.js';
 import { slugify, validateMenu } from './menu.js';
+const toBase64 = (bytes) => { let out = ''; for (let i = 0; i < bytes.length; i += 0x8000) out += String.fromCharCode(...bytes.subarray(i, i + 0x8000)); return btoa(out); };
 
 /**
  * Private Control Room operations for the separately configured AI and GitHub
@@ -478,7 +479,15 @@ async function openLivePr(context, p) {
   }
 
   try {
+    // Fase 2c: le foto confermate entrano nella stessa PR (menus/media/), lette dalla copia pubblica in R2.
+    const media = [];
+    for (const file of menuMediaFiles(prepared.menu)) {
+      const object = await context.env?.BUCKET?.get?.(`public/media/${file.sha}.${file.ext}`);
+      assert(object, `Manca la copia della foto ${file.sha.slice(0, 12)}: rimettila in Revisione.`, 409);
+      media.push({ path: file.path, base64: toBase64(new Uint8Array(await object.arrayBuffer())) });
+    }
     const opened = await openApprovedMenuPr(context.env, {
+      media,
       slug: prepared.draft.slug,
       menu: prepared.menu,
       requestKind: prepared.draft.request_kind,
@@ -651,7 +660,11 @@ async function mergeLivePr(context, p) {
   assert(status.headRef === record.branch_name && status.htmlUrl === record.pr_url, 'La PR GitHub non corrisponde a quella registrata.', 409);
   const filePath = `menus/${record.slug}.json`;
   const files = await listPrFiles(context.env, prNumber, options);
-  assert(files.length === 1 && files[0].filename === filePath, `La PR deve modificare solo ${filePath}.`, 409);
+  // Oltre al menu, solo le foto che il menu approvato usa (menus/media/<sha256>.<ext>), aggiunte e mai modificate.
+  const allowedMedia = new Set(menuMediaFiles(JSON.parse(record.draft_menu_json)).map((f) => f.path));
+  assert(files.filter((f) => f.filename === filePath).length === 1
+    && files.every((f) => f.filename === filePath || (allowedMedia.has(f.filename) && f.status === 'added')),
+  `La PR deve modificare solo ${filePath} e aggiungere le foto del menu approvato.`, 409);
   const head = await readCurrentMenu(context.env, record.slug, { ...options, ref: status.headSha });
   assert(head.exists && sameMenuSemantics(head.menu, JSON.parse(record.draft_menu_json)), 'Il file nella PR non coincide con il menu approvato.', 409);
   await auditOnly({ ...context, requestId: record.request_id, revision: record.request_revision,

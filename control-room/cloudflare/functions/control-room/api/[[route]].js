@@ -1,3 +1,4 @@
+import { seal, readSealedSetting } from '../../_lib/sealed.js';
 import { assistExtraction } from '../../_lib/assist.js';
 import { applyMenuChanges } from '../../_lib/changes.js';
 import { prepareUpdate } from '../../_lib/update.js';
@@ -217,7 +218,7 @@ async function readPendingInner(db, env, calm) {
       const weakRows = await rows(db, "SELECT a.warnings_json AS w, a.source_text AS t FROM material_analyses a JOIN materials m ON m.id=a.material_id WHERE a.request_id=? AND m.archived_at IS NULL", material.request_id).catch(() => []);
       const sure = weakRows.reduce((n, r) => n + String(r.t || '').split('\n').filter((l) => l.trim() && !l.startsWith('[da verificare]') && !l.startsWith('#') && !l.startsWith('>')).length, 0);
       const unsure = weakRows.reduce((n, r) => n + String(r.t || '').split('\n').filter((l) => l.startsWith('[da verificare]')).length, 0);
-      if (outcome.ok && !hasDraft && unsure >= 10 && sure < unsure) { outcome.weak = { sure, unsure }; done.push({ material, request, outcome }); continue; }
+      if (outcome.ok && !hasDraft && unsure >= 10 && sure < unsure) { outcome.weak = { sure, unsure, sections: weakRows.flatMap((r) => { try { return JSON.parse(r.w || '[]'); } catch { return []; } }).filter((w) => /^Sezioni meno sicure: /.test(w)).map((w) => w.replace(/^Sezioni meno sicure: /, '').replace(/\.$/, '')).join(', ') }; done.push({ material, request, outcome }); continue; }
       if (outcome.ok && request?.category && request.category !== 'nuovo_premium' && request.plan !== 'premium' && !hasDraft) {
         try { await action(jarvis, 'generateDraft', { requestId: request.id }, env); outcome.drafted = true; outcome.notesText = notesSummary(await draftNotes(db, request.id)); }
         catch (error) { outcome.draftError = String(error?.message || 'errore').slice(0, 240); }
@@ -808,14 +809,14 @@ export async function action(db, type, input, env = {}) {
       assert(apiKey || (await missions.setting(db, 'voice_api_key')), 'Incolla la chiave del servizio voce.');
       await missions.putSetting(db, 'voice_provider', provider);
       await missions.putSetting(db, 'voice_id', voiceId);
-      if (apiKey) await missions.putSetting(db, 'voice_api_key', apiKey);
+      if (apiKey) await missions.putSetting(db, 'voice_api_key', await seal(env, apiKey));
     }
     await auditedBatch(db, [], 'jarvis.voice_settings', `Voce di Jarvis: ${provider}${voiceId ? ` (${voiceId})` : ''}.`, null);
     result = { ok: true };
   } else if (type === 'testVoice') {
     const chat = await missions.setting(db, 'telegram_chat_id');
     assert(chat && telegramReady(env), 'Telegram non ancora collegato.', 409);
-    const audio = await speak({ provider: await missions.setting(db, 'voice_provider'), apiKey: await missions.setting(db, 'voice_api_key'), voiceId: await missions.setting(db, 'voice_id') },
+    const audio = await speak({ provider: await missions.setting(db, 'voice_provider'), apiKey: await readSealedSetting(env, missions.setting, missions.putSetting, db, 'voice_api_key'), voiceId: await missions.setting(db, 'voice_id') },
       'Buonasera Riccardo. Sono Jarvis. Da adesso puoi parlarmi con un vocale: ti ascolto, preparo il lavoro e aspetto sempre il tuo sì prima di pubblicare.');
     assert(audio, 'La voce non ha risposto: controlla servizio e chiave.', 502);
     const sent = await sendVoice(env, chat, audio, 'Prova voce di Jarvis.');
