@@ -183,6 +183,28 @@ describe('Comandi vocali di Jarvis', () => {
       assert.match(calls.at(-1).body.text, /pratica che mi hai appena fatto aprire/);
     } finally { globalThis.fetch = previous; db.close(); }
   });
+  it('«Il piano è un abbonamento standard» dopo aver aperto la pratica: aggiorna QUELLA pratica, non apre pratiche su altri clienti', async () => {
+    const db = database();
+    const previous = globalThis.fetch;
+    globalThis.fetch = fakeFetch;
+    try {
+      calls.length = 0;
+      await missions.putSetting(db, 'telegram_chat_id', '42');
+      await db.prepare("INSERT INTO clients (id,name,plan,menu_id,internal_notes,revision,created_at,updated_at) VALUES ('ph','Nuovo contatto email','premium','enoteca-prova','',1,'2026-10-01','2026-10-01')").bind().run();
+      let env = testEnv(db, { TELEGRAM_BOT_TOKEN: TOKEN, AI: aiSaying('', { intent: 'crea_pratica', locale: 'Il Pisello di Marco', risposta: '' }) });
+      await missions.telegramUpdate(db, env, { message: { chat: { id: 42, type: 'private' }, text: 'Il nome del locale è Il Pisello di Marco.' } });
+      env = testEnv(db, { TELEGRAM_BOT_TOKEN: TOKEN, AI: aiSaying('', { intent: 'aggiorna_menu', locale: '', risposta: '' }) });
+      await missions.telegramUpdate(db, env, { message: { chat: { id: 42, type: 'private' }, text: 'Il piano è un abbonamento standard.' } });
+      const all = await db.prepare('SELECT r.subject,r.plan,r.category,c.name AS client FROM requests r JOIN clients c ON c.id=r.client_id').bind().all();
+      assert.equal(all.results.length, 1, 'nessuna pratica in più');
+      assert.deepEqual([all.results[0].client, all.results[0].plan, all.results[0].category, all.results[0].subject], ['Il Pisello di Marco', 'standard', 'nuovo_standard', 'Nuovo menu Standard · Il Pisello di Marco']);
+      assert.match(calls.at(-1).body.text, /Segnato, Riccardo: piano Standard/);
+      // Senza pratica appena aperta, un cliente «Nuovo contatto email» non viene mai scelto a caso.
+      await missions.putSetting(db, 'tg_focus', 'null');
+      await missions.telegramUpdate(db, env, { message: { chat: { id: 42, type: 'private' }, text: 'Il piano è un abbonamento standard.' } });
+      assert.equal((await db.prepare('SELECT COUNT(*) AS n FROM requests').bind().first()).n, 1);
+    } finally { globalThis.fetch = previous; db.close(); }
+  });
   it('nome non detto davvero o cliente simile: chiede, non crea', async () => {
     const db = database();
     const previous = globalThis.fetch;
