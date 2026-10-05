@@ -30,10 +30,17 @@ describe('Lettura delle foto: due letture, entrano solo le voci concordi', () =>
       return { response: A };
     } };
     const r = await readMenuPhoto(ai, new Uint8Array([255, 216, 255, 1, 2]), 'image/jpeg');
-    assert.equal(new Set(seen).size, 2);
+    // Mistral giù (anche al secondo tentativo) → la seconda lettura la fa il modello di riserva.
+    assert.equal(new Set(seen).size, 3);
+    assert.ok(seen.some((m) => m.includes('gemma')));
     assert.equal(r.ok, true);
-    assert.equal(r.method, 'jarvis_foto_lettura_singola');
-    assert.equal(r.agreed, 0);
+    assert.equal(r.method, 'jarvis_foto_doppia_lettura');
+    assert.match(r.warnings[0], /uno di riserva/);
+    // Anche il modello di riserva giù: una lettura sola, tutto da verificare.
+    const down = { run: async (model) => { if (!model.includes('llama')) throw new Error('giù'); return { response: A }; } };
+    const single = await readMenuPhoto(down, new Uint8Array([255, 216, 255, 1, 2]), 'image/jpeg');
+    assert.equal(single.method, 'jarvis_foto_lettura_singola');
+    assert.equal(single.agreed, 0);
   });
   it('rifiuta formati non leggibili e foto senza piatti', async () => {
     assert.equal((await readMenuPhoto({ run: async () => ({}) }, new Uint8Array(4), 'image/heic')).ok, false);
