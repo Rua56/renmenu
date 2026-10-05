@@ -1,0 +1,400 @@
+{
+  "id": "enoteca-isonzo-test",
+  "nome": "Enoteca Isonzo Test",
+  "lingue": [
+    "it",
+    "en"
+  ],
+  "sezioni": [
+    {
+      "nome": {
+        "it": "Antipasti",
+        "en": "Starters"
+      },
+      "voci": [
+        {
+          "nome": {
+            "it": "Crudo di San Daniele 24 mesi",
+            "en": "24-month San Daniele raw ham"
+          },
+          "prezzo": "14,00",
+          "descrizione": {
+            "it": "con gnocco fritto e giardiniera della casa",
+            "en": "with fried gnocco and house giardiniera"
+          }
+        },
+        {
+          "nome": {
+            "it": "Frico croccante",
+            "en": "Crispy Frico"
+          },
+          "prezzo": "12,00",
+          "descrizione": {
+            "it": "con polenta morbida e cipolla rossa caramellata",
+            "en": "with soft polenta and caramelised red onion"
+          },
+          "foto": "https://renmenu-jarvis-stage.pages.dev/jarvis-hook/media/6563b5e03920d1d0db3e1532240cafb381d0718f8c3645efc20c2ed777313d7a.jpg"
+        },
+        {
+          "nome": {
+            "it": "Tartare di manzo",
+            "en": "Beef tartare"
+          },
+          "prezzo": "16,00",
+          "descrizione": {
+            "it": "con tuorlo marinato, senape antica e crostini",
+            "en": "with marinated egg yolk, ancient mustard and crostini"
+          }
+        }
+      ]
+    },
+    {
+      "nome": {
+        "it": "Primi",
+        "en": "First courses"
+      },
+      "voci": [
+        {
+          "nome": {
+            "it": "Cjarsons della Carnia",
+            "en": "Cjarsons della Carnia"
+          },
+          "prezzo": "15,00",
+          "descrizione": {
+            "it": "ripieni di patate, uvetta e cannella, con burro fuso e ricotta affumicata",
+            "en": "filled with potatoes, raisins and cinnamon, with melted butter and smoked ricotta"
+          },
+          "foto": "https://renmenu-jarvis-stage.pages.dev/jarvis-hook/media/aac1c804635a062732bf82e64dfa576213f7994c50792e3da84e6da8d21e0d53.jpg"
+        },
+        {
+          "nome": {
+            "it": "Risotto al Collio bianco",
+            "en": "Collio white risotto"
+          },
+          "prezzo": "16,00",
+          "descrizione": {
+            "it": "con mantecatura al Montasio stravecchio (minimo per due persone)",
+            "en": "with Montasio stravecchio cream (minimum for two people)"
+          }
+        },
+        {
+          "nome": {
+            "it": "Tagliolini al ragù bianco di cervo",
+            "en": "Tagliolini with white deer ragù"
+          },
+          "prezzo": "17,00"
+        }
+      ]
+    },
+    {
+      "nome": {
+        "it": "Secondi",
+        "en": "Main courses"
+      },
+      "voci": [
+        {
+          "nome": {
+            "it": "Guancia di manzo al Refosco",
+            "en": "Beef cheek in Refosco"
+          },
+          "prezzo": "22,00",
+          "descrizione": {
+            "it": "con purè di patate e cavolo cappuccio",
+            "en": "with mashed potatoes and cabbage"
+          }
+        },
+        {
+          "nome": {
+            "it": "Filetto di branzino",
+            "en": "Sea bass fillet"
+          },
+          "prezzo": "24,00",
+          "descrizione": {
+            "it": "con verdure dell'orto e salsa al limone",
+            "en": "with garden vegetables and lemon sauce"
+          }
+        }
+      ]
+    },
+    {
+      "nome": {
+        "it": "Dolci",
+        "en": "Desserts"
+      },
+      "voci": [
+        {
+          "nome": {
+            "it": "Gubana con grappa",
+            "en": "Gubana with grappa"
+          },
+          "prezzo": "7,00"
+        },
+        {
+          "nome": {
+            "it": "Tiramisù della casa",
+            "en": "House Tiramisù"
+          },
+          "prezzo": "6,00"
+        }
+      ]
+    },
+    {
+      "nome": {
+        "it": "Percorso degustazione «Terre dell'Isonzo»",
+        "en": "Terre dell'Isonzo tasting menu"
+      },
+      "descrizione": {
+        "it": "Il percorso è servito per tutto il tavolo.",
+        "en": "The menu is served for the whole table."
+      },
+      "tipo": "degustazione",
+      "prezzo": "55,00",
+      "unita": {
+        "it": "a persona",
+        "en": "per person"
+      },
+      "voci": [
+        {
+          "nome": {
+            "it": "Frico croccante",
+            "en": "Crispy Frico"
+          }
+        },
+        {
+          "nome": {
+            "it": "Cjarsons della Carnia",
+            "en": "Cjarsons della Carnia"
+          }
+        },
+        {
+          "nome": {
+            "it": "Guancia di manzo al Refosco",
+            "en": "Beef cheek with Refosco"
+          }
+        },
+        {
+          "nome": {
+            "it": "Gubana con grappa",
+            "en": "Gubana with grappa"
+          }
+        },
+        {
+          "nome": {
+            "it": "Abbinamento vini",
+            "en": "Wine pairing"
+          },
+          "prezzo": "25,00"
+        }
+      ]
+    },
+    {
+      "nome": {
+        "it": "Vini bianchi",
+        "en": "White wines"
+      },
+      "voci": [
+        {
+          "nome": {
+            "it": "Ribolla Gialla Collio 2024",
+            "en": "Ribolla Gialla Collio 2024"
+          },
+          "prezzi": [
+            {
+              "etichetta": {
+                "it": "Calice",
+                "en": "Glass"
+              },
+              "prezzo": "5,00"
+            },
+            {
+              "etichetta": {
+                "it": "Bottiglia",
+                "en": "Bottle"
+              },
+              "prezzo": "28,00"
+            }
+          ],
+          "foto": "https://renmenu-jarvis-stage.pages.dev/jarvis-hook/media/5810848dc501dd4a8b809b8545e81e77e8a5c1caf185ef97de8fcf1733d0a833.jpg",
+          "scheda": {
+            "territorio": "Collio"
+          }
+        },
+        {
+          "nome": {
+            "it": "Friulano Colli Orientali 2023",
+            "en": "Friulano Colli Orientali 2023"
+          },
+          "prezzi": [
+            {
+              "etichetta": {
+                "it": "Calice",
+                "en": "Glass"
+              },
+              "prezzo": "6,00"
+            },
+            {
+              "etichetta": {
+                "it": "Bottiglia",
+                "en": "Bottle"
+              },
+              "prezzo": "32,00"
+            }
+          ]
+        },
+        {
+          "nome": {
+            "it": "Malvasia Istriana 2022",
+            "en": "Malvasia Istriana 2022"
+          },
+          "prezzi": [
+            {
+              "etichetta": {
+                "it": "Calice",
+                "en": "Glass"
+              },
+              "prezzo": "6,50"
+            },
+            {
+              "etichetta": {
+                "it": "Bottiglia",
+                "en": "Bottle"
+              },
+              "prezzo": "35,00"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "nome": {
+        "it": "Vini rossi",
+        "en": "Red wines"
+      },
+      "voci": [
+        {
+          "nome": {
+            "it": "Refosco dal Peduncolo Rosso 2022",
+            "en": "Refosco dal Peduncolo Rosso 2022"
+          },
+          "prezzi": [
+            {
+              "etichetta": {
+                "it": "Calice",
+                "en": "Glass"
+              },
+              "prezzo": "6,00"
+            },
+            {
+              "etichetta": {
+                "it": "Bottiglia",
+                "en": "Bottle"
+              },
+              "prezzo": "34,00"
+            }
+          ],
+          "foto": "https://renmenu-jarvis-stage.pages.dev/jarvis-hook/media/c799238ff452400ec6e503bc9283ca0fbd1611a4a5d5d6c6cf1ebfb0a6bc6056.jpg",
+          "scheda": {
+            "cantina": "Vigneti del Friuli",
+            "territorio": "Friuli"
+          }
+        },
+        {
+          "nome": {
+            "it": "Schioppettino di Prepotto 2021",
+            "en": "Schioppettino di Prepotto 2021"
+          },
+          "prezzi": [
+            {
+              "etichetta": {
+                "it": "Calice",
+                "en": "Glass"
+              },
+              "prezzo": "7,00"
+            },
+            {
+              "etichetta": {
+                "it": "Bottiglia",
+                "en": "Bottle"
+              },
+              "prezzo": "42,00"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "nome": {
+        "it": "Bollicine",
+        "en": "Sparkling wine"
+      },
+      "voci": [
+        {
+          "nome": {
+            "it": "Ribolla Gialla Spumante Brut",
+            "en": "Ribolla Gialla Spumante Brut"
+          },
+          "prezzi": [
+            {
+              "etichetta": {
+                "it": "Calice",
+                "en": "Glass"
+              },
+              "prezzo": "6,00"
+            },
+            {
+              "etichetta": {
+                "it": "Bottiglia",
+                "en": "Bottle"
+              },
+              "prezzo": "30,00"
+            }
+          ]
+        },
+        {
+          "nome": {
+            "it": "Franciacorta Satèn",
+            "en": "Franciacorta Satèn"
+          },
+          "prezzi": [
+            {
+              "etichetta": {
+                "it": "Bottiglia",
+                "en": "Bottle"
+              },
+              "prezzo": "48,00"
+            }
+          ]
+        }
+      ]
+    }
+  ],
+  "premium": {
+    "direzione": "editoriale",
+    "caratteri": "classico",
+    "colori": {
+      "fondo": "#121212",
+      "testo": "#f3eee6",
+      "accento": "#a67c2e",
+      "secondario": "#6e1f2b"
+    },
+    "storia": {
+      "it": "L'enoteca è nata nel 1987 da mio nonno Bruno, in una vecchia cantina sotto le mura di Gorizia. Oggi la portiamo avanti noi nipoti, con i vini del Collio e dell'Isonzo e la cucina friulana di casa."
+    },
+    "logo": "https://renmenu-jarvis-stage.pages.dev/jarvis-hook/media/ba6482324c13810abf154146af2f39f3b54c1e984e25f5205424d266ac234bf7.png",
+    "galleria": [
+      {
+        "src": "https://renmenu-jarvis-stage.pages.dev/jarvis-hook/media/31b0a8b4e75c5502dd28644011534c3834bbd1e16745e5d5fb2af44e2b83f0ec.jpg",
+        "alt": {
+          "it": "Interno di enoteca con tavoli e scaffali di vino"
+        }
+      }
+    ]
+  },
+  "instagram": "enotecaisonzotest",
+  "telefono": "0481 555 123",
+  "coperto": "3,00",
+  "indirizzo": "Via Rastello 12, Gorizia",
+  "orari": {
+    "it": "Da martedì a domenica, 18:00 - 24:00, Lunedì chiuso"
+  }
+}
