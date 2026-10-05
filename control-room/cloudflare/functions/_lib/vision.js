@@ -76,8 +76,8 @@ const priceText = (item) => (item.prezzi ? item.prezzi.map((p) => `${p.etichetta
  * ordine senza inventare nulla: il prezzo torna sulla riga del nome, i numeri degli allergeni
  * diventano «> (1-2)» (da confermare dal locale, come sempre), le righe «Allergeni» senza numeri spariscono. */
 const BARE_PRICE = /^\s*(?:€\s*)?(\d{1,4}(?:[.,]\d{1,2})?)\s*(?:€|eur[o]?)?\s*$/i;
-const ALLERGEN_TAIL = /\s*[-–—,(]?\s*al+er+geni(?:\s*[:.]?\s*((?:\d{1,2}\s*[-,/]?\s*)+))?\s*\)?\s*$/i;
-const ALLERGEN_ROW = /^\s*>?\s*al+er+geni\b\s*[:.]?\s*((?:\d{1,2}\s*[-,/]?\s*)*)(?:soliti)?\s*(?:[—–-]\s*)?(\d{1,4}(?:[.,]\d{1,2})?)?\s*$/i;
+const ALLERGEN_TAIL = /\s*[-–—,(]?\s*a[lf]{1,3}er+g[ei]ni(?:\s*[:.]?\s*((?:\d{1,2}\s*[-,/]?\s*)+))?\s*\)?\s*$/i;
+const ALLERGEN_ROW = /^\s*>?\s*a[lf]{1,3}er+g[ei]ni\b\s*[:.]?\s*((?:\d{1,2}\s*[-,/]?\s*)*)(?:soliti|solfiti|sof+it+i)?\s*(?:[—–-]\s*)?(\d{1,4}(?:[.,]\d{1,2})?)?\s*$/i;
 const codes = (raw) => (String(raw || '').match(/\d{1,2}/g) || []).filter((n) => Number(n) >= 1 && Number(n) <= 14).join('-');
 const hasPrice = (line) => /(?:\s[-–]|—)\s*(?:€\s*)?\d{1,4}(?:[.,]\d{1,2})?\s*(?:€)?\s*$/.test(line) || /\s\d{1,4}[.,]\d{2}\s*€?\s*$/.test(line);
 export function tidyReading(text) {
@@ -89,7 +89,7 @@ export function tidyReading(text) {
     if (!line.trim()) { out.push(line); continue; }
     if (/^#{1,3}\s/.test(line)) { out.push(line); item = -1; legend = false; continue; }
     // Legenda finale «Allergeni / 1 Glutine …»: non sono piatti.
-    if (/^\s*al+er+geni\s*:?\s*$/i.test(line)) { legend = true; continue; }
+    if (/^\s*a[lf]{1,3}er+g[ei]ni\s*:?\s*$/i.test(line)) { legend = true; continue; }
     if (legend && /^\s*\d{1,2}\s*[-.)]?\s*[A-Za-zÀ-ÿ]/.test(line)) { out.push(`${DOUBT} Legenda allergeni sulla foto: «${line.trim()}»`); continue; }
     const row = line.match(ALLERGEN_ROW);
     if (row) {
@@ -108,13 +108,16 @@ export function tidyReading(text) {
       continue;
     }
     let name = line, list = '';
+    // «Amari, liquori — Likerji 2,50»: il trattino lungo separa le due lingue, non il prezzo.
+    const tailPrice = name.match(/^(.*\S)\s+(?:€\s*)?(\d{1,4}[.,]\d{2})\s*€?\s*$/);
+    if (tailPrice && /\s—\s/.test(tailPrice[1]) && !/a[lf]{1,3}er+g[ei]ni/i.test(tailPrice[1])) name = `${tailPrice[1].replace(/\s—\s/g, ' - ')} — ${tailPrice[2]}`;
     const tail = name.match(ALLERGEN_TAIL);
     if (tail && !hasPrice(name)) { list = codes(tail[1]); name = name.slice(0, tail.index).trimEnd(); }
     else if (hasPrice(name)) {
-      const m = name.match(/^(.*?)\s*[-–—,(]\s*al+er+geni\s*[:.]?\s*((?:\d{1,2}\s*[-,/]?\s*)*)\)?\s*([—–-]\s*\d.*)$/i);
+      const m = name.match(/^(.*?)\s*[-–—,(]\s*a[lf]{1,3}er+g[ei]ni\s*[:.]?\s*(\d{1,2}(?:\s*[-,/]\s*\d{1,2})*)?\)?\s*((?:\s[-–]|—)\s*€?\s*\d{1,4}(?:[.,]\d{1,2})?\s*€?)\s*$/i);
       if (m) { name = `${m[1]} ${m[3]}`; list = codes(m[2]); }
       // «Goulash — Allergeni 1 10,00 €»: allergeni tra nome e prezzo, senza trattino davanti al prezzo.
-      const mid = !m && name.match(/^(.*?)\s*[-–—,(]?\s*al+er+geni\s*[:.]?\s*((?:\d{1,2}\s*[-,/]?\s*)*)(?:soliti)?\)?\s+(\d{1,4}[.,]\d{2})\s*€?\s*$/i);
+      const mid = !m && name.match(/^(.*?)\s*[-–—,(]?\s*a[lf]{1,3}er+g[ei]ni\s*[:.]?\s*(\d{1,2}(?:\s*[-,/]\s*\d{1,2})*)?\s*(?:soliti|solfiti)?\)?\s+(\d{1,4}[.,]\d{2})\s*€?\s*$/i);
       if (mid && mid[1].trim()) { name = `${mid[1].trim()} — ${mid[3]}`; list = codes(mid[2]); }
     }
     out.push(name);
@@ -145,8 +148,10 @@ export function readingItems(text) { return parse(text).items.filter((i) => !i.c
  * «# Percorso — 55,00 € a persona» con le portate. Entra solo ciò che le DUE letture confermano;
  * tutto il resto diventa una riga «[da verificare] …» con entrambe le letture.
  */
-export function combineReadings(first, second) {
-  const A = parse(first), B = parse(second || '');
+export function combineReadings(first, second, third = '') {
+  const A = parse(first), B = parse(second || ''), C = third ? parse(third) : null;
+  const usedC = new Set();
+  let byThird = 0;
   const single = !second;
   const used = new Set(), lines = [], doubts = [];
   let agreed = 0, lastB = -1, currentSection = null;
@@ -181,12 +186,18 @@ export function combineReadings(first, second) {
         if (descriptionAsName(row.name) && !descriptionAsName(next.other.name)) { name = next.other.name; aNameIsDesc = true; }
       }
     }
+    // 3) Le prime due non concordano: decide la terza lettura (se c'è). Entra solo con nome e prezzi uguali: 2 letture su 3.
+    if (!hit && C) {
+      const ci = C.items.findIndex((other, i) => !usedC.has(i) && other.course === row.course && priceKey(other) === priceKey(row) && similar(other.name, row.name));
+      if (ci >= 0) { usedC.add(ci); hit = { other: C.items[ci], index: -1 }; byThird += 1; }
+    }
     if (!hit) {
       const near = B.items.find((other) => similar(other.name, row.name));
       doubts.push(`${DOUBT} ${row.name}${row.course ? ' (portata del percorso)' : `: letto ${priceText(row)}`}${near ? (row.course ? '' : `, seconda lettura ${priceText(near)}`) : ', non trovato nella seconda lettura'}`);
       continue;
     }
-    used.add(hit.index); lastB = Math.max(lastB, hit.index); agreed += 1;
+    if (hit.index >= 0) { used.add(hit.index); lastB = Math.max(lastB, hit.index); }
+    agreed += 1;
     sectionHead(row.section);
     const other = hit.other;
     // Nome scritto tutto in maiuscolo da una lettura e normale dall'altra: si tiene quello normale.
@@ -209,7 +220,7 @@ export function combineReadings(first, second) {
     if (descriptionAsName(other.name) && A.items.some((row) => similar(row.descr, other.name))) return;
     doubts.push(`${DOUBT} ${other.name}${other.course ? ' (portata del percorso)' : `: letto ${priceText(other)}`} solo nella seconda lettura`);
   });
-  return { text: [...lines, ...doubts].join('\n'), agreed, doubts: doubts.length };
+  return { text: [...lines, ...doubts].join('\n'), agreed, doubts: doubts.length, byThird };
 }
 
 /** Foto di un menu → testo fonte con le sole voci concordi tra due modelli. Non lancia mai. */
@@ -229,13 +240,21 @@ export async function readMenuPhoto(ai, bytes, mime, { timeoutMs = 110_000 } = {
   if (failed >= 0 && texts.some((t) => t && readingItems(t).length)) {
     try { texts[failed] = await transcribe(ai, VISION_FALLBACK, dataUrl, timeoutMs); fallbackUsed = Boolean(texts[failed]); } catch { /* resta una lettura sola */ }
   }
-  const good = texts.filter((t) => t && readingItems(t).length);
+  // La lettura più completa fa da base (ordine e sezioni del menu), l'altra conferma.
+  const good = texts.filter((t) => t && readingItems(t).length).sort((a, b) => readingItems(b).length - readingItems(a).length);
   if (!good.length) return { ok: false, reason: 'non riesco a leggere piatti e prezzi in questa foto: prova con una foto più nitida, dritta e senza riflessi', raw: texts };
-  const combined = combineReadings(good[0], good[1]);
+  let combined = combineReadings(good[0], good[1]);
+  // Molte voci in disaccordo (menu lunghi, scritte piccole): una terza lettura con un altro modello fa da arbitro.
+  let thirdText = '';
+  if (good.length === 2 && !fallbackUsed && combined.doubts >= 10 && combined.agreed < 0.8 * readingItems(good[0]).length) {
+    try { thirdText = await transcribe(ai, VISION_FALLBACK, dataUrl, timeoutMs); } catch { thirdText = ''; }
+    if (thirdText && readingItems(thirdText).length) combined = combineReadings(good[0], good[1], thirdText);
+    else thirdText = '';
+  }
   const warnings = [good.length === 2
-    ? `Foto letta da Jarvis due volte con modelli diversi${fallbackUsed ? ' (uno di riserva, il primo non rispondeva)' : ''}: ${combined.agreed} voci concordi${combined.doubts ? `, ${combined.doubts} righe da verificare sulla foto` : ''}.`
+    ? `Foto letta da Jarvis ${thirdText ? 'tre volte con tre modelli diversi' : 'due volte con modelli diversi'}${fallbackUsed ? ' (uno di riserva, il primo non rispondeva)' : ''}: ${combined.agreed} voci concordi${thirdText && combined.byThird ? ` (${combined.byThird} confermate dalla terza lettura)` : ''}${combined.doubts ? `, ${combined.doubts} righe da verificare sulla foto` : ''}.`
     : 'Foto letta una sola volta (il secondo modello non ha risposto): tutte le voci restano da verificare sulla foto.'];
-  return { ok: true, text: combined.text, agreed: combined.agreed, doubts: combined.doubts, method: good.length === 2 ? 'jarvis_foto_doppia_lettura' : 'jarvis_foto_lettura_singola', warnings, raw: texts };
+  return { ok: true, text: combined.text, agreed: combined.agreed, doubts: combined.doubts, method: good.length === 2 ? (thirdText ? 'jarvis_foto_tripla_lettura' : 'jarvis_foto_doppia_lettura') : 'jarvis_foto_lettura_singola', warnings, raw: thirdText ? [...texts, thirdText] : texts };
 }
 
 /** PDF → testo incorporato (nessuna interpretazione). */

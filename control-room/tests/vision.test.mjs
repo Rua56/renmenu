@@ -42,6 +42,18 @@ describe('Lettura delle foto: due letture, entrano solo le voci concordi', () =>
     assert.equal(single.method, 'jarvis_foto_lettura_singola');
     assert.equal(single.agreed, 0);
   });
+  it('molte voci in disaccordo: una terza lettura decide, ma entra solo ciò che due letture su tre confermano', async () => {
+    const base = Array.from({ length: 14 }, (_, i) => `Piatto numero ${i + 1} — ${i + 5},00`).join('\n');
+    const wrong = Array.from({ length: 14 }, (_, i) => `Piatto numero ${i + 1} — ${i + 50},00`).join('\n');
+    const third = Array.from({ length: 14 }, (_, i) => `Piatto numero ${i + 1} — ${i < 10 ? i + 5 : i + 90},00`).join('\n');
+    const ai = { run: async (model) => ({ response: model.includes('gemma') ? third : model.includes('llama') ? base : wrong }) };
+    const r = await readMenuPhoto(ai, new Uint8Array([255, 216, 255, 1, 2]), 'image/jpeg');
+    assert.equal(r.method, 'jarvis_foto_tripla_lettura');
+    assert.equal(r.agreed, 10);
+    assert.match(r.text, /^Piatto numero 1 — 5,00$/m);
+    assert.doesNotMatch(r.text, /^Piatto numero 12 — /m, 'prezzo letto diverso da tutte e tre: resta in dubbio');
+    assert.match(r.warnings[0], /tre volte con tre modelli diversi: 10 voci concordi \(10 confermate dalla terza lettura\)/);
+  });
   it('rifiuta formati non leggibili e foto senza piatti', async () => {
     assert.equal((await readMenuPhoto({ run: async () => ({}) }, new Uint8Array(4), 'image/heic')).ok, false);
     assert.equal((await readMenuPhoto({ run: async () => ({ response: 'Una bella foto di un tramonto' }) }, new Uint8Array(4), 'image/png')).ok, false);

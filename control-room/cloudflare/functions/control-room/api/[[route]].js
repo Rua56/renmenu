@@ -495,7 +495,7 @@ export async function action(db, type, input, env = {}) {
       const match = String(row.source || '').match(/^riga (\d+)(.*)$/);
       const segment = match && segments.find((seg) => Number(match[1]) >= seg.start && Number(match[1]) <= seg.end);
       if (!segment) return row;
-      const how = segment.method === 'jarvis_foto_doppia_lettura' ? 'letta da Jarvis due volte' : segment.method === 'jarvis_pdf_testo' ? 'testo del PDF' : segment.method === 'manual' ? 'trascrizione manuale' : 'letta da Jarvis una volta';
+      const how = segment.method === 'jarvis_foto_doppia_lettura' ? 'letta da Jarvis due volte' : segment.method === 'jarvis_foto_tripla_lettura' ? 'confermata da almeno due letture su tre' : segment.method === 'jarvis_pdf_testo' ? 'testo del PDF' : segment.method === 'manual' ? 'trascrizione manuale' : 'letta da Jarvis una volta';
       return { ...row, source: `file «${segment.filename}» riga ${Number(match[1]) - segment.start + 1} (${how})`, status: segment.method === 'jarvis_foto_lettura_singola' ? 'da_verificare' : row.status };
     });
     let extraction;
