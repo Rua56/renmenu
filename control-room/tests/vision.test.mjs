@@ -102,3 +102,17 @@ describe('Lettura con Gemini', () => {
     assert.ok(r.raw.some((t) => /Gemini 429 RESOURCE_EXHAUSTED/.test(t)));
   });
 });
+
+describe('Gemini: impostazione del pensiero rifiutata', () => {
+  it('400 sul pensiero: riprova senza e legge comunque', async () => {
+    const bodies = [];
+    const fetchImpl = async (url, init) => { const body = JSON.parse(init.body); bodies.push(body);
+      return body.generationConfig.thinkingConfig ? Response.json({ error: { status: 'INVALID_ARGUMENT' } }, { status: 400 })
+        : Response.json({ candidates: [{ content: { parts: [{ text: 'pensiero', thought: true }, { text: '# Primi\nSpaghetti — 7,00' }] } }] }); };
+    const { transcribeGemini } = await import('../cloudflare/functions/_lib/vision.js');
+    const text = await transcribeGemini({ key: 'k', model: 'gemini-3-flash-preview', fetchImpl }, new Uint8Array([1, 2]), 'image/png');
+    assert.equal(text, '# Primi\nSpaghetti — 7,00');
+    assert.equal(bodies[0].generationConfig.thinkingConfig.thinkingLevel, 'low');
+    assert.equal(bodies.length, 2);
+  });
+});
