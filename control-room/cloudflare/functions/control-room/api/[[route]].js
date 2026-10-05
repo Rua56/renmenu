@@ -26,6 +26,7 @@ import { dropRepeatedPages, notesSummary, reviewNotes, structureNotes } from '..
 import { briefLines, briefNotes, creativeBrief, premiumDirections, storyFromSource } from '../../_lib/premium.js';
 import { applyVenueInfo, extractVenueInfo } from '../../_lib/venue-info.js';
 import { applyPriceCorrections } from '../../_lib/corrections.js';
+import { applyOps as applyDraftOps } from '../../_lib/draft-edit.js';
 async function draftNotes(db, requestId) {
   try { return parseList((await getOne(db, 'SELECT review_notes_json AS n FROM drafts WHERE request_id=? ORDER BY created_at DESC LIMIT 1', requestId))?.n); }
   catch { return []; }
@@ -200,13 +201,16 @@ async function geminiConfig(db, env) {
 }
 async function readPendingInner(db, env, calm) {
   let pending = [];
-  try { pending = await rows(db, "SELECT id,request_id,filename FROM materials WHERE processing_status='da_trascrivere' AND archived_at IS NULL AND (mime='application/pdf' OR mime IN ('image/jpeg','image/png','image/webp')) AND created_at>'2026-10-02T22:30' AND NOT EXISTS (SELECT 1 FROM materials n WHERE n.request_id=materials.request_id AND n.archived_at IS NULL AND n.created_at>?) ORDER BY created_at ASC LIMIT 1", calm); }
+  try { pending = await rows(db, "SELECT id,request_id,filename FROM materials WHERE processing_status='da_trascrivere' AND archived_at IS NULL AND (mime='application/pdf' OR mime IN ('image/jpeg','image/png','image/webp')) AND created_at>'2026-10-02T22:30' AND NOT EXISTS (SELECT 1 FROM materials n WHERE n.request_id=materials.request_id AND n.archived_at IS NULL AND n.created_at>?) ORDER BY created_at ASC LIMIT 12", calm); }
   catch { return []; }
+  // Letture rimandate (Google lento): aspettano il loro turno senza bloccare le altre pratiche.
+  try { const waiting = JSON.parse(await missions.setting(db, 'read_retries') || '{}') || {}; pending = pending.filter((m) => !(waiting[m.id]?.next > new Date().toISOString())).slice(0, 1); } catch { pending = pending.slice(0, 1); }
   const done = [];
   for (const material of pending) {
     const jarvis = asJarvis(db);
     try {
-      const outcome = (await action(jarvis, 'readMaterial', { materialId: material.id }, env)).result;
+      const outcome = (await action(jarvis, 'readMaterial', { materialId: material.id, allowDefer: true }, env)).result;
+      if (outcome.deferred) { done.push({ material, outcome }); continue; }
       // Pratica già classificata e senza bozza (es. foto aggiunta da Telegram): Jarvis prepara la bozza.
       const request = await getOne(db, 'SELECT id,category,plan,kind,subject FROM requests WHERE id=?', material.request_id);
       const stillUnread = await getOne(db, "SELECT id FROM materials WHERE request_id=? AND processing_status='da_trascrivere' AND archived_at IS NULL", material.request_id);
@@ -973,6 +977,42 @@ export async function action(db, type, input, env = {}) {
       { sql: 'SELECT 1 FROM draft_versions WHERE draft_id=? AND revision=?', args: [id, revision + 1] });
     assert(saved.every((entry) => entry.meta.changes === 1), 'Bozza o pratica modificata da un’altra sessione. Ricarica.', 409);
     result = { id, validation };
+  } else if (type === 'editDraftOps' || type === 'restoreDraftSnapshot') {
+    // Modifiche dettate a Jarvis (Telegram) o loro annullamento: stesso salvataggio della Revisione,
+    // con blocco ottimistico, validazione completa e versione registrata. La checklist si azzera.
+    const id = identifier(p.id), revision = Number(p.revision);
+    const draft = await getOne(db, 'SELECT * FROM drafts WHERE id=?', id);
+    assert(draft, 'Bozza non trovata.', 404);
+    assert(Number.isInteger(revision) && revision === draft.revision, 'Bozza modificata da un’altra sessione.', 409);
+    assert(['bozza', 'revisione', 'pronta_pr'].includes(draft.status), 'Bozza già chiusa.', 409);
+    const linkedRequest = await getOne(db, 'SELECT kind,menu_id,revision,status FROM requests WHERE id=?', draft.request_id);
+    assert(!['completata', 'archiviata', 'chiusa'].includes(linkedRequest?.status), 'Pratica chiusa: menu già pubblicato.', 409);
+    let menu, provenance, summary = '', needsEnglish = false;
+    if (type === 'editDraftOps') {
+      const before = JSON.parse(draft.menu_json);
+      const applied = applyDraftOps(before, parseList(draft.provenance_json), Array.isArray(p.ops) ? p.ops : [], clean(p.source || 'Riccardo (Telegram)', 80, 'Fonte'));
+      menu = applied.menu; provenance = applied.provenance; summary = applied.summary.join(' '); needsEnglish = applied.needsEnglish;
+      assert(applied.summary.length, 'Nessuna modifica da applicare.', 422);
+    } else {
+      menu = p.menu; provenance = Array.isArray(p.provenance) ? p.provenance : [];
+      summary = 'Ripristinata la versione precedente.';
+    }
+    assert(menu && typeof menu === 'object' && !Array.isArray(menu) && menu.id === draft.slug, 'Il Menu ID non deve cambiare.', 422);
+    const validation = validateMenu(menu);
+    assert(!validation.errors.length, `Menù non valido: ${validation.errors.slice(0, 3).join(' ')}`, 422);
+    const menuJson = JSON.stringify(menu), timestamp = now();
+    assert(menuJson.length <= 250_000, 'Menù troppo grande.');
+    const saved = await auditedBatch(db, [
+      db.prepare("UPDATE drafts SET menu_json=?,checks_json=?,provenance_json=?,status='revisione',revision=revision+1,updated_at=? WHERE id=? AND revision=? AND EXISTS (SELECT 1 FROM requests WHERE requests.id=? AND requests.revision=?)")
+        .bind(menuJson, JSON.stringify(checksDefault()), JSON.stringify(provenance), timestamp, id, revision, draft.request_id, linkedRequest.revision),
+      db.prepare('INSERT INTO draft_versions (id,draft_id,revision,menu_json,actor,created_at) SELECT ?,id,?,?,?,? FROM drafts WHERE id=? AND revision=?')
+        .bind(uid(), revision + 1, menuJson, type === 'editDraftOps' ? 'jarvis_telegram' : 'annulla_telegram', timestamp, id, revision + 1),
+      db.prepare("UPDATE requests SET status='in_revisione',revision=revision+1,updated_at=? WHERE id=? AND revision=? AND EXISTS (SELECT 1 FROM drafts WHERE drafts.id=? AND drafts.revision=? AND drafts.status='revisione')")
+        .bind(timestamp, draft.request_id, linkedRequest.revision, id, revision + 1)
+    ], type === 'editDraftOps' ? 'draft.telegram_edit' : 'draft.telegram_undo', summary.slice(0, 400), draft.request_id,
+      { sql: 'SELECT 1 FROM draft_versions WHERE draft_id=? AND revision=?', args: [id, revision + 1] });
+    assert(saved.every((entry) => entry.meta.changes === 1), 'Bozza o pratica modificata da un’altra sessione.', 409);
+    result = { id, revision: revision + 1, summary, needsEnglish, validation: { warnings: validation.warnings.length } };
   } else if (type === 'reviewDraft') {
     const id = identifier(p.id), revision = Number(p.revision);
     const draft = await getOne(db, 'SELECT * FROM drafts WHERE id=?', id);
@@ -1177,8 +1217,33 @@ export async function action(db, type, input, env = {}) {
     }
     // Gemini (chiave salvata cifrata da Riccardo nella Control Room): lettura più affidabile dei menu fitti.
     const gemini = await geminiConfig(db, env);
-    const read = material.mime === 'application/pdf' ? await readMenuPdf(env.AI, bytes, material.filename) : await readMenuPhoto(env.AI, bytes, material.mime, { gemini });
+    // Lettura in coda (giro dell'orologio): se Google è lento o sovraccarico, Jarvis riprova dopo 2, 5 e 10 minuti
+    // prima di ripiegare sui modelli di riserva. Il tasto «Rileggi» di Riccardo non aspetta mai.
+    const RETRY_MINUTES = [2, 5, 10];
+    let retries = {}; try { retries = JSON.parse(await missions.setting(db, 'read_retries') || '{}') || {}; } catch {}
+    const tries = Number(retries[materialId]?.n) || 0;
+    const read = material.mime === 'application/pdf' ? await readMenuPdf(env.AI, bytes, material.filename)
+      : await readMenuPhoto(env.AI, bytes, material.mime, { gemini, deferOnTransient: p.allowDefer === true && tries < RETRY_MINUTES.length });
     const stamp = now();
+    // Contatori di Gemini del giorno (per «stato»): richieste, problemi, ultimo errore.
+    if (gemini && read.geminiStats) {
+      try {
+        const day = new Date().toISOString().slice(0, 10);
+        let g = { day, requests: 0, failed: 0, deferred: 0, last: '' }; try { const c = JSON.parse(await missions.setting(db, 'gemini_day') || 'null'); if (c?.day === day) g = c; } catch {}
+        g.requests += read.geminiStats.requests || 0; g.failed += read.geminiStats.failed || 0; if (read.retryLater) g.deferred += 1;
+        if (read.geminiStats.errors?.length) g.last = String(read.geminiStats.errors[0]).slice(0, 120);
+        if (/429|RESOURCE_EXHAUSTED/i.test(g.last)) g.quota = true;
+        await missions.putSetting(db, 'gemini_day', JSON.stringify(g));
+      } catch { /* solo statistiche */ }
+    }
+    if (read.retryLater) {
+      const minutes = RETRY_MINUTES[tries];
+      retries[materialId] = { n: tries + 1, next: new Date(Date.now() + minutes * 60_000).toISOString() };
+      await missions.putSetting(db, 'read_retries', JSON.stringify(retries));
+      await auditedBatch(db, [], 'material.read.deferred', `Google non risponde: rileggo «${material.filename}» tra ${minutes} minuti (tentativo ${tries + 1} di ${RETRY_MINUTES.length}).`.slice(0, 600), request.id);
+      return { state: await state(db, env), result: { ok: true, deferred: { n: tries + 1, of: RETRY_MINUTES.length, minutes } } };
+    }
+    if (tries) { delete retries[materialId]; await missions.putSetting(db, 'read_retries', JSON.stringify(retries)).catch(() => {}); }
     // Contatore delle letture del giorno (per «stato» e la quota gratuita): resta anche se la pratica viene eliminata.
     if (material.mime !== 'application/pdf') {
       try {
@@ -1207,6 +1272,22 @@ export async function action(db, type, input, env = {}) {
       ], 'material.read.jarvis', `Jarvis ha letto «${material.filename}»: ${read.warnings[0]}`.slice(0, 600), request.id);
       result = { ok: true, agreed: read.agreed ?? null, doubts: read.doubts ?? 0, method: read.method, warnings: read.warnings };
     }
+  } else if (type === 'rereadRequest') {
+    // Rilettura di tutti i file di una pratica con le regole attuali: li rimette in coda, li legge il giro
+    // dell'orologio (uno al minuto) e la bozza mai toccata viene rifatta. Una bozza già modificata non si tocca.
+    const requestId = identifier(p.requestId);
+    const target = await getOne(db, 'SELECT id,status,subject FROM requests WHERE id=?', requestId);
+    assert(target, 'Pratica non trovata.', 404);
+    assert(!['completata', 'archiviata', 'chiusa'].includes(target.status), 'Pratica chiusa.', 409);
+    const IN = "processing_status IN ('letto_da_jarvis','non_leggibile','da_trascrivere') AND archived_at IS NULL AND (mime='application/pdf' OR mime IN ('image/jpeg','image/png','image/webp'))";
+    const files = await rows(db, `SELECT id FROM materials WHERE request_id=? AND ${IN}`, requestId);
+    assert(files.length, 'Nessun file da rileggere in questa pratica.', 422);
+    await auditedBatch(db, [db.prepare(`UPDATE materials SET processing_status='da_trascrivere' WHERE request_id=? AND ${IN}`).bind(requestId)],
+      'material.reread', `Rilettura in coda: ${files.length} file di «${String(target.subject || '').slice(0, 80)}».`.slice(0, 600), requestId);
+    try { const open = JSON.parse(await missions.setting(db, 'tg_checks') || 'null'); if (open?.requestId === requestId) await missions.putSetting(db, 'tg_checks', 'null'); } catch { /* nessun dubbio aperto */ }
+    try { const waiting = JSON.parse(await missions.setting(db, 'read_retries') || '{}') || {}; for (const f of files) delete waiting[f.id]; await missions.putSetting(db, 'read_retries', JSON.stringify(waiting)); } catch { /* niente rinvii */ }
+    const draft = await getOne(db, 'SELECT id,status,revision FROM drafts WHERE request_id=?', requestId);
+    result = { queued: files.length, subject: target.subject, draft: draft ? { status: draft.status, revision: draft.revision } : null };
   } else if (type === 'mediaPlace' || type === 'mediaRemove') {
     // Foto per il menu: Riccardo conferma il posto proposto da Jarvis (o ne sceglie un altro), la
     // toglie o la scarta. Solo lui: Jarvis propone e basta. La foto ridotta è già stata caricata

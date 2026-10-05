@@ -129,4 +129,22 @@ describe('Gemini: modello non disponibile per la chiave', () => {
     assert.ok(r.models.every((m) => m.startsWith('gemini-') && m !== 'gemini-2.5-flash'), JSON.stringify(r.models));
     assert.notEqual(r.models[0], r.models[1], 'due modelli diversi');
   });
+  const menuText = '# Primi\nSpaghetti — 7,00\nRisotto — 8,00';
+  it('in coda: se Google è sovraccarico Jarvis rimanda la lettura invece di ripiegare subito sui modelli deboli', async () => {
+    const fetchImpl = async () => Response.json({ error: { status: 'RESOURCE_EXHAUSTED' } }, { status: 429 });
+    let used = 0;
+    const ai = { run: async () => { used += 1; return { response: menuText }; } };
+    const r = await readMenuPhoto(ai, new Uint8Array([255, 216, 255, 1]), 'image/jpeg', { deferOnTransient: true, gemini: { key: 'k'.repeat(39), models: ['gemini-2.5-flash'], fetchImpl } });
+    assert.equal(r.ok, false);
+    assert.equal(r.retryLater, true);
+    assert.equal(used, 0, 'nessun modello di Cloudflare consumato');
+    assert.ok(r.geminiStats.failed >= 1 && r.geminiStats.errors.length);
+  });
+  it('errore non passeggero (modello assente, 404): niente rinvio, si ripiega subito', async () => {
+    const fetchImpl = async () => Response.json({ error: { status: 'NOT_FOUND' } }, { status: 404 });
+    const ai = { run: async () => ({ response: menuText }) };
+    const r = await readMenuPhoto(ai, new Uint8Array([255, 216, 255, 1]), 'image/jpeg', { deferOnTransient: true, gemini: { key: 'k'.repeat(39), models: ['gemini-2.5-flash'], fetchImpl } });
+    assert.equal(r.ok, true);
+    assert.ok(!r.retryLater);
+  });
 });

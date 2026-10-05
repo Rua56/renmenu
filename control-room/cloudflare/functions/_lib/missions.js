@@ -11,6 +11,8 @@ import { briefingDue, buildBriefing, romeDay } from './briefing.js';
 import { answerCallback, clearButtons, downloadTelegramFile, sendTelegram, sendVoice, telegramReady } from './telegram.js';
 import { CHAT_MODEL, chat as freeChat, matchVenue, planFromText, speak, transcribe, understand, venueSaid } from './voice.js';
 import { classifyRequest } from './autopilot.js';
+import { proposeOps, validateOps } from './draft-edit.js';
+import { GEMINI_PREFERRED } from './vision.js';
 import { findDishes, findLocales, guessIntent, hintsText } from './understanding.js';
 import { memoryContext, memoryFor, menuStatements, noteStatement } from './memory.js';
 
@@ -32,6 +34,8 @@ const describeChange = (entry) => entry.type === 'prezzo' ? `${entry.name}: ${en
   : entry.type === 'aggiungi' ? `aggiunto ${entry.name} ${entry.price}` : entry.type === 'rimuovi' ? `tolto ${entry.name}`
     : entry.type === 'coperto' ? `coperto ${entry.value}` : `${entry.name}: ${entry.label || entry.type}`;
 
+const EDIT_WORDS = /(?:\d|\beuro\b|€|\bcost\w*|\bprezz\w*|\baggiung\w*|\btogli\w*|\brimuov\w*|\belimin\w*|\bcancell\w*|\bcambia\w*|\bmetti\w*|\bsposta\w*|\brinomin\w*|\bdescrizion\w*|\bchiam\w*|\bdividi\w*|\bspezza\w*|\bsono\b)/i;
+const REREAD = /\b(?:rileggi\w*|rilegg\w+|rileggere|rifai la lettura|leggi(?:le|li)? (?:di nuovo|ancora))\b/i;
 const STATUS_WORDS = /^\W*(?:ok\s+)?(?:jarvis[\s,!.]*)?(?:\/)?stato[\s?!.]*$/i;
 
 export function createMissions(deps) {
@@ -131,10 +135,13 @@ export function createMissions(deps) {
     const reads = count?.day === quotaDay ? count.n : 0, failedReads = count?.day === quotaDay ? count.failed : 0;
     const queued = (await safe("SELECT COUNT(*) AS n FROM materials WHERE processing_status='da_trascrivere' AND archived_at IS NULL"))?.n || 0;
     const lastMail = (await safe('SELECT MAX(created_at) AS at FROM mail_files'))?.at;
+    let gem = null; try { const g = JSON.parse(await setting(db, 'gemini_day') || 'null'); if (g?.day === quotaDay) gem = g; } catch {}
+    let retrying = 0; try { const w = JSON.parse(await setting(db, 'read_retries') || '{}') || {}; retrying = Object.values(w).filter((r) => r?.next > new Date().toISOString()).length; } catch {}
     const when = (iso) => new Intl.DateTimeFormat('it-IT', { timeZone: 'Europe/Rome', day: 'numeric', month: 'long', hour: '2-digit', minute: '2-digit' }).format(new Date(iso));
     const health = [
       `Foto lette oggi: ${reads}${failedReads ? ` (${failedReads} non riuscite)` : ''}. La quota gratuita regge circa 20 letture al giorno e si azzera alle 2 di notte.`,
-      queued ? `File in attesa di lettura: ${queued}.` : 'Nessun file in attesa di lettura.',
+      ...(gem ? [`Gemini oggi: ${gem.requests} richieste, ${gem.failed} senza risposta${gem.deferred ? `, ${gem.deferred} letture rimandate e riprovate` : ''}${gem.last ? ` (ultimo errore: ${gem.last})` : ''}.${gem.quota ? ' Google ha segnalato la quota esaurita: si ripristina da sola, intanto leggo con i modelli di riserva.' : ''}`] : []),
+      queued ? `File in attesa di lettura: ${queued}${retrying ? `, di cui ${retrying} rimandati perché Google era lento` : ''}.` : 'Nessun file in attesa di lettura.',
       lastMail ? `Ultimo allegato arrivato da Gmail: ${when(lastMail)}.` : 'Da Gmail non è ancora arrivato nessun allegato.'
     ];
     return `${lines.length ? `Pratiche affidate a me:\n${lines.join('\n')}` : 'Nessuna pratica affidata in corso.'}\nRichieste aperte nella Control Room: ${pending}.\n\n${health.join('\n')}`;
@@ -471,6 +478,13 @@ export function createMissions(deps) {
         if (!outcome.silent) await sendTelegram(env, chat, outcome.text, null, deps.fetchImpl);
         return;
       }
+      if (verb === 'undo') {
+        const outcome = await undoDraftEdit(db, env, missionId);
+        await answerCallback(env, query.id, outcome.text, deps.fetchImpl);
+        if (query.message?.message_id) await clearButtons(env, chat, query.message.message_id, deps.fetchImpl);
+        await sendTelegram(env, chat, outcome.text, null, deps.fetchImpl);
+        return;
+      }
       const outcome = ['pub', 'no'].includes(verb) ? await decide(db, env, missionId, verb === 'pub')
         : verb === 'att' ? await attachTelegramFile(db, env, missionId) : verb === 'attno' ? (await putSetting(db, 'tg_pending_file', ''), { text: 'Va bene, la foto non viene usata.' }) : { text: 'Comando sconosciuto.' };
       await answerCallback(env, query.id, outcome.text, deps.fetchImpl);
@@ -605,6 +619,12 @@ export function createMissions(deps) {
     // «Il piano è Standard» subito dopo aver aperto una pratica: vale per QUELLA pratica, non per un menu online.
     const planned = intent.intent === 'crea_pratica' ? null : await planForFocus(db, utterance, intent.locale);
     if (planned) { await answer(planned); return; }
+    if (REREAD.test(said0)) { await answer(await voiceReread(db, env, intent.locale, utterance)); return; }
+    // Correzione dettata a una bozza aperta («le braciole costano 9»), anche se il modello l'ha presa per una domanda.
+    if (['risposta', 'non_chiaro'].includes(intent.intent) && EDIT_WORDS.test(said0)) {
+      const target = await draftTarget(db, intent.locale, clues, utterance).catch(() => null);
+      if (target?.draft && draftMentions(target.draft, utterance)) { const edited = await voiceEditDraft(db, env, utterance, target.draft); await answer(edited.text, edited.buttons || null, { keep: edited.keep }); return; }
+    }
     if (intent.intent === 'risposta' || (intent.intent === 'non_chiaro' && clues.guess.intent === 'non_chiaro')) {
       const talk = await freeChat(env.AI, { utterance: said0, context, history: fresh ? [...history, { who: 'Riccardo', text: pending.text }] : history, spoken });
       await auditedBatch(jarvisDb(db), [], 'jarvis.chat', `Conversazione libera: ${talk.ok ? (talk.model === CHAT_MODEL ? 'GPT-OSS 120B' : 'modello di riserva') : 'nessuna risposta'}.`, null).catch(() => {});
@@ -622,8 +642,121 @@ export function createMissions(deps) {
     }
     if (intent.intent === 'ricorda') { await answer(await voiceRemember(db, utterance, intent.locale, clues)); return; }
     if (intent.intent === 'crea_pratica') { await answer(await voiceCreate(db, utterance, intent.locale)); return; }
-    if (intent.intent === 'aggiorna_menu') { await answer(await voiceUpdate(db, env, utterance, intent.locale, clues)); return; }
+    if (intent.intent === 'aggiorna_menu') {
+      const target = await draftTarget(db, intent.locale, clues, utterance);
+      if (target?.ask) { await answer(target.ask); return; }
+      if (target?.draft) { const edited = await voiceEditDraft(db, env, utterance, target.draft); await answer(edited.text, edited.buttons || null, { keep: edited.keep }); return; }
+      await answer(await voiceUpdate(db, env, utterance, intent.locale, clues));
+      return;
+    }
     await answer(intent.risposta || 'Non ho afferrato, Riccardo: di quale locale parliamo e cosa devo fare?');
+  }
+  // ——— Correzioni alla BOZZA in Revisione, dettate o scritte su Telegram ———
+  async function geminiFor(db, env) {
+    try {
+      const key = await readSealedSetting(env, setting, putSetting, db, 'gemini_api_key');
+      const models = JSON.parse(await setting(db, 'gemini_models') || '[]');
+      return key && models.length ? { key, models: [...new Set([...models, ...GEMINI_PREFERRED])], fetchImpl: deps.fetchImpl } : null;
+    } catch { return null; }
+  }
+  const OPEN_DRAFTS = "SELECT d.id,d.request_id,d.slug,d.status,d.revision,d.menu_json,d.provenance_json,r.subject,c.id AS client_id,c.name AS client_name FROM drafts d JOIN requests r ON r.id=d.request_id LEFT JOIN clients c ON c.id=r.client_id WHERE d.status IN ('bozza','revisione','pronta_pr') AND r.status NOT IN ('completata','archiviata','chiusa') ORDER BY d.updated_at DESC LIMIT 20";
+  const plainWords = (text) => String(text || '').toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/[^a-z0-9]+/g, ' ').trim().split(/\s+/).filter((w) => w.length >= 4);
+  function draftMentions(draft, utterance) {
+    const said = plainWords(utterance);
+    let menu; try { menu = JSON.parse(draft.menu_json); } catch { return false; }
+    return (menu.sezioni || []).some((section) => (section.voci || []).some((item) => plainWords(typeof item.nome === 'string' ? item.nome : item.nome?.it).some((w) => said.some((u) => u === w || (w.length >= 6 && u.length >= 5 && u.slice(0, 5) === w.slice(0, 5))))));
+  }
+  /** Quale bozza aperta riguarda il comando: null se il comando riguarda un menu già online. */
+  async function draftTarget(db, spokenVenue, clues, utterance) {
+    const drafts = await rows(db, OPEN_DRAFTS).catch(() => []);
+    if (!drafts.length) return null;
+    const named = drafts.map((d) => ({ id: d.id, name: d.client_name || '', menu_id: '' }));
+    const bySpoken = spokenVenue ? matchVenue(spokenVenue, named) : { client: null, candidates: [] };
+    const byClue = [...new Set(clues.locales.map((c) => c.id))].map((id) => drafts.find((d) => d.client_id === id)).filter(Boolean);
+    if (bySpoken.client) return { draft: drafts.find((d) => d.id === bySpoken.client.id) };
+    if (bySpoken.candidates.length > 1) return { ask: `Ci sono più bozze aperte che corrispondono: ${bySpoken.candidates.map((c) => `«${c.name}»`).join(', ')}. Di quale parliamo?` };
+    if (byClue.length === 1) return { draft: byClue[0] };
+    if (spokenVenue || clues.locales.length) return null; // locale detto ma senza bozza aperta: menu già online
+    // Nessun locale nominato: la pratica su cui Riccardo sta lavorando, oppure l'unica bozza che nomina quei piatti.
+    let focus = null; try { focus = JSON.parse(await setting(db, 'tg_focus') || 'null'); } catch {}
+    if (focus?.requestId && Date.now() - Date.parse(focus.at) < FOCUS_MINUTES * MINUTE) { const inFocus = drafts.find((d) => d.request_id === focus.requestId); if (inFocus) return { draft: inFocus }; }
+    const mentioned = drafts.filter((d) => draftMentions(d, utterance));
+    if (clues.dishes.length) return null; // il piatto è in un menu online
+    if (mentioned.length === 1) return { draft: mentioned[0] };
+    if (mentioned.length > 1) return { ask: `Quel piatto compare in più bozze aperte: ${mentioned.map((d) => `«${d.client_name || d.subject}»`).join(', ')}. Di quale locale parliamo?` };
+    return null;
+  }
+  async function voiceEditDraft(db, env, utterance, draft) {
+    let menu; try { menu = JSON.parse(draft.menu_json); } catch { return { text: 'La bozza non si legge: aprila in Revisione.' }; }
+    const name = draft.client_name || menu.nome || draft.subject || 'la bozza';
+    const plan = await proposeOps({ ai: env.AI, gemini: await geminiFor(db, env), utterance, menu });
+    if (plan.unavailable) return { text: `Non riesco a interpretare la modifica adesso: i modelli non rispondono. Riprova tra qualche minuto, oppure correggi la bozza di «${name}» in Revisione.` };
+    const checked = validateOps(plan.ops, menu, utterance);
+    if (checked.problems.length) return { text: `Per la bozza di «${name}» non applico nulla, perché:\n${checked.problems.slice(0, 5).map((p) => `• ${p}`).join('\n')}\n\nRiscrivimi la correzione con i nomi e i prezzi precisi.` };
+    if (!checked.ops.length) return { text: plan.dubbio ? plan.dubbio : `Non trovo una modifica precisa per la bozza di «${name}». Dimmi per esempio «le braciole costano 9» o «aggiungi il tiramisù a 5 euro nei dolci».`, keep: true };
+    const snapshot = { draftId: draft.id, menu_json: draft.menu_json, provenance_json: draft.provenance_json, at: now() };
+    let saved;
+    try { saved = (await action(jarvisDb(db), 'editDraftOps', { id: draft.id, revision: draft.revision, ops: checked.ops, source: 'Riccardo (Telegram)' }, env)).result; }
+    catch (error) { return { text: `Non sono riuscito a modificare la bozza di «${name}»: ${String(error?.message || 'errore').slice(0, 200)}` }; }
+    await putSetting(db, 'draft_undo', JSON.stringify({ ...snapshot, revision: saved.revision })).catch(() => {});
+    const english = saved.needsEnglish && (menu.lingue || []).includes('en');
+    if (english) await putSetting(db, 'draft_translate', JSON.stringify({ draftId: draft.id, at: now() })).catch(() => {});
+    return {
+      text: `Fatto, bozza di «${name}» aggiornata:\n${checked.ops.length ? saved.summary.split(/(?<=\.)\s+/).map((line) => `• ${line}`).join('\n') : ''}\n\nLa trovi in Revisione. La checklist si è azzerata: va riconfermata prima dell’anteprima.${english ? ' L’inglese delle voci nuove lo preparo tra un minuto.' : ''}`,
+      buttons: [['Annulla', `undo:${draft.id}`]]
+    };
+  }
+  async function undoDraftEdit(db, env, draftId) {
+    let saved = null; try { saved = JSON.parse(await setting(db, 'draft_undo') || 'null'); } catch {}
+    if (!saved || saved.draftId !== draftId) return { text: 'Non c’è più nulla da annullare per questa bozza.' };
+    const draft = await getOne(db, 'SELECT id,revision,status FROM drafts WHERE id=?', draftId);
+    if (!draft) return { text: 'La bozza non esiste più.' };
+    if (draft.revision !== saved.revision) return { text: 'Dopo la mia modifica la bozza è cambiata ancora: per non perdere lavoro non annullo. Correggila in Revisione, oppure dimmi la correzione.' };
+    try {
+      await action(jarvisDb(db), 'restoreDraftSnapshot', { id: draftId, revision: draft.revision, menu: JSON.parse(saved.menu_json), provenance: JSON.parse(saved.provenance_json || '[]') }, env);
+    } catch (error) { return { text: `Non sono riuscito ad annullare: ${String(error?.message || 'errore').slice(0, 200)}` }; }
+    await putSetting(db, 'draft_undo', 'null').catch(() => {});
+    try { const q = JSON.parse(await setting(db, 'draft_translate') || 'null'); if (q?.draftId === draftId) await putSetting(db, 'draft_translate', 'null'); } catch {}
+    return { text: 'Annullato: la bozza è tornata com’era prima della mia modifica.' };
+  }
+  /** Inglese delle voci aggiunte o cambiate a voce: lo prepara il giro dell'orologio. */
+  async function translateAfterEdit(db, env) {
+    let queued = null; try { queued = JSON.parse(await setting(db, 'draft_translate') || 'null'); } catch {}
+    if (!queued?.draftId) return null;
+    await putSetting(db, 'draft_translate', 'null');
+    const draft = await getOne(db, "SELECT id,revision,status FROM drafts WHERE id=? AND status IN ('bozza','revisione','pronta_pr')", queued.draftId);
+    if (!draft) return null;
+    let undo = null; try { undo = JSON.parse(await setting(db, 'draft_undo') || 'null'); } catch {}
+    let text;
+    try {
+      const out = (await action(jarvisDb(db), 'translateDraft', { id: draft.id, revision: draft.revision }, env)).result;
+      if (undo?.draftId === draft.id && undo.revision === draft.revision) { const now2 = await getOne(db, 'SELECT revision FROM drafts WHERE id=?', draft.id); await putSetting(db, 'draft_undo', JSON.stringify({ ...undo, revision: now2.revision })); }
+      text = `Inglese delle voci modificate pronto in bozza${out?.summary ? ` (${String(out.summary).slice(0, 120)})` : ''}. Resta una bozza automatica: la controlli tu.`;
+    } catch (error) {
+      if (/già l.inglese|niente da tradurre/i.test(String(error?.message))) return null;
+      text = `Non sono riuscito a preparare l’inglese delle voci nuove (${String(error?.message || 'errore').slice(0, 120)}). Puoi farlo in Revisione con «Traduci».`;
+    }
+    const chat = await setting(db, 'telegram_chat_id');
+    if (chat && telegramReady(env)) await sendTelegram(env, chat, text, null, deps.fetchImpl);
+    return { text };
+  }
+  // «Jarvis, rileggi le foto»: rimette in coda tutti i file della pratica e li legge con le regole attuali.
+  async function voiceReread(db, env, spokenVenue, utterance) {
+    const open = await rows(db, "SELECT r.id,r.subject,c.name AS client_name FROM requests r LEFT JOIN clients c ON c.id=r.client_id WHERE r.status NOT IN ('completata','archiviata','chiusa') AND EXISTS (SELECT 1 FROM materials m WHERE m.request_id=r.id AND m.archived_at IS NULL AND m.processing_status IN ('letto_da_jarvis','non_leggibile','da_trascrivere') AND (m.mime='application/pdf' OR m.mime IN ('image/jpeg','image/png','image/webp'))) ORDER BY r.updated_at DESC LIMIT 10").catch(() => []);
+    if (!open.length) return 'Non ci sono pratiche aperte con foto o PDF da rileggere.';
+    let pick = null;
+    const named = spokenVenue ? matchVenue(spokenVenue, open.map((r) => ({ id: r.id, name: r.client_name || r.subject || '', menu_id: '' }))) : { client: null, candidates: [] };
+    if (named.client) pick = open.find((r) => r.id === named.client.id);
+    if (!pick) { const said = String(utterance).toLowerCase(); const hit = open.filter((r) => r.client_name && said.includes(String(r.client_name).toLowerCase())); if (hit.length === 1) pick = hit[0]; }
+    if (!pick) { let focus = null; try { focus = JSON.parse(await setting(db, 'tg_focus') || 'null'); } catch {} if (focus?.requestId && Date.now() - Date.parse(focus.at) < FOCUS_MINUTES * MINUTE) pick = open.find((r) => r.id === focus.requestId) || null; }
+    if (!pick && open.length === 1) pick = open[0];
+    if (!pick) return `Di quale pratica rileggo le foto? ${open.slice(0, 6).map((r) => `«${r.client_name || r.subject}»`).join(', ')}.`;
+    let out;
+    try { out = (await action(jarvisDb(db), 'rereadRequest', { requestId: pick.id }, env)).result; }
+    catch (error) { return `Non sono riuscito a mettere in coda la rilettura: ${String(error?.message || 'errore').slice(0, 200)}`; }
+    const untouched = out.draft && out.draft.status === 'bozza' && out.draft.revision === 1;
+    const draft = !out.draft ? ' Quando ho finito preparo la bozza.' : untouched ? ' La bozza attuale, mai modificata, la rifaccio con le nuove letture.' : ' Hai già lavorato sulla bozza, quindi non la tocco: a lettura finita, in Revisione tocca «Rifai la bozza con tutti i materiali».';
+    return `Rimetto in coda ${out.queued} file di «${pick.client_name || pick.subject}»: ne leggo uno al minuto e ti scrivo appena ho finito.${draft}`;
   }
   async function planForFocus(db, utterance, spokenVenue) {
     const plan = planFromText(utterance);
@@ -767,5 +900,5 @@ export function createMissions(deps) {
     if (chat && telegramReady(env)) await sendTelegram(env, chat, text, null, deps.fetchImpl);
     return { text };
   }
-  return { entrust, tick, decide, telegramUpdate, setting, putSetting, briefing, notify, startChecks, answerCheck, draftAfterChecks };
+  return { entrust, tick, decide, telegramUpdate, setting, putSetting, briefing, notify, startChecks, answerCheck, draftAfterChecks, translateAfterEdit, undoDraftEdit, draftTarget, voiceEditDraft };
 }

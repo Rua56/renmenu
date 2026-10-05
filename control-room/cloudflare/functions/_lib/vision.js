@@ -292,7 +292,8 @@ export async function transcribeGemini({ key, model, fetchImpl = globalThis.fetc
   return String(text).replace(/```[a-z]*\n?|```/g, '').trim();
 }
 
-export async function readMenuPhoto(ai, bytes, mime, { timeoutMs = 110_000, gemini = null } = {}) {
+export const TRANSIENT_GEMINI = /Gemini (?:503|500|429|senza testo)|tempo scaduto|abort|fetch failed|network|UNAVAILABLE|RESOURCE_EXHAUSTED/i;
+export async function readMenuPhoto(ai, bytes, mime, { timeoutMs = 110_000, gemini = null, deferOnTransient = false } = {}) {
   const geminiReady = Boolean(gemini?.key && gemini?.models?.length);
   if (typeof ai?.run !== 'function' && !geminiReady) return { ok: false, reason: 'lettura delle foto non disponibile in questo ambiente' };
   if (!PHOTO_TYPES.has(mime)) return { ok: false, reason: `formato ${mime} non leggibile: manda la foto in JPG o PNG` };
@@ -319,6 +320,11 @@ export async function readMenuPhoto(ai, bytes, mime, { timeoutMs = 110_000, gemi
   const reads = await Promise.allSettled(primary.map((r) => r.run()));
   const used = primary.map((r) => r.label);
   const texts = reads.map((r, i) => { if (r.status !== 'fulfilled') notes.push(`${primary[i].label}: ${String(r.reason?.message || 'errore').slice(0, 120)}`); return r.status === 'fulfilled' ? r.value : ''; });
+  // Google sovraccarico o lento: meglio riprovare tra qualche minuto con Gemini che ripiegare subito su modelli più deboli.
+  const geminiStats = { requests: primary.length, failed: texts.filter((t) => !t).length, errors: notes.filter((n) => TRANSIENT_GEMINI.test(n)).slice(0, 4) };
+  if (deferOnTransient && geminiReady && texts.some((t) => !t || !readingItems(t).length) && notes.some((n) => TRANSIENT_GEMINI.test(n))) {
+    return { ok: false, retryLater: true, reason: 'Google non risponde adesso', geminiStats, raw: notes.map((n) => `[nota] ${n}`) };
+  }
   // Una lettura mancata (quota Gemini finita, errore): la sostituisce un modello di riserva.
   let fallbackUsed = false;
   for (let i = 0; i < texts.length; i += 1) {
@@ -329,7 +335,7 @@ export async function readMenuPhoto(ai, bytes, mime, { timeoutMs = 110_000, gemi
   }
   // La lettura più completa fa da base (ordine e sezioni del menu), l'altra conferma.
   const good = texts.filter((t) => t && readingItems(t).length).sort((a, b) => readingItems(b).length - readingItems(a).length);
-  if (!good.length) return { ok: false, reason: 'non riesco a leggere piatti e prezzi in questa foto: prova con una foto più nitida, dritta e senza riflessi', raw: [...texts, ...notes.map((n) => `[nota] ${n}`)] };
+  if (!good.length) return { ok: false, geminiStats, reason: 'non riesco a leggere piatti e prezzi in questa foto: prova con una foto più nitida, dritta e senza riflessi', raw: [...texts, ...notes.map((n) => `[nota] ${n}`)] };
   let combined = combineReadings(good[0], good[1]);
   // Molte voci in disaccordo (menu lunghi, scritte piccole): una terza lettura con un altro modello fa da arbitro.
   let thirdText = '';
@@ -346,7 +352,7 @@ export async function readMenuPhoto(ai, bytes, mime, { timeoutMs = 110_000, gemi
     ? `Foto letta da Jarvis ${thirdText ? 'tre volte con tre modelli diversi' : 'due volte con modelli diversi'}${withGemini ? ' (Gemini)' : ''}${fallbackUsed ? ' (uno di riserva, il primo non rispondeva)' : ''}: ${combined.agreed} voci concordi${thirdText && combined.byThird ? ` (${combined.byThird} confermate dalla terza lettura)` : ''}${combined.doubts ? `, ${combined.doubts} righe da verificare sulla foto` : ''}.`
     : 'Foto letta una sola volta (il secondo modello non ha risposto): tutte le voci restano da verificare sulla foto.'];
   if (good.length === 2 && weakSections.length) warnings.push(`Sezioni meno sicure: ${weakSections.join(', ')}.`);
-  return { ok: true, text: combined.text, agreed: combined.agreed, doubts: combined.doubts, checks: combined.checks || [], models: used,
+  return { ok: true, geminiStats, text: combined.text, agreed: combined.agreed, doubts: combined.doubts, checks: combined.checks || [], models: used,
     method: good.length === 2 ? (thirdText ? 'jarvis_foto_tripla_lettura' : 'jarvis_foto_doppia_lettura') : 'jarvis_foto_lettura_singola', warnings,
     raw: [...(thirdText ? [...texts, thirdText] : texts), ...notes.map((n) => `[nota] ${n}`)] };
 }

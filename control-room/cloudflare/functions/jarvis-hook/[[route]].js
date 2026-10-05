@@ -55,6 +55,11 @@ export async function onRequest(context) {
       const read = await readPendingMaterials(env.DB, env).catch(() => []);
       for (const { material, request, outcome } of read) {
         if (outcome?.ok && outcome.waiting) continue; // altre foto in coda: un solo messaggio alla fine
+        if (outcome?.deferred) {
+          // Google lento: un solo avviso, al primo rinvio.
+          if (outcome.deferred.n === 1) await missions.notify(env.DB, env, material.request_id, 'foto in attesa', `Google è lento e non ha risposto alla lettura di «${material.filename}». Non ripiego su modelli più deboli: riprovo tra ${outcome.deferred.minutes} minuti (fino a ${outcome.deferred.of} tentativi) e ti scrivo appena ho il risultato.`);
+          continue;
+        }
         const many = (outcome?.files || []).length > 1;
         const head = many
           ? `Ho letto ${outcome.files.length} file${request?.subject ? ` della pratica «${String(request.subject).slice(0, 60)}»` : ''}, uno alla volta:\n${outcome.files.map((f, i) => `${i + 1}. «${f.filename}»: ${String(f.note).slice(0, 160)}`).join('\n')}\n`
@@ -68,6 +73,7 @@ export async function onRequest(context) {
         if (outcome?.checks) await missions.startChecks(env.DB, env, material.request_id).catch(() => 0);
       }
       await missions.draftAfterChecks(env.DB, env).catch(() => null);
+      await missions.translateAfterEdit(env.DB, env).catch(() => null);
       const drafted = await runAutopilot(env.DB, env);
       const chat = drafted.length ? await missions.setting(env.DB, 'telegram_chat_id') : null;
       if (chat && telegramReady(env)) for (const entry of drafted) await sendTelegram(env, chat, entry.message);
