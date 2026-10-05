@@ -31,6 +31,8 @@ const describeChange = (entry) => entry.type === 'prezzo' ? `${entry.name}: ${en
   : entry.type === 'aggiungi' ? `aggiunto ${entry.name} ${entry.price}` : entry.type === 'rimuovi' ? `tolto ${entry.name}`
     : entry.type === 'coperto' ? `coperto ${entry.value}` : `${entry.name}: ${entry.label || entry.type}`;
 
+const STATUS_WORDS = /^\W*(?:ok\s+)?(?:jarvis[\s,!.]*)?(?:\/)?stato[\s?!.]*$/i;
+
 export function createMissions(deps) {
   const { action, auditedBatch, getOne, rows, now, uid } = deps;
   const jarvisDb = (db) => ({ prepare: (sql) => db.prepare(sql), batch: (s) => db.batch(s), actor: 'jarvis' });
@@ -38,6 +40,26 @@ export function createMissions(deps) {
   async function setting(db, key) {
     try { return (await getOne(db, 'SELECT value FROM jarvis_settings WHERE key=?', key))?.value ?? null; }
     catch (error) { if (/no such table/i.test(String(error?.message))) return null; throw error; }
+  }
+  // Punto della situazione con dati certi dal database (scritto o a voce: «Jarvis, stato»).
+  async function statusText(db) {
+    const list = await rows(db, "SELECT m.status,m.note,d.menu_json FROM jarvis_missions m JOIN drafts d ON d.id=m.draft_id WHERE m.status NOT IN ('completata','annullata') ORDER BY m.updated_at DESC LIMIT 10");
+    const pending = (await getOne(db, "SELECT COUNT(*) AS n FROM requests WHERE status NOT IN ('completata','archiviata','chiusa')"))?.n || 0;
+    const lines = list.map((row) => { let name = 'pratica'; try { name = JSON.parse(row.menu_json).nome; } catch {} return `- ${name}: ${row.status.replace('_', ' ')}${row.note ? ` (${row.note})` : ''}`; });
+    // Salute di Jarvis: letture foto di oggi (quota gratuita di Cloudflare), ultimo file da Gmail, letture in corso.
+    const safe = async (sql, ...args) => { try { return await getOne(db, sql, ...args); } catch { return null; } };
+    let count = null; try { count = JSON.parse(await setting(db, 'reads_day') || 'null'); } catch {}
+    const quotaDay = new Date().toISOString().slice(0, 10); // la quota di Cloudflare si azzera a mezzanotte UTC (le 2 in Italia d'estate)
+    const reads = count?.day === quotaDay ? count.n : 0, failedReads = count?.day === quotaDay ? count.failed : 0;
+    const queued = (await safe("SELECT COUNT(*) AS n FROM materials WHERE processing_status='da_trascrivere' AND archived_at IS NULL"))?.n || 0;
+    const lastMail = (await safe('SELECT MAX(created_at) AS at FROM mail_files'))?.at;
+    const when = (iso) => new Intl.DateTimeFormat('it-IT', { timeZone: 'Europe/Rome', day: 'numeric', month: 'long', hour: '2-digit', minute: '2-digit' }).format(new Date(iso));
+    const health = [
+      `Foto lette oggi: ${reads}${failedReads ? ` (${failedReads} non riuscite)` : ''}. La quota gratuita regge circa 20 letture al giorno e si azzera alle 2 di notte.`,
+      queued ? `File in attesa di lettura: ${queued}.` : 'Nessun file in attesa di lettura.',
+      lastMail ? `Ultimo allegato arrivato da Gmail: ${when(lastMail)}.` : 'Da Gmail non è ancora arrivato nessun allegato.'
+    ];
+    return `${lines.length ? `Pratiche affidate a me:\n${lines.join('\n')}` : 'Nessuna pratica affidata in corso.'}\nRichieste aperte nella Control Room: ${pending}.\n\n${health.join('\n')}`;
   }
   async function putSetting(db, key, value) {
     await db.prepare('INSERT INTO jarvis_settings (key,value,updated_at) VALUES (?,?,?) ON CONFLICT(key) DO UPDATE SET value=excluded.value,updated_at=excluded.updated_at')
@@ -389,24 +411,8 @@ export function createMissions(deps) {
     }
     if (!chat || from !== chat) return;
     if (/^\/briefing\b/i.test(text)) { await briefing(db, env, { force: true }); return; }
-    if (/^\/stato\b/i.test(text) || /^(?:jarvis[\s,!.]*)?stato[\s?!.]*$/i.test(text)) {
-      const list = await rows(db, "SELECT m.status,m.note,d.menu_json FROM jarvis_missions m JOIN drafts d ON d.id=m.draft_id WHERE m.status NOT IN ('completata','annullata') ORDER BY m.updated_at DESC LIMIT 10");
-      const pending = (await getOne(db, "SELECT COUNT(*) AS n FROM requests WHERE status IN ('nuova','dati_da_confermare','in_revisione')"))?.n || 0;
-      const lines = list.map((row) => { let name = 'pratica'; try { name = JSON.parse(row.menu_json).nome; } catch {} return `- ${name}: ${row.status.replace('_', ' ')}${row.note ? ` (${row.note})` : ''}`; });
-      // Salute di Jarvis: letture foto di oggi (quota gratuita di Cloudflare), ultimo file da Gmail, letture in corso.
-      const today = `${romeDate()}T00:00:00`;
-      const safe = async (sql, ...args) => { try { return await getOne(db, sql, ...args); } catch { return null; } };
-      const reads = (await safe("SELECT COUNT(*) AS n FROM audit_events WHERE action='material.read.jarvis' AND created_at>=?", today))?.n || 0;
-      const failedReads = (await safe("SELECT COUNT(*) AS n FROM audit_events WHERE action='material.read.failed' AND created_at>=?", today))?.n || 0;
-      const queued = (await safe("SELECT COUNT(*) AS n FROM materials WHERE processing_status='da_trascrivere' AND archived_at IS NULL"))?.n || 0;
-      const lastMail = (await safe('SELECT MAX(created_at) AS at FROM mail_files'))?.at;
-      const when = (iso) => new Intl.DateTimeFormat('it-IT', { timeZone: 'Europe/Rome', day: 'numeric', month: 'long', hour: '2-digit', minute: '2-digit' }).format(new Date(iso));
-      const health = [
-        `Foto lette oggi: ${reads}${failedReads ? ` (${failedReads} non riuscite)` : ''}. La quota gratuita regge circa 20 letture al giorno e si azzera alle 2 di notte.`,
-        queued ? `File in attesa di lettura: ${queued}.` : 'Nessun file in attesa di lettura.',
-        lastMail ? `Ultimo allegato arrivato da Gmail: ${when(lastMail)}.` : 'Da Gmail non è ancora arrivato nessun allegato.'
-      ];
-      await sendTelegram(env, chat, `${lines.length ? `Pratiche affidate a me:\n${lines.join('\n')}` : 'Nessuna pratica affidata in corso.'}\nRichieste aperte nella Control Room: ${pending}.\n\n${health.join('\n')}`, null, deps.fetchImpl);
+    if (/^\/stato\b/i.test(text) || STATUS_WORDS.test(text)) {
+      await sendTelegram(env, chat, await statusText(db), null, deps.fetchImpl);
       return;
     }
     if (/^\/aiuto\b|^\/help\b/i.test(text) || text.startsWith('/')) {
@@ -434,6 +440,7 @@ export function createMissions(deps) {
     if (!file?.bytes?.length) { await sendTelegram(env, chat, 'Non riesco a scaricare il vocale da Telegram: riprova.', null, deps.fetchImpl); return; }
     const heard = await transcribe(env.AI, file.bytes);
     if (!heard.ok) { await sendTelegram(env, chat, `Perdona Riccardo, ${heard.reason}. Puoi ripetere?`, null, deps.fetchImpl); return; }
+    if (STATUS_WORDS.test(heard.text.trim())) { await reply(db, env, chat, `«${heard.text.trim()}»\n\n${await statusText(db)}`, false); return; }
     await converse(db, env, chat, heard.text, true);
   }
   // Comprensione: locali (anche trascritti male) e piatti dei menu in memoria citati nel comando.
@@ -474,7 +481,8 @@ export function createMissions(deps) {
     const open = await rows(db, "SELECT subject,status FROM requests WHERE status NOT IN ('completata','archiviata','chiusa') ORDER BY updated_at DESC LIMIT 15").catch(() => []);
     const memory = await mentionedMemory(db, clues);
     const hints = hintsText(clues);
-    return `${history ? `CONVERSAZIONE RECENTE (dal più vecchio):\n${history}\n\n` : ''}${hints ? `${hints}\n\n` : ''}${memory ? `${memory}\n\n` : ''}${brief}\n\nLocali con menu online: ${clients.map((c) => `${c.name} (menu ${c.menu_id}, piano ${c.plan}${c.trial_ends_at ? `, prova fino al ${String(c.trial_ends_at).slice(0, 10)}` : ''}${c.renewal_at ? `, rinnovo ${String(c.renewal_at).slice(0, 10)}` : ''})`).join('; ') || 'nessuno'}.\nPratiche aperte: ${open.map((r) => `${r.subject} [${r.status}]`).join('; ') || 'nessuna'}.`;
+    const facts = `DATI CERTI DI ADESSO (valgono più della conversazione, che può essere superata: pratiche e clienti possono essere stati eliminati): pratiche aperte ${open.length ? open.map((r) => `${r.subject} [${r.status}]`).join('; ') : 'nessuna'}.\n\n`;
+    return `${facts}${history ? `CONVERSAZIONE RECENTE (dal più vecchio, può essere superata):\n${history}\n\n` : ''}${hints ? `${hints}\n\n` : ''}${memory ? `${memory}\n\n` : ''}${brief}\n\nLocali con menu online: ${clients.map((c) => `${c.name} (menu ${c.menu_id}, piano ${c.plan}${c.trial_ends_at ? `, prova fino al ${String(c.trial_ends_at).slice(0, 10)}` : ''}${c.renewal_at ? `, rinnovo ${String(c.renewal_at).slice(0, 10)}` : ''})`).join('; ') || 'nessuno'}.\nPratiche aperte: ${open.map((r) => `${r.subject} [${r.status}]`).join('; ') || 'nessuna'}.`;
   }
   // Conversazione: ricorda gli ultimi scambi e, se Jarvis ha appena chiesto un chiarimento,
   // unisce la risposta di Riccardo al comando precedente (es. «cambia il frico a 12» → «quale locale?» → «Bakaro»).
