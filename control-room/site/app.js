@@ -10,12 +10,17 @@ import { resetDemoState } from './demo-store.js';
 
 // Navigazione semplice: prima le cose di tutti i giorni, poi gli strumenti, poi il sistema.
 const navItems = [
-  ['command', '◉', 'Oggi', 'Principale'], ['clienti', '◆', 'Locali', 'Principale'], ['sistema', '☰', 'Sistema', 'Principale'],
+  ['command', '◉', 'Oggi', 'Principale'], ['locali', '◆', 'Locali', 'Principale'], ['sistema', '☰', 'Sistema', 'Principale'],
   ['revisione', '✓', 'Revisione', 'Strumenti'], ['richieste', '✉', 'Richieste', 'Strumenti'], ['approvazioni', '★', 'Approvazioni', 'Strumenti'], ['builder', '✎', 'Builder', 'Strumenti'],
   ['materiali', '▤', 'Materiali', 'Strumenti'], ['anteprima', '▢', 'Anteprima', 'Strumenti'], ['notifiche', '◔', 'Notifiche', 'Sistema'], ['registro', '≡', 'Registro', 'Sistema'], ['voce', '◖', 'Voce (browser)', 'Sistema'],
-  ['pratica', '◉', 'Pratica', 'Nascoste'], ['pratiche', '◉', 'Tutte le pratiche', 'Nascoste'], ['modifica', '✎', 'Modifica a mano', 'Nascoste']
+  ['clienti', '◆', 'Schede cliente', 'Nascoste'], ['locale', '◆', 'Locale', 'Nascoste'], ['pratica', '◉', 'Pratica', 'Nascoste'], ['pratiche', '◉', 'Tutte le pratiche', 'Nascoste'], ['modifica', '✎', 'Modifica a mano', 'Nascoste']
 ];
-const MAIN_TABS = ['command', 'clienti', 'sistema'];
+const MAIN_TABS = ['command', 'locali', 'sistema'];
+const TAB_ICONS = {
+  command: '<svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="8" fill="none" stroke="currentColor" stroke-width="1.8"/><circle cx="12" cy="12" r="2.6" fill="currentColor"/></svg>',
+  locali: '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 10l8-6 8 6v9a1 1 0 0 1-1 1H5a1 1 0 0 1-1-1z" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"/></svg>',
+  sistema: '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 7h14M5 12h14M5 17h14" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></svg>'
+};
 const validViews = new Set(navItems.map(([id]) => id));
 const $ = (selector, root = document) => root.querySelector(selector);
 const escapeHtml = (value) => String(value ?? '').replace(/[&<>'"]/g, (character) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', "'": '&#39;', '"': '&quot;' }[character]));
@@ -299,10 +304,9 @@ function navCount(id) {
 function renderNavigation() {
   const hint = (id) => { const n = navCount(id); return n ? `<span class="nav-hint" aria-label="${n} da vedere">${n}</span>` : ''; };
   const tab = activeTab();
-  const link = ([id, number, label]) => `<a class="nav-link" href="#${id}" aria-current="${tab === id ? 'page' : 'false'}"><span class="nav-icon" aria-hidden="true">${number}</span><span>${label}</span>${hint(id)}</a>`;
-  const main = navItems.filter(([id]) => MAIN_TABS.includes(id));
-  primaryNav.innerHTML = main.map(link).join('');
-  bottomNav.innerHTML = main.map(link).join('');
+  const link = ([id, , label]) => `<a class="nav-link" href="#${id}" aria-current="${tab === id ? 'page' : 'false'}">${TAB_ICONS[id]}<span>${label}</span>${hint(id)}</a>`;
+  primaryNav.innerHTML = '';
+  bottomNav.innerHTML = `<button class="ask" type="button" data-action="ask-open" aria-label="Scrivi o parla a Jarvis"><span>Scrivi o parla a Jarvis…</span><b aria-hidden="true"><svg viewBox="0 0 24 24"><rect x="9" y="3" width="6" height="11" rx="3" fill="none" stroke="currentColor" stroke-width="1.8"/><path d="M5.5 11.5a6.5 6.5 0 0 0 13 0M12 18v3" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></svg></b></button><div class="tabs">${navItems.filter(([id]) => MAIN_TABS.includes(id)).map(link).join('')}</div>`;
 }
 function renderUnavailable() {
   modeBadge.textContent = 'NON DISPONIBILE';
@@ -387,7 +391,7 @@ function jarvisHero() {
   if (active) parts.push(`sto seguendo <strong>${active}</strong> ${active === 1 ? 'pratica' : 'pratiche'}`);
   const says = parts.length ? `${parts.join(', ')}.` : 'Tutto in ordine: nessuna decisione in sospeso. Puoi scrivermi o mandarmi un vocale su Telegram.';
   const tile = (route, label, value, note, hot = false) => `<button class="jarvis-action${hot && value ? ' hot' : ''}" type="button" data-route="${route}"><small>${label}</small><strong>${value}</strong><span>${note}</span></button>`;
-  return `<section class="jarvis-hero" aria-label="Jarvis"><div class="reactor${autopilotRunning || active ? ' busy' : ''}" aria-hidden="true"><span class="r1"></span><span class="r2"></span><span class="r3"></span><span class="core">J</span></div><div><p class="eyebrow">J.A.R.V.I.S. · ${autopilotRunning ? 'AL LAVORO' : 'IN ASCOLTO'}</p><h1>${greeting}, Riccardo.</h1><p class="jarvis-says">${says}</p></div></section>`;
+  return `<section class="jarvis-hero" aria-label="Jarvis"><div class="reactor${autopilotRunning || active ? ' busy' : ''}${waitingYes ? ' wait' : ''}" aria-hidden="true"><span class="r1"></span><span class="r2"></span><span class="r3"></span><span class="core">J</span></div><div><p class="eyebrow">${new Intl.DateTimeFormat('it-IT', { weekday: 'long', day: 'numeric', month: 'long', timeZone: 'Europe/Rome' }).format(new Date())}</p><h1>${greeting}, Riccardo</h1><p class="jarvis-says">${says}</p></div></section>`;
 }
 
 function requestOperationalCard(request, compact = false) {
@@ -878,7 +882,7 @@ const TONE_ORDER = { hot: 0, alert: 1, info: 2, good: 3 };
 
 function activeTab() {
   if (['command', 'pratica', 'pratiche', 'modifica'].includes(activeView)) return 'command';
-  return activeView === 'clienti' ? 'clienti' : 'sistema';
+  return ['locali', 'locale', 'clienti'].includes(activeView) ? 'locali' : 'sistema';
 }
 function praticaInfo(request) {
   const draft = draftForRequest(request.id);
@@ -999,7 +1003,7 @@ function renderSistema() {
   const tools = [
     ['revisione', 'Revisione', 'Controlli e bozza completa', navCount('revisione')], ['richieste', 'Richieste', 'Tutte le richieste arrivate, anche archiviate', navCount('richieste')],
     ['approvazioni', 'Approvazioni', 'PR, pubblicazione e verifica passo per passo', 0], ['builder', 'Builder avanzato', 'Estrazione da testo e modifica JSON', 0],
-    ['materiali', 'Materiali', 'File, foto e PDF ricevuti', 0], ['anteprima', 'Anteprima', 'Come appare il menu sul telefono', 0],
+    ['clienti', 'Schede cliente complete', 'Anagrafiche, contatti, piano, note', 0], ['materiali', 'Materiali', 'File, foto e PDF ricevuti', 0], ['anteprima', 'Anteprima', 'Come appare il menu sul telefono', 0],
     ['notifiche', 'Notifiche', 'Avvisi di Jarvis ed email al proprietario', navCount('notifiche')], ['registro', 'Registro', 'Tutto quello che è successo, con data', 0], ['voce', 'Voce (browser)', 'Prova del microfono', 0]
   ];
   return `<div class="view-wrap">${header('SISTEMA', 'Sistema', 'Gli strumenti completi di prima, sempre a portata. Per il lavoro di ogni giorno basta Oggi.')}
@@ -1063,6 +1067,9 @@ function setVoceName(voce, value) { if (typeof voce.nome === 'string') voce.nome
 async function handleOggiAction(action, trigger) {
   const draft = draftForRequest();
   if (action === 'pratiche-filtro') { praticheFilter = trigger.dataset.filtro; if (activeView === 'pratiche') render(); else navigate('pratiche'); return true; }
+  if (action === 'ask-open') { openAsk(); return true; }
+  if (action === 'ask-close') { closeAsk(); return true; }
+  if (action === 'ask-copy') { try { await navigator.clipboard.writeText(trigger.dataset.text); toast('Copiato: incollalo in Telegram.'); } catch { toast('Copia non riuscita: scrivilo a mano in Telegram.', 'error'); } return true; }
   if (action === 'rileggi-online') { const request = requestById(); if (draft && request) { onlineMenus.delete(draft.id); render(); } return true; }
   if (!action.startsWith('edit-') && !action.startsWith('add-')) return false;
   if (!draft) return true;
@@ -1117,6 +1124,52 @@ async function handleOggiAction(action, trigger) {
   }
   return false;
 }
+// Locali: elenco semplice dei locali, un tocco per aprire la scheda con le sue pratiche.
+let localiQuery = '';
+function menuLink(client) {
+  if (isDemoMode || !client?.menuId) return '';
+  return client.menuId === 'trattoria-blanch' ? 'https://renmenu.pages.dev/blanch/' : `https://renmenu.pages.dev/menu/?m=${encodeURIComponent(client.menuId)}`;
+}
+function localeLook(client) {
+  const waiting = allPratiche().some((info) => info.request.clientId === client.id && info.group === 'decidere');
+  if (waiting) return { dot: 'am', note: 'Aspetta una tua decisione' };
+  return client.menuId ? { dot: 'ok', note: 'Menu online' } : { dot: 'off', note: 'Menu non ancora online' };
+}
+function renderLocali() {
+  const list = [...state.clients].sort((a, b) => (localeLook(a).dot === 'am' ? 0 : 1) - (localeLook(b).dot === 'am' ? 0 : 1) || String(a.name).localeCompare(String(b.name), 'it'));
+  const row = (client) => {
+    const look = localeLook(client);
+    return `<button class="locale" type="button" data-vrow data-select-client="${escapeHtml(client.id)}" data-route="locale"><span class="av" aria-hidden="true">${escapeHtml(String(client.name || '?').trim().charAt(0).toUpperCase())}</span><span class="locale-main"><strong>${escapeHtml(client.name)}</strong><span>${escapeHtml(PLAN_RULES[client.plan]?.label || 'Piano da definire')} · ${look.note}</span></span><i class="dot ${look.dot}" aria-hidden="true"></i></button>`;
+  };
+  return `<div class="view-wrap"><h1 class="page-title">Locali</h1><input id="locali-search" class="search" type="search" placeholder="Cerca un locale" autocomplete="off" aria-label="Cerca un locale" value="${escapeHtml(localiQuery)}">${list.length ? list.map(row).join('') : empty('Nessun locale registrato.')}</div>`;
+}
+function renderLocale() {
+  const client = selectedClient();
+  if (!client) return `<div class="view-wrap"><button class="back-bar" type="button" data-route="locali">← Locali</button>${empty('Scegli un locale.')}</div>`;
+  const infos = allPratiche().filter((info) => info.request.clientId === client.id);
+  const link = menuLink(client);
+  const date = client.renewalAt || client.trialEndsAt;
+  const fact = (label, value) => `<div class="fact"><small>${label}</small><strong>${escapeHtml(value)}</strong></div>`;
+  return `<div class="view-wrap"><button class="back-bar" type="button" data-route="locali">← Locali</button><h1 class="page-title">${escapeHtml(client.name)}</h1>
+    <div class="facts">${fact('Piano', PLAN_RULES[client.plan]?.label || 'Da definire')}${fact('Menu', client.menuId ? 'Online' : 'Non ancora online')}${fact(client.renewalAt ? 'Rinnovo' : 'Prova fino al', date ? new Intl.DateTimeFormat('it-IT', { dateStyle: 'medium' }).format(new Date(date)) : '—')}${fact('Email', client.email || 'Non registrata')}</div>
+    <p class="lab">PRATICHE</p><div class="oggi-cards">${infos.length ? infos.map(praticaCard).join('') : empty('Nessuna pratica per questo locale.')}</div>
+    <div class="acts">${link ? `<a class="button secondary" href="${escapeHtml(link)}" target="_blank" rel="noopener">Apri il menu</a>` : ''}<button class="button secondary" type="button" data-select-client="${escapeHtml(client.id)}" data-route="clienti">Scheda completa</button></div></div>`;
+}
+// «Scrivi o parla a Jarvis»: la conversazione vera avviene su Telegram; qui le frasi utili e il collegamento.
+const ASK_PHRASES = ['Mostrami l’anteprima di …', 'Mandami il QR di …', 'Nella bozza di … metti … a … euro'];
+const askSheet = $('#ask-sheet');
+function openAsk() {
+  const bot = state?.telegram?.bot;
+  const linked = state?.telegram?.linked;
+  askSheet.innerHTML = `<div class="sheet-head"><strong>Parla con Jarvis</strong><button type="button" data-action="ask-close">Chiudi</button></div>
+    <div class="log"><div class="msg j">Per scrivermi o mandarmi un vocale usa Telegram: lì capisco testo e voce, ti mostro l’anteprima e ti chiedo il SÌ prima di pubblicare.</div>${isDemoMode ? '<div class="msg j">Questa è la demo: nessun messaggio parte.</div>' : linked === false ? '<div class="msg j">Telegram non risulta ancora collegato.</div>' : ''}</div>
+    <p class="lab">Frasi utili · tocca per copiare</p><div class="quick">${ASK_PHRASES.map((phrase) => `<button type="button" data-action="ask-copy" data-text="${escapeHtml(phrase)}">${escapeHtml(phrase)}</button>`).join('')}</div>
+    ${bot && !isDemoMode ? `<a class="cta" href="https://t.me/${escapeHtml(bot)}" target="_blank" rel="noopener">Apri Telegram</a>` : ''}`;
+  askSheet.hidden = false;
+  askSheet.querySelector('button')?.focus();
+}
+function closeAsk() { askSheet.hidden = true; }
+document.addEventListener('keydown', (event) => { if (event.key === 'Escape' && !askSheet.hidden) closeAsk(); });
 function toolBackBar() {
   const request = requestById();
   if (!backToPratica || !request || !TOOL_VIEWS.has(activeView)) return '';
@@ -1124,7 +1177,8 @@ function toolBackBar() {
 }
 
 function renderView() {
-  const renderers = { sistema: renderSistema, pratica: renderPratica, pratiche: renderPratiche, modifica: renderModifica, command: renderCommand, richieste: renderRequests, clienti: renderClients, materiali: renderMaterials, builder: renderBuilder, revisione: renderReview, anteprima: renderPreview, approvazioni: renderApprovals, notifiche: renderNotifications, registro: renderAudit, voce: renderVoice };
+  const renderers = { locali: renderLocali, locale: renderLocale, sistema: renderSistema, pratica: renderPratica, pratiche: renderPratiche, modifica: renderModifica, command: renderCommand, richieste: renderRequests, clienti: renderClients, materiali: renderMaterials, builder: renderBuilder, revisione: renderReview, anteprima: renderPreview, approvazioni: renderApprovals, notifiche: renderNotifications, registro: renderAudit, voce: renderVoice };
+  view.dataset.screen = activeView;
   view.innerHTML = toolBackBar() + renderers[activeView]() + (activeView === 'builder' ? renderAiPanel() : '');
   document.title = `${navItems.find(([id]) => id === activeView)?.[2] || 'Control Room'} · RenMenu`;
 }
@@ -1145,7 +1199,7 @@ function navigate(target) {
   closeMaterialViewer();
   mobileMenuOpen = false;
   if (location.hash !== `#${target}`) location.hash = target;
-  else { activeView = target; render(); $('#main-content').focus(); }
+  else { activeView = target; render(); $('#main-content').focus({ preventScroll: true }); window.scrollTo(0, 0); }
 }
 
 let autopilotRunning = false;
@@ -1707,7 +1761,7 @@ dialog.addEventListener('cancel', () => { pendingConfirm = null; });
 materialViewer?.addEventListener('close', releaseMaterialPreview);
 materialViewer?.addEventListener('cancel', () => { releaseMaterialPreview(); });
 window.addEventListener('beforeunload', releaseMaterialPreview);
-window.addEventListener('hashchange', () => { closeMaterialViewer(); const previous = activeView; activeView = routeFromHash(); backToPratica = previous === 'pratica' || (backToPratica && TOOL_VIEWS.has(previous) && TOOL_VIEWS.has(activeView)); mobileMenuOpen = false; render(); $('#main-content').focus(); });
+window.addEventListener('hashchange', () => { closeMaterialViewer(); const previous = activeView; activeView = routeFromHash(); backToPratica = previous === 'pratica' || (backToPratica && TOOL_VIEWS.has(previous) && TOOL_VIEWS.has(activeView)); mobileMenuOpen = false; render(); $('#main-content').focus({ preventScroll: true }); window.scrollTo(0, 0); });
 
 view.addEventListener('input', (event) => {
   if (event.target.id !== 'edit-search') return;
@@ -1718,6 +1772,12 @@ view.addEventListener('input', (event) => {
     section.hidden = Boolean(query) && !any;
     if (query && any) section.open = true;
   });
+});
+view.addEventListener('input', (event) => {
+  if (event.target.id !== 'locali-search') return;
+  localiQuery = event.target.value;
+  const query = localiQuery.trim().toLowerCase();
+  document.querySelectorAll('.locale[data-vrow]').forEach((row) => { row.hidden = Boolean(query) && !row.textContent.toLowerCase().includes(query); });
 });
 view.addEventListener('toggle', (event) => {
   const section = event.target;

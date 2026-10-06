@@ -19,17 +19,17 @@ with sync_playwright() as playwright:
         errors = []
         page.on('pageerror', lambda e: errors.append(str(e)))
         page.goto(BASE, wait_until='networkidle')
-        page.locator('h1', has_text=', Riccardo.').wait_for()
+        page.locator('h1', has_text=', Riccardo').wait_for()
         dimensions = page.evaluate('({inner: window.innerWidth, scroll: document.documentElement.scrollWidth, body: document.body.scrollWidth})')
         assert dimensions['scroll'] <= width and dimensions['body'] <= width, f'overflow {width}: {dimensions}'
         assert not errors, f'JS error {width}: {errors}'
         if width <= 768:
-            targets = page.locator('#bottom-nav > .nav-link').evaluate_all('(links) => links.map((item) => ({width: item.getBoundingClientRect().width, height: item.getBoundingClientRect().height}))')
+            targets = page.locator('#bottom-nav .tabs > .nav-link').evaluate_all('(links) => links.map((item) => ({width: item.getBoundingClientRect().width, height: item.getBoundingClientRect().height}))')
             assert all(target['width'] >= 44 and target['height'] >= 44 for target in targets), f'touch target mobile {width}: {targets}'
         if width in (390, 1280):
             page.screenshot(path=str(OUT / ('mobile-390.png' if width == 390 else 'desktop-1280.png')), full_page=True)
-        nav = '#bottom-nav' if width <= 768 else '#primary-nav'
-        assert page.locator(f'{nav} .nav-link').count() == 3, 'tre voci: Oggi, Locali, Sistema'
+        nav = '#bottom-nav'
+        assert page.locator(f'{nav} .tabs > .nav-link').count() == 3, 'tre voci: Oggi, Locali, Sistema'
         page.locator(f'{nav} [href="#sistema"]').click()
         page.get_by_role('button', name='Richieste').first.click()
         page.get_by_role('heading', name='Richieste', exact=True).wait_for()
@@ -44,7 +44,7 @@ with sync_playwright() as playwright:
         assert focus['visible'] and (focus['outline'] not in ('none', '') or focus['shadow'] != 'none'), f'focus non visibile {width}: {focus}'
         if width == 390:
             context.set_offline(True)
-            page.locator('#bottom-nav [href="#clienti"]').click()
+            page.evaluate("location.hash = 'clienti'")
             form = page.locator('form[data-form="create-client"]')
             form.locator('[name="name"]').fill('Locale offline sintetico')
             form.locator('button[type="submit"]').click()
