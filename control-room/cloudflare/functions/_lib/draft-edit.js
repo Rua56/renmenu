@@ -186,8 +186,10 @@ export function validateOps(rawOps, menu, utterance) {
   const list = Array.isArray(rawOps) ? rawOps.slice(0, 12) : [];
   const touched = new Set();
   for (const raw of list) {
-    const type = raw?.tipo;
-    if (!OP_TYPES.includes(type)) { problems.push('Operazione non riconosciuta.'); continue; }
+    // Alcuni modelli scrivono il tipo con maiuscole o varianti («sposta_voce», «Sposta»): riconduco al tipo esatto.
+    const written = String(raw?.tipo ?? '').trim().toLowerCase();
+    const type = OP_TYPES.includes(written) ? written : OP_TYPES.slice().sort((x, y) => y.length - x.length).find((t) => written.startsWith(t)) || written;
+    if (!OP_TYPES.includes(type)) { problems.push(`Operazione non riconosciuta (tipo «${clip(raw?.tipo, 30) || 'vuoto'}»).`); continue; }
     const si = Number.isInteger(raw.si) ? raw.si : null, vi = Number.isInteger(raw.vi) ? raw.vi : null;
     if (type === 'aggiungi') {
       const name = clip(raw.nome, 80);
