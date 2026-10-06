@@ -977,6 +977,10 @@ function cambiaBlock(draft, request) {
   }
   return `<section class="panel spaced-top-small"><p class="eyebrow">COSA CAMBIA</p>${body}</section>`;
 }
+function pianoPanel(request) {
+  const rows = ['standard', 'annuale', 'premium'].map((code) => `<button class="plan-choice" type="button" data-action="scegli-piano" data-plan="${code}"><strong>${escapeHtml(PLAN_RULES[code].label)}</strong><span>${escapeHtml(PLAN_RULES[code].summary)}</span></button>`).join('');
+  return `<section class="panel spaced-top-small"><p class="eyebrow">SCEGLI IL PIANO</p><p>Jarvis non prepara la bozza finché non scegli il piano: dipende da cosa ha chiesto il locale.</p><div class="plan-choices">${rows}</div></section>`;
+}
 function renderPratica() {
   const request = requestById();
   if (!request) return `<div class="view-wrap">${header('PRATICA', 'Nessuna pratica', 'Scegli una pratica da Oggi.')}<button class="button" type="button" data-route="command">Torna a Oggi</button></div>`;
@@ -986,6 +990,7 @@ function renderPratica() {
   const closed = info.group === 'chiuse';
   let next;
   if (closed) next = '<section class="panel spaced-top-small"><p class="eyebrow">STATO</p><p><strong>Pratica chiusa.</strong> Per cambiare il menu scrivi le modifiche a Jarvis su Telegram: si apre una nuova pratica.</p></section>';
+  else if (!draft && request.kind === 'nuovo' && !PLAN_RULES[request.plan]) next = pianoPanel(request);
   else if (!draft) next = `<section class="panel spaced-top-small"><p class="eyebrow">PROSSIMO PASSO</p><p>${request.status === 'in_attesa' ? 'Mancano dati: apri il Builder per chiedere conferma al locale.' : 'Non c’è ancora una bozza.'}</p><div class="button-row spaced-top-small">${request.status === 'in_attesa' ? `<button class="button" type="button" data-route="builder">Apri il Builder</button>` : '<button class="button" type="button" data-action="generate-draft">Prepara la bozza dal testo</button>'}</div></section>`;
   else {
     const panel = jarvisMissionPanel(draft);
@@ -1067,6 +1072,13 @@ function setVoceName(voce, value) { if (typeof voce.nome === 'string') voce.nome
 async function handleOggiAction(action, trigger) {
   const draft = draftForRequest();
   if (action === 'pratiche-filtro') { praticheFilter = trigger.dataset.filtro; if (activeView === 'pratiche') render(); else navigate('pratiche'); return true; }
+  if (action === 'scegli-piano') {
+    const request = requestById(); const plan = trigger.dataset.plan;
+    if (!request || !PLAN_RULES[plan]) return true;
+    const subject = String(request.subject || '').replace(/^Nuovo menu (?:\(piano da definire\)|Standard|Annuale|Premium)/, `Nuovo menu ${PLAN_RULES[plan].label.split(' ')[0]}`);
+    await doAction('updateRequest', { id: request.id, revision: request.revision, patch: { plan, category: `nuovo_${plan}`, subject } }, `Piano ${PLAN_RULES[plan].label} segnato. Ora puoi preparare la bozza.`);
+    return true;
+  }
   if (action === 'ask-open') { openAsk(); return true; }
   if (action === 'ask-close') { closeAsk(); return true; }
   if (action === 'ask-copy') { try { await navigator.clipboard.writeText(trigger.dataset.text); toast('Copiato: incollalo in Telegram.'); } catch { toast('Copia non riuscita: scrivilo a mano in Telegram.', 'error'); } return true; }
