@@ -95,7 +95,7 @@ const SYSTEM = [
   'Trasformala in operazioni, usando SOLO gli indici dell’elenco: [S2] è la sezione 2, [2.5] è la voce 5 della sezione 2 (si=2, vi=5).',
   'Tipi consentiti: prezzo (si, vi, prezzo); varianti (si, vi, varianti[{etichetta, prezzo}]: più prezzi per la stessa voce, per esempio calice e bottiglia, piccola e grande, oppure vitello e maiale se il nome elenca le alternative); aggiungi (si, nome, prezzo oppure varianti, descrizione facoltativa, dopo_vi facoltativo; se la sezione è nuova scrivi il suo nome in sezione e ometti si); rimuovi (si, vi); rinomina (si, vi, nome); descrizione (si, vi, descrizione; stringa vuota per toglierla); sposta (si, vi, a_si; se la sezione di destinazione non esiste ancora scrivi il suo nome in sezione e ometti a_si); rinomina_sezione (si, nome).',
   'Regole ferree: non inventare nulla. Nomi, prezzi e descrizioni devono essere quelli detti da Riccardo (i prezzi in formato 12,00). Non toccare le voci che Riccardo non nomina. Non scrivere allergeni, ingredienti o traduzioni. Se la richiesta è incomprensibile o ambigua, restituisci operazioni vuote e spiega in «dubbio», in italiano, cosa ti serve sapere.',
-  'Per dividere una voce in due piatti distinti: rimuovi la voce e aggiungi i due piatti nella stessa sezione. Se Riccardo dice di tenere una voce con due prezzi, usa varianti. Rispondi solo con JSON.'
+  'Per dividere una voce in due piatti distinti: rimuovi la voce e aggiungi i due piatti nella stessa sezione. Se Riccardo dice di tenere una voce con due prezzi, usa varianti. Rispondi solo con JSON, in questa forma: {"operazioni":[{"tipo":"sposta","si":10,"vi":0,"sezione":"Bevande"},{"tipo":"prezzo","si":2,"vi":1,"prezzo":"9,00"}],"dubbio":""}. Ogni operazione ha sempre il campo «tipo».'
 ].join('\n');
 
 function parseJson(text) {
@@ -187,7 +187,8 @@ export function validateOps(rawOps, menu, utterance) {
   const touched = new Set();
   for (const raw of list) {
     // Alcuni modelli scrivono il tipo con maiuscole o varianti («sposta_voce», «Sposta»): riconduco al tipo esatto.
-    const written = String(raw?.tipo ?? '').trim().toLowerCase();
+    // Se il modello dimentica «tipo» ma indica voce e destinazione, l'intenzione è lo spostamento.
+    const written = String(raw?.tipo ?? raw?.operazione ?? raw?.op ?? (Number.isInteger(raw?.si) && Number.isInteger(raw?.vi) && (Number.isInteger(raw?.a_si) || raw?.sezione) && raw?.nome === undefined ? 'sposta' : '')).trim().toLowerCase();
     const type = OP_TYPES.includes(written) ? written : OP_TYPES.slice().sort((x, y) => y.length - x.length).find((t) => written.startsWith(t)) || written;
     if (!OP_TYPES.includes(type)) { problems.push(`Operazione non riconosciuta (tipo «${clip(raw?.tipo, 30) || 'vuoto'}»).`); continue; }
     const si = Number.isInteger(raw.si) ? raw.si : null, vi = Number.isInteger(raw.vi) ? raw.vi : null;

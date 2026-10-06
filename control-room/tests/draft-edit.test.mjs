@@ -119,3 +119,10 @@ test('il tipo di operazione scritto con varianti viene ricondotto, uno sconosciu
   assert.equal(validateOps([{ tipo: 'Sposta_voce', si: 0, vi: 2, a_si: 1 }], menu(), said).ops.length, 1);
   assert.match(validateOps([{ tipo: 'cancella_tutto' }], menu(), said).problems[0], /tipo «cancella_tutto»/);
 });
+
+test('operazione senza «tipo» ma con voce e destinazione è uno spostamento', () => {
+  const said = 'sposta lo strudel di mele nei vini';
+  const out = validateOps([{ si: 0, vi: 2, a_si: 1 }, { operazione: 'sposta', si: 0, vi: 2, a_si: 1 }], menu(), said);
+  assert.equal(out.ops.length, 2);
+  assert.match(validateOps([{ nome: 'x' }], menu(), said).problems[0], /vuoto/);
+});
