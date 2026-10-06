@@ -65,7 +65,7 @@ Gli orari, detti a Telegram o scritti in un'email, vengono letti per giorni e fa
 
 ### Sezioni e pratica in primo piano
 
-Da Telegram Jarvis sa anche unire sezioni («unifica le tre sezioni bevande»: le voci finiscono in una sola, i doppioni con stesso nome e stesso prezzo vengono tolti) e togliere una sezione intera («togli la sezione bevande»), purché tu la nomini. Più voci aggiunte nella stessa sezione nuova finiscono in una sola sezione, con l'iniziale maiuscola. Se togli tutte le voci di una sezione, la sezione sparisce da sola. Una frase senza il nome del locale riguarda sempre la pratica su cui stai lavorando (si rinnova a ogni correzione e dura 60 minuti): non viene più dedotta dai nomi dei piatti, che in locali diversi si somigliano («caffè», «bibite»). Per un menu già online dì il nome del locale.
+Da Telegram Jarvis sa anche unire sezioni («unifica le tre sezioni bevande»: le voci finiscono in una sola, i doppioni con stesso nome e stesso prezzo vengono tolti) e togliere una sezione intera («togli la sezione bevande»), purché tu la nomini. Più voci aggiunte nella stessa sezione nuova finiscono in una sola sezione, con l'iniziale maiuscola. Se togli tutte le voci di una sezione, la sezione sparisce da sola. Una frase senza il nome del locale riguarda sempre la pratica su cui stai lavorando (si rinnova a ogni correzione e dura 60 minuti): non viene più dedotta dai nomi dei piatti, che in locali diversi si somigliano («caffè», «bibite»). Un nome di locale che compare solo nell'interpretazione del modello e non nella tua frase viene ignorato. Per un menu già online dì il nome del locale.
 
 ### Le schermate
 
