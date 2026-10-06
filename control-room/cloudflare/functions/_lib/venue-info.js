@@ -3,6 +3,7 @@
  * un dubbio (due numeri, un importo strano, un nome pagina incerto) non inserisce e chiede.
  * Nessun valore viene inventato: ogni campo porta la riga da cui è stato letto. */
 import { fixTypos } from './typos.js';
+import { normalizeHours } from './hours.js';
 
 const VOCAB = ['coperto', 'telefono', 'cellulare', 'numero', 'whatsapp', 'instagram', 'facebook', 'orari', 'orario', 'aperti', 'aperto', 'apertura',
   'chiusi', 'chiuso', 'chiusura', 'lunedì', 'martedì', 'mercoledì', 'giovedì', 'venerdì', 'sabato', 'domenica', 'giorni', 'pranzo', 'cena', 'persona'];
@@ -159,8 +160,11 @@ export function extractVenueInfo(sourceText, { protectedWords = [] } = {}) {
   if (hours.length) {
     // orari: refuso segnalato se una delle parti è stata corretta
     const sameBlock = hours.every((h, i) => !i || h.line - hours[i - 1].line <= 2);
+    // Orari riscritti in modo ordinato (italiano e inglese) quando giorni e fasce sono chiari; altrimenti restano come scritti.
+    const written = hours.map((h) => h.value).join(', ');
+    const tidy = sameBlock ? normalizeHours({ text: written }) : null;
     found.orari = sameBlock
-      ? { value: hours.map((h) => h.value).join(', ').slice(0, 200), clauses: hours.map((h) => h.clause), line: hours[0].line, source: hours.map((h) => h.source).filter((s, i, a) => a.indexOf(s) === i).join(' / '), fixed: hours.some((h) => h.fixed) }
+      ? { value: tidy ? tidy.it : written.slice(0, 200), ...(tidy ? { en: tidy.en } : {}), clauses: hours.map((h) => h.clause), line: hours[0].line, source: hours.map((h) => h.source).filter((s, i, a) => a.indexOf(s) === i).join(' / '), fixed: hours.some((h) => h.fixed) }
       : { doubt: `Orari scritti in punti diversi dell’email (righe ${hours.map((h) => h.line).join(', ')}): controllali tu.`, line: hours[0].line, source: hours[0].source, fixed: false };
   }
   return { found };
@@ -191,9 +195,10 @@ export function applyVenueInfo(menu, info, { source = 'testo ricevuto', overwrit
     const current = field === 'orari' ? (typeof menu.orari === 'object' ? menu.orari?.it : menu.orari) : menu[field];
     if (String(current || '') === entry.value) continue;
     if (current && !overwrite) { doubts.push({ field, ...entry, doubt: `${INFO_LABELS[field]}: nel menu c’è «${current}», nel testo «${entry.value}». Quale tengo?` }); continue; }
-    next[field] = field === 'orari' ? { it: entry.value } : entry.value;
+    next[field] = field === 'orari' ? { it: entry.value, ...(entry.en ? { en: entry.en } : {}) } : entry.value;
     applied.push({ field, value: entry.value, before: current || null, line: entry.line, source: entry.source, fixed: entry.fixed, check: entry.check || null });
     provenance.push({ path: field === 'orari' ? 'orari.it' : field, source: entry.line ? `riga ${entry.line}` : source, value: entry.value, status: 'confermato' });
+    if (field === 'orari' && entry.en) provenance.push({ path: 'orari.en', source: 'Orari italiani riscritti in inglese da Jarvis (nessuna traduzione automatica)', value: entry.en, status: 'confermato' });
   }
   if (applied.length) warnings.push(`Inseriti dal testo: ${applied.map((a) => `${INFO_LABELS[a.field]} ${show(a.field, a.value)}${a.before ? ` (prima «${a.before}»)` : ''}${a.line ? ` (riga ${a.line})` : ''}${a.fixed ? ' — corretto un refuso, controlla' : ''}${a.check ? ` — ${a.check}` : ''}`).join('; ')}.`);
   for (const d of doubts) warnings.push(`Da confermare — ${INFO_LABELS[d.field]}: ${d.doubt}`);

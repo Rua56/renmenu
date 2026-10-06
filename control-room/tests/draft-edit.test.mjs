@@ -174,7 +174,7 @@ test('dati del locale e storia: solo se scritti nella frase', () => {
   const out = applyOps(premium, [], ok.ops, 'R');
   assert.equal(out.menu.telefono, '+39 351 917 0910');
   assert.equal(out.menu.instagram, 'osteriacodelli23');
-  assert.deepEqual(out.menu.orari, { it: 'Mer-Ven 18-22' });
+  assert.deepEqual(out.menu.orari, { it: 'Mercoledì–venerdì 18:00–22:00', en: 'Wednesday–Friday 18:00–22:00' });
   assert.equal(out.menu.premium.storia.it.split('\n').length, 2);
   assert.equal(out.needsEnglish, true);
   assert.match(validateOps([{ tipo: 'locale', campo: 'telefono', nome: '+39 333 111 2222' }], premium, said).problems[0], /non ho letto/);

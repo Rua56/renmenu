@@ -252,6 +252,12 @@ export function isPlainHeading(row, nextRow) {
 
 // Titoli scritti tutto in maiuscolo ("PRIMI", "VINI AL CALICE") -> "Primi", "Vini al calice",
 // per uniformità con gli altri titoli. Titoli con minuscole restano come scritti dal cliente.
+// Titolo di sezione scritto tutto in minuscolo («antipasti»): solo l'iniziale maiuscola, il resto com'è.
+export function sectionTitleCase(title) {
+  const text = sentenceCaseIfShouting(title);
+  const letters = text.replace(/[^A-Za-zÀ-ÿ]/g, '');
+  return letters.length >= 2 && letters === letters.toLowerCase() ? text.replace(/^([^A-Za-zÀ-ÿ]*)([a-zà-ÿ])/, (_, lead, first) => lead + first.toLocaleUpperCase('it-IT')) : text;
+}
 export function sentenceCaseIfShouting(title) {
   const letters = title.replace(/[^A-Za-zÀ-ÿ]/g, '');
   if (letters.length < 2 || letters !== letters.toUpperCase()) return title;
@@ -305,7 +311,7 @@ export function extractMenuFromText(venue, source, requestedSlug) {
     // Percorso degustazione: titolo (con o senza prezzo) seguito da portate senza prezzo.
     const degu = row.startsWith('[da verificare]') ? null : degustazioneHeading(row);
     if (degu && nextClean && !priceRow(nextClean) && !degustazioneHeading(nextClean)) {
-      openSection(sentenceCaseIfShouting(degu.name), lineNumber, { tipo: 'degustazione' });
+      openSection(sectionTitleCase(degu.name), lineNumber, { tipo: 'degustazione' });
       if (degu.amount) section.prezzo = fmt(degu.amount);
       if (degu.unit) section.unita = { it: degu.unit };
       if (degu.ambiguous) confirm.push({ text: row, line: lineNumber, hint: 'Percorso con più prezzi nella stessa riga: scegli tu il prezzo del percorso.' });
@@ -314,7 +320,7 @@ export function extractMenuFromText(venue, source, requestedSlug) {
     // Intestazione di colonne («calice  bottiglia», anche dopo il titolo della sezione).
     const columns = columnsHeader(row.replace(/^#{1,3}\s*/, ''));
     if (columns) {
-      if (columns.title && columns.title.length <= 60) openSection(sentenceCaseIfShouting(columns.title), lineNumber, { columns: columns.columns });
+      if (columns.title && columns.title.length <= 60) openSection(sectionTitleCase(columns.title), lineNumber, { columns: columns.columns });
       else section.columns = columns.columns;
       consumed.push(lineNumber);
       continue;
@@ -325,7 +331,7 @@ export function extractMenuFromText(venue, source, requestedSlug) {
       && (section.tipo !== 'degustazione' || KNOWN_SECTION.test(row) || isShouting(row));
     const knownHeading = section.tipo !== 'degustazione' && row.length <= 40 && !/\d/.test(row) && KNOWN_SECTION.test(row) && row.replace(/:\s*$/, '').trim().split(/\s+/).length <= 4 && !nextIsVariantOnly;
     if (/^#{1,3}\s*[^\s#]/.test(row) || /^\[[^\]]+\]$/.test(row) || plainHeading || knownHeading) {
-      const title = sentenceCaseIfShouting(row.replace(/^#{1,3}\s*|^\[|\]$/g, '').replace(/:\s*$/, '').trim());
+      const title = sectionTitleCase(row.replace(/^#{1,3}\s*|^\[|\]$/g, '').replace(/:\s*$/, '').trim());
       if (title) openSection(title, lineNumber);
       continue;
     }

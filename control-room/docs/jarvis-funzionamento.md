@@ -59,6 +59,10 @@ Ingressi e uscite:
 
 Interfaccia mobile-first in HTML e JavaScript senza framework. Protetta da Cloudflare Access (solo `renmenu1569@gmail.com`) e, in più, da una verifica della firma del token lato server su ogni pagina e ogni API. Le scritture accettano solo richieste dello stesso sito.
 
+### Orari di apertura
+
+Gli orari, detti a Telegram o scritti in un'email, vengono letti per giorni e fasce e riscritti in una riga ordinata, uguale in italiano e in inglese, senza traduzione automatica. Esempio: «mercoledì chiuso, da giovedì a martedì dalle 12 alle 15 e dalle 19 alle 22» diventa «12:00–15:00 e 19:00–22:00 · Chiuso il mercoledì». Se dici solo le fasce («12-15 e 19-22») restano i giorni già scritti; se dici un solo giorno cambia solo quello. Ogni orario deve essere stato detto davvero: se la frase è ambigua (giorni senza orario, cifre che non sono orari) Jarvis non scrive nulla e chiede. Il codice è in `_lib/hours.js`. Anche i titoli di sezione scritti tutti in minuscolo («antipasti») prendono l'iniziale maiuscola.
+
 ### Le schermate
 
 Dal 6 ottobre 2026 la Control Room ha tre voci sempre visibili (telefono e computer): **Oggi**, **Locali**, **Sistema**, in una barra in basso con sopra «Scrivi o parla a Jarvis…». L'aspetto segue il modello approvato (colonna stretta, sfera di Jarvis che diventa ambra quando aspetta il tuo SÌ, schede piatte, tema scuro). Gli strumenti di prima restano tutti, dentro Sistema, con i nuovi colori. La barra «Scrivi o parla a Jarvis…» apre un foglio con il link a Telegram e le frasi utili da copiare: la conversazione vera resta su Telegram.
