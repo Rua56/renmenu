@@ -1311,6 +1311,12 @@ export function createMissions(deps) {
     const clients = await rows(db, "SELECT id,name,menu_id,plan FROM clients WHERE menu_id IS NOT NULL AND menu_id<>''");
     const { client, candidates } = pickLocale(spokenVenue, clues, clients);
     if (client && /^nuovo contatto/i.test(client.name || '') && !(spokenVenue && matchVenue(spokenVenue, [client]).client)) return 'Su quale menu devo intervenire? Dimmi il nome del locale.';
+    if (!client && spokenVenue) {
+      // Locale con un menu in formato proprio (per esempio Trattoria Blanch): Jarvis lo conosce ma non può ancora modificarlo.
+      const legacy = await rows(db, "SELECT id,name FROM clients WHERE (menu_id IS NULL OR menu_id='') AND menu_url IS NOT NULL AND menu_url<>''").catch(() => []);
+      const own = matchVenue(spokenVenue, legacy.map((c) => ({ ...c, menu_id: '' }))).client;
+      if (own) return `«${own.name}» ha un menu online in un formato proprio, che non è ancora collegato alla modifica di Jarvis: non ho cambiato niente e non ho aperto nessuna pratica. Per ora la modifica va fatta a mano nei file del locale.`;
+    }
     if (!client) return candidates.length > 1 ? `Ho trovato più locali: ${candidates.map((c) => c.name).join(', ')}. Quale intendi?` : `${spokenVenue ? `Non trovo un locale con menu online che si chiami «${spokenVenue}».` : 'Non ho capito di quale locale si tratta.'} Su quale menu devo intervenire?`;
     const proposal = classifyRequest('Richiesta a voce', utterance);
     const category = ['prezzo', 'piatto', 'vini_cocktail', 'disponibilita'].includes(proposal.category) ? proposal.category : 'piatto';
