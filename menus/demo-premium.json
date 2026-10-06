@@ -1,0 +1,243 @@
+{
+  "id": "demo-premium",
+  "nome": "Osteria del Castello",
+  "lingue": [
+    "it",
+    "en",
+    "de"
+  ],
+  "sottotitolo": {
+    "it": "Cucina goriziana di stagione",
+    "en": "Seasonal Gorizia cooking",
+    "de": "Saisonale Küche aus Görz"
+  },
+  "indirizzo": "Borgo Castello 1, Gorizia (esempio)",
+  "orari": {
+    "it": "Mer-lun 12-14:30 e 19-22:30 · martedì chiuso",
+    "en": "Wed-Mon 12-2:30pm and 7-10:30pm · closed Tuesday",
+    "de": "Mi-Mo 12-14:30 und 19-22:30 Uhr · Dienstag Ruhetag"
+  },
+  "coperto": "3,00",
+  "premium": {
+    "direzione": "editoriale",
+    "caratteri": "classico",
+    "colori": {
+      "fondo": "#f5efe4",
+      "testo": "#1f2622",
+      "accento": "#8a5a2b",
+      "secondario": "#2a3b30"
+    },
+    "motto": {
+      "it": "Dal 1962 sotto le mura del castello",
+      "en": "Beneath the castle walls since 1962",
+      "de": "Seit 1962 unter den Burgmauern"
+    },
+    "storia": {
+      "it": "Menù di esempio per mostrare il Premium su misura: colori, caratteri e impaginazione sono quelli del locale, i piatti si aggiornano come in ogni menù RenMenu.",
+      "en": "Sample menu showing the custom Premium: colours, fonts and layout follow the venue, while dishes are updated like any RenMenu menu.",
+      "de": "Beispielkarte für das maßgeschneiderte Premium: Farben, Schriften und Layout gehören dem Lokal, die Gerichte werden wie bei jeder RenMenu-Karte aktualisiert."
+    }
+  },
+  "sezioni": [
+    {
+      "nome": {
+        "it": "Antipasti",
+        "en": "Starters",
+        "de": "Vorspeisen"
+      },
+      "voci": [
+        {
+          "nome": {
+            "it": "Frico croccante con polenta",
+            "en": "Crispy frico with polenta",
+            "de": "Knuspriger Frico mit Polenta"
+          },
+          "prezzo": "9,00",
+          "descrizione": {
+            "it": "Formaggio Montasio e patate",
+            "en": "Montasio cheese and potatoes",
+            "de": "Montasio-Käse und Kartoffeln"
+          }
+        },
+        {
+          "nome": {
+            "it": "Prosciutto di San Daniele",
+            "en": "San Daniele ham",
+            "de": "San-Daniele-Schinken"
+          },
+          "prezzo": "12,00",
+          "descrizione": {
+            "it": "Stagionato 18 mesi",
+            "en": "Aged 18 months",
+            "de": "18 Monate gereift"
+          }
+        }
+      ]
+    },
+    {
+      "nome": {
+        "it": "Primi",
+        "en": "First courses",
+        "de": "Erste Gänge"
+      },
+      "voci": [
+        {
+          "nome": {
+            "it": "Gnocchi di susine",
+            "en": "Plum dumplings",
+            "de": "Zwetschgenknödel"
+          },
+          "prezzo": "13,00",
+          "descrizione": {
+            "it": "Burro, cannella e zucchero",
+            "en": "Butter, cinnamon and sugar",
+            "de": "Butter, Zimt und Zucker"
+          }
+        },
+        {
+          "nome": {
+            "it": "Cjarsons della Carnia",
+            "en": "Carnia cjarsons",
+            "de": "Cjarsons aus Karnien"
+          },
+          "prezzo": "14,00"
+        }
+      ]
+    },
+    {
+      "nome": {
+        "it": "Percorso del Castello",
+        "en": "Castle tasting menu",
+        "de": "Burg-Degustationsmenü"
+      },
+      "tipo": "degustazione",
+      "prezzo": "55,00",
+      "unita": {
+        "it": "a persona, vini esclusi",
+        "en": "per person, wine excluded",
+        "de": "pro Person, ohne Wein"
+      },
+      "descrizione": {
+        "it": "Per tutto il tavolo",
+        "en": "For the whole table",
+        "de": "Für den ganzen Tisch"
+      },
+      "voci": [
+        {
+          "nome": {
+            "it": "Frico e polenta",
+            "en": "Frico and polenta",
+            "de": "Frico und Polenta"
+          }
+        },
+        {
+          "nome": {
+            "it": "Gnocchi di susine",
+            "en": "Plum dumplings",
+            "de": "Zwetschgenknödel"
+          }
+        },
+        {
+          "nome": {
+            "it": "Guancia di manzo al Collio",
+            "en": "Beef cheek braised in Collio wine",
+            "de": "Rinderbacke in Collio-Wein"
+          }
+        },
+        {
+          "nome": {
+            "it": "Gubana della casa",
+            "en": "House gubana",
+            "de": "Hausgemachte Gubana"
+          }
+        }
+      ]
+    },
+    {
+      "nome": {
+        "it": "Vini del Collio",
+        "en": "Collio wines",
+        "de": "Weine aus dem Collio"
+      },
+      "voci": [
+        {
+          "nome": {
+            "it": "Ribolla Gialla",
+            "en": "Ribolla Gialla",
+            "de": "Ribolla Gialla"
+          },
+          "descrizione": {
+            "it": "Collio DOC",
+            "en": "Collio DOC",
+            "de": "Collio DOC"
+          },
+          "prezzi": [
+            {
+              "etichetta": {
+                "it": "Calice",
+                "en": "Glass",
+                "de": "Glas"
+              },
+              "prezzo": "6,00"
+            },
+            {
+              "etichetta": {
+                "it": "Bottiglia",
+                "en": "Bottle",
+                "de": "Flasche"
+              },
+              "prezzo": "28,00"
+            }
+          ]
+        },
+        {
+          "nome": {
+            "it": "Friulano",
+            "en": "Friulano",
+            "de": "Friulano"
+          },
+          "descrizione": {
+            "it": "Collio DOC",
+            "en": "Collio DOC",
+            "de": "Collio DOC"
+          },
+          "prezzi": [
+            {
+              "etichetta": {
+                "it": "Calice",
+                "en": "Glass",
+                "de": "Glas"
+              },
+              "prezzo": "5,50"
+            },
+            {
+              "etichetta": {
+                "it": "Bottiglia",
+                "en": "Bottle",
+                "de": "Flasche"
+              },
+              "prezzo": "26,00"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "nome": {
+        "it": "Dolci",
+        "en": "Desserts",
+        "de": "Desserts"
+      },
+      "voci": [
+        {
+          "nome": {
+            "it": "Gubana con grappa",
+            "en": "Gubana with grappa",
+            "de": "Gubana mit Grappa"
+          },
+          "prezzo": "7,00"
+        }
+      ]
+    }
+  ]
+}

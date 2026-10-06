@@ -14,10 +14,13 @@ index.html                    landing page del servizio
 menu/index.html               visualizzatore: menu/?m=<id> legge menus/<id>.json
 crea/index.html               generatore JSON, QR e cartello A5
 menus/*.json                  un file per ogni locale
+richard/index.html             menu privato interattivo con carrello e ordine WhatsApp
 scripts/validate-menus.py     controllo locale dei JSON, senza modifiche automatiche
 assets/                       stile, logo e helper comuni
 vendita/                      materiali commerciali e checklist operativa
 ```
+
+Il menu speciale di Richard è disponibile su `https://renmenu.pages.dev/richard/` (e sul corrispondente percorso GitHub Pages). È indipendente dai menu JSON standard: le scelte vengono salvate localmente nel browser e il pulsante finale apre WhatsApp con il messaggio precompilato; l'invio effettivo richiede un'azione dell'utente nella chat. La pagina è esclusa dall'indicizzazione e dalla sitemap.
 
 ## Aggiungere o aggiornare un locale
 
