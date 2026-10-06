@@ -834,10 +834,11 @@ export function createMissions(deps) {
     if (bySpoken.client) return { draft: drafts.find((d) => d.id === bySpoken.client.id) };
     if (bySpoken.candidates.length > 1) return { ask: `Ci sono più bozze aperte che corrispondono: ${bySpoken.candidates.map((c) => `«${c.name}»`).join(', ')}. Di quale parliamo?` };
     if (byClue.length === 1) return { draft: byClue[0] };
-    if (spokenVenue || clues.locales.length) return null; // locale detto ma senza bozza aperta: menu già online
-    // Nessun locale nominato: la pratica su cui Riccardo sta lavorando, oppure l'unica bozza che nomina quei piatti.
+    // Nessun locale nominato a voce: la pratica su cui Riccardo sta lavorando vince sui locali dedotti solo da parole comuni
+    // («bevande», «caffè» compaiono in molti menu): così una frase senza nome non finisce su un altro locale.
     let focus = null; try { focus = JSON.parse(await setting(db, 'tg_focus') || 'null'); } catch {}
-    if (focus?.requestId && Date.now() - Date.parse(focus.at) < FOCUS_MINUTES * MINUTE) { const inFocus = drafts.find((d) => d.request_id === focus.requestId); if (inFocus) return { draft: inFocus }; }
+    if (!spokenVenue && focus?.requestId && Date.now() - Date.parse(focus.at) < FOCUS_MINUTES * MINUTE) { const inFocus = drafts.find((d) => d.request_id === focus.requestId); if (inFocus) return { draft: inFocus }; }
+    if (spokenVenue || clues.locales.length) return null; // locale detto ma senza bozza aperta: menu già online
     const mentioned = drafts.filter((d) => draftMentions(d, utterance));
     if (clues.dishes.length) return null; // il piatto è in un menu online
     if (mentioned.length === 1) return { draft: mentioned[0] };
@@ -866,6 +867,8 @@ export function createMissions(deps) {
     try { saved = (await action(jarvisDb(db), 'editDraftOps', { id: draft.id, revision: draft.revision, ops: checked.ops, source: 'Riccardo (Telegram)' }, env)).result; }
     catch (error) { return { text: `Non sono riuscito a modificare la bozza di «${name}»: ${String(error?.message || 'errore').slice(0, 200)}` }; }
     await putSetting(db, 'draft_undo', JSON.stringify({ ...snapshot, revision: saved.revision })).catch(() => {});
+    // Chi lavora su una bozza continua a lavorarci: ogni correzione rinnova la pratica «in primo piano».
+    await putSetting(db, 'tg_focus', JSON.stringify({ requestId: draft.request_id, subject: draft.subject || name, at: now() })).catch(() => {});
     // Memoria delle correzioni dettate: se Riccardo rifà la bozza, la Control Room le rimette al loro posto.
     try {
       const key = editLogKey(draft.request_id); let log = []; try { log = JSON.parse(await setting(db, key) || '[]'); } catch { log = []; }

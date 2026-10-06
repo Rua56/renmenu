@@ -192,3 +192,49 @@ test('correzioni dettate: si rimettono solo dove la voce è la stessa', () => {
   const r = replayableOps(other, ops, fp);
   assert.equal(r.keep.length, 0); assert.equal(r.skipped.length, 1);
 });
+
+// ——— Sezioni: una sola sezione nuova, unire, togliere ———
+const drinkMenu = () => ({
+  id: 'prova', nome: 'Prova', lingue: ['it', 'en'],
+  sezioni: [
+    { nome: { it: 'Primi' }, voci: [{ nome: { it: 'Gnocchi' }, prezzo: '12,00' }] },
+    { nome: { it: 'bevande' }, voci: [{ nome: { it: 'bibite' }, prezzo: '5,00' }] },
+    { nome: { it: 'bevande' }, voci: [{ nome: { it: 'calice di vino' }, prezzo: '6,00' }, { nome: { it: 'Bibite' }, prezzo: '5,00' }, { nome: { it: 'Caffe' }, prezzo: '1,00' }] },
+    { nome: { it: 'bevande' }, voci: [{ nome: { it: 'caffè' }, prezzo: '1,00' }] }
+  ]
+});
+
+test('tre voci nella stessa sezione nuova: la sezione si crea una volta sola, con l’iniziale maiuscola', () => {
+  const said = 'le bevande sono: bibite 5€ calice di vino 6€ caffè 1€';
+  const raw = ['bibite|5,00', 'calice di vino|6,00', 'caffè|1,00'].map((x) => ({ tipo: 'aggiungi', nome: x.split('|')[0], prezzo: x.split('|')[1], sezione: 'bevande' }));
+  const { ops, problems } = validateOps(raw, menu(), said);
+  assert.deepEqual(problems, []);
+  const out = applyOps(menu(), [], ops, 'Riccardo');
+  assert.equal(out.menu.sezioni.length, 3);
+  assert.equal(out.menu.sezioni[2].nome.it, 'Bevande');
+  assert.deepEqual(out.menu.sezioni[2].voci.map((v) => v.nome.it), ['bibite', 'calice di vino', 'caffè']);
+});
+
+test('unire le sezioni con lo stesso nome: voci insieme, doppioni tolti', () => {
+  const { ops, problems } = validateOps([{ tipo: 'unisci_sezioni', sezioni: [1, 2, 3] }], drinkMenu(), 'unifica le tre sezioni bevande');
+  assert.deepEqual(problems, []);
+  const out = applyOps(drinkMenu(), [], ops, 'Riccardo');
+  assert.equal(out.menu.sezioni.length, 2);
+  assert.deepEqual(out.menu.sezioni[1].voci.map((v) => v.nome.it), ['bibite', 'calice di vino', 'Caffe']);
+});
+
+test('togliere una sezione: serve che la frase la nomini', () => {
+  const ok = validateOps([{ tipo: 'rimuovi_sezione', si: 3 }], drinkMenu(), 'rimuovi la sezione bevande');
+  assert.deepEqual(ok.problems, []);
+  assert.equal(applyOps(drinkMenu(), [], ok.ops, 'R').menu.sezioni.length, 3);
+  const no = validateOps([{ tipo: 'rimuovi_sezione', si: 0 }], drinkMenu(), 'rimuovi la sezione bevande');
+  assert.equal(no.ops.length, 0); assert.match(no.problems[0], /non l’hai nominata/);
+});
+
+test('togliendo tutte le voci di una sezione, la sezione sparisce invece di rendere il menu non valido', () => {
+  const { ops, problems } = validateOps([{ tipo: 'rimuovi', si: 1, vi: 0 }, { tipo: 'rimuovi', si: 3, vi: 0 }], drinkMenu(), 'rimuovi bibite e caffè');
+  assert.deepEqual(problems, []);
+  const out = applyOps(drinkMenu(), [], ops, 'R');
+  assert.deepEqual(out.menu.sezioni.map((s) => s.voci.length), [1, 3]);
+  assert.ok(out.summary.some((l) => /non aveva più piatti/.test(l)));
+});

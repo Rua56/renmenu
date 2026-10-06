@@ -1020,7 +1020,7 @@ function renderSistema() {
 const PRICE_RE = /^\d+(?:[,.]\d{1,2})?$/;
 function editState(draft) {
   if (!editBuffer || editBuffer.draftId !== draft.id || editBuffer.revision !== draft.revision) {
-    editBuffer = { draftId: draft.id, revision: draft.revision, menu: clone(draft.menu), removed: new Set(), added: new Set(), open: null, openAdd: null, openSecs: new Set() };
+    editBuffer = { draftId: draft.id, revision: draft.revision, menu: clone(draft.menu), removed: new Set(), removedSecs: new Set(), added: new Set(), open: null, openAdd: null, openSecs: new Set() };
   }
   return editBuffer;
 }
@@ -1029,6 +1029,7 @@ function editChanges(draft) {
   let count = 0;
   buf.menu.sezioni.forEach((section, si) => section.voci.forEach((voce, vi) => {
     const key = `${si}.${vi}`;
+    if (buf.removedSecs.has(si)) { if (vi === 0) count += 1; return; }
     if (buf.removed.has(key)) { if (!buf.added.has(key)) count += 1; return; }
     if (buf.added.has(key)) { count += 1; return; }
     if (JSON.stringify(voce) !== JSON.stringify(draft.menu.sezioni[si].voci[vi])) count += 1;
@@ -1062,8 +1063,10 @@ function renderModifica() {
   const add = (section, si) => buf.openAdd === si
     ? `<div class="vrow edit"><label class="field">Nome della voce<input data-an autocomplete="off"></label><label class="field">Prezzo in euro<input data-ap inputmode="decimal" placeholder="12,00"></label><div class="button-row"><button class="button small-button" type="button" data-action="add-ok" data-si="${si}">Aggiungi</button><button class="button secondary small-button" type="button" data-action="add-cancel">Annulla</button></div></div>`
     : `<button class="addrow" type="button" data-action="add-open" data-si="${si}">+ Aggiungi una voce</button>`;
-  const sections = buf.menu.sezioni.map((section, si) => `<details class="vsec" data-si="${si}" ${buf.openSecs.has(si) || buf.openAdd === si || String(buf.open || '').startsWith(`${si}.`) ? 'open' : ''}><summary>${escapeHtml(textOf(section.nome))}<small>${section.voci.length}</small></summary>${rows(section, si)}${add(section, si)}</details>`).join('');
-  return `<div class="view-wrap modifica"><button class="back-bar" type="button" data-route="pratica">← Pratica</button>${header('MODIFICA A MANO', request?.subject || 'Bozza', 'Tocca una voce per cambiare nome o prezzo. Salvando, la bozza torna da controllare.')}
+  const sectionOff = (section, si) => `<div class="vsec removed-sec" data-si="${si}"><span class="vname">${escapeHtml(textOf(section.nome))}</span><em class="vtag off">SEZIONE TOLTA</em><button class="mini-button" type="button" data-action="edit-secundo" data-si="${si}">Rimetti</button></div>`;
+  const sectionDel = (section, si) => `<button class="addrow" type="button" data-action="edit-secdel" data-si="${si}">Togli la sezione «${escapeHtml(textOf(section.nome))}» con le sue ${section.voci.length} voci</button>`;
+  const sections = buf.menu.sezioni.map((section, si) => buf.removedSecs.has(si) ? sectionOff(section, si) : `<details class="vsec" data-si="${si}" ${buf.openSecs.has(si) || buf.openAdd === si || String(buf.open || '').startsWith(`${si}.`) ? 'open' : ''}><summary>${escapeHtml(textOf(section.nome))}<small>${section.voci.length}</small></summary>${rows(section, si)}${add(section, si)}${sectionDel(section, si)}</details>`).join('');
+  return `<div class="view-wrap modifica"><button class="back-bar" type="button" data-route="pratica">← Pratica</button>${header('MODIFICA A MANO', request?.subject || 'Bozza', 'Tocca una voce per cambiare nome o prezzo, oppure per toglierla («Togli dal menu»). In fondo a ogni sezione puoi togliere l’intera sezione. Salvando, la bozza torna da controllare.')}
     <label class="field edit-search">Cerca una voce<input id="edit-search" type="search" placeholder="Es. prosciutto" autocomplete="off"></label>
     ${sections}
     <div class="savebar"><span>${changes ? `${changes} modifiche non salvate` : 'Nessuna modifica'}</span><button class="button" type="button" data-action="edit-save" ${changes ? '' : 'disabled'}>Salva e torna alla pratica</button></div></div>`;
@@ -1088,6 +1091,8 @@ async function handleOggiAction(action, trigger) {
   const buf = editState(draft);
   const key = trigger.dataset.key;
   const rowOf = () => trigger.closest('.vrow');
+  if (action === 'edit-secdel') { buf.removedSecs.add(Number(trigger.dataset.si)); buf.open = null; buf.openAdd = null; render(); return true; }
+  if (action === 'edit-secundo') { buf.removedSecs.delete(Number(trigger.dataset.si)); render(); return true; }
   if (action === 'edit-open') { buf.open = buf.open === key ? null : key; render(); return true; }
   if (action === 'edit-undo') { buf.removed.delete(key); render(); return true; }
   if (action === 'edit-del') { buf.removed.add(key); buf.open = null; render(); return true; }
@@ -1125,6 +1130,8 @@ async function handleOggiAction(action, trigger) {
   if (action === 'edit-save') {
     const menu = clone(buf.menu);
     menu.sezioni.forEach((section, si) => { section.voci = section.voci.filter((_, vi) => !buf.removed.has(`${si}.${vi}`)); });
+    // Sezioni tolte, e sezioni rimaste senza voci perché le hai tolte tutte: spariscono (un menu non può avere sezioni vuote).
+    menu.sezioni = menu.sezioni.filter((section, si) => !buf.removedSecs.has(si) && (section.voci.length || !buf.menu.sezioni[si].voci.length));
     const check = validateMenu(menu);
     if (!check.valid) { toast(`Non posso salvare: ${check.errors[0]?.message || 'menu non valido'}`, 'error'); return true; }
     reviewEvidenceCache.delete(String(draft.id));

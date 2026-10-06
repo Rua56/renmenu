@@ -165,3 +165,8 @@ h1.page-title { margin: 8px 2px 12px; }
 .plan-choice strong { font-size: 1rem; }
 .plan-choice span { color: var(--muted); font-size: .85rem; line-height: 1.4; }
 .plan-choice:hover, .plan-choice:focus-visible { border-color: var(--teal); }
+
+.removed-sec { display: flex; align-items: center; gap: .6rem; min-height: 48px; padding: .5rem 1rem; }
+.removed-sec .vname { flex: 1; min-width: 0; color: var(--muted); text-decoration: line-through; }
+.removed-sec .mini-button { flex: none; }
+.removed-sec .mini-button { width: auto; min-width: 0; padding: .45rem .9rem; white-space: nowrap; }
