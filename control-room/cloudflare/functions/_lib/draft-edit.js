@@ -5,8 +5,9 @@
 // deve essere stato detto davvero (anche a parole) e ogni parola di un nome nuovo deve venire dalla
 // frase o dal nome precedente. Se una sola operazione non regge, non si applica nulla.
 import { CLOUDFLARE_FREE_MODEL } from './ai-live.js';
+import { DIREZIONI } from './premium.js';
 
-export const OP_TYPES = ['prezzo', 'varianti', 'aggiungi', 'rimuovi', 'rinomina', 'descrizione', 'sposta', 'rinomina_sezione', 'motto'];
+export const OP_TYPES = ['prezzo', 'varianti', 'aggiungi', 'rimuovi', 'rinomina', 'descrizione', 'sposta', 'rinomina_sezione', 'motto', 'aspetto'];
 
 const plain = (value) => String(value || '').toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '');
 const words = (value) => plain(value).replace(/[^a-z0-9]+/g, ' ').trim().split(/\s+/).filter(Boolean);
@@ -84,6 +85,7 @@ const OP_SCHEMA = {
       tipo: { type: 'string', enum: OP_TYPES },
       si: { type: 'integer' }, vi: { type: 'integer' }, nome: { type: 'string' }, prezzo: { type: 'string' },
       varianti: { type: 'array', items: { type: 'object', properties: { etichetta: { type: 'string' }, prezzo: { type: 'string' } }, required: ['etichetta', 'prezzo'] } },
+      direzione: { type: 'string' }, colori: { type: 'object', properties: { fondo: { type: 'string' }, testo: { type: 'string' }, accento: { type: 'string' }, secondario: { type: 'string' } } },
       descrizione: { type: 'string' }, sezione: { type: 'string' }, a_si: { type: 'integer' }, dopo_vi: { type: 'integer' }
     }, required: ['tipo'] } },
     dubbio: { type: 'string' }
@@ -93,7 +95,7 @@ const OP_SCHEMA = {
 const SYSTEM = [
   'Sei Jarvis, assistente di Riccardo per RenMenu. Riccardo ti detta (anche a voce, con errori di trascrizione) una correzione alla BOZZA di un menu.',
   'Trasformala in operazioni, usando SOLO gli indici dell’elenco: [S2] è la sezione 2, [2.5] è la voce 5 della sezione 2 (si=2, vi=5).',
-  'Tipi consentiti: prezzo (si, vi, prezzo); varianti (si, vi, varianti[{etichetta, prezzo}]: più prezzi per la stessa voce, per esempio calice e bottiglia, piccola e grande, oppure vitello e maiale se il nome elenca le alternative); aggiungi (si, nome, prezzo oppure varianti, descrizione facoltativa, dopo_vi facoltativo; se la sezione è nuova scrivi il suo nome in sezione e ometti si); rimuovi (si, vi); rinomina (si, vi, nome); descrizione (si, vi, descrizione; stringa vuota per toglierla); sposta (si, vi, a_si; se la sezione di destinazione non esiste ancora scrivi il suo nome in sezione e ometti a_si); rinomina_sezione (si, nome); motto (nome: la frase che compare sotto il logo nell’apertura del menu Premium, per esempio uno slogan del locale; nessun indice).',
+  'Tipi consentiti: prezzo (si, vi, prezzo); varianti (si, vi, varianti[{etichetta, prezzo}]: più prezzi per la stessa voce, per esempio calice e bottiglia, piccola e grande, oppure vitello e maiale se il nome elenca le alternative); aggiungi (si, nome, prezzo oppure varianti, descrizione facoltativa, dopo_vi facoltativo; se la sezione è nuova scrivi il suo nome in sezione e ometti si); rimuovi (si, vi); rinomina (si, vi, nome); descrizione (si, vi, descrizione; stringa vuota per toglierla); sposta (si, vi, a_si; se la sezione di destinazione non esiste ancora scrivi il suo nome in sezione e ometti a_si); rinomina_sezione (si, nome); motto (nome: la frase che compare sotto il logo nell’apertura del menu Premium, per esempio uno slogan del locale; nessun indice); aspetto (direzione: editoriale, bistrot o moderno; colori: {fondo, testo, accento, secondario} in formato #rrggbb, solo quelli che Riccardo ha scritto; nessun indice).',
   'Regole ferree: non inventare nulla. Nomi, prezzi e descrizioni devono essere quelli detti da Riccardo (i prezzi in formato 12,00). Non toccare le voci che Riccardo non nomina. Non scrivere allergeni, ingredienti o traduzioni. Se la richiesta è incomprensibile o ambigua, restituisci operazioni vuote e spiega in «dubbio», in italiano, cosa ti serve sapere.',
   'Per dividere una voce in due piatti distinti: rimuovi la voce e aggiungi i due piatti nella stessa sezione. Se Riccardo dice di tenere una voce con due prezzi, usa varianti. Rispondi solo con JSON, in questa forma: {"operazioni":[{"tipo":"sposta","si":10,"vi":0,"sezione":"Bevande"},{"tipo":"prezzo","si":2,"vi":1,"prezzo":"9,00"}],"dubbio":""}. Ogni operazione ha sempre il campo «tipo».'
 ].join('\n');
@@ -213,6 +215,26 @@ export function validateOps(rawOps, menu, utterance) {
       ops.push(entry);
       continue;
     }
+    if (type === 'aspetto') {
+      if (!menu?.premium) { problems.push('Aspetto: questo menu non è Premium.'); continue; }
+      if (ops.some((o) => o.tipo === 'aspetto')) { problems.push('Aspetto: una sola modifica per volta.'); continue; }
+      const entry = { tipo: type };
+      const dir = plain(raw.direzione);
+      if (dir) { if (!DIREZIONI[dir]) { problems.push('Aspetto: la direzione deve essere editoriale, bistrot o moderno.'); continue; } entry.direzione = dir; }
+      const wanted = raw.colori && typeof raw.colori === 'object' && !Array.isArray(raw.colori) ? Object.entries(raw.colori) : [];
+      const colori = {}; let bad = false;
+      for (const [key, value] of wanted) {
+        const hex = String(value || '').trim().toLowerCase();
+        if (!['fondo', 'testo', 'accento', 'secondario'].includes(key) || !/^#[0-9a-f]{6}$/.test(hex)) { problems.push(`Aspetto: il colore «${clip(key, 20)}» non è valido.`); bad = true; break; }
+        // Un colore vale solo se è scritto davvero nella frase.
+        if (!String(utterance).toLowerCase().includes(hex)) { problems.push(`Aspetto: non ho letto il colore ${hex} nella tua frase.`); bad = true; break; }
+        colori[key] = hex;
+      }
+      if (bad) continue;
+      if (!entry.direzione && !Object.keys(colori).length) { problems.push('Aspetto: dimmi la direzione o i colori.'); continue; }
+      if (Object.keys(colori).length) entry.colori = colori;
+      ops.push(entry); continue;
+    }
     if (type === 'motto') {
       const text = clip(raw.nome ?? raw.testo ?? raw.descrizione, 160);
       if (!menu?.premium) { problems.push('Frase d’apertura: questo menu non è Premium.'); continue; }
@@ -298,6 +320,14 @@ export function applyOps(menuIn, provenanceIn, ops, source) {
       fresh.push(item);
       needsEnglish = true;
       summary.push(`Aggiunto «${op.nome}» (${priceText(item)}) in «${itText(section.nome)}».`);
+      continue;
+    }
+    if (op.tipo === 'aspetto') {
+      const before = menu.premium || {};
+      const direzione = op.direzione || before.direzione || 'editoriale';
+      const base = op.direzione && op.direzione !== before.direzione ? DIREZIONI[direzione].colori : (before.colori || DIREZIONI[direzione].colori);
+      menu.premium = { ...before, direzione, caratteri: DIREZIONI[direzione].caratteri, colori: { ...base, ...(op.colori || {}) } };
+      summary.push(`Aspetto: ${DIREZIONI[direzione].label}${op.colori ? `, colori ${Object.entries(op.colori).map(([k, v]) => `${k} ${v}`).join(', ')}` : ''}.`);
       continue;
     }
     if (op.tipo === 'motto') {
