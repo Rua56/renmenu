@@ -67,3 +67,18 @@ export async function sendVoice(env, chatId, bytes, caption = '', fetchImpl = gl
     return await response.json().catch(() => ({ ok: false }));
   } catch { return { ok: false }; }
 }
+
+// Immagine (anteprima nella chat) e file (qualità piena, per stampare): usati per il QR del menu.
+async function upload(env, method, field, chatId, bytes, filename, mime, caption, fetchImpl = globalThis.fetch) {
+  if (!telegramReady(env) || !bytes?.length) return { ok: false };
+  try {
+    const form = new FormData();
+    form.append('chat_id', String(chatId));
+    form.append(field, new Blob([typeof bytes === 'string' ? new TextEncoder().encode(bytes) : bytes], { type: mime }), filename);
+    if (caption) form.append('caption', String(caption).slice(0, 1000));
+    const response = await fetchImpl(`${API}/bot${String(env.TELEGRAM_BOT_TOKEN).trim()}/${method}`, { method: 'POST', body: form });
+    return await response.json().catch(() => ({ ok: false }));
+  } catch { return { ok: false }; }
+}
+export const sendPhoto = (env, chatId, bytes, caption = '', fetchImpl) => upload(env, 'sendPhoto', 'photo', chatId, bytes, 'qr.png', 'image/png', caption, fetchImpl);
+export const sendDocument = (env, chatId, bytes, filename, mime, caption = '', fetchImpl) => upload(env, 'sendDocument', 'document', chatId, bytes, filename, mime, caption, fetchImpl);
