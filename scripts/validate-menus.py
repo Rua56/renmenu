@@ -349,6 +349,8 @@ def validate_menu(path: Path, report: Report) -> None:
 
         if "tipo" in section and section["tipo"] not in {"degustazione"}:
             report.error(f"{section_label}: tipo '{section['tipo']}' non supportato (consentito: degustazione).")
+        if "senzaTitolo" in section and not isinstance(section["senzaTitolo"], bool):
+            report.error(f"{section_label}: 'senzaTitolo' deve essere true o false.")
         if "prezzo" in section:
             validate_price(section["prezzo"], section_label, report)
 

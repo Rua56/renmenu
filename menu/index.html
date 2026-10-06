@@ -247,7 +247,9 @@
     document.getElementById('lang').querySelectorAll('button').forEach(b => b.onclick = () => { lang = b.dataset.lang; document.documentElement.lang = lang; render(document.getElementById('q')?.value || ''); });
 
     // chips (scroll via JS so the #data= hash, if present, is preserved)
-    document.getElementById('chips').innerHTML = menu.sezioni.map((s, i) => `<a class="chip" href="#${slug(s, i)}" data-i="${i}">${iconFor(s)}${esc(t(s.nome))}</a>`).join('');
+    // Elenco senza titolo (`senzaTitolo: true`): non ha chip; se restano meno di due sezioni con titolo, la barra non serve.
+    const chipped = menu.sezioni.map((s, i) => [s, i]).filter(([s]) => !s.senzaTitolo);
+    document.getElementById('chips').innerHTML = menu.sezioni.some((s) => s.senzaTitolo) && chipped.length < 2 ? '' : chipped.map(([s, i]) => `<a class="chip" href="#${slug(s, i)}" data-i="${i}">${iconFor(s)}${esc(t(s.nome))}</a>`).join('');
     document.getElementById('chips').querySelectorAll('.chip').forEach(c => c.addEventListener('click', e => { e.preventDefault(); const el = document.getElementById(c.getAttribute('href').slice(1)); if (el) { const y = el.getBoundingClientRect().top + window.scrollY - 128; window.scrollTo({ top: y, behavior: 'smooth' }); } }));
 
     const tel = menu.telefono ? String(menu.telefono).replace(/\s/g, '') : '';
@@ -272,7 +274,7 @@
       if (!voci.length) return;
       total += voci.length;
       const count = `${voci.length} ${voci.length === 1 ? S().piatto : S().piatti}`;
-      html += `<section class="sezione${revealed ? '' : ' reveal'}" id="${slug(s, i)}" data-tono="${i % 4}"><div class="sezione__head"><span class="sezione__icon">${iconFor(s)}</span><h2>${esc(t(s.nome))}</h2>${s.descrizione && t(s.descrizione) ? `<span class="sezione__desc">${esc(t(s.descrizione))}</span>` : s.tipo === 'degustazione' ? '' : `<span class="sezione__count">${count}</span>`}</div>${s.tipo === 'degustazione' && s.prezzo ? `<div class="degu__prezzo">€ ${esc(s.prezzo)} <small>${esc(t(s.unita) || S().persona)}</small></div>` : ''}<div class="voci${s.tipo === 'degustazione' ? ' voci--degu' : ''}">`;
+      html += `<section class="sezione${revealed ? '' : ' reveal'}" id="${slug(s, i)}" data-tono="${i % 4}">${s.senzaTitolo ? '' : `<div class="sezione__head"><span class="sezione__icon">${iconFor(s)}</span><h2>${esc(t(s.nome))}</h2>${s.descrizione && t(s.descrizione) ? `<span class="sezione__desc">${esc(t(s.descrizione))}</span>` : s.tipo === 'degustazione' ? '' : `<span class="sezione__count">${count}</span>`}</div>`}${s.tipo === 'degustazione' && s.prezzo ? `<div class="degu__prezzo">€ ${esc(s.prezzo)} <small>${esc(t(s.unita) || S().persona)}</small></div>` : ''}<div class="voci${s.tipo === 'degustazione' ? ' voci--degu' : ''}">`;
       html += voci.map(v => {
         const tags = (v.tag || []).map(k => R.tags[k] ? `<span class="tag ${k === 'top' ? 'tag--top' : ''}">${R.tags[k].icon} ${esc(R.tags[k][lang] || R.tags[k].it)}</span>` : '').join('');
         const all = (v.allergeni || []).length ? `<span class="all" title="${S().allergeni}">${S().allergeni} ${v.allergeni.map((k) => `<i>${esc(k)}</i>`).join('')}</span>` : '';
