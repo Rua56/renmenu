@@ -14,7 +14,7 @@ import { briefingDue, buildBriefing, romeDay } from './briefing.js';
 import { answerCallback, clearButtons, downloadTelegramFile, sendTelegram, sendVoice, telegramReady } from './telegram.js';
 import { CHAT_MODEL, chat as freeChat, matchVenue, planFromText, speak, transcribe, understand, venueSaid } from './voice.js';
 import { classifyRequest } from './autopilot.js';
-import { proposeOps, validateOps } from './draft-edit.js';
+import { editFingerprints, editLogKey, proposeOps, validateOps } from './draft-edit.js';
 import { GEMINI_PREFERRED } from './vision.js';
 import { findDishes, findLocales, guessIntent, hintsText } from './understanding.js';
 import { memoryContext, memoryFor, menuStatements, noteStatement } from './memory.js';
@@ -746,6 +746,12 @@ export function createMissions(deps) {
     try { saved = (await action(jarvisDb(db), 'editDraftOps', { id: draft.id, revision: draft.revision, ops: checked.ops, source: 'Riccardo (Telegram)' }, env)).result; }
     catch (error) { return { text: `Non sono riuscito a modificare la bozza di «${name}»: ${String(error?.message || 'errore').slice(0, 200)}` }; }
     await putSetting(db, 'draft_undo', JSON.stringify({ ...snapshot, revision: saved.revision })).catch(() => {});
+    // Memoria delle correzioni dettate: se Riccardo rifà la bozza, la Control Room le rimette al loro posto.
+    try {
+      const key = editLogKey(draft.request_id); let log = []; try { log = JSON.parse(await setting(db, key) || '[]'); } catch { log = []; }
+      log.push({ at: now(), ops: checked.ops, fp: editFingerprints(menu, checked.ops) });
+      await putSetting(db, key, JSON.stringify(log.slice(-60)));
+    } catch { /* la correzione è già salvata: la memoria è solo un aiuto */ }
     // Un'anteprima già preparata vale solo per il contenuto esatto: dopo la modifica la missione in attesa si ferma, così nessun SÌ vecchio resta in giro.
     let paused = false;
     try {
@@ -767,13 +773,17 @@ export function createMissions(deps) {
   async function undoDraftEdit(db, env, draftId) {
     let saved = null; try { saved = JSON.parse(await setting(db, 'draft_undo') || 'null'); } catch {}
     if (!saved || saved.draftId !== draftId) return { text: 'Non c’è più nulla da annullare per questa bozza.' };
-    const draft = await getOne(db, 'SELECT id,revision,status FROM drafts WHERE id=?', draftId);
+    const draft = await getOne(db, 'SELECT id,request_id,revision,status FROM drafts WHERE id=?', draftId);
     if (!draft) return { text: 'La bozza non esiste più.' };
     if (draft.revision !== saved.revision) return { text: 'Dopo la mia modifica la bozza è cambiata ancora: per non perdere lavoro non annullo. Correggila in Revisione, oppure dimmi la correzione.' };
     try {
       await action(jarvisDb(db), 'restoreDraftSnapshot', { id: draftId, revision: draft.revision, menu: JSON.parse(saved.menu_json), provenance: JSON.parse(saved.provenance_json || '[]') }, env);
     } catch (error) { return { text: `Non sono riuscito ad annullare: ${String(error?.message || 'errore').slice(0, 200)}` }; }
     await putSetting(db, 'draft_undo', 'null').catch(() => {});
+    try {
+      const key = editLogKey(draft.request_id); const log = JSON.parse(await setting(db, key) || '[]');
+      if (Array.isArray(log) && log.length) { log.pop(); await putSetting(db, key, JSON.stringify(log)); }
+    } catch { /* solo memoria */ }
     try { const q = JSON.parse(await setting(db, 'draft_translate') || 'null'); if (q?.draftId === draftId) await putSetting(db, 'draft_translate', 'null'); } catch {}
     return { text: 'Annullato: la bozza è tornata com’era prima della mia modifica.' };
   }

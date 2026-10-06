@@ -17,12 +17,13 @@ const hasLang = (value, lang) => Boolean(value && typeof value === 'object' && !
 // Campi testuali traducibili ancora privi della lingua di destinazione.
 export function translationEntries(menu, lang = 'en') {
   const entries = [];
-  const add = (path, value) => {
+  const add = (path, value, max = MAX_TEXT) => {
     const text = italian(value);
-    if (text && text.length <= MAX_TEXT && !hasLang(value, lang)) entries.push({ path, text });
+    if (text && text.length <= max && !hasLang(value, lang)) entries.push({ path, text });
   };
   for (const key of ROOT_FIELDS) if (key in (menu || {})) add(key, menu[key]);
   if (menu?.premium && typeof menu.premium === 'object' && 'motto' in menu.premium) add('premium.motto', menu.premium.motto);
+  if (menu?.premium && typeof menu.premium === 'object' && 'storia' in menu.premium) add('premium.storia', menu.premium.storia, 1500);
   for (const [si, section] of (menu?.sezioni || []).entries()) {
     add(`sezioni.${si}.nome`, section?.nome);
     if (section && 'descrizione' in section) add(`sezioni.${si}.descrizione`, section.descrizione);
@@ -55,7 +56,7 @@ export function checkTranslation(source, output) {
   const text = typeof output === 'string' ? output.trim() : '';
   if (!text) return 'traduzione vuota';
   if (text.length > source.length * 3 + 40) return 'traduzione troppo lunga';
-  if (/[<>{}\n\r]|https?:\/\//i.test(text)) return 'caratteri non ammessi';
+  if ((source.includes('\n') ? /[<>{}\r]/ : /[<>{}\n\r]/).test(text) || /https?:\/\//i.test(text)) return 'caratteri non ammessi';
   if (DIGITS(source) !== DIGITS(text)) return 'numeri diversi dall’originale';
   if (/[€$£]/.test(text) && !/[€$£]/.test(source)) return 'simbolo di valuta aggiunto';
   for (const [english, italianWord] of CLAIMS) if (english.test(text) && !italianWord.test(source)) return 'informazione aggiunta (allergeni/diete)';
