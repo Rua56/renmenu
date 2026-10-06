@@ -67,6 +67,8 @@ Gli orari, detti a Telegram o scritti in un'email, vengono letti per giorni e fa
 
 Prima del confronto le due letture sono riportate allo stesso formato. Un piatto scritto come titolo con prezzo («# NOME — 10»), o con il nome come titolo e la descrizione sulla riga col prezzo, diventa «Nome — prezzo» con la descrizione sotto. Restano titoli i percorsi degustazione, il coperto e le sezioni con più piatti. Entra in bozza solo ciò che le due letture confermano; il resto resta «da verificare».
 
+Se sul materiale i piatti sono un elenco unico, senza titoli di sezione, la bozza resta un elenco unico senza titolo (`senzaTitolo` nella sezione; il menu pubblico non mostra l'intestazione né il pulsante di sezione) e restano solo i titoli scritti davvero, come «Dolci». Le foto si uniscono nell'ordine in cui sono state mandate e un file che comincia con piatti senza titolo apre l'elenco senza titolo, senza finire nell'ultima sezione del file precedente. Se Riccardo dà un titolo all'elenco, torna una sezione normale. «Prepara la bozza» a Telegram vale per la pratica in primo piano o nominata, anche a metà nome.
+
 ### Modifiche a un menu già online senza prezzi né piatti
 
 Se la frase non contiene prezzi o piatti da cambiare (per esempio titoli delle sezioni, unione di sezioni, descrizioni), Jarvis crea comunque la pratica di aggiornamento con una bozza identica al menu online (stesso Menu ID, stesso QR) e vi applica la correzione come per ogni bozza. La pratica diventa quella in primo piano per 60 minuti. Pubblicazione e SÌ restano invariati.

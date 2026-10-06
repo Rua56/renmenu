@@ -10,7 +10,7 @@ import { speak } from '../../_lib/voice.js';
 import { OWNER_REVIEW } from '../../_lib/missions.js';
 import { readCurrentMenu } from '../../_lib/github-live.js';
 import { isSameOriginWrite, verifyOwner } from '../../_lib/auth.js';
-import { slugify, validateMenu, venueFromSource } from '../../_lib/menu.js';
+import { DEFAULT_SECTION, slugify, validateMenu, venueFromSource } from '../../_lib/menu.js';
 import { integrations } from '../../_lib/integrations.js';
 import { reviewIssues, EVIDENCE_LABELS } from '../../_lib/editorial.js';
 import { runPrivateIntegrationAction } from '../../_lib/operations.js';
@@ -547,11 +547,14 @@ async function action(db, type, input, env = {}) {
     if (request.kind === 'nuovo') await assertSlugFree(db, slugify(desiredSlug), requestId, request.client_id);
     // Foto e PDF già letti (da Jarvis o trascritti a mano): si aggiungono in coda al testo della
     // pratica; la provenienza indica il file e la riga, non la riga del testo combinato.
-    const allAnalyses = await rows(db, "SELECT a.source_text AS text,a.provenance_json AS prov,m.filename FROM material_analyses a JOIN materials m ON m.id=a.material_id WHERE a.request_id=? AND m.archived_at IS NULL AND a.status IN ('needs_review','complete') AND length(a.source_text)>0 ORDER BY a.created_at", requestId);
+    const allAnalyses = await rows(db, "SELECT a.source_text AS text,a.provenance_json AS prov,m.filename FROM material_analyses a JOIN materials m ON m.id=a.material_id WHERE a.request_id=? AND m.archived_at IS NULL AND a.status IN ('needs_review','complete') AND length(a.source_text)>0 ORDER BY m.created_at, a.created_at", requestId);
     const { kept: analyses, repeated: repeatedPages } = dropRepeatedPages(allAnalyses);
     let combinedSource = String(request.source_text || '');
     const segments = [];
     for (const analysis of analyses) {
+      // Un file che comincia con piatti senza titolo non deve finire nell'ultima sezione del file precedente: apre l'elenco senza titolo.
+      const firstLine = String(analysis.text).split(/\r?\n/).find((l) => l.trim());
+      if (combinedSource.trim() && firstLine && !/^\s*#/.test(firstLine)) combinedSource += `\n# ${DEFAULT_SECTION}`;
       const start = combinedSource.split(/\r?\n/).length + 1;
       combinedSource += `\n${analysis.text}`;
       const method = parseList(analysis.prov)[0]?.method || 'manual';

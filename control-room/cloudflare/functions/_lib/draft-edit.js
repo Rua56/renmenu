@@ -452,6 +452,7 @@ export function applyOps(menuIn, provenanceIn, ops, source) {
       const section = menu.sezioni.find((s) => s.__s === op.si);
       summary.push(`Sezione «${itText(section.nome)}» → «${op.nome}».`);
       section.nome = { it: op.nome };
+      delete section.senzaTitolo; // un titolo dato a voce vale: la sezione torna a mostrare il nome
       needsEnglish = true;
       continue;
     }
