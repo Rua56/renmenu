@@ -1,6 +1,6 @@
 import { describe, it } from 'node:test';
 import assert from 'node:assert/strict';
-import { combineReadings, readMenuPhoto, readMenuPdf } from '../cloudflare/functions/_lib/vision.js';
+import { combineReadings, readMenuPhoto, readMenuPdf, tidyReading } from '../cloudflare/functions/_lib/vision.js';
 import { extractMenuFromText } from '../cloudflare/functions/_lib/menu.js';
 
 const A = '# Primi\nGnocchi di susine — 12\nBlecs al ragù — 11\n# Dolci\nStrudel di mele — 6\nGubana — 5';
@@ -146,5 +146,25 @@ describe('Gemini: modello non disponibile per la chiave', () => {
     const r = await readMenuPhoto(ai, new Uint8Array([255, 216, 255, 1]), 'image/jpeg', { deferOnTransient: true, gemini: { key: 'k'.repeat(39), models: ['gemini-2.5-flash'], fetchImpl } });
     assert.equal(r.ok, true);
     assert.ok(!r.retryLater);
+  });
+});
+
+describe('Foto della Chincaglieria: un modello scrive i piatti come titoli', () => {
+  const prima = 'IL TAGLIERE DI SALUMI — 18\n> Prosciutto crudo artigianale D’Osvaldo, pancetta arrotolata, ossocollo, salama, mortadella di Cinghiale al tartufo (consigliato per due)\n> Allergeni: contiene prodotti naturalmente privi di glutine\n\nLA VERTICALE DI FORMAGGI — 12\n> La nostra selezione di formaggi accompagnata dal miele e dalle confetture dei nostri artigiani\n> Allergeni: 7 contiene prodotti naturalmente privi di glutine, può contenere formaggi a latte crudo\n\nIL CARPACCIO DI FICHI, PROSCIUTTO D’OSVALDO, NOCI E CACIOTTA — [?]\n> Allergeni: 7,8 contiene prodotti naturalmente privi di glutine\n\nLA ZUCCA IN SAOR — 10\n> Zucca al forno, cipolla rossa, pinoli e uvetta\n> Allergeni: 12 contiene prodotti naturalmente privi di glutine\n\nLA TARTARA D’ASINO, CREMA AL CREN E FORMAGGIO, PETALI DI CIPOLLA E SUSINE — 16\n> Allergeni: 7,12 contiene prodotti naturalmente privi di glutine\n\nLA “MILLEFOGLIE” DI SARDE SCOTTATE, PANE ALL’AGLIO E MOZZARELLA — 13\n> Allergeni: 1, 4, 7 *\n\nL’UOVO, I FUNGHI ED IL FORMAGGIO — 15\n> uovo morbido, crema di funghi, funghi arrosto e Vecchio Zoff\n> Allergeni: 7 *@\n\nGLI GNOCCHI DI RICOTTA, CREMA DI FAGIOLI, GUANCIALE E ACETO — 14\n> Allergeni: 1, 3, 7, 9, 12 @';
+  const seconda = '# IL TAGLIERE DI SALUMI\nProsciutto crudo artigianale D’Osvaldo, pancetta arrotolata, ossocollo, salama, mortadella di Cinghiale al tartufo — 18\n> (consigliato per due)\n> Allergeni: contiene prodotti naturalmente privi di glutine\n\n# LA VERTICALE DI FORMAGGI\nLa nostra selezione di formaggi accompagnata dal miele e dalle confetture dei nostri artigiani — 12\n> Allergeni: 7 contiene prodotti naturalmente privi di glutine, può contenere formaggi a latte crudo\n\n# IL CARPACCIO DI FICHI, PROSCIUTTO D’OSVALDO, NOCI E CACIOTTA\n> Allergeni: 7,8 contiene prodotti naturalmente privi di glutine\n\n# LA ZUCCA IN SAOR — 10\nZucca al forno, cipolla rossa, pinoli e uvetta\n> Allergeni: 12 contiene prodotti naturalmente privi di glutine\n\n# LA TARTARA D’ASINO, CREMA AL CREN E FORMAGGIO, PETALI DI CIPOLLA E SUSINE — 16\n> Allergeni: 7,12 contiene prodotti naturalmente privi di glutine\n\n# LA “MILLEFOGLIE” DI SARDE SCOTTATE, PANE ALL’AGLIO E MOZZARELLA — 13\n> Allergeni: 1, 4, 7 *\n\n# L’UOVO, I FUNGHI ED IL FORMAGGIO: uovo morbido, crema di funghi, funghi arrosto e Vecchio Zoff — 15\n> Allergeni: 7 *@\n\n# GLI GNOCCHI DI RICOTTA, CREMA DI FAGIOLI, GUANCIALE E ACETO — 14\n> Allergeni: 1, 3, 7, 9, 12 @';
+  it('le due letture concordano sugli stessi 7 piatti, senza falsi dubbi', () => {
+    const out = combineReadings(prima, seconda);
+    assert.equal(out.agreed, 7);
+    assert.match(out.text, /^IL TAGLIERE DI SALUMI — 18,00$/m);
+    assert.match(out.text, /^LA ZUCCA IN SAOR — 10,00$/m);
+    assert.match(out.text, /^L’UOVO, I FUNGHI ED IL FORMAGGIO.* — 15,00$/m);
+    const doubts = out.text.split('\n').filter((l) => l.startsWith('[da verificare]'));
+    assert.ok(doubts.some((l) => /CARPACCIO DI FICHI/.test(l)), 'il piatto senza prezzo resta da verificare');
+    assert.ok(!doubts.some((l) => /TAGLIERE|VERTICALE|ZUCCA|TARTARA|MILLEFOGLIE|GNOCCHI DI RICOTTA/.test(l) && /non trovato|solo nella seconda|letto \d/.test(l)), doubts.join(' | '));
+  });
+  it('un percorso degustazione resta un titolo con le sue portate', () => {
+    const out = tidyReading('# Menu degustazione — 55 € a persona\nCrudo di gambero\nRisotto al nero\n# Dolci\nTiramisù — 5');
+    assert.match(out, /^# Menu degustazione — 55 € a persona$/m);
+    assert.match(out, /^# Dolci$/m);
   });
 });

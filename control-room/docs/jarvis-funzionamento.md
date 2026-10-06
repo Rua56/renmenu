@@ -63,6 +63,10 @@ Interfaccia mobile-first in HTML e JavaScript senza framework. Protetta da Cloud
 
 Gli orari, detti a Telegram o scritti in un'email, vengono letti per giorni e fasce e riscritti in una riga ordinata, uguale in italiano e in inglese, senza traduzione automatica. Esempio: «mercoledì chiuso, da giovedì a martedì dalle 12 alle 15 e dalle 19 alle 22» diventa «12:00–15:00 e 19:00–22:00 · Chiuso il mercoledì». Se dici solo le fasce («12-15 e 19-22») restano i giorni già scritti; se dici un solo giorno cambia solo quello. Ogni orario deve essere stato detto davvero: se la frase è ambigua (giorni senza orario, cifre che non sono orari) Jarvis non scrive nulla e chiede. Il codice è in `_lib/hours.js`. Anche i titoli di sezione scritti tutti in minuscolo («antipasti») prendono l'iniziale maiuscola.
 
+### Foto con formati diversi tra le due letture
+
+Prima del confronto le due letture sono riportate allo stesso formato. Un piatto scritto come titolo con prezzo («# NOME — 10»), o con il nome come titolo e la descrizione sulla riga col prezzo, diventa «Nome — prezzo» con la descrizione sotto. Restano titoli i percorsi degustazione, il coperto e le sezioni con più piatti. Entra in bozza solo ciò che le due letture confermano; il resto resta «da verificare».
+
 ### Modifiche a un menu già online senza prezzi né piatti
 
 Se la frase non contiene prezzi o piatti da cambiare (per esempio titoli delle sezioni, unione di sezioni, descrizioni), Jarvis crea comunque la pratica di aggiornamento con una bozza identica al menu online (stesso Menu ID, stesso QR) e vi applica la correzione come per ogni bozza. La pratica diventa quella in primo piano per 60 minuti. Pubblicazione e SÌ restano invariati.

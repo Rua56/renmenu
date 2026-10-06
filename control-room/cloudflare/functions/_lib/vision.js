@@ -91,11 +91,43 @@ const ALLERGEN_TAIL = /\s*[-–—,(]?\s*a[lf]{1,3}er+g[ei]ni(?:\s*[:.]?\s*((?:\
 const ALLERGEN_ROW = /^\s*>?\s*a[lf]{1,3}er+g[ei]ni\b\s*[:.]?\s*((?:\d{1,2}\s*[-,/]?\s*)*)(?:soliti|solfiti|sof+it+i)?\s*(?:[—–-]\s*)?(\d{1,4}(?:[.,]\d{1,2})?)?\s*$/i;
 const codes = (raw) => (String(raw || '').match(/\d{1,2}/g) || []).filter((n) => Number(n) >= 1 && Number(n) <= 14).join('-');
 const hasPrice = (line) => /(?:\s[-–]|—)\s*(?:€\s*)?\d{1,4}(?:[.,]\d{1,2})?\s*(?:€)?\s*$/.test(line) || /\s\d{1,4}[.,]\d{2}\s*€?\s*$/.test(line);
+/* Alcuni modelli scrivono ogni piatto come titolo («# LA ZUCCA IN SAOR — 10»): con il prezzo sulla riga e subito dopo una
+ * descrizione («> …»), un altro titolo o la fine, è un piatto, non una sezione. I percorsi («# Menu degustazione — 55 € a persona»,
+ * seguiti dalle portate) e il coperto restano titoli. */
+function dishesWrittenAsHeadings(text) {
+  const lines = String(text || '').split(/\r?\n/);
+  const nextIdx = (i) => { for (let j = i + 1; j < lines.length; j += 1) if (lines[j].trim()) return j; return -1; };
+  const isHeading = (l) => /^\s*#{1,3}\s/.test(l);
+  const isNote = (l) => /^\s*>/.test(l);
+  const priced = /^(.*\S)\s*[—–-]\s*(?:€\s*)?(\d{1,4}(?:[.,]\d{1,2})?)\s*€?\s*$/;
+  const PATH = /a persona|per persona|percorso|degustazione|\bmenu\b|tasting|coperto|servizio|\bpp\b/i;
+  // Dopo la riga i: solo righe «>» e vuote, poi titolo o fine? (un piatto isolato, non una sezione con altri piatti)
+  const endsAfterNotes = (i) => { let k = i + 1, notes = 0; while (k < lines.length && (!lines[k].trim() || isNote(lines[k]))) { if (isNote(lines[k])) notes += 1; k += 1; } return notes > 0 && (k >= lines.length || isHeading(lines[k])); };
+  const out = [];
+  for (let i = 0; i < lines.length; i += 1) {
+    const line = lines[i];
+    // «# IL TAGLIERE DI SALUMI» + «Prosciutto, salama… — 18» + «> (consigliato per due)» + fine/titolo: il titolo è il piatto, la riga col prezzo è la descrizione.
+    const bare = line.match(/^\s*#{1,3}\s*([^—–]+?)\s*$/);
+    if (bare && !PATH.test(bare[1]) && bare[1].split(/\s+/).length >= 4) {
+      const j = nextIdx(i), d = j >= 0 && !isHeading(lines[j]) && !isNote(lines[j]) ? lines[j].match(priced) : null;
+      if (d && d[1].trim().split(/\s+/).length >= 6 && endsAfterNotes(j)) { out.push(`${bare[1].trim()} — ${d[2]}`, `> ${d[1].trim()}`); i = j; continue; }
+    }
+    // «# LA ZUCCA IN SAOR — 10»: titolo con prezzo, poi (facoltativa) una riga di descrizione e le note «>» fino a un titolo o alla fine = piatto.
+    const m = line.match(/^\s*#{1,3}\s*(.+?)\s*[—–-]\s*(?:€\s*)?(\d{1,4}(?:[.,]\d{1,2})?)\s*€?\s*$/);
+    if (m && !PATH.test(line)) {
+      const j = nextIdx(i);
+      if (j < 0 || isNote(lines[j]) || isHeading(lines[j])) { out.push(`${m[1].trim()} — ${m[2]}`); continue; }
+      if (!priced.test(lines[j]) && !/\d[.,]\d{2}\s*€?\s*$/.test(lines[j]) && endsAfterNotes(j)) { out.push(`${m[1].trim()} — ${m[2]}`, `> ${lines[j].trim()}`); i = j; continue; }
+    }
+    out.push(line);
+  }
+  return out.join('\n');
+}
 export function tidyReading(text) {
   const out = [];
   let item = -1; // ultima riga «voce» (non titolo, non descrizione) ancora senza prezzo o appena chiusa
   let legend = false;
-  for (const raw of String(text || '').split(/\r?\n/)) {
+  for (const raw of dishesWrittenAsHeadings(text).split(/\r?\n/)) {
     // «> prosciutto cotto 5,00»: una riga col prezzo è una voce, non una descrizione.
     const line = /^\s*>\s*.*\d[.,]\d{2}\s*(?:€|euro)?\s*$/i.test(raw) ? raw.replace(/^\s*>\s*/, '').trimEnd() : raw.trimEnd();
     if (!line.trim()) { out.push(line); continue; }
