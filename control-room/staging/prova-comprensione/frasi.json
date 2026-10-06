@@ -174,5 +174,17 @@
 [
 "togli le braciole dal menu di x",
 "aggiorna_menu"
+],
+[
+"affida a te la pratica di x",
+"affida_pratica"
+],
+[
+"ok la bozza va bene, mandala al cliente",
+"affida_pratica"
+],
+[
+"jarvis approva e affida",
+"affida_pratica"
 ]
 ]

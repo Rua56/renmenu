@@ -391,11 +391,46 @@ describe('Comandi vocali di Jarvis', () => {
       const env = testEnv(db, { TELEGRAM_BOT_TOKEN: TOKEN, JARVIS_ORIGIN: 'https://jarvis.test', AI: aiSaying('', { intent: 'stato', locale: '', risposta: '', dettaglio: 'breve' }) });
       await missions.telegramUpdate(db, env, { message: { chat: { id: 42, type: 'private' }, text: 'Jarvis tutto apposto?' } });
       const msg = calls.at(-1).body;
-      assert.match(msg.text, /Prossimo passo: rivedi «Bar Aurora» in Revisione/);
+      assert.match(msg.text, /Prossimo passo: guarda «Bar Aurora»/);
       const draft = await db.prepare('SELECT id FROM drafts').bind().first();
       assert.ok(JSON.stringify(msg.reply_markup).includes(`peek:${draft.id}`));
       await missions.telegramUpdate(db, env, { callback_query: { id: 'c4', data: `peek:${draft.id}`, message: { chat: { id: 42 }, message_id: 3 } } });
       assert.match(calls.at(-1).body.text, /jarvis-hook\/bozza\/BZ-/);
+    } finally { globalThis.fetch = previous; db.close(); }
+  });
+
+  it('«affida la pratica»: riepilogo con link e pulsante; il tocco affida davvero; una bozza cambiata nel frattempo non si affida', async () => {
+    const db = database();
+    const previous = globalThis.fetch;
+    globalThis.fetch = fakeFetch;
+    try {
+      calls.length = 0;
+      await pratica(db, 'Bar Aurora');
+      await missions.putSetting(db, 'telegram_chat_id', '42');
+      const env = testEnv(db, { TELEGRAM_BOT_TOKEN: TOKEN, AI: aiSaying('', { intent: 'affida_pratica', locale: 'Bar Aurora', risposta: '' }) });
+      await missions.telegramUpdate(db, env, { message: { chat: { id: 42, type: 'private' }, text: 'Jarvis affida a te la pratica di Bar Aurora' } });
+      const ask = calls.at(-1).body;
+      assert.match(ask.text, /Riepilogo per affidare «Bar Aurora»/);
+      assert.match(ask.text, /Con il tuo tocco confermi di aver controllato prezzi, allergeni e lingue/);
+      assert.match(ask.text, /jarvis-hook\/bozza\/BZ-/);
+      assert.match(ask.text, /Pubblico solo dopo il tuo SÌ/);
+      const draft = await db.prepare('SELECT id,revision FROM drafts').bind().first();
+      const data = JSON.stringify(ask.reply_markup);
+      assert.ok(data.includes(`aff:${draft.id}:${draft.revision}:`), data);
+      assert.equal((await db.prepare('SELECT COUNT(*) n FROM jarvis_missions').bind().first()).n, 0, 'niente prima del tocco');
+      // la bozza cambia dopo il riepilogo: il tocco vecchio non vale
+      await db.prepare('UPDATE drafts SET revision=revision+1 WHERE id=?').bind(draft.id).run();
+      await missions.telegramUpdate(db, env, { callback_query: { id: 'a1', data: `aff:${draft.id}:${draft.revision}:n`, message: { chat: { id: 42 }, message_id: 5 } } });
+      assert.match(calls.at(-1).body.text, /La bozza è cambiata dopo il riepilogo/);
+      assert.equal((await db.prepare('SELECT COUNT(*) n FROM jarvis_missions').bind().first()).n, 0);
+      const fresh = await db.prepare('SELECT revision FROM drafts WHERE id=?').bind(draft.id).first();
+      await missions.telegramUpdate(db, env, { callback_query: { id: 'a2', data: `aff:${draft.id}:${fresh.revision}:n`, message: { chat: { id: 42 }, message_id: 6 } } });
+      assert.match(calls.at(-1).body.text, /Fatto, Riccardo: «Bar Aurora» è affidata a Jarvis/);
+      assert.equal((await db.prepare('SELECT COUNT(*) n FROM jarvis_missions').bind().first()).n, 1);
+      assert.equal((await db.prepare("SELECT COUNT(*) n FROM audit_events WHERE action='jarvis.entrust'").bind().first()).n, 1);
+      // già affidata: il riepilogo lo dice e non offre pulsanti
+      await missions.telegramUpdate(db, env, { callback_query: { id: 'a3', data: `affq:${draft.id}`, message: { chat: { id: 42 }, message_id: 7 } } });
+      assert.match(calls.at(-1).body.text, /sta già seguendo/);
     } finally { globalThis.fetch = previous; db.close(); }
   });
 });

@@ -6,6 +6,8 @@ import { notesSummary } from './notes.js';
 // operazioni (con gli stessi controlli) dell'interfaccia, con «jarvis» come autore nel registro.
 // Si ferma e chiede a Riccardo quando qualcosa non è chiaro; pubblica solo dopo il suo SÌ.
 import { deletionPlan } from './delete-request.js';
+import { reviewIssues } from './editorial.js';
+import { allExtras } from './extras.js';
 import { assessReply, proposeReplyChanges, sha256Hex } from './approvals.js';
 import { sendOwnerNotification } from './owner-notifications.js';
 import { briefingDue, buildBriefing, romeDay } from './briefing.js';
@@ -471,7 +473,7 @@ export function createMissions(deps) {
     if (update?.callback_query) {
       const query = update.callback_query, from = String(query.message?.chat?.id || '');
       if (!chat || from !== chat) return;
-      const [verb, missionId, extra] = String(query.data || '').split(':');
+      const [verb, missionId, extra, arg4] = String(query.data || '').split(':');
       if (verb === 'chk') {
         if (query.message?.message_id) await clearButtons(env, chat, query.message.message_id, deps.fetchImpl);
         const outcome = missionId === 'end' ? await answerCheck(db, env, chat, -1, 'end') : await answerCheck(db, env, chat, Number(missionId), String(extra || ''));
@@ -490,7 +492,15 @@ export function createMissions(deps) {
         const found = (await rows(db, OPEN_DRAFTS).catch(() => [])).find((d) => d.id === missionId);
         const shown = found ? await showDraft(db, env, found) : { text: 'Quella bozza non è più aperta.' };
         await answerCallback(env, query.id, 'Ecco la bozza', deps.fetchImpl);
-        await sendTelegram(env, chat, shown.text, null, deps.fetchImpl);
+        await sendTelegram(env, chat, shown.text, shown.buttons || null, deps.fetchImpl);
+        return;
+      }
+      if (verb === 'affq' || verb === 'aff' || verb === 'affno') {
+        await answerCallback(env, query.id, verb === 'affno' ? 'Ok, non affido' : 'Un attimo', deps.fetchImpl);
+        if (query.message?.message_id && verb !== 'affq') await clearButtons(env, chat, query.message.message_id, deps.fetchImpl);
+        const out = verb === 'affno' ? { text: 'Va bene, non affido niente: la pratica resta in Revisione.' }
+          : verb === 'affq' ? await entrustBrief(db, env, missionId) : await runEntrust(db, env, missionId, Number(extra), String(arg4 || 'n'));
+        await sendTelegram(env, chat, out.text, out.buttons || null, deps.fetchImpl, { stacked: true });
         return;
       }
       if (verb === 'del' || verb === 'delc' || verb === 'delno') {
@@ -648,6 +658,7 @@ export function createMissions(deps) {
       const text = talk.ok ? talk.text : intent.risposta;
       if (text) { await answer(text, null, { keep: !talk.ok }); return; }
     }
+    if (intent.intent === 'affida_pratica') { const asked = await voiceEntrust(db, env, intent.locale, clues, utterance); await answer(asked.text, asked.buttons || null, { keep: asked.keep === true }); return; }
     if (intent.intent === 'cancella_pratica') { const asked = await voiceDelete(db, env, intent.locale, clues, utterance); await answer(asked.text, asked.buttons || null, { keep: asked.keep === true }); return; }
     if (intent.intent === 'stato') { const report = await statusReport(db, env, intent.dettaglio || (/\b(dettagli\w*|complet\w*|report|resoconto|riepilogo|tutto)\b/i.test(said0) ? 'completo' : /buone\s+notizie|novit/i.test(said0) ? 'buone_notizie' : 'breve')); await answer(report.text, report.buttons || null, { keep: false }); return; }
     if (intent.intent === 'anteprima') { const shown = await voiceShowPreview(db, env, intent.locale, clues, utterance); await answer(shown.text, shown.buttons || null, { keep: shown.keep }); return; }
@@ -745,8 +756,8 @@ export function createMissions(deps) {
     const english = saved.needsEnglish && (menu.lingue || []).includes('en');
     if (english) await putSetting(db, 'draft_translate', JSON.stringify({ draftId: draft.id, at: now() })).catch(() => {});
     return {
-      text: `Fatto, bozza di «${name}» aggiornata:\n${checked.ops.length ? saved.summary.split(/(?<=\.)\s+/).map((line) => `• ${line}`).join('\n') : ''}\n\nLa trovi in Revisione. La checklist si è azzerata: va riconfermata prima dell’anteprima.${paused ? ' L’anteprima che avevo già preparato non vale più: ho fermato quella pratica, e dopo la revisione me la riaffidi da «Approva e affida a Jarvis».' : ''}${english ? ' L’inglese delle voci nuove lo preparo tra un minuto.' : ''}${paused ? '' : '\n\nProssimo passo: guarda la bozza, riconferma la checklist in Revisione e poi «Approva e affida a Jarvis»: l’anteprima parte da sola.'}`,
-      buttons: [['Annulla', `undo:${draft.id}`], ['Mostrami la bozza', `peek:${draft.id}`]]
+      text: `Fatto, bozza di «${name}» aggiornata:\n${checked.ops.length ? saved.summary.split(/(?<=\.)\s+/).map((line) => `• ${line}`).join('\n') : ''}\n\nLa trovi in Revisione. La checklist si è azzerata: va riconfermata prima dell’anteprima.${paused ? ' L’anteprima che avevo già preparato non vale più: ho fermato quella pratica, e dopo la revisione me la riaffidi da «Approva e affida a Jarvis».' : ''}${english ? ' L’inglese delle voci nuove lo preparo tra un minuto.' : ''}${paused ? '' : '\n\nProssimo passo: guarda la bozza e, se ti va bene, affidami la pratica: ti faccio il riepilogo da confermare qui.'}`,
+      buttons: [['Annulla', `undo:${draft.id}`], ['Mostrami la bozza', `peek:${draft.id}`], ['Affida a Jarvis', `affq:${draft.id}`]]
     };
   }
   async function undoDraftEdit(db, env, draftId) {
@@ -825,6 +836,58 @@ export function createMissions(deps) {
   // Nuova pratica a voce: cliente (esistente o nuovo) + pratica «nuovo menu». Le foto e i PDF che
   // Riccardo manda nell'ora successiva si collegano da soli a questa pratica.
   const FOCUS_MINUTES = 60;
+  // ——— «Affido a Jarvis» da Telegram: riepilogo da confermare con un tocco (stessa conferma della Control Room) ———
+  async function voiceEntrust(db, env, spokenVenue, clues, utterance) {
+    const drafts = await rows(db, OPEN_DRAFTS).catch(() => []);
+    const target = await draftTarget(db, spokenVenue, clues, utterance).catch(() => null);
+    if (target?.ask) return { text: target.ask };
+    let draft = target?.draft || null;
+    if (!draft && !spokenVenue && !clues.locales.length) {
+      if (drafts.length === 1) draft = drafts[0];
+      else return { text: drafts.length ? `Quale pratica affido? Ho queste bozze aperte: ${drafts.map((d) => `«${d.client_name || d.subject}»`).join(', ')}.` : 'Non ho bozze da affidare, Riccardo.' };
+    }
+    if (!draft) return { text: `Non trovo una bozza aperta per «${spokenVenue || 'quel locale'}». Dimmi il nome esatto del locale.` };
+    return entrustBrief(db, env, draft.id);
+  }
+  async function entrustBrief(db, env, draftId) {
+    const draft = await getOne(db, 'SELECT d.id,d.request_id,d.status,d.revision,d.menu_json,d.checks_json,d.provenance_json FROM drafts d WHERE d.id=?', draftId);
+    if (!draft || !['bozza', 'revisione', 'pronta_pr'].includes(draft.status)) return { text: 'Quella bozza non è più aperta.' };
+    const request = await getOne(db, 'SELECT r.id,r.plan,r.kind,r.subject,r.source_text,c.email AS client_email,c.name AS client_name FROM requests r JOIN clients c ON c.id=r.client_id WHERE r.id=?', draft.request_id);
+    if (['completata', 'archiviata', 'chiusa'].includes(request?.status)) return { text: 'Questa pratica è chiusa: per modificare un menu online serve una pratica di aggiornamento.' };
+    const mission = await Promise.resolve().then(() => getOne(db, 'SELECT status FROM jarvis_missions WHERE request_id=?', draft.request_id)).catch(() => null);
+    if (mission && ACTIVE.includes(mission.status)) return { text: `Jarvis sta già seguendo «${request.client_name}» (stato: ${mission.status.replace(/_/g, ' ')}).` };
+    if (request.kind === 'nuovo' && !ACTIVATION_BY_PLAN[request.plan]) return { text: `Il piano di «${request.client_name}» non è confermato: dimmi se è Standard, Annuale o Premium (da Control Room, scheda cliente) e poi riprovo.` };
+    let menu, saved = {}; try { menu = JSON.parse(draft.menu_json); } catch { return { text: 'La bozza non si legge: aprila in Revisione.' }; }
+    try { saved = JSON.parse(draft.checks_json || '{}') || {}; } catch { saved = {}; }
+    const note = 'Riepilogo su Telegram: prezzi, allergeni e lingue controllati da Riccardo.';
+    const probe = { prices: true, allergens: true, languages: true, clientApproval: false, allergenOmissionConfirmed: true, fieldEvidence: { prices: note, allergens: note, languages: note }, ...(saved.creativeApproval === true ? { creativeApproval: true, creativeApprovalEvidence: saved.creativeApprovalEvidence } : {}) };
+    const { issues, missing } = reviewIssues(menu, probe, request.plan);
+    const blockers = issues.filter((issue) => !/checklist contiene conferme/i.test(issue));
+    const items = (menu.sezioni || []).reduce((t, section) => t + (section.voci || []).length, 0);
+    const link = await peekUrl(db, env, draft.id);
+    if (blockers.length) return { text: `Non posso ancora affidare «${request.client_name}»: ${blockers.slice(0, 3).join(' ')}\n\nGuarda la bozza: ${link}`, buttons: [['Mostrami la bozza', `peek:${draft.id}`]] };
+    const extras = allExtras(request.source_text, menu).filter((entry) => !entry.legend);
+    let english = 0; try { english = JSON.parse(draft.provenance_json || '[]').filter((entry) => String(entry.path).endsWith('.en')).length; } catch {}
+    const lines = [`Riepilogo per affidare «${request.client_name}» (versione ${draft.revision}, ${items} voci).`, '',
+      'Con il tuo tocco confermi di aver controllato prezzi, allergeni e lingue:',
+      `- Prezzi: ${items - missing.pricesMissing.length} voci su ${items} hanno il prezzo.`,
+      `- Allergeni: ${missing.allergensMissing.length ? `${missing.allergensMissing.length} voci non ne indicano: restano senza, non li invento.` : 'tutte le voci li indicano.'}`,
+      `- Lingue: ${english ? `${english} testi in inglese tradotti da me (bozza, da verificare).` : 'nessuna traduzione automatica da verificare.'}`];
+    if (extras.length) lines.push(`- Dati scritti dal locale non ancora nel menu: ${extras.slice(0, 5).map((entry) => (entry.type === 'coperto' ? `coperto € ${entry.value}` : `allergeni di ${entry.name}: ${entry.label}`)).join('; ')}.`);
+    lines.push('', `Guarda la bozza: ${link}`, '', request.client_email ? `Poi preparo l'anteprima e la mando a ${request.client_email}.` : 'Il locale non ha email: l’anteprima la approvi tu qui su Telegram.', 'Pubblico solo dopo il tuo SÌ.');
+    return { text: lines.join('\n'), buttons: [...(extras.length ? [['Sì, affida e inserisci i dati del locale', `aff:${draft.id}:${draft.revision}:x`], ['Sì, affida senza quei dati', `aff:${draft.id}:${draft.revision}:n`]] : [['Sì, affida a Jarvis', `aff:${draft.id}:${draft.revision}:n`]]), ['Non ancora', 'affno:x']] };
+  }
+  async function runEntrust(db, env, draftId, revision, mode) {
+    const draft = await getOne(db, 'SELECT id,request_id,revision,status FROM drafts WHERE id=?', draftId);
+    if (!draft) return { text: 'Quella bozza non esiste più.' };
+    if (draft.revision !== revision) { const again = await entrustBrief(db, env, draftId); return { text: `La bozza è cambiata dopo il riepilogo che hai visto: non affido niente. Ecco quello aggiornato.\n\n${again.text}`, buttons: again.buttons }; }
+    const request = await getOne(db, 'SELECT r.source_text,r.subject,c.email AS client_email,c.name AS client_name FROM requests r JOIN clients c ON c.id=r.client_id WHERE r.id=?', draft.request_id);
+    let accept = [];
+    if (mode === 'x') { try { accept = allExtras(request.source_text, JSON.parse((await getOne(db, 'SELECT menu_json FROM drafts WHERE id=?', draftId)).menu_json)).filter((entry) => !entry.legend).map((entry) => entry.id); } catch { accept = []; } }
+    try { await entrust(db, env, { draftId, revision, accept, confirmation: 'AFFIDO A JARVIS' }); }
+    catch (error) { return { text: `Non riesco ad affidarla: ${String(error?.message || 'errore').slice(0, 220)}` }; }
+    return { text: `Fatto, Riccardo: «${request.client_name}» è affidata a Jarvis.${request.client_email ? ` Preparo l'anteprima per ${request.client_email} e ti scrivo quando risponde.` : ' Ti mando qui l’anteprima da approvare.'} Pubblico solo con il tuo SÌ.` };
+  }
   // ——— «Elimina la pratica di X»: Jarvis propone, Riccardo conferma col pulsante, poi si cancella ———
   async function voiceDelete(db, env, spokenVenue, clues, utterance) {
     const open = await rows(db, "SELECT r.id,r.subject,r.status,r.updated_at,c.id AS client_id,c.name FROM requests r JOIN clients c ON c.id=r.client_id WHERE r.status<>'completata' ORDER BY r.updated_at DESC LIMIT 80").catch(() => []);
@@ -914,10 +977,10 @@ export function createMissions(deps) {
       const stale = detail.find((d) => d.stale), ready = detail.find((d) => d.missionStatus === 'attesa_si' && !d.stale), stuck = detail.find((d) => d.stuck);
       const review = detail.find((d) => !d.missionStatus && ['bozza', 'revisione', 'pronta_pr'].includes(d.draftStatus));
       const photos = detail.find((d) => !d.missionStatus && !d.draftStatus && !d.nFiles), reading = detail.find((d) => d.toRead);
-      if (stale) return { text: `la bozza di «${stale.name}» è cambiata dopo l’anteprima: guardala, riconferma la checklist e riaffidami la pratica da «Approva e affida a Jarvis».`, buttons: stale.draftId ? [['Mostrami la bozza', `peek:${stale.draftId}`]] : null };
+      if (stale) return { text: `la bozza di «${stale.name}» è cambiata dopo l’anteprima: guardala e riaffidamela, il riepilogo da confermare te lo faccio qui.`, buttons: stale.draftId ? [['Mostrami la bozza', `peek:${stale.draftId}`], ['Affida a Jarvis', `affq:${stale.draftId}`]] : null };
       if (ready) return { text: `«${ready.name}» è pronto: se vuoi pubblicarlo tocca SÌ, altrimenti «Non ancora».`, buttons: [['SÌ, pubblica', `pub:${ready.missionId}`], ['Non ancora', `no:${ready.missionId}`]] };
       if (stuck) return { text: `«${stuck.name}» è ferma: riaffidala dalla Control Room, oppure dimmi «elimina la pratica di ${stuck.name}».`, buttons: null };
-      if (review) return { text: `rivedi «${review.name}» in Revisione e poi «Approva e affida a Jarvis»: l’anteprima parte da sola. Vuoi guardare la bozza adesso?`, buttons: review.draftId ? [['Mostrami la bozza', `peek:${review.draftId}`]] : null };
+      if (review) return { text: `guarda «${review.name}» e, se ti va bene, affidamela: il riepilogo da confermare te lo faccio qui.`, buttons: review.draftId ? [['Mostrami la bozza', `peek:${review.draftId}`], ['Affida a Jarvis', `affq:${review.draftId}`]] : null };
       if (photos) return { text: `mandami le foto o il PDF del menu di «${photos.name}».`, buttons: null };
       if (reading) return { text: `nessuno da parte tua: sto leggendo i file di «${reading.name}».`, buttons: null };
       return { text: 'vuoi aprire una nuova pratica? Dimmi il nome del locale.', buttons: null };
@@ -971,15 +1034,19 @@ export function createMissions(deps) {
     }
     return showDraft(db, env, draft);
   }
-  async function showDraft(db, env, draft) {
-    let menu; try { menu = JSON.parse(draft.menu_json); } catch { return { text: 'La bozza non si legge: aprila in Revisione.' }; }
+  // Link di sola lettura alla bozza (24 ore): niente approvazione, niente pubblicazione.
+  async function peekUrl(db, env, draftId) {
     const code = `BZ-${[...crypto.getRandomValues(new Uint8Array(10))].map((b) => 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789'[b % 32]).join('')}`;
     await Promise.resolve().then(() => db.prepare("DELETE FROM jarvis_settings WHERE key LIKE 'peek\\_%' ESCAPE '\\' AND updated_at < ?").bind(new Date(Date.now() - 2 * 24 * 3600_000).toISOString()).run()).catch(() => {});
-    await putSetting(db, `peek_${code}`, JSON.stringify({ draftId: draft.id, exp: new Date(Date.now() + 24 * 3600_000).toISOString() }));
+    await putSetting(db, `peek_${code}`, JSON.stringify({ draftId, exp: new Date(Date.now() + 24 * 3600_000).toISOString() }));
+    return `${String(env.JARVIS_ORIGIN || 'https://renmenu-jarvis-stage.pages.dev').replace(/\/+$/, '')}/jarvis-hook/bozza/${code}`;
+  }
+  async function showDraft(db, env, draft) {
+    let menu; try { menu = JSON.parse(draft.menu_json); } catch { return { text: 'La bozza non si legge: aprila in Revisione.' }; }
+    const link = await peekUrl(db, env, draft.id);
     const sections = (menu.sezioni || []).length, items = (menu.sezioni || []).reduce((t, s2) => t + (s2.voci || []).length, 0);
     const checks = await Promise.resolve().then(() => getOne(db, 'SELECT checks_json FROM drafts WHERE id=?', draft.id)).then((row) => { try { return JSON.parse(row?.checks_json || '{}') || {}; } catch { return {}; } }).catch(() => ({}));
-    const origin = String(env.JARVIS_ORIGIN || 'https://renmenu-jarvis-stage.pages.dev').replace(/\/+$/, '');
-    return { text: `Ecco la bozza di «${draft.client_name || menu.nome || draft.subject}» (versione ${draft.revision}, ${items} voci in ${sections} sezioni):\n${origin}/jarvis-hook/bozza/${code}\n\nÈ solo da guardare: non è pubblicata e non è stata inviata a nessuno. Il link vale 24 ore.${['prices', 'allergens', 'languages'].every((key) => checks[key]) ? '' : ' La checklist di revisione (prezzi, allergeni, lingue) non è ancora confermata.'}\n\nProssimo passo: ${['prices', 'allergens', 'languages'].every((key) => checks[key]) ? 'è tutto confermato, quando vuoi «Approva e affida a Jarvis» e l’anteprima parte da sola.' : 'conferma prezzi, allergeni e lingue in Revisione, poi «Approva e affida a Jarvis»: l’anteprima parte da sola.'}`, keep: false };
+    return { text: `Ecco la bozza di «${draft.client_name || menu.nome || draft.subject}» (versione ${draft.revision}, ${items} voci in ${sections} sezioni):\n${link}\n\nÈ solo da guardare: non è pubblicata e non è stata inviata a nessuno. Il link vale 24 ore.${['prices', 'allergens', 'languages'].every((key) => checks[key]) ? '' : ' La checklist di revisione (prezzi, allergeni, lingue) non è ancora confermata.'}\n\nProssimo passo: se la bozza ti va bene, affidami la pratica: ti faccio il riepilogo da confermare qui, con un tocco.`, keep: false, buttons: [['Affida a Jarvis', `affq:${draft.id}`]] };
   }
   async function voiceCreate(db, utterance, spokenVenue, urgent = false) {
     const venue = String(spokenVenue || '').replace(/^[«"“']|[»"”']$/g, '').trim();
@@ -1093,10 +1160,10 @@ export function createMissions(deps) {
     const chat = await setting(db, 'telegram_chat_id');
     const request = await getOne(db, 'SELECT id,subject FROM requests WHERE id=?', queued.requestId);
     if (!request || await getOne(db, 'SELECT id FROM drafts WHERE request_id=?', request.id)) return null;
-    let text;
-    try { await action(jarvisDb(db), 'generateDraft', { requestId: request.id }, env); text = `Bozza pronta per «${String(request.subject || 'la pratica').slice(0, 60)}»: controllala in Revisione. Le voci che hai saltato restano da verificare.`; }
+    let text, buttons = null;
+    try { await action(jarvisDb(db), 'generateDraft', { requestId: request.id }, env); text = `Bozza pronta per «${String(request.subject || 'la pratica').slice(0, 60)}»: guardala qui sotto e, se ti va bene, affidamela. Le voci che hai saltato restano da verificare.`; buttons = [['Mostrami la bozza', `peek:${(await getOne(db, 'SELECT id FROM drafts WHERE request_id=?', request.id))?.id}`], ['Affida a Jarvis', `affq:${(await getOne(db, 'SELECT id FROM drafts WHERE request_id=?', request.id))?.id}`]]; }
     catch (error) { text = `Non sono riuscito a preparare la bozza: ${String(error?.message || 'errore').slice(0, 160)}.`; }
-    if (chat && telegramReady(env)) await sendTelegram(env, chat, text, null, deps.fetchImpl);
+    if (chat && telegramReady(env)) await sendTelegram(env, chat, text, buttons, deps.fetchImpl, { stacked: true });
     return { text };
   }
   // Prova di comprensione: classifica frasi senza eseguire nulla e senza scrivere sul database.
