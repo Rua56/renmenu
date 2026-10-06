@@ -93,3 +93,23 @@ test('sposta, nuova sezione e rinomina sezione', () => {
   assert.deepEqual(moved.problems, []);
   assert.equal(applyOps(menu(), prov(), moved.ops, 'R').menu.sezioni[1].voci.at(-1).nome.it, 'Strudel di mele');
 });
+
+test('sposta più voci in una sezione nuova, creata una sola volta', () => {
+  const said = 'sposta frico con polenta e strudel di mele in una nuova sezione Bevande';
+  const checked = validateOps([
+    { tipo: 'sposta', si: 0, vi: 1, sezione: 'Bevande' },
+    { tipo: 'sposta', si: 0, vi: 2, sezione: 'Bevande' }
+  ], menu(), said);
+  assert.deepEqual(checked.problems, []);
+  const out = applyOps(menu(), prov(), checked.ops, 'R');
+  assert.equal(out.menu.sezioni.length, 3);
+  assert.equal(out.menu.sezioni[2].nome.it, 'Bevande');
+  assert.deepEqual(out.menu.sezioni[2].voci.map((v) => v.nome.it), ['Frico con polenta', 'Strudel di mele']);
+  assert.equal(out.menu.sezioni[0].voci.length, 1);
+  assert.equal(out.needsEnglish, true);
+  assert.ok(!JSON.stringify(out.menu).includes('__'));
+  // il nome della nuova sezione deve venire dalla frase
+  assert.match(validateOps([{ tipo: 'sposta', si: 0, vi: 1, sezione: 'Dolcezze' }], menu(), 'sposta il frico con polenta altrove').problems[0], /destinazione non valida/);
+  // se la sezione esiste già, si usa quella
+  assert.equal(validateOps([{ tipo: 'sposta', si: 0, vi: 1, sezione: 'Vini' }], menu(), 'sposta il frico con polenta nei vini').ops[0].a_si, 1);
+});
