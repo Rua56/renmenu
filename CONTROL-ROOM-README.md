@@ -4,6 +4,8 @@
 
 > **Regola di manutenzione.** Ogni modifica a Jarvis o alla Control Room aggiorna, nella stessa pull request, questo README, le policy in `docs/` quando cambia un comportamento e il registro in [`control-room/docs/CHANGELOG.md`](control-room/docs/CHANGELOG.md). Il funzionamento passo per passo è in [`control-room/docs/jarvis-funzionamento.md`](control-room/docs/jarvis-funzionamento.md).
 
+**Coperto (6 ottobre 2026):** detto a Telegram va nel campo coperto, in fondo al menu sopra le informazioni, mai in una sezione propria.
+
 **Sezioni (6 ottobre 2026):** da Telegram si possono unire o togliere sezioni, e dalla Modifica a mano togliere voci e sezioni intere (con «Rimetti» prima di salvare); una frase senza nome del locale riguarda la pratica in primo piano.
 
 **Interfaccia (dal 6 ottobre 2026):** tre voci in una barra in basso (Oggi, Locali, Sistema), con l'aspetto del modello approvato e la barra «Scrivi o parla a Jarvis…» che rimanda a Telegram. Oggi elenca solo ciò che aspetta una decisione; ogni pratica ha la sua pagina (avanzamento, «Cosa cambia», «Modifica a mano», passo successivo). Gli strumenti completi (Revisione, Richieste, Approvazioni, Builder, Materiali, Anteprima, Notifiche, Registro, Voce) sono in Sistema. Dettagli in `control-room/docs/jarvis-funzionamento.md`.

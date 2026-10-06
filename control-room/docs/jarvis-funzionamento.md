@@ -63,6 +63,10 @@ Interfaccia mobile-first in HTML e JavaScript senza framework. Protetta da Cloud
 
 Gli orari, detti a Telegram o scritti in un'email, vengono letti per giorni e fasce e riscritti in una riga ordinata, uguale in italiano e in inglese, senza traduzione automatica. Esempio: «mercoledì chiuso, da giovedì a martedì dalle 12 alle 15 e dalle 19 alle 22» diventa «12:00–15:00 e 19:00–22:00 · Chiuso il mercoledì». Se dici solo le fasce («12-15 e 19-22») restano i giorni già scritti; se dici un solo giorno cambia solo quello. Ogni orario deve essere stato detto davvero: se la frase è ambigua (giorni senza orario, cifre che non sono orari) Jarvis non scrive nulla e chiede. Il codice è in `_lib/hours.js`. Anche i titoli di sezione scritti tutti in minuscolo («antipasti») prendono l'iniziale maiuscola.
 
+### Il coperto
+
+Il coperto non è mai una sezione né una voce: si scrive nel campo coperto del menu e compare in fondo, sopra le informazioni del locale. Jarvis lo inserisce solo con un importo che hai detto davvero; se esiste già una sezione «Coperto» fatta solo da quella voce, la toglie e usa il campo. Frasi come «niente coperto» o con più importi restano un dubbio e Jarvis chiede.
+
 ### Sezioni e pratica in primo piano
 
 Da Telegram Jarvis sa anche unire sezioni («unifica le tre sezioni bevande»: le voci finiscono in una sola, i doppioni con stesso nome e stesso prezzo vengono tolti) e togliere una sezione intera («togli la sezione bevande»), purché tu la nomini. Più voci aggiunte nella stessa sezione nuova finiscono in una sola sezione, con l'iniziale maiuscola. Se togli tutte le voci di una sezione, la sezione sparisce da sola. Una frase senza il nome del locale riguarda sempre la pratica su cui stai lavorando (si rinnova a ogni correzione e dura 60 minuti): non viene più dedotta dai nomi dei piatti, che in locali diversi si somigliano («caffè», «bibite»). Un nome di locale che compare solo nell'interpretazione del modello e non nella tua frase viene ignorato. Per un menu già online dì il nome del locale.
