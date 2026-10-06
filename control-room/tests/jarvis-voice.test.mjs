@@ -244,6 +244,30 @@ describe('Comandi vocali di Jarvis', () => {
     } finally { globalThis.fetch = previous; db.close(); }
   });
 
+  it('modifica senza prezzi né piatti su un menu online: bozza identica al menu online e correzione applicata', async () => {
+    const db = database();
+    const previous = globalThis.fetch;
+    globalThis.fetch = fakeFetch;
+    try {
+      await db.prepare("INSERT INTO clients (id,name,email,plan,menu_id,internal_notes,revision,created_at,updated_at) VALUES ('c1','Osteria Viva',NULL,'standard','osteria-viva','',1,'2026-10-01','2026-10-01')").bind().run();
+      await missions.putSetting(db, 'telegram_chat_id', '42');
+      const ai = { run: async (model, input) => {
+        const schema = input?.response_format?.json_schema;
+        if (schema?.properties?.operazioni) return { response: { operazioni: [{ tipo: 'rinomina_sezione', si: 1, nome: 'Da bere' }], dubbio: '' } };
+        return { response: JSON.stringify({ intent: 'aggiorna_menu', locale: 'Osteria Viva', risposta: '' }) };
+      } };
+      const env = testEnv(db, { TELEGRAM_BOT_TOKEN: TOKEN, GITHUB_PROVIDER: 'live', GITHUB_TOKEN: 't', GITHUB_FETCH: fakeFetch, TRANSLATION_PROVIDER: 'disabled', AI: ai });
+      await missions.telegramUpdate(db, env, { message: { chat: { id: 42, type: 'private' }, text: 'Jarvis, nel menu Osteria Viva chiama la sezione Bevande «Da bere»' } });
+      const draft = await db.prepare('SELECT menu_json FROM drafts').bind().first();
+      assert.ok(draft, JSON.stringify(calls.at(-1)?.body));
+      const menu = JSON.parse(draft.menu_json);
+      assert.deepEqual(menu.sezioni.map((x) => x.nome.it), ['Antipasti', 'Da bere']);
+      assert.equal(menu.sezioni[1].voci[0].prezzo, '4,00', 'il resto invariato');
+      assert.match(calls.at(-1).body.text, /Ho preparato la bozza di «Osteria Viva»[\s\S]*Da bere/);
+      assert.equal((await db.prepare('SELECT COUNT(*) AS n FROM jarvis_missions').bind().first()).n, 0, 'niente affidato né pubblicato');
+    } finally { globalThis.fetch = previous; db.close(); }
+  });
+
   it('«tutto apposto?» → punto della situazione scritto dai dati, senza pratiche inventate', async () => {
     const db = database();
     const previous = globalThis.fetch;

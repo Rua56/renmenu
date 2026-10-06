@@ -1365,8 +1365,21 @@ export function createMissions(deps) {
       requestId = (await action(jarvis, 'createRequest', { clientId: client.id, subject: `Richiesta a voce · ${client.name}`, sourceText: utterance, sourceChannel: 'altro', category })).result.id;
       await action(jarvis, 'generateDraft', { requestId }, env);
     } catch (error) {
+      // Nessun prezzo o piatto da cambiare (per esempio «i titoli delle sezioni sono in minuscolo»): la bozza parte identica al menu online e la frase si applica come correzione di bozza.
+      if (/modifica precisa|Nessun piatto/i.test(String(error?.message || ''))) {
+        try {
+          await action(jarvis, 'generateDraft', { requestId, baseOnly: true }, env);
+          await putSetting(db, 'tg_focus', JSON.stringify({ requestId, subject: `Richiesta a voce · ${client.name}`, at: now() }));
+          const base = (await rows(db, OPEN_DRAFTS)).find((d) => d.request_id === requestId);
+          if (base) {
+            const edited = await voiceEditDraft(db, env, utterance, base);
+            return `Ho preparato la bozza di «${client.name}» partendo dal menu online. ${edited.text}`;
+          }
+        } catch (inner) { return `Ho aperto la pratica per «${client.name}», ma non ho preparato la bozza: ${String(inner?.message || 'errore').slice(0, 200)}`; }
+      }
       return `Ho aperto la pratica per «${client.name}», ma non ho preparato la bozza: ${String(error?.message || 'errore').slice(0, 200)}`;
     }
+    await putSetting(db, 'tg_focus', JSON.stringify({ requestId, subject: `Richiesta a voce · ${client.name}`, at: now() })).catch(() => {});
     const done = await getOne(db, "SELECT summary FROM audit_events WHERE request_id=? AND action='draft.generate' ORDER BY created_at DESC LIMIT 1", requestId);
     let todo = '';
     try { todo = notesSummary(JSON.parse((await getOne(db, 'SELECT review_notes_json AS n FROM drafts WHERE request_id=? ORDER BY created_at DESC LIMIT 1', requestId))?.n || '[]')); } catch {}
