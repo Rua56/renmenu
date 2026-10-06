@@ -1,42 +1,178 @@
 [
-["jarvis come siamo messi con le pratiche?","stato"],
-["jarvis aggiornami sulla situazione","stato"],
-["jarvis tutto apposto?","stato"],
-["jarvis dammi buone notizie","stato"],
-["jarvis mi serve un menu per cliente 'x' in fretta","crea_pratica"],
-["jarvis mostrami anteprima di 'x'","anteprima"],
-["jarvis stupiscimi","risposta"],
-["jarvis ho bisogno di un resoconto dettagliato","stato"],
-["jarvis fammi sorridere","risposta"],
-["jarvis, mi sento creativo","risposta"],
-["Jarvis, che si dice?","stato"],
-["novità?","stato"],
-["dimmi come stanno andando le cose","stato"],
-["c'è qualcosa che richiede la mia attenzione?","stato"],
-["fammi un riepilogo della giornata","stato"],
-["quante pratiche abbiamo aperte?","stato"],
-["qualcosa da segnalare?","stato"],
-["report completo di tutto per favore","stato"],
-["ci sono problemi?","stato"],
-["raccontami qualche novità bella","stato"],
-["tutto ok con le foto?","stato"],
-["fammi vedere la bozza di x","anteprima"],
-["mandami il link del menu in preparazione per x","anteprima"],
-["voglio dare un'occhiata all'anteprima","anteprima"],
-["apri una pratica per il bar luna","crea_pratica"],
-["nuovo cliente: pizzeria da gigi, subito","crea_pratica"],
-["devo fare un menu per la trattoria al ponte, urgentissimo","crea_pratica"],
-["metti online il menu di x","pubblica"],
-["ricordati che x chiude il lunedì","ricorda"],
-["al bar luna il caffè costa 1,50","aggiorna_menu"],
-["togli il tiramisù dal menu di x","aggiorna_menu"],
-["cambia il colore del menu di x in verde","aggiorna_menu"],
-["ciao jarvis","risposta"],
-["come stai?","risposta"],
-["dammi un'idea per una candela","risposta"],
-["raccontami una barzelletta","risposta"],
-["che ne pensi del piano premium?","risposta"],
-["motivami","risposta"],
-["cosa posso fare oggi per far crescere renmenu?","risposta"],
-["quanto costa il piano annuale?","risposta"]
+[
+"jarvis come siamo messi con le pratiche?",
+"stato"
+],
+[
+"jarvis aggiornami sulla situazione",
+"stato"
+],
+[
+"jarvis tutto apposto?",
+"stato"
+],
+[
+"jarvis dammi buone notizie",
+"stato"
+],
+[
+"jarvis mi serve un menu per cliente 'x' in fretta",
+"crea_pratica"
+],
+[
+"jarvis mostrami anteprima di 'x'",
+"anteprima"
+],
+[
+"jarvis stupiscimi",
+"risposta"
+],
+[
+"jarvis ho bisogno di un resoconto dettagliato",
+"stato"
+],
+[
+"jarvis fammi sorridere",
+"risposta"
+],
+[
+"jarvis, mi sento creativo",
+"risposta"
+],
+[
+"Jarvis, che si dice?",
+"stato"
+],
+[
+"novità?",
+"stato"
+],
+[
+"dimmi come stanno andando le cose",
+"stato"
+],
+[
+"c'è qualcosa che richiede la mia attenzione?",
+"stato"
+],
+[
+"fammi un riepilogo della giornata",
+"stato"
+],
+[
+"quante pratiche abbiamo aperte?",
+"stato"
+],
+[
+"qualcosa da segnalare?",
+"stato"
+],
+[
+"report completo di tutto per favore",
+"stato"
+],
+[
+"ci sono problemi?",
+"stato"
+],
+[
+"raccontami qualche novità bella",
+"stato"
+],
+[
+"tutto ok con le foto?",
+"stato"
+],
+[
+"fammi vedere la bozza di x",
+"anteprima"
+],
+[
+"mandami il link del menu in preparazione per x",
+"anteprima"
+],
+[
+"voglio dare un'occhiata all'anteprima",
+"anteprima"
+],
+[
+"apri una pratica per il bar luna",
+"crea_pratica"
+],
+[
+"nuovo cliente: pizzeria da gigi, subito",
+"crea_pratica"
+],
+[
+"devo fare un menu per la trattoria al ponte, urgentissimo",
+"crea_pratica"
+],
+[
+"metti online il menu di x",
+"pubblica"
+],
+[
+"ricordati che x chiude il lunedì",
+"ricorda"
+],
+[
+"al bar luna il caffè costa 1,50",
+"aggiorna_menu"
+],
+[
+"togli il tiramisù dal menu di x",
+"aggiorna_menu"
+],
+[
+"cambia il colore del menu di x in verde",
+"aggiorna_menu"
+],
+[
+"ciao jarvis",
+"risposta"
+],
+[
+"come stai?",
+"risposta"
+],
+[
+"dammi un'idea per una candela",
+"risposta"
+],
+[
+"raccontami una barzelletta",
+"risposta"
+],
+[
+"che ne pensi del piano premium?",
+"risposta"
+],
+[
+"motivami",
+"risposta"
+],
+[
+"cosa posso fare oggi per far crescere renmenu?",
+"risposta"
+],
+[
+"quanto costa il piano annuale?",
+"risposta"
+],
+[
+"elimina la pratica di x",
+"cancella_pratica"
+],
+[
+"cancella il cliente di prova",
+"cancella_pratica"
+],
+[
+"butta via la pratica del bar luna",
+"cancella_pratica"
+],
+[
+"togli le braciole dal menu di x",
+"aggiorna_menu"
+]
 ]

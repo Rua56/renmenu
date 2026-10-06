@@ -5,6 +5,7 @@ import { notesSummary } from './notes.js';
 // controllato la bozza. Jarvis porta la pratica fino alla pubblicazione usando le stesse
 // operazioni (con gli stessi controlli) dell'interfaccia, con «jarvis» come autore nel registro.
 // Si ferma e chiede a Riccardo quando qualcosa non è chiaro; pubblica solo dopo il suo SÌ.
+import { deletionPlan } from './delete-request.js';
 import { assessReply, proposeReplyChanges, sha256Hex } from './approvals.js';
 import { sendOwnerNotification } from './owner-notifications.js';
 import { briefingDue, buildBriefing, romeDay } from './briefing.js';
@@ -485,6 +486,20 @@ export function createMissions(deps) {
         await sendTelegram(env, chat, outcome.text, null, deps.fetchImpl);
         return;
       }
+      if (verb === 'peek') {
+        const found = (await rows(db, OPEN_DRAFTS).catch(() => [])).find((d) => d.id === missionId);
+        const shown = found ? await showDraft(db, env, found) : { text: 'Quella bozza non è più aperta.' };
+        await answerCallback(env, query.id, 'Ecco la bozza', deps.fetchImpl);
+        await sendTelegram(env, chat, shown.text, null, deps.fetchImpl);
+        return;
+      }
+      if (verb === 'del' || verb === 'delc' || verb === 'delno') {
+        const outcome = verb === 'delno' ? { text: 'Va bene, non elimino niente.' } : await runDelete(db, env, verb === 'del' ? { requestId: missionId } : { clientId: missionId });
+        await answerCallback(env, query.id, verb === 'delno' ? 'Non elimino' : 'Fatto', deps.fetchImpl);
+        if (query.message?.message_id) await clearButtons(env, chat, query.message.message_id, deps.fetchImpl);
+        await sendTelegram(env, chat, outcome.text, null, deps.fetchImpl);
+        return;
+      }
       const outcome = ['pub', 'no'].includes(verb) ? await decide(db, env, missionId, verb === 'pub')
         : verb === 'att' ? await attachTelegramFile(db, env, missionId) : verb === 'attno' ? (await putSetting(db, 'tg_pending_file', ''), { text: 'Va bene, la foto non viene usata.' }) : { text: 'Comando sconosciuto.' };
       await answerCallback(env, query.id, outcome.text, deps.fetchImpl);
@@ -633,7 +648,8 @@ export function createMissions(deps) {
       const text = talk.ok ? talk.text : intent.risposta;
       if (text) { await answer(text, null, { keep: !talk.ok }); return; }
     }
-    if (intent.intent === 'stato') { await answer(await statusReport(db, env, intent.dettaglio || (/\b(dettagli\w*|complet\w*|report|resoconto|riepilogo|tutto)\b/i.test(said0) ? 'completo' : /buone\s+notizie|novit/i.test(said0) ? 'buone_notizie' : 'breve')), null, { keep: false }); return; }
+    if (intent.intent === 'cancella_pratica') { const asked = await voiceDelete(db, env, intent.locale, clues, utterance); await answer(asked.text, asked.buttons || null, { keep: asked.keep === true }); return; }
+    if (intent.intent === 'stato') { const report = await statusReport(db, env, intent.dettaglio || (/\b(dettagli\w*|complet\w*|report|resoconto|riepilogo|tutto)\b/i.test(said0) ? 'completo' : /buone\s+notizie|novit/i.test(said0) ? 'buone_notizie' : 'breve')); await answer(report.text, report.buttons || null, { keep: false }); return; }
     if (intent.intent === 'anteprima') { const shown = await voiceShowPreview(db, env, intent.locale, clues, utterance); await answer(shown.text, shown.buttons || null, { keep: shown.keep }); return; }
     if (intent.intent === 'pubblica') {
       const waiting = await rows(db, "SELECT m.id,d.menu_json,d.slug FROM jarvis_missions m JOIN drafts d ON d.id=m.draft_id WHERE m.status='attesa_si' ORDER BY m.updated_at DESC LIMIT 10");
@@ -729,8 +745,8 @@ export function createMissions(deps) {
     const english = saved.needsEnglish && (menu.lingue || []).includes('en');
     if (english) await putSetting(db, 'draft_translate', JSON.stringify({ draftId: draft.id, at: now() })).catch(() => {});
     return {
-      text: `Fatto, bozza di «${name}» aggiornata:\n${checked.ops.length ? saved.summary.split(/(?<=\.)\s+/).map((line) => `• ${line}`).join('\n') : ''}\n\nLa trovi in Revisione. La checklist si è azzerata: va riconfermata prima dell’anteprima.${paused ? ' L’anteprima che avevo già preparato non vale più: ho fermato quella pratica, e dopo la revisione me la riaffidi da «Approva e affida a Jarvis».' : ''}${english ? ' L’inglese delle voci nuove lo preparo tra un minuto.' : ''}`,
-      buttons: [['Annulla', `undo:${draft.id}`]]
+      text: `Fatto, bozza di «${name}» aggiornata:\n${checked.ops.length ? saved.summary.split(/(?<=\.)\s+/).map((line) => `• ${line}`).join('\n') : ''}\n\nLa trovi in Revisione. La checklist si è azzerata: va riconfermata prima dell’anteprima.${paused ? ' L’anteprima che avevo già preparato non vale più: ho fermato quella pratica, e dopo la revisione me la riaffidi da «Approva e affida a Jarvis».' : ''}${english ? ' L’inglese delle voci nuove lo preparo tra un minuto.' : ''}${paused ? '' : '\n\nProssimo passo: guarda la bozza, riconferma la checklist in Revisione e poi «Approva e affida a Jarvis»: l’anteprima parte da sola.'}`,
+      buttons: [['Annulla', `undo:${draft.id}`], ['Mostrami la bozza', `peek:${draft.id}`]]
     };
   }
   async function undoDraftEdit(db, env, draftId) {
@@ -809,6 +825,47 @@ export function createMissions(deps) {
   // Nuova pratica a voce: cliente (esistente o nuovo) + pratica «nuovo menu». Le foto e i PDF che
   // Riccardo manda nell'ora successiva si collegano da soli a questa pratica.
   const FOCUS_MINUTES = 60;
+  // ——— «Elimina la pratica di X»: Jarvis propone, Riccardo conferma col pulsante, poi si cancella ———
+  async function voiceDelete(db, env, spokenVenue, clues, utterance) {
+    const open = await rows(db, "SELECT r.id,r.subject,r.status,r.updated_at,c.id AS client_id,c.name FROM requests r JOIN clients c ON c.id=r.client_id WHERE r.status<>'completata' ORDER BY r.updated_at DESC LIMIT 80").catch(() => []);
+    const clients = (await rows(db, 'SELECT id,name,menu_id FROM clients ORDER BY updated_at DESC LIMIT 300').catch(() => [])).map((c) => ({ ...c, menu_id: c.menu_id || '' }));
+    let ids = [];
+    if (spokenVenue || clues.locales.length) {
+      const named = spokenVenue ? matchVenue(spokenVenue, clients) : { client: null, candidates: [] };
+      ids = named.client ? [named.client.id] : named.candidates.length ? named.candidates.map((c) => c.id) : [...new Set(clues.locales.map((c) => c.id))];
+      if (!ids.length) return { text: `Non trovo un cliente che si chiami «${spokenVenue}». Dimmi il nome esatto del locale.` };
+    } else if (open.length === 1) ids = [open[0].client_id];
+    else return { text: open.length ? `Quale pratica elimino? Ho aperte: ${open.slice(0, 8).map((r) => `«${r.name}»`).join(', ')}.` : 'Non ci sono pratiche aperte da eliminare, Riccardo.' };
+    if (ids.length > 1) return { text: `Ci sono più clienti simili: ${ids.map((id) => `«${clients.find((c) => c.id === id)?.name}»`).join(', ')}. Quale elimino?` };
+    const client = clients.find((c) => c.id === ids[0]);
+    const requests = open.filter((r) => r.client_id === client.id);
+    if (requests.length > 1) return { text: `«${client.name}» ha ${requests.length} pratiche aperte: ${requests.map((r) => `«${r.subject}»`).join(', ')}. Dimmi quale elimino, per esempio con le parole del titolo.` };
+    const target = requests[0] ? { requestId: requests[0].id } : { clientId: client.id };
+    const plan = await deletionPlan(db, { getOne, rows }, target);
+    const label = plan.request?.subject || `cliente «${client.name}»`;
+    if (!plan.ok) return { text: `Non elimino «${label}»: ${plan.blockers[0]}` };
+    const parts = [];
+    if (plan.drafts.length) { let items = 0; try { items = (JSON.parse(plan.drafts[0].menu_json).sezioni || []).reduce((t, section) => t + (section.voci || []).length, 0); } catch {} parts.push(`la bozza (versione ${plan.drafts[0].revision}${items ? `, ${items} voci` : ''})`); }
+    if (plan.materials.length) parts.push(`${plan.materials.length} ${plan.materials.length === 1 ? 'file caricato' : 'file caricati'}`);
+    const clientLine = plan.deleteClient ? `Elimino anche il cliente «${client.name}»: non ha altre pratiche né un menu online.` : (plan.clientNote || '');
+    return { text: `Vuoi che elimini «${label}»?${parts.length ? ` Cancello ${parts.join(' e ')}.` : ''} ${clientLine}\n\nNon si può annullare. Il registro delle azioni resta.`.replace(/ \n/g, '\n'),
+      buttons: [['SÌ, elimina', `${plan.request ? 'del' : 'delc'}:${plan.request?.id || client.id}`], ['No, tienila', 'delno:x']] };
+  }
+  async function runDelete(db, env, target) {
+    const plan = await deletionPlan(db, { getOne, rows }, target);
+    if (!plan.ok) return { text: `Non elimino: ${plan.blockers[0]}` };
+    const label = plan.request?.subject || `cliente «${plan.client?.name}»`;
+    try { await action(jarvisDb(db), 'deleteRequest', { ...target, confirmation: 'ELIMINA PRATICA' }, env); }
+    catch (error) { return { text: `Non sono riuscito a eliminare «${label}»: ${String(error?.message || 'errore').slice(0, 200)}` }; }
+    // Ricordi di lavoro che puntavano alla pratica eliminata.
+    const mine = (key, test) => setting(db, key).then((raw) => { try { const v = JSON.parse(raw || 'null'); return v && test(v) ? putSetting(db, key, 'null') : null; } catch { return null; } }).catch(() => null);
+    const draftIds = new Set(plan.drafts.map((d) => d.id));
+    await mine('tg_focus', (v) => v.requestId === plan.request?.id);
+    await mine('tg_checks', (v) => v.requestId === plan.request?.id);
+    await mine('draft_undo', (v) => draftIds.has(v.draftId));
+    await mine('draft_translate', (v) => draftIds.has(v.draftId));
+    return { text: `Fatto, Riccardo: ho eliminato «${label}»${plan.deleteClient && plan.request ? ` e il cliente «${plan.client.name}»` : ''}, con ${plan.materials.length} file${plan.drafts.length ? ' e la bozza' : ''}.\n\nProssimo passo: vuoi aprire una nuova pratica? Dimmi il nome del locale.` };
+  }
   // ——— Punto della situazione: scritto da dati certi del database, mai inventato dal modello ———
   const MISSION_LABEL = { affidata: 'la sto preparando io', attesa_cliente: 'anteprima inviata, aspetto la risposta del locale', attesa_invio: 'anteprima in coda per Gmail', attesa_si: 'aspetta il tuo SÌ per pubblicare', ferma: 'ferma, serve il tuo intervento', pubblicazione: 'in pubblicazione', verifica: 'in verifica dopo la pubblicazione' };
   async function statusReport(db, env, cut = 'breve') {
@@ -819,8 +876,8 @@ export function createMissions(deps) {
     // Poche interrogazioni raggruppate (il limite di richieste per messaggio è basso): missioni, bozze e file di tutte le pratiche aperte.
     const ids = new Set(reqs.map((r) => r.id));
     const firstBy = (list) => { const map = new Map(); for (const row of list) if (ids.has(row.request_id) && !map.has(row.request_id)) map.set(row.request_id, row); return map; };
-    const missionOf = firstBy(await safe(() => rows(db, "SELECT request_id,status,note FROM jarvis_missions WHERE status NOT IN ('completata','annullata') ORDER BY updated_at DESC LIMIT 200"), []));
-    const draftOf = firstBy(await safe(() => rows(db, 'SELECT request_id,status,revision FROM drafts ORDER BY created_at DESC LIMIT 300'), []));
+    const missionOf = firstBy(await safe(() => rows(db, "SELECT id,request_id,status,note FROM jarvis_missions WHERE status NOT IN ('completata','annullata') ORDER BY updated_at DESC LIMIT 200"), []));
+    const draftOf = firstBy(await safe(() => rows(db, 'SELECT id,request_id,status,revision FROM drafts ORDER BY created_at DESC LIMIT 300'), []));
     const fileRows = await safe(() => rows(db, 'SELECT request_id,processing_status AS st,COUNT(*) AS n FROM materials WHERE archived_at IS NULL GROUP BY request_id,processing_status'), []);
     const approvalOf = new Map((await safe(() => rows(db, 'SELECT request_id,snapshot_sha FROM publication_approvals'), [])).map((a) => [a.request_id, a.snapshot_sha]));
     for (const r of reqs) {
@@ -839,7 +896,7 @@ export function createMissions(deps) {
       else if (toRead) phrase = `${toRead} file da leggere su ${nFiles}`;
       else if (nFiles) phrase = `${nFiles} file letti, bozza non ancora preparata`;
       else phrase = 'in attesa di foto o PDF del menu';
-      detail.push({ name: r.client || r.subject, phrase, waitsYou: stale || mission?.status === 'attesa_si' || mission?.status === 'ferma' || (!mission && draft && ['bozza', 'revisione', 'pronta_pr'].includes(draft.status)), stuck: mission?.status === 'ferma' });
+      detail.push({ name: r.client || r.subject, missionId: mission?.id, missionStatus: mission?.status, draftId: draft?.id, draftStatus: draft?.status, stale, toRead, nFiles, phrase, waitsYou: stale || mission?.status === 'attesa_si' || mission?.status === 'ferma' || (!mission && draft && ['bozza', 'revisione', 'pronta_pr'].includes(draft.status)), stuck: mission?.status === 'ferma' });
     }
     const quotaDay = day;
     let count = null; try { count = JSON.parse(await setting(db, 'reads_day') || 'null'); } catch {}
@@ -852,6 +909,20 @@ export function createMissions(deps) {
     if (gem?.quota) problems.push('Google ha segnalato la quota esaurita, quindi leggo con i modelli di riserva');
     const waiting = detail.filter((d) => d.waitsYou);
     const word = (n, one, many) => `${n} ${n === 1 ? one : many}`;
+    // Proposta del passo successivo: una sola, la più utile, con un pulsante solo dove l'azione è sicura.
+    const next = (() => {
+      const stale = detail.find((d) => d.stale), ready = detail.find((d) => d.missionStatus === 'attesa_si' && !d.stale), stuck = detail.find((d) => d.stuck);
+      const review = detail.find((d) => !d.missionStatus && ['bozza', 'revisione', 'pronta_pr'].includes(d.draftStatus));
+      const photos = detail.find((d) => !d.missionStatus && !d.draftStatus && !d.nFiles), reading = detail.find((d) => d.toRead);
+      if (stale) return { text: `la bozza di «${stale.name}» è cambiata dopo l’anteprima: guardala, riconferma la checklist e riaffidami la pratica da «Approva e affida a Jarvis».`, buttons: stale.draftId ? [['Mostrami la bozza', `peek:${stale.draftId}`]] : null };
+      if (ready) return { text: `«${ready.name}» è pronto: se vuoi pubblicarlo tocca SÌ, altrimenti «Non ancora».`, buttons: [['SÌ, pubblica', `pub:${ready.missionId}`], ['Non ancora', `no:${ready.missionId}`]] };
+      if (stuck) return { text: `«${stuck.name}» è ferma: riaffidala dalla Control Room, oppure dimmi «elimina la pratica di ${stuck.name}».`, buttons: null };
+      if (review) return { text: `rivedi «${review.name}» in Revisione e poi «Approva e affida a Jarvis»: l’anteprima parte da sola. Vuoi guardare la bozza adesso?`, buttons: review.draftId ? [['Mostrami la bozza', `peek:${review.draftId}`]] : null };
+      if (photos) return { text: `mandami le foto o il PDF del menu di «${photos.name}».`, buttons: null };
+      if (reading) return { text: `nessuno da parte tua: sto leggendo i file di «${reading.name}».`, buttons: null };
+      return { text: 'vuoi aprire una nuova pratica? Dimmi il nome del locale.', buttons: null };
+    })();
+    const finish = (text) => ({ text: `${text}\n\nProssimo passo: ${next.text}`.slice(0, 3900), buttons: next.buttons });
     if (cut === 'buone_notizie') {
       const online = (await safe(() => getOne(db, "SELECT COUNT(*) AS n FROM clients WHERE menu_id IS NOT NULL AND menu_id<>''"), null))?.n || 0;
       const done = (await safe(() => getOne(db, "SELECT COUNT(*) AS n FROM requests WHERE status='completata' AND updated_at>=?", weekAgo), null))?.n || 0;
@@ -864,7 +935,7 @@ export function createMissions(deps) {
       if (ready.length) good.push(`${ready.map((d) => `«${d.name}»`).join(' e ')} ${ready.length === 1 ? 'è pronto e aspetta' : 'sono pronti e aspettano'} solo il tuo SÌ`);
       if (reads && !failedReads) good.push(`le ${reads} letture di foto di oggi sono andate tutte a buon fine`);
       if (!problems.length) good.push('nessun problema in vista');
-      return good.length > 1 ? `Buone notizie, Riccardo: ${good.slice(0, 5).join('; ')}.` : `Notizie clamorose non ne ho, Riccardo, ma nemmeno guai: ${good[0] || 'tutto procede con calma'}.`;
+      return finish(good.length > 1 ? `Buone notizie, Riccardo: ${good.slice(0, 5).join('; ')}.` : `Notizie clamorose non ne ho, Riccardo, ma nemmeno guai: ${good[0] || 'tutto procede con calma'}.`);
     }
     if (cut === 'completo') {
       const lines = detail.map((d) => `- ${d.name}: ${d.phrase}`);
@@ -872,14 +943,14 @@ export function createMissions(deps) {
       const dates = await safe(() => rows(db, 'SELECT name,trial_ends_at,renewal_at FROM clients WHERE (trial_ends_at IS NOT NULL AND trial_ends_at>=?) OR (renewal_at IS NOT NULL AND renewal_at>=?) ORDER BY COALESCE(trial_ends_at,renewal_at) LIMIT 6', day, day), []);
       const when = (iso) => new Intl.DateTimeFormat('it-IT', { timeZone: 'Europe/Rome', day: 'numeric', month: 'long' }).format(new Date(iso));
       const brief = dates.length ? `Prossime scadenze: ${dates.map((c) => `${c.name} (${c.trial_ends_at && c.trial_ends_at >= day ? `fine prova ${when(c.trial_ends_at)}` : `rinnovo ${when(c.renewal_at)}`})`).join('; ')}.` : 'Nessuna scadenza di prova o rinnovo in vista.';
-      return [`Resoconto completo, Riccardo.`, '', reqs.length ? `Pratiche aperte (${reqs.length}):\n${lines.join('\n')}` : 'Non ci sono pratiche aperte.',
+      return finish([`Resoconto completo, Riccardo.`, '', reqs.length ? `Pratiche aperte (${reqs.length}):\n${lines.join('\n')}` : 'Non ci sono pratiche aperte.',
         waiting.length ? `\nAspettano te: ${waiting.map((d) => `«${d.name}»`).join(', ')}.` : '\nNon aspetto nulla da te per ora.',
-        problems.length ? `\nDa tenere d’occhio: ${problems.join('; ')}.` : '\nProblemi: nessuno.', '', base, brief ? `\n${brief}` : ''].filter((x) => x !== undefined).join('\n').slice(0, 3800);
+        problems.length ? `\nDa tenere d’occhio: ${problems.join('; ')}.` : '\nProblemi: nessuno.', '', base, brief ? `\n${brief}` : ''].filter((x) => x !== undefined).join('\n').slice(0, 3500));
     }
     // breve
     const head = reqs.length ? `Hai ${word(reqs.length, 'pratica aperta', 'pratiche aperte')}: ${detail.slice(0, 4).map((d) => `«${d.name}» (${d.phrase})`).join('; ')}${detail.length > 4 ? ` e altre ${detail.length - 4}` : ''}.` : 'Non ci sono pratiche aperte.';
     const verdict = problems.length ? `Una cosa da guardare: ${problems.join('; ')}.` : waiting.length ? `Per il resto è tutto regolare: aspettano te ${waiting.map((d) => `«${d.name}»`).join(', ')}.` : 'Per il resto è tutto regolare, non aspetto nulla da te.';
-    return `${head} ${verdict}${queued ? ` File in coda di lettura: ${queued}.` : ''}`;
+    return finish(`${head} ${verdict}${queued ? ` File in coda di lettura: ${queued}.` : ''}`);
   }
   // ——— «Mostrami l’anteprima di X»: link di sola visione alla bozza (nessuna approvazione, nessuna pubblicazione) ———
   async function voiceShowPreview(db, env, spokenVenue, clues, utterance) {
@@ -898,6 +969,9 @@ export function createMissions(deps) {
       if (client) return { text: `«${client.name}» non ha bozze aperte, ma ha il menu online: https://renmenu.pages.dev/menu/?m=${encodeURIComponent(client.menu_id)}` };
       return { text: `Non trovo una bozza né un menu online per «${spokenVenue || 'quel locale'}». Dimmi il nome esatto del locale.` };
     }
+    return showDraft(db, env, draft);
+  }
+  async function showDraft(db, env, draft) {
     let menu; try { menu = JSON.parse(draft.menu_json); } catch { return { text: 'La bozza non si legge: aprila in Revisione.' }; }
     const code = `BZ-${[...crypto.getRandomValues(new Uint8Array(10))].map((b) => 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789'[b % 32]).join('')}`;
     await Promise.resolve().then(() => db.prepare("DELETE FROM jarvis_settings WHERE key LIKE 'peek\\_%' ESCAPE '\\' AND updated_at < ?").bind(new Date(Date.now() - 2 * 24 * 3600_000).toISOString()).run()).catch(() => {});
@@ -905,7 +979,7 @@ export function createMissions(deps) {
     const sections = (menu.sezioni || []).length, items = (menu.sezioni || []).reduce((t, s2) => t + (s2.voci || []).length, 0);
     const checks = await Promise.resolve().then(() => getOne(db, 'SELECT checks_json FROM drafts WHERE id=?', draft.id)).then((row) => { try { return JSON.parse(row?.checks_json || '{}') || {}; } catch { return {}; } }).catch(() => ({}));
     const origin = String(env.JARVIS_ORIGIN || 'https://renmenu-jarvis-stage.pages.dev').replace(/\/+$/, '');
-    return { text: `Ecco la bozza di «${draft.client_name || menu.nome || draft.subject}» (versione ${draft.revision}, ${items} voci in ${sections} sezioni):\n${origin}/jarvis-hook/bozza/${code}\n\nÈ solo da guardare: non è pubblicata e non è stata inviata a nessuno. Il link vale 24 ore.${['prices', 'allergens', 'languages'].every((key) => checks[key]) ? '' : ' La checklist di revisione (prezzi, allergeni, lingue) non è ancora confermata.'}`, keep: false };
+    return { text: `Ecco la bozza di «${draft.client_name || menu.nome || draft.subject}» (versione ${draft.revision}, ${items} voci in ${sections} sezioni):\n${origin}/jarvis-hook/bozza/${code}\n\nÈ solo da guardare: non è pubblicata e non è stata inviata a nessuno. Il link vale 24 ore.${['prices', 'allergens', 'languages'].every((key) => checks[key]) ? '' : ' La checklist di revisione (prezzi, allergeni, lingue) non è ancora confermata.'}\n\nProssimo passo: ${['prices', 'allergens', 'languages'].every((key) => checks[key]) ? 'è tutto confermato, quando vuoi «Approva e affida a Jarvis» e l’anteprima parte da sola.' : 'conferma prezzi, allergeni e lingue in Revisione, poi «Approva e affida a Jarvis»: l’anteprima parte da sola.'}`, keep: false };
   }
   async function voiceCreate(db, utterance, spokenVenue, urgent = false) {
     const venue = String(spokenVenue || '').replace(/^[«"“']|[»"”']$/g, '').trim();
