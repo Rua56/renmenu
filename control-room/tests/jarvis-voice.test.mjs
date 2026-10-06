@@ -85,8 +85,11 @@ const LIVE = { id: 'osteria-viva', nome: 'Osteria Viva', lingue: ['it'], sezioni
   { nome: { it: 'Bevande' }, voci: [{ nome: { it: 'Spritz Aperol' }, prezzo: '4,00' }] }] };
 const TOKEN = '123456789:AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA';
 const calls = [];
+let publicState = 'ok';
 const fakeFetch = async (url, options = {}) => {
   const href = String(url);
+  if (href.startsWith('https://renmenu.pages.dev/menus/prova.json')) return publicState === 'ok' ? Response.json({ id: 'prova', nome: 'Prova' }) : new Response('x', { status: 404 });
+  if (href.startsWith('https://renmenu.pages.dev/menu/?m=prova')) return new Response('<html></html>', { status: publicState === 'pagina' ? 500 : 200 });
   if (href.includes('/contents/menus/osteria-viva.json')) return Response.json({ type: 'file', sha: 'abc1234def', content: Buffer.from(JSON.stringify(LIVE)).toString('base64') });
   if (href.includes('/contents/menus/')) return Response.json({ message: 'Not Found' }, { status: 404 });
   if (href.startsWith('https://api.elevenlabs.io/')) { calls.push({ method: 'tts', url: href, body: JSON.parse(options.body), headers: options.headers }); return new Response(new Uint8Array(2000), { status: 200 }); }
@@ -322,10 +325,10 @@ describe('Comandi vocali di Jarvis', () => {
     } finally { globalThis.fetch = previous; db.close(); }
   });
 
-  async function pratica(db, name) {
+  async function pratica(db, name, email = null) {
     globalThis.fetch = previousFetch;
     const stamp = '2026-10-05T10:00:00.000Z';
-    await db.prepare("INSERT INTO clients (id,name,email,plan,menu_id,internal_notes,revision,created_at,updated_at) VALUES ('cx',?,NULL,'standard','','',1,?,?)").bind(name, stamp, stamp).run();
+    await db.prepare("INSERT INTO clients (id,name,email,plan,menu_id,internal_notes,revision,created_at,updated_at) VALUES ('cx',?,?,'standard','','',1,?,?)").bind(name, email, stamp, stamp).run();
     const made = await action(db, 'createRequest', { clientId: 'cx', subject: `Nuovo menu Standard · ${name}`, sourceChannel: 'altro', sourceText: SOURCE.replace('Trattoria Nuova', name), kind: 'nuovo', plan: 'standard', category: 'nuovo_standard' });
     const requestId = made.body.id || made.body.result?.id || made.body.data?.id;
     await action(db, 'generateDraft', { requestId });
@@ -431,6 +434,92 @@ describe('Comandi vocali di Jarvis', () => {
       // già affidata: il riepilogo lo dice e non offre pulsanti
       await missions.telegramUpdate(db, env, { callback_query: { id: 'a3', data: `affq:${draft.id}`, message: { chat: { id: 42 }, message_id: 7 } } });
       assert.match(calls.at(-1).body.text, /sta già seguendo/);
+    } finally { globalThis.fetch = previous; db.close(); }
+  });
+
+  it('controllo dopo la pubblicazione: tace se va tutto bene, avvisa solo al secondo controllo fallito', async () => {
+    const db = database();
+    const previous = globalThis.fetch;
+    globalThis.fetch = fakeFetch;
+    try {
+      calls.length = 0;
+      await missions.putSetting(db, 'telegram_chat_id', '42');
+      const env = testEnv(db, { TELEGRAM_BOT_TOKEN: TOKEN });
+      const set = (patch = {}) => missions.putSetting(db, 'watch_m1', JSON.stringify({ requestId: null, slug: 'prova', name: 'Prova', url: 'https://renmenu.pages.dev/menu/?m=prova', sha: null, step: 0, fails: 0, next: '2026-01-01T00:00:00.000Z', ...patch }));
+      const read = async () => JSON.parse((await db.prepare("SELECT value FROM jarvis_settings WHERE key='watch_m1'").bind().first())?.value || 'null');
+      await set();
+      publicState = 'ok';
+      await missions.watchTick(db, env);
+      assert.equal(calls.filter((c) => c.method === 'sendMessage').length, 0, 'va tutto bene: silenzio');
+      const first = await read();
+      assert.equal(first.step, 1); assert.ok(first.sha, 'baseline registrata');
+      assert.ok(Date.parse(first.next) > Date.now() + 40 * 3600_000, 'prossimo controllo fra circa 2 giorni');
+      // problema: il primo fallimento riprova dopo 10 minuti senza disturbare
+      publicState = 'rotto';
+      await set({ sha: first.sha });
+      await missions.watchTick(db, env);
+      assert.equal(calls.filter((c) => c.method === 'sendMessage').length, 0);
+      assert.equal((await read()).fails, 1);
+      await set({ sha: first.sha, fails: 1 });
+      await missions.watchTick(db, env);
+      const alert = calls.filter((c) => c.method === 'sendMessage').at(-1)?.body.text || '';
+      assert.match(alert, /Attenzione, Riccardo: controllando «Prova»/);
+      assert.match(alert, /Non tocco niente/);
+      // l'ultimo controllo andato bene chiude la sorveglianza
+      publicState = 'ok';
+      await set({ step: 2, sha: first.sha === null ? undefined : first.sha });
+      await missions.watchTick(db, env);
+      assert.equal(await read(), null);
+    } finally { publicState = 'ok'; globalThis.fetch = previous; db.close(); }
+  });
+
+  it('giro mattutino: propone il promemoria con il testo, lo manda in coda solo al tocco e lo segnala quando è inviato', async () => {
+    const db = database();
+    const previous = globalThis.fetch;
+    globalThis.fetch = fakeFetch;
+    try {
+      calls.length = 0;
+      await pratica(db, 'Pizzeria Sole', 'sole@example.com');
+      await missions.putSetting(db, 'telegram_chat_id', '42');
+      const env = testEnv(db, { TELEGRAM_BOT_TOKEN: TOKEN });
+      const draft = await db.prepare('SELECT id,revision FROM drafts').bind().first();
+      await missions.entrust(db, env, { draftId: draft.id, revision: draft.revision, confirmation: 'AFFIDO A JARVIS' });
+      assert.equal((await db.prepare('SELECT status FROM jarvis_missions').bind().first()).status, 'attesa_invio');
+      await db.prepare("UPDATE jarvis_outbox SET status='inviata',sent_at='2026-10-02T08:00:00.000Z'").bind().run();
+      await missions.tick(db, env);
+      assert.equal((await db.prepare('SELECT status FROM jarvis_missions').bind().first()).status, 'attesa_cliente');
+      const days = (n) => new Date(Date.now() - n * 86_400_000).toISOString();
+      // dopo 1 giorno niente da proporre
+      await db.prepare('UPDATE publication_approvals SET sent_at=?').bind(days(1)).run();
+      calls.length = 0;
+      await missions.briefing(db, env, { force: true });
+      assert.ok(!calls.some((c) => c.method === 'sendMessage' && /Da decidere stamattina/.test(c.body.text || '')));
+      // dopo 4 giorni propone il promemoria, con il testo
+      await db.prepare('UPDATE publication_approvals SET sent_at=?').bind(days(4)).run();
+      calls.length = 0;
+      await missions.briefing(db, env, { force: true });
+      const proposal = calls.filter((c) => c.method === 'sendMessage').map((c) => c.body).find((b) => /Da decidere stamattina/.test(b.text));
+      assert.match(proposal.text, /«Pizzeria Sole» non ha risposto all’anteprima da 4 giorni/);
+      assert.match(proposal.text, /Lo mando solo se tocchi il pulsante/);
+      const mission = await db.prepare('SELECT id FROM jarvis_missions').bind().first();
+      assert.ok(JSON.stringify(proposal.reply_markup).includes(`soll:${mission.id}`));
+      assert.equal((await db.prepare("SELECT COUNT(*) n FROM jarvis_outbox WHERE subject LIKE 'Promemoria:%'").bind().first()).n, 0, 'niente in coda prima del tocco');
+      // lo stesso giorno non lo ripropone
+      calls.length = 0;
+      await missions.briefing(db, env, { force: true });
+      assert.ok(!calls.some((c) => c.method === 'sendMessage' && /non ha risposto all’anteprima/.test(c.body.text || '')));
+      // il tocco lo mette in coda
+      await missions.telegramUpdate(db, env, { callback_query: { id: 's1', data: `soll:${mission.id}`, message: { chat: { id: 42 }, message_id: 9 } } });
+      assert.match(calls.at(-1).body.text, /il promemoria per «Pizzeria Sole» è in coda/);
+      const queued = await db.prepare("SELECT recipient,subject,body,status FROM jarvis_outbox WHERE subject LIKE 'Promemoria:%'").bind().first();
+      assert.equal(queued.recipient, 'sole@example.com'); assert.equal(queued.status, 'in_coda');
+      assert.match(queued.body, /Riferimento anteprima: RM-/);
+      assert.equal((await db.prepare('SELECT status FROM jarvis_missions').bind().first()).status, 'attesa_invio');
+      // inviato da Gmail: torna in attesa del locale e lo dice
+      await db.prepare("UPDATE jarvis_outbox SET status='inviata' WHERE subject LIKE 'Promemoria:%'").bind().run();
+      await missions.tick(db, env);
+      assert.equal((await db.prepare('SELECT status FROM jarvis_missions').bind().first()).status, 'attesa_cliente');
+      assert.match(calls.at(-1).body.text, /Promemoria inviato a «Pizzeria Sole»/);
     } finally { globalThis.fetch = previous; db.close(); }
   });
 });
