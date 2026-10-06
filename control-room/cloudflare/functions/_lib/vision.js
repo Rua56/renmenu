@@ -217,7 +217,7 @@ export function combineReadings(first, second, third = '') {
         lines.push(`# ${s.name}`);
         if (s.prezzo || other?.prezzo) doubts.push(`${DOUBT} Prezzo del percorso «${s.name}»: letto ${s.prezzo || 'nessun prezzo'}${other ? `, seconda lettura ${other.prezzo || 'nessun prezzo'}` : ', percorso non trovato nella seconda lettura'}`);
       }
-    } else if (s.name !== 'Dal materiale ricevuto') lines.push(`# ${s.name}`);
+    } else if (!/^(?:piatti|dal materiale ricevuto)$/i.test(s.name)) lines.push(`# ${s.name}`);
   };
   // Titolo di pagina senza voci («Mescita — by the glass»): letto da entrambe → resta, serve a capire i prezzi.
   for (const title of A.titles) if (single || B.titles.some((t) => /mescita|glass|calice|bicchiere/i.test(t))) { lines.push(`# ${title}`); break; }

@@ -273,7 +273,7 @@ describe('Control Room API staging', () => {
       assert.equal(archived.body.state.requests.find((item) => item.id === requestId).status, 'in_revisione');
     } finally { db.close(); }
   });
-  it('menu senza sezioni su più foto: un elenco senza titolo nell’ordine di invio, i piatti non finiscono nei dolci', async () => {
+  it('menu senza sezioni su più foto: una sola sezione «Piatti» nell’ordine di invio, i piatti non finiscono nei dolci', async () => {
     const db = database();
     try {
       const clientId = (await action(db, 'createClient', { name: 'La Chincaglieria Gastronomica' })).body.result.id;
@@ -289,8 +289,7 @@ describe('Control Room API staging', () => {
           .bind(`an-${i}`, `mat-${i}`, requestId, 'x'.repeat(64), text, '[]', '[]', 'needs_review', readAt[i]).run();
       }
       const draft = (await action(db, 'generateDraft', { requestId })).body.state.drafts[0];
-      assert.deepEqual(draft.menu.sezioni.map((x) => x.nome.it), ['Dal materiale ricevuto', 'Dolci']);
-      assert.equal(draft.menu.sezioni[0].senzaTitolo, true);
+      assert.deepEqual(draft.menu.sezioni.map((x) => x.nome.it), ['Piatti', 'Dolci']);
       assert.equal(draft.menu.sezioni[0].voci.length, 19);
       assert.match(draft.menu.sezioni[0].voci[0].nome.it, /Prosciutto|TAGLIERE/i);
       assert.equal(draft.menu.sezioni[1].voci.length, 5);
