@@ -1,0 +1,16 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://renmenu.pages.dev/control-room/schemas/client_message_draft",
+  "title": "client_message_draft",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["channel", "purpose", "message", "variables_used", "requires_approval", "warnings"],
+  "properties": {
+    "channel": { "enum": ["email", "whatsapp", "telefono", "in_app"] },
+    "purpose": { "type": "string", "maxLength": 300 },
+    "message": { "type": "string", "maxLength": 5000 },
+    "variables_used": { "type": "array", "items": { "type": "string" } },
+    "requires_approval": { "const": true },
+    "warnings": { "type": "array", "items": { "type": "string" } }
+  }
+}

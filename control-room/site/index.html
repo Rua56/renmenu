@@ -1,0 +1,55 @@
+<!doctype html>
+<html lang="it" data-theme="dark">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <meta name="theme-color" content="#0c0a0d">
+  <meta name="description" content="RenMenu Control Room — demo operativa privata">
+  <title>J.A.R.V.I.S. · RenMenu</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,500;9..144,600&family=Instrument+Sans:wght@400;500;600;700&family=JetBrains+Mono:wght@500;600&display=swap">
+  <link rel="stylesheet" href="./styles.css">
+</head>
+<body>
+  <a class="skip-link" href="#main-content">Vai al contenuto</a>
+  <div class="app-shell" id="app">
+    <header class="topbar">
+      <a class="brand" href="#command" aria-label="RenMenu Control Room, Command Center">
+        <span class="brand-mark" aria-hidden="true"><i></i><b>J</b></span>
+        <span class="brand-copy"><strong>J.A.R.V.I.S.</strong><small>RENMENU · CONTROL ROOM</small></span>
+      </a>
+      <div class="topbar-actions">
+        <span class="mode-badge" id="mode-badge" role="status" aria-live="polite">Caricamento</span>
+        <button class="icon-button" id="theme-toggle" type="button" aria-label="Attiva tema chiaro" title="Cambia tema">◐</button>
+      </div>
+    </header>
+    <aside class="sidebar" aria-label="Navigazione principale"><nav id="primary-nav"></nav></aside>
+    <main id="main-content" class="main-content" tabindex="-1">
+      <section id="view" aria-label="Area di lavoro"><p class="loading">Apertura Control Room…</p></section>
+    </main>
+    <nav class="bottom-nav" id="bottom-nav" aria-label="Navigazione rapida mobile"></nav>
+  </div>
+  <div id="toast-region" class="toast-region" aria-live="polite" aria-atomic="true"></div>
+  <dialog id="confirm-dialog" class="confirm-dialog" aria-labelledby="confirm-title">
+    <form method="dialog" id="confirm-form">
+      <p class="eyebrow">CONFERMA RICHIESTA</p><h2 id="confirm-title">Conferma</h2>
+      <p id="confirm-copy"></p>
+      <label id="confirm-input-wrap" class="field">Frase di conferma<input id="confirm-input" autocomplete="off" spellcheck="false"></label>
+      <menu><button class="button secondary" value="cancel">Annulla</button><button class="button danger" id="confirm-submit" value="confirm">Conferma simulazione</button></menu>
+    </form>
+  </dialog>
+  <dialog id="material-viewer" class="material-viewer" aria-labelledby="material-viewer-title" aria-describedby="material-viewer-meta">
+    <section class="material-viewer-shell">
+      <header class="material-viewer-header"><div><p class="eyebrow">FONTE PRIVATA</p><h2 id="material-viewer-title">Materiale</h2><p id="material-viewer-meta" class="muted"></p></div><button id="material-viewer-close" class="icon-button" type="button" data-action="close-material-viewer" aria-label="Chiudi viewer privato">×</button></header>
+      <div class="material-compare-grid">
+        <div id="material-viewer-content" class="material-viewer-content" aria-live="polite"></div>
+        <aside id="material-viewer-comparison" class="material-viewer-comparison" aria-label="Bozza a confronto"></aside>
+      </div>
+      <footer class="material-viewer-actions"><div id="material-viewer-zoom" class="button-row" hidden><button class="button secondary small-button" type="button" data-action="material-zoom-out" aria-label="Riduci zoom immagine">−</button><output id="material-viewer-zoom-label">100%</output><button class="button secondary small-button" type="button" data-action="material-zoom-in" aria-label="Aumenta zoom immagine">+</button></div><div class="button-row"><a id="material-viewer-external" class="button secondary small-button" target="_blank" rel="noopener" hidden>Apri Blob in scheda</a><button class="button secondary small-button" type="button" data-action="close-material-viewer">Chiudi</button></div></footer>
+    </section>
+  </dialog>
+  <noscript><p class="noscript">Per usare RenMenu Control Room occorre abilitare JavaScript.</p></noscript>
+  <script type="module" src="./app.js"></script>
+</body>
+</html>

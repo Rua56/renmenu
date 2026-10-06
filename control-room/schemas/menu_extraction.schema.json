@@ -1,0 +1,38 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://renmenu.pages.dev/control-room/schemas/menu_extraction",
+  "title": "menu_extraction",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["locale_name", "subtitle", "languages_detected", "sections", "contact_data", "hours", "source_references", "uncertain_fields", "missing_fields", "warnings"],
+  "properties": {
+    "locale_name": { "type": ["string", "null"] },
+    "subtitle": { "type": ["string", "null"] },
+    "languages_detected": { "type": "array", "items": { "type": "string", "pattern": "^[a-z]{2}$" } },
+    "sections": {
+      "type": "array", "items": { "type": "object", "additionalProperties": false,
+        "required": ["name", "items", "source_reference"],
+        "properties": {
+          "name": { "type": "string" }, "source_reference": { "type": ["string", "null"] },
+          "items": { "type": "array", "items": { "type": "object", "additionalProperties": false,
+            "required": ["name", "price", "description", "source_reference", "confidence"],
+            "properties": {
+              "name": { "type": "string" }, "price": { "type": ["string", "null"] },
+              "description": { "type": ["string", "null"] }, "source_reference": { "type": ["string", "null"] },
+              "confidence": { "type": "number", "minimum": 0, "maximum": 1 }
+            }
+          } }
+        }
+      }
+    },
+    "contact_data": { "type": "object", "additionalProperties": false,
+      "required": ["phone", "email", "address"],
+      "properties": { "phone": { "type": ["string", "null"] }, "email": { "type": ["string", "null"] }, "address": { "type": ["string", "null"] } }
+    },
+    "hours": { "type": ["string", "null"] },
+    "source_references": { "type": "array", "items": { "type": "string" } },
+    "uncertain_fields": { "type": "array", "items": { "type": "string" } },
+    "missing_fields": { "type": "array", "items": { "type": "string" } },
+    "warnings": { "type": "array", "items": { "type": "string" } }
+  }
+}
