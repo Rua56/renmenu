@@ -139,3 +139,17 @@ test('frase d’apertura Premium: solo con parole dette, solo in un menu Premium
   assert.match(validateOps([{ tipo: 'motto', nome: 'Il miglior locale del mondo' }], premium, said).problems[0], /non corrisponde/);
   assert.match(validateOps([{ tipo: 'motto', nome: 'Nel cuore del Collio' }], menu(), said).problems[0], /non è Premium/);
 });
+
+test('aspetto Premium: direzione e colori solo se scritti nella frase', () => {
+  const premium = { ...menu(), premium: { direzione: 'editoriale', caratteri: 'classico', colori: { fondo: '#f6f1e7', testo: '#1f1b16', accento: '#8a5a2b', secondario: '#2a3b30' }, logo: 'https://x.test/l.png' } };
+  const said = 'usa il bistrot con fondo #faf6ee accento #4a6b22 secondario #f4dfd9';
+  const ok = validateOps([{ tipo: 'aspetto', direzione: 'bistrot', colori: { fondo: '#FAF6EE', accento: '#4a6b22', secondario: '#f4dfd9' } }], premium, said);
+  assert.deepEqual(ok.problems, []);
+  const out = applyOps(premium, [], ok.ops, 'R').menu.premium;
+  assert.equal(out.direzione, 'bistrot'); assert.equal(out.caratteri, 'artigianale');
+  assert.deepEqual(out.colori, { fondo: '#faf6ee', testo: '#2a211b', accento: '#4a6b22', secondario: '#f4dfd9' });
+  assert.equal(out.logo, 'https://x.test/l.png');
+  assert.match(validateOps([{ tipo: 'aspetto', colori: { accento: '#112233' } }], premium, said).problems[0], /non ho letto il colore #112233/);
+  assert.match(validateOps([{ tipo: 'aspetto', direzione: 'barocco' }], premium, said).problems[0], /direzione/);
+  assert.match(validateOps([{ tipo: 'aspetto', direzione: 'bistrot' }], menu(), said).problems[0], /non è Premium/);
+});
