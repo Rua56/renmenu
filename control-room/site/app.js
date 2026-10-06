@@ -10,10 +10,12 @@ import { resetDemoState } from './demo-store.js';
 
 // Navigazione semplice: prima le cose di tutti i giorni, poi gli strumenti, poi il sistema.
 const navItems = [
-  ['command', '◉', 'Jarvis', 'Ogni giorno'], ['revisione', '✓', 'Revisione', 'Ogni giorno'], ['richieste', '✉', 'Richieste', 'Ogni giorno'], ['clienti', '◆', 'Clienti', 'Ogni giorno'],
-  ['approvazioni', '★', 'Approvazioni', 'Strumenti'], ['builder', '✎', 'Builder', 'Strumenti'], ['materiali', '▤', 'Materiali', 'Strumenti'], ['anteprima', '▢', 'Anteprima', 'Strumenti'],
-  ['notifiche', '◔', 'Notifiche', 'Sistema'], ['registro', '≡', 'Registro', 'Sistema'], ['voce', '◖', 'Voce (browser)', 'Sistema']
+  ['command', '◉', 'Oggi', 'Principale'], ['clienti', '◆', 'Locali', 'Principale'], ['sistema', '☰', 'Sistema', 'Principale'],
+  ['revisione', '✓', 'Revisione', 'Strumenti'], ['richieste', '✉', 'Richieste', 'Strumenti'], ['approvazioni', '★', 'Approvazioni', 'Strumenti'], ['builder', '✎', 'Builder', 'Strumenti'],
+  ['materiali', '▤', 'Materiali', 'Strumenti'], ['anteprima', '▢', 'Anteprima', 'Strumenti'], ['notifiche', '◔', 'Notifiche', 'Sistema'], ['registro', '≡', 'Registro', 'Sistema'], ['voce', '◖', 'Voce (browser)', 'Sistema'],
+  ['pratica', '◉', 'Pratica', 'Nascoste'], ['pratiche', '◉', 'Tutte le pratiche', 'Nascoste'], ['modifica', '✎', 'Modifica a mano', 'Nascoste']
 ];
+const MAIN_TABS = ['command', 'clienti', 'sistema'];
 const validViews = new Set(navItems.map(([id]) => id));
 const $ = (selector, root = document) => root.querySelector(selector);
 const escapeHtml = (value) => String(value ?? '').replace(/[&<>'"]/g, (character) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', "'": '&#39;', '"': '&quot;' }[character]));
@@ -289,17 +291,18 @@ function initializeTheme() {
 function navCount(id) {
   if (!state) return 0;
   if (id === 'revisione') return state.drafts.filter((draft) => ['bozza', 'revisione'].includes(draft.status) && !['completata', 'archiviata', 'chiusa'].includes(requestById(draft.requestId)?.status) && !['affidata', 'attesa_invio', 'attesa_cliente', 'attesa_si', 'pubblicazione', 'verifica'].includes(missionFor(draft)?.status)).length;
+  if (id === 'command') return allPratiche().filter((info) => info.group === 'decidere').length;
   if (id === 'richieste') return state.requests.filter((request) => request.status === 'nuova').length;
   if (id === 'notifiche') return state.notifications.filter((item) => !item.readAt && /^Jarvis · /.test(item.subject || '')).length;
   return 0;
 }
 function renderNavigation() {
   const hint = (id) => { const n = navCount(id); return n ? `<span class="nav-hint" aria-label="${n} da vedere">${n}</span>` : ''; };
-  const nav = navItems.map(([id, number, label, group], index) => `${index === 0 || navItems[index - 1][3] !== group ? `<p class="nav-group">${group}</p>` : ''}<a class="nav-link" href="#${id}" aria-current="${activeView === id ? 'page' : 'false'}"><span class="nav-icon" aria-hidden="true">${number}</span><span>${label}</span>${hint(id)}</a>`).join('');
-  primaryNav.innerHTML = nav;
-  const mobilePrimary = navItems.slice(0, 4).map(([id, number, label]) => `<a class="nav-link" href="#${id}" aria-current="${activeView === id ? 'page' : 'false'}"><span class="nav-icon">${number}</span><span>${label}</span></a>`).join('');
-  const extra = navItems.slice(4).map(([id, number, label]) => `<a class="nav-link" href="#${id}" aria-current="${activeView === id ? 'page' : 'false'}"><span class="nav-icon">${number}</span><span>${label}</span></a>`).join('');
-  bottomNav.innerHTML = `${mobilePrimary}<button class="nav-link" type="button" data-action="toggle-mobile-menu" aria-expanded="${mobileMenuOpen}"><span class="nav-icon">••</span><span>Altro</span></button>${mobileMenuOpen ? `<div class="mobile-nav-menu" aria-label="Altre sezioni">${extra}</div>` : ''}`;
+  const tab = activeTab();
+  const link = ([id, number, label]) => `<a class="nav-link" href="#${id}" aria-current="${tab === id ? 'page' : 'false'}"><span class="nav-icon" aria-hidden="true">${number}</span><span>${label}</span>${hint(id)}</a>`;
+  const main = navItems.filter(([id]) => MAIN_TABS.includes(id));
+  primaryNav.innerHTML = main.map(link).join('');
+  bottomNav.innerHTML = main.map(link).join('');
 }
 function renderUnavailable() {
   modeBadge.textContent = 'NON DISPONIBILE';
@@ -339,7 +342,7 @@ function jarvisPanel() {
   const row = (item) => `<div class="list-row"><div class="list-main"><strong>${escapeHtml(item.subject)}</strong><small>${escapeHtml(item.body)}</small><small>${time(item.createdAt)}</small></div><div class="button-row"><button class="mini-button" type="button" data-select-request="${escapeHtml(item.requestId || '')}" data-route="${item.subject.includes('bozza pronta') ? 'revisione' : 'richieste'}">Apri</button><button class="mini-button" type="button" data-action="mark-notification" data-notification-id="${escapeHtml(item.id)}" data-read="true">Fatto</button></div></div>`;
   return `<section class="panel spaced-top-small"><p class="eyebrow">JARVIS</p>${autopilotRunning ? '<p class="notice">Jarvis sta preparando le nuove richieste…</p>' : ''}<div class="list">${notes.map(row).join('')}</div>${telegram}</section>`;
 }
-function renderCommand() {
+function commandDetails() {
   const open = state.requests.filter((request) => !['completata', 'archiviata', 'chiusa'].includes(request.status)).length;
   const newRequests = state.requests.filter((request) => request.status === 'nuova').length;
   const drafts = state.drafts.filter((draft) => ['bozza', 'revisione'].includes(draft.status)).length;
@@ -364,7 +367,7 @@ function renderCommand() {
     ['Rinnovi', renewalDates.length ? renewals : '—', 'clienti', renewalDates.length ? 'entro 30 giorni' : 'nessuna scadenza disponibile'],
     ['Aggiornamenti oggi', updatesToday, 'richieste', 'dati con data odierna']
   ];
-  return `<div class="view-wrap">${jarvisHero()}${demoNotice()}${jarvisPanel()}<details class="details-more"><summary>Tutti i numeri e i dettagli</summary><div class="kpis command-kpis">${metrics.map(([label, value, route, note]) => `<button class="kpi" type="button" data-route="${route}" aria-label="${label}: ${value}"><span>${label}</span><strong>${value}</strong><small>${note}</small></button>`).join('')}</div>${tasks[0] ? `<div class="next-action"><span class="eyebrow">PROSSIMA AZIONE CONSIGLIATA</span><strong>${escapeHtml(tasks[0].label)} · ${escapeHtml(tasks[0].request.subject)}</strong><button class="button secondary small-button" type="button" data-select-request="${tasks[0].request.id}" data-route="${tasks[0].request.status === 'in_attesa' ? 'builder' : 'revisione'}">Apri priorità</button></div>` : ''}<div class="grid grid-command"><section class="panel"><div class="panel-heading"><div><p class="eyebrow">CODA DI LAVORO</p><h2>Task attivi</h2></div><span class="capsule">${tasks.length} priorità</span></div><div class="task-list">${tasks.length ? tasks.map((task, index) => `<button class="task-card" type="button" data-select-request="${task.request.id}" data-route="${task.request.status === 'in_attesa' ? 'builder' : 'revisione'}"><span class="task-index">0${index + 1}</span><span class="task-body"><strong>${escapeHtml(task.label)}</strong><small>${escapeHtml(task.request.subject)} · ${escapeHtml(task.detail)}</small></span>${status(task.request.status)}</button>`).join('') : empty('Nessuna priorità aperta.')}</div></section><aside class="panel"><p class="eyebrow">SEGNALI</p><h2>Stato di controllo</h2><div class="stack"><div class="list-row"><div class="list-main"><strong>Fonti tracciate</strong><small>Ogni prezzo estratto mostra una riga o “nessuna fonte”.</small></div><span class="status good">attivo</span></div><div class="list-row"><div class="list-main"><strong>Azioni esterne</strong><small>PR, pubblicazione e messaggi restano simulati.</small></div><span class="status info">manuale</span></div><div class="list-row"><div class="list-main"><strong>Avvisi menu</strong><small>${warnings} avvisi tecnici/editoriali da rivedere.</small></div><span class="status wait">vincolata</span></div></div><div class="button-row spaced-top"><button class="button secondary" type="button" data-route="notifiche">Email proprietario</button><button class="button secondary" type="button" data-route="registro">Apri registro</button><button class="button secondary" type="button" data-route="voce">Testa voce</button>${isDemoMode ? '<button class="button secondary" type="button" data-action="reset-demo">Ripristina demo</button>' : ''}</div></aside></div><div class="spaced-top">${ownerEmailCard()}</div><section class="panel spaced-top" aria-labelledby="gmail-intake-title"><div class="panel-heading"><div><p class="eyebrow">EMAIL IN ARRIVO</p><h2 id="gmail-intake-title">Casella business RenMenu</h2></div><span class="capsule">unico monitor Gmail</span></div><p class="muted">Le richieste pertinenti dalla Inbox di renmenu1569@gmail.com vengono registrate come pratiche private in questa Control Room, non più nel precedente Jarvis. Le email non pertinenti non diventano pratiche. Nessuna risposta automatica, cancellazione o pubblicazione; gli allegati restano da verificare nella casella originale e il primo evento reale va collaudato.</p><div class="stack">${gmailRequests.length ? gmailRequests.slice(0, 5).map((request) => `<div class="list-row"><div class="list-main"><strong>${escapeHtml(request.subject)}</strong><small>${request.id.includes('synthetic') ? 'Collaudo fittizio · ' : ''}${time(request.createdAt)} · ${escapeHtml(request.id)}</small></div><div class="list-meta">${status(request.status)}<button class="button secondary small-button" type="button" data-select-request="${escapeHtml(request.id)}" data-route="richieste">Apri pratica</button></div></div>`).join('') : empty('Nessuna richiesta Gmail importata. Il monitor non recupera automaticamente la posta pregressa.')}</div><p class="muted">Le email originali restano in Gmail finché il relativo menù non è online e disponibile e Riccardo non ne autorizza la rimozione.</p></section></details></div>`;
+  return `<div class="kpis command-kpis">${metrics.map(([label, value, route, note]) => `<button class="kpi" type="button" data-route="${route}" aria-label="${label}: ${value}"><span>${label}</span><strong>${value}</strong><small>${note}</small></button>`).join('')}</div>${tasks[0] ? `<div class="next-action"><span class="eyebrow">PROSSIMA AZIONE CONSIGLIATA</span><strong>${escapeHtml(tasks[0].label)} · ${escapeHtml(tasks[0].request.subject)}</strong><button class="button secondary small-button" type="button" data-select-request="${tasks[0].request.id}" data-route="${tasks[0].request.status === 'in_attesa' ? 'builder' : 'revisione'}">Apri priorità</button></div>` : ''}<div class="grid grid-command"><section class="panel"><div class="panel-heading"><div><p class="eyebrow">CODA DI LAVORO</p><h2>Task attivi</h2></div><span class="capsule">${tasks.length} priorità</span></div><div class="task-list">${tasks.length ? tasks.map((task, index) => `<button class="task-card" type="button" data-select-request="${task.request.id}" data-route="${task.request.status === 'in_attesa' ? 'builder' : 'revisione'}"><span class="task-index">0${index + 1}</span><span class="task-body"><strong>${escapeHtml(task.label)}</strong><small>${escapeHtml(task.request.subject)} · ${escapeHtml(task.detail)}</small></span>${status(task.request.status)}</button>`).join('') : empty('Nessuna priorità aperta.')}</div></section><aside class="panel"><p class="eyebrow">SEGNALI</p><h2>Stato di controllo</h2><div class="stack"><div class="list-row"><div class="list-main"><strong>Fonti tracciate</strong><small>Ogni prezzo estratto mostra una riga o “nessuna fonte”.</small></div><span class="status good">attivo</span></div><div class="list-row"><div class="list-main"><strong>Azioni esterne</strong><small>PR, pubblicazione e messaggi restano simulati.</small></div><span class="status info">manuale</span></div><div class="list-row"><div class="list-main"><strong>Avvisi menu</strong><small>${warnings} avvisi tecnici/editoriali da rivedere.</small></div><span class="status wait">vincolata</span></div></div><div class="button-row spaced-top"><button class="button secondary" type="button" data-route="notifiche">Email proprietario</button><button class="button secondary" type="button" data-route="registro">Apri registro</button><button class="button secondary" type="button" data-route="voce">Testa voce</button>${isDemoMode ? '<button class="button secondary" type="button" data-action="reset-demo">Ripristina demo</button>' : ''}</div></aside></div><div class="spaced-top">${ownerEmailCard()}</div><section class="panel spaced-top" aria-labelledby="gmail-intake-title"><div class="panel-heading"><div><p class="eyebrow">EMAIL IN ARRIVO</p><h2 id="gmail-intake-title">Casella business RenMenu</h2></div><span class="capsule">unico monitor Gmail</span></div><p class="muted">Le richieste pertinenti dalla Inbox di renmenu1569@gmail.com vengono registrate come pratiche private in questa Control Room, non più nel precedente Jarvis. Le email non pertinenti non diventano pratiche. Nessuna risposta automatica, cancellazione o pubblicazione; gli allegati restano da verificare nella casella originale e il primo evento reale va collaudato.</p><div class="stack">${gmailRequests.length ? gmailRequests.slice(0, 5).map((request) => `<div class="list-row"><div class="list-main"><strong>${escapeHtml(request.subject)}</strong><small>${request.id.includes('synthetic') ? 'Collaudo fittizio · ' : ''}${time(request.createdAt)} · ${escapeHtml(request.id)}</small></div><div class="list-meta">${status(request.status)}<button class="button secondary small-button" type="button" data-select-request="${escapeHtml(request.id)}" data-route="richieste">Apri pratica</button></div></div>`).join('') : empty('Nessuna richiesta Gmail importata. Il monitor non recupera automaticamente la posta pregressa.')}</div><p class="muted">Le email originali restano in Gmail finché il relativo menù non è online e disponibile e Riccardo non ne autorizza la rimozione.</p></section>`;
 }
 
 // Cuore di Jarvis: saluto, una frase sullo stato e i pochi gesti che servono adesso.
@@ -384,8 +387,7 @@ function jarvisHero() {
   if (active) parts.push(`sto seguendo <strong>${active}</strong> ${active === 1 ? 'pratica' : 'pratiche'}`);
   const says = parts.length ? `${parts.join(', ')}.` : 'Tutto in ordine: nessuna decisione in sospeso. Puoi scrivermi o mandarmi un vocale su Telegram.';
   const tile = (route, label, value, note, hot = false) => `<button class="jarvis-action${hot && value ? ' hot' : ''}" type="button" data-route="${route}"><small>${label}</small><strong>${value}</strong><span>${note}</span></button>`;
-  return `<section class="jarvis-hero" aria-label="Jarvis"><div class="reactor${autopilotRunning || active ? ' busy' : ''}" aria-hidden="true"><span class="r1"></span><span class="r2"></span><span class="r3"></span><span class="core">J</span></div><div><p class="eyebrow">J.A.R.V.I.S. · ${autopilotRunning ? 'AL LAVORO' : 'IN ASCOLTO'}</p><h1>${greeting}, Riccardo.</h1><p class="jarvis-says">${says}</p></div></section>
-<div class="jarvis-actions">${tile('revisione', 'Da controllare', review, review ? 'Apri la Revisione' : 'Nessuna bozza in attesa', true)}${tile('approvazioni', 'Aspettano il SÌ', waitingYes, waitingYes ? 'Conferma su Telegram o qui' : 'Niente da pubblicare', true)}${tile('richieste', 'Nuove richieste', fresh, fresh ? 'Le preparo io' : 'Nessuna in arrivo')}${tile('clienti', 'Menu online', online, 'Locali attivi')}</div>`;
+  return `<section class="jarvis-hero" aria-label="Jarvis"><div class="reactor${autopilotRunning || active ? ' busy' : ''}" aria-hidden="true"><span class="r1"></span><span class="r2"></span><span class="r3"></span><span class="core">J</span></div><div><p class="eyebrow">J.A.R.V.I.S. · ${autopilotRunning ? 'AL LAVORO' : 'IN ASCOLTO'}</p><h1>${greeting}, Riccardo.</h1><p class="jarvis-says">${says}</p></div></section>`;
 }
 
 function requestOperationalCard(request, compact = false) {
@@ -862,9 +864,268 @@ function renderAiPanel() {
   const title = current?.type === 'aiExtractMenu' ? 'Proposta di menù da revisionare' : 'Classificazione da revisionare';
   return `<section class="panel spaced-top" id="ai-advisory"><div class="panel-heading"><div><p class="eyebrow">AI · SOLO BOZZA</p><h2>Analisi assistita della pratica</h2></div><span class="capsule">nessuna pubblicazione</span></div><p class="notice warning"><strong>Invio al provider AI configurato:</strong> questi pulsanti inviano solo il testo della pratica e, per l’estrazione, le trascrizioni private già registrate. Non inviano il PDF originale o le immagini. L’account Cloudflare verificato oggi è su Workers Free: richieste oltre la quota gratuita falliscono, ma un futuro cambio di piano potrebbe comportare costi. Il server permette soltanto la fixture sigillata e massimo tre tentativi al giorno per azione. Una risposta riuscita resta una proposta da revisionare: nessun campo, bozza, PR o messaggio viene salvato automaticamente.</p><div class="button-row spaced-top"><button class="button secondary" type="button" data-action="ai-classify" ${!aiBusy && String(request.sourceText || '').trim() ? '' : 'disabled'}>Classifica richiesta (bozza)</button><button class="button secondary" type="button" data-action="ai-extract" ${aiBusy ? 'disabled' : ''}>Analizza menù (bozza)</button></div>${aiBusy ? '<p class="muted small spaced-top" role="status">Analisi AI in corso; attendi l’esito prima di riprovare.</p>' : current?.error ? `<p class="notice danger spaced-top" role="alert">Analisi non completata: ${escapeHtml(current.error)}</p>` : result ? `<div class="spaced-top" role="status"><h3>${title}</h3><p class="muted small">Provider: ${escapeHtml(current.provider)} · revisione pratica ${escapeHtml(request.revision)}. Confronta ogni campo e riferimento con la fonte originale; eventuali errori bloccanti restano da correggere.</p><pre class="json-editor private-material-text">${escapeHtml(JSON.stringify(result, null, 2))}</pre></div>` : '<p class="muted small spaced-top">Nessuna analisi AI eseguita in questa sessione.</p>'}</section>`;
 }
+// ---------- Oggi · Pratica · Pratiche · Sistema · Modifica a mano ----------
+// Una sola schermata di partenza: cosa aspetta una decisione, cosa sta facendo Jarvis, il resto è a un tocco.
+const CLOSED_STATUSES = ['completata', 'archiviata', 'chiusa'];
+const TOOL_VIEWS = new Set(['revisione', 'richieste', 'approvazioni', 'builder', 'materiali', 'anteprima', 'notifiche', 'registro', 'voce']);
+let praticheFilter = 'decidere';
+let backToPratica = false;
+const onlineMenus = new Map();
+let editBuffer = null;
+const textOf = (value) => (typeof value === 'string' ? value : (value && (value.it ?? Object.values(value).find((entry) => typeof entry === 'string'))) || '');
+const countVoci = (menu) => (menu?.sezioni || []).reduce((sum, section) => sum + (section.voci?.length || 0), 0);
+const TONE_ORDER = { hot: 0, alert: 1, info: 2, good: 3 };
+
+function activeTab() {
+  if (['command', 'pratica', 'pratiche', 'modifica'].includes(activeView)) return 'command';
+  return activeView === 'clienti' ? 'clienti' : 'sistema';
+}
+function praticaInfo(request) {
+  const draft = draftForRequest(request.id);
+  const mission = (state.missions || []).find((entry) => entry.requestId === request.id || (draft && entry.draftId === draft.id)) || null;
+  const closed = CLOSED_STATUSES.includes(request.status) || mission?.status === 'completata';
+  const activeMission = mission && !['completata', 'ferma', 'annullata'].includes(mission.status);
+  const base = { request, draft, mission, client: clientById(request.clientId) };
+  if (closed) return { ...base, group: 'chiuse', tone: 'good', headline: 'Chiusa', cta: 'Apri la pratica', step: 5 };
+  if (mission?.status === 'attesa_si') return { ...base, group: 'decidere', tone: 'hot', headline: 'Aspetta il tuo SÌ', cta: 'Controlla e decidi', step: 3 };
+  if (mission?.status === 'ferma') return { ...base, group: 'decidere', tone: 'alert', headline: 'Jarvis si è fermato', cta: 'Vedi perché', step: 2 };
+  if (activeMission) return { ...base, group: 'corso', tone: 'info', headline: `Jarvis: ${MISSION_LABEL[mission.status] || mission.status}`, cta: 'Segui la pratica', step: ['pubblicazione', 'verifica'].includes(mission.status) ? 4 : 2 };
+  if (draft && ['bozza', 'revisione', 'pronta_pr'].includes(draft.status)) return { ...base, group: 'decidere', tone: 'info', headline: 'Bozza da controllare', cta: 'Apri la pratica', step: 2 };
+  if (request.status === 'nuova') return { ...base, group: 'decidere', tone: 'alert', headline: 'Nuova richiesta', cta: 'Apri la pratica', step: 1 };
+  if (request.status === 'in_attesa') return { ...base, group: 'decidere', tone: 'alert', headline: 'Mancano dati', cta: 'Apri la pratica', step: 1 };
+  return { ...base, group: 'corso', tone: 'info', headline: statusLabel(request.status), cta: 'Apri la pratica', step: draft ? 2 : 1 };
+}
+function allPratiche() {
+  return state.requests.filter((request) => request.status !== 'archiviata').map(praticaInfo)
+    .sort((a, b) => (TONE_ORDER[a.tone] - TONE_ORDER[b.tone]) || String(b.request.updatedAt || '').localeCompare(String(a.request.updatedAt || '')));
+}
+function praticaCard(info) {
+  const { request, client, mission } = info;
+  const detail = mission?.note && info.group !== 'chiuse' ? mission.note : request.nextStep || '';
+  return `<button class="oggi-card ${info.tone}" type="button" data-select-request="${escapeHtml(request.id)}" data-route="pratica"><span class="oggi-tag">${escapeHtml(info.headline)}</span><strong>${escapeHtml(client?.name || request.subject)}</strong><span class="oggi-sub">${escapeHtml(request.subject)}${detail ? ` · ${escapeHtml(detail)}` : ''}</span><span class="oggi-cta">${escapeHtml(info.cta)} →</span></button>`;
+}
+function oggiDecisions() {
+  const all = allPratiche();
+  const decide = all.filter((info) => info.group === 'decidere');
+  const corso = all.filter((info) => info.group === 'corso');
+  const chiuse = all.filter((info) => info.group === 'chiuse');
+  const shown = decide.slice(0, 4);
+  const first = decide.length
+    ? `<section class="oggi-block"><p class="eyebrow">DA DECIDERE · ${decide.length}</p><div class="oggi-cards">${shown.map(praticaCard).join('')}</div>${decide.length > shown.length ? `<button class="button secondary small-button" type="button" data-action="pratiche-filtro" data-filtro="decidere">Altre ${decide.length - shown.length} da decidere</button>` : ''}</section>`
+    : '<section class="oggi-block"><p class="eyebrow">DA DECIDERE · 0</p><p class="oggi-calm">Niente aspetta una tua decisione.</p></section>';
+  const second = corso.length
+    ? `<section class="oggi-block"><p class="eyebrow">IN CORSO · ${corso.length}</p><div class="oggi-cards compact">${corso.slice(0, 3).map(praticaCard).join('')}</div></section>` : '';
+  const filtro = (key, label, n) => `<button class="oggi-all-link" type="button" data-action="pratiche-filtro" data-filtro="${key}"><strong>${n}</strong><span>${label}</span></button>`;
+  const third = `<section class="oggi-block"><p class="eyebrow">TUTTE LE PRATICHE</p><div class="oggi-all">${filtro('decidere', 'da decidere', decide.length)}${filtro('corso', 'in corso', corso.length)}${filtro('chiuse', 'chiuse', chiuse.length)}</div></section>`;
+  return first + second + third;
+}
+function renderCommand() {
+  return `<div class="view-wrap">${jarvisHero()}${demoNotice()}${oggiDecisions()}${jarvisPanel()}</div>`;
+}
+function renderPratiche() {
+  const all = allPratiche();
+  const counts = { decidere: 0, corso: 0, chiuse: 0 };
+  all.forEach((info) => { counts[info.group] += 1; });
+  const list = all.filter((info) => info.group === praticheFilter);
+  const seg = [['decidere', 'Da decidere'], ['corso', 'In corso'], ['chiuse', 'Chiuse']].map(([key, label]) => `<button type="button" class="${praticheFilter === key ? 'on' : ''}" data-action="pratiche-filtro" data-filtro="${key}" aria-pressed="${praticheFilter === key}">${label}<b>${counts[key]}</b></button>`).join('');
+  const archived = archivedCount();
+  return `<div class="view-wrap"><button class="back-bar" type="button" data-route="command">← Oggi</button>${header('PRATICHE', 'Tutte le pratiche', 'Un elenco solo, diviso per quello che serve da te.')}<div class="seg" role="group" aria-label="Filtro pratiche">${seg}</div><div class="oggi-cards">${list.length ? list.map(praticaCard).join('') : empty('Nessuna pratica in questo elenco.')}</div>${praticheFilter === 'chiuse' && archived ? `<p class="muted small spaced-top-small">${archived} pratiche archiviate: si vedono in Sistema, Richieste.</p>` : ''}</div>`;
+}
+const PRATICA_STEPS = ['Richiesta', 'Bozza', 'Controllo', 'Il tuo SÌ', 'Online'];
+function stepsBar(now) {
+  return `<ol class="steps" aria-label="Avanzamento">${PRATICA_STEPS.map((label, index) => `<li class="${index < now ? 'done' : index === now ? 'now' : ''}"><i>${index < now ? '✓' : index + 1}</i><span>${label}</span></li>`).join('')}</ol>`;
+}
+async function fetchOnline(draft, request) {
+  onlineMenus.set(draft.id, { status: 'loading' });
+  try {
+    const read = (await performAction('githubReadMenu', { slug: draft.slug, requestId: request.id, requestRevision: request.revision }))?.result;
+    onlineMenus.set(draft.id, read?.exists && read.menu ? { status: 'ok', menu: read.menu } : { status: 'new' });
+  } catch (error) {
+    onlineMenus.set(draft.id, { status: 'error', message: error.message || 'lettura non riuscita' });
+  }
+  if (activeView === 'pratica' && selectedRequestId === request.id) render();
+}
+function onlineState(draft, request) {
+  if (isDemoMode) {
+    const snapshot = request.kind !== 'nuovo' ? state.publicMenuSnapshots?.[draft.slug] : null;
+    return snapshot?.menu ? { status: 'ok', menu: snapshot.menu, demo: true } : { status: 'new' };
+  }
+  const known = onlineMenus.get(draft.id);
+  if (known) return known;
+  onlineMenus.set(draft.id, { status: 'loading' });
+  setTimeout(() => fetchOnline(draft, request), 0);
+  return { status: 'loading' };
+}
+function cambiaBlock(draft, request) {
+  if (!draft) return '';
+  if (request.kind === 'nuovo') return `<section class="panel spaced-top-small"><p class="eyebrow">COSA CAMBIA</p><p><strong>Menu nuovo</strong>: ${countVoci(draft.menu)} voci in ${draft.menu.sezioni?.length || 0} sezioni.</p></section>`;
+  const online = onlineState(draft, request);
+  let body;
+  if (online.status === 'loading') body = '<p class="muted">Leggo il menu online per il confronto…</p>';
+  else if (online.status === 'error') body = `<p class="notice warning">Confronto non disponibile: ${escapeHtml(online.message)}. Puoi riprovare.</p><button class="button secondary small-button" type="button" data-action="rileggi-online">Riprova</button>`;
+  else if (online.status === 'new') body = '<p class="muted">Non ho un menu online con cui confrontare questa bozza.</p>';
+  else {
+    const diff = menuDiff(online.menu, draft.menu);
+    const rows = diff.changes.map((change) => `<div class="diff-row"><strong>${escapeHtml(String(change.type).replaceAll('_', ' '))}</strong><span>${escapeHtml(change.label)}<br><code>${escapeHtml(change.before ?? '—')} → ${escapeHtml(change.after ?? '—')}</code></span></div>`);
+    body = diff.changes.length
+      ? `<div class="diff-list">${rows.slice(0, 8).join('')}</div>${rows.length > 8 ? `<details class="details-more"><summary>Altre ${rows.length - 8} modifiche</summary><div class="diff-list">${rows.slice(8).join('')}</div></details>` : ''}<p class="muted small">Tutto il resto del menu resta uguale al menu online${online.demo ? ' (esempio della demo)' : ''}.</p>`
+      : '<p class="muted">Nessuna differenza dal menu online.</p>';
+  }
+  return `<section class="panel spaced-top-small"><p class="eyebrow">COSA CAMBIA</p>${body}</section>`;
+}
+function renderPratica() {
+  const request = requestById();
+  if (!request) return `<div class="view-wrap">${header('PRATICA', 'Nessuna pratica', 'Scegli una pratica da Oggi.')}<button class="button" type="button" data-route="command">Torna a Oggi</button></div>`;
+  const info = praticaInfo(request);
+  const { draft, mission, client } = info;
+  const editable = draft && ['bozza', 'revisione', 'pronta_pr'].includes(draft.status);
+  const closed = info.group === 'chiuse';
+  let next;
+  if (closed) next = '<section class="panel spaced-top-small"><p class="eyebrow">STATO</p><p><strong>Pratica chiusa.</strong> Per cambiare il menu scrivi le modifiche a Jarvis su Telegram: si apre una nuova pratica.</p></section>';
+  else if (!draft) next = `<section class="panel spaced-top-small"><p class="eyebrow">PROSSIMO PASSO</p><p>${request.status === 'in_attesa' ? 'Mancano dati: apri il Builder per chiedere conferma al locale.' : 'Non c’è ancora una bozza.'}</p><div class="button-row spaced-top-small">${request.status === 'in_attesa' ? `<button class="button" type="button" data-route="builder">Apri il Builder</button>` : '<button class="button" type="button" data-action="generate-draft">Prepara la bozza dal testo</button>'}</div></section>`;
+  else {
+    const panel = jarvisMissionPanel(draft);
+    next = `${sourceExtrasPanel(draft)}${panel || `<section class="panel spaced-top-small"><p class="eyebrow">PROSSIMO PASSO</p><p>Controlla la bozza e prosegui dall’area Approvazioni.</p><div class="button-row spaced-top-small"><button class="button" type="button" data-route="approvazioni">Apri Approvazioni</button></div></section>`}`;
+  }
+  const tone = info.tone === 'hot' ? 'hot' : info.tone === 'alert' ? 'alert' : '';
+  return `<div class="view-wrap pratica"><button class="back-bar" type="button" data-route="command">← Oggi</button>
+    <header class="pratica-head ${tone}"><p class="eyebrow">${escapeHtml(client?.name || 'Pratica')} · ${escapeHtml(requestTypeLabel(request))}</p><h1>${escapeHtml(request.subject)}</h1><p class="oggi-tag inline">${escapeHtml(info.headline)}</p>${mission?.note && !closed ? `<p class="muted small">${escapeHtml(mission.note)}</p>` : request.nextStep ? `<p class="muted small">${escapeHtml(request.nextStep)}</p>` : ''}</header>
+    ${stepsBar(info.step)}${demoNotice()}${cambiaBlock(draft, request)}
+    ${editable ? '<div class="button-row spaced-top-small"><button class="button secondary" type="button" data-route="modifica">Modifica a mano</button><button class="button secondary" type="button" data-route="anteprima">Anteprima</button></div><p class="muted small">Per modificare a voce, scrivi o manda un vocale a Jarvis su Telegram.</p>' : ''}
+    ${next}
+    <details class="details-more"><summary>Dettagli e strumenti di questa pratica</summary>${planRulesPanel(request, draft)}<div class="button-row spaced-top-small">${[['revisione', 'Revisione'], ['approvazioni', 'Approvazioni'], ['materiali', 'Materiali'], ['richieste', 'Richiesta originale'], ['registro', 'Registro']].map(([route, label]) => `<button class="button secondary small-button" type="button" data-select-request="${escapeHtml(request.id)}" data-route="${route}">${label}</button>`).join('')}</div></details></div>`;
+}
+function renderSistema() {
+  const tools = [
+    ['revisione', 'Revisione', 'Controlli e bozza completa', navCount('revisione')], ['richieste', 'Richieste', 'Tutte le richieste arrivate, anche archiviate', navCount('richieste')],
+    ['approvazioni', 'Approvazioni', 'PR, pubblicazione e verifica passo per passo', 0], ['builder', 'Builder avanzato', 'Estrazione da testo e modifica JSON', 0],
+    ['materiali', 'Materiali', 'File, foto e PDF ricevuti', 0], ['anteprima', 'Anteprima', 'Come appare il menu sul telefono', 0],
+    ['notifiche', 'Notifiche', 'Avvisi di Jarvis ed email al proprietario', navCount('notifiche')], ['registro', 'Registro', 'Tutto quello che è successo, con data', 0], ['voce', 'Voce (browser)', 'Prova del microfono', 0]
+  ];
+  return `<div class="view-wrap">${header('SISTEMA', 'Sistema', 'Gli strumenti completi di prima, sempre a portata. Per il lavoro di ogni giorno basta Oggi.')}
+    <div class="sys-list">${tools.map(([route, label, note, n]) => `<button class="sys-row" type="button" data-route="${route}"><span><strong>${label}</strong><small>${note}</small></span>${n ? `<b class="nav-hint">${n}</b>` : ''}<i aria-hidden="true">›</i></button>`).join('')}</div>
+    <details class="details-more"><summary>Tutti i numeri e i dettagli</summary>${commandDetails()}</details></div>`;
+}
+
+// Modifica a mano: voci leggibili, un tocco per cambiare nome o prezzo, aggiungere o togliere. Salva come bozza (le conferme si rifanno).
+const PRICE_RE = /^\d+(?:[,.]\d{1,2})?$/;
+function editState(draft) {
+  if (!editBuffer || editBuffer.draftId !== draft.id || editBuffer.revision !== draft.revision) {
+    editBuffer = { draftId: draft.id, revision: draft.revision, menu: clone(draft.menu), removed: new Set(), added: new Set(), open: null, openAdd: null, openSecs: new Set() };
+  }
+  return editBuffer;
+}
+function editChanges(draft) {
+  const buf = editState(draft);
+  let count = 0;
+  buf.menu.sezioni.forEach((section, si) => section.voci.forEach((voce, vi) => {
+    const key = `${si}.${vi}`;
+    if (buf.removed.has(key)) { if (!buf.added.has(key)) count += 1; return; }
+    if (buf.added.has(key)) { count += 1; return; }
+    if (JSON.stringify(voce) !== JSON.stringify(draft.menu.sezioni[si].voci[vi])) count += 1;
+  }));
+  return count;
+}
+function renderModifica() {
+  const request = requestById();
+  const draft = draftForRequest();
+  if (!draft || !['bozza', 'revisione', 'pronta_pr'].includes(draft.status)) return `<div class="view-wrap"><button class="back-bar" type="button" data-route="pratica">← Pratica</button>${header('MODIFICA A MANO', 'Nessuna bozza modificabile', 'Questa pratica non ha una bozza aperta.')}</div>`;
+  const buf = editState(draft);
+  const changes = editChanges(draft);
+  const rows = (section, si) => section.voci.map((voce, vi) => {
+    const key = `${si}.${vi}`;
+    const orig = draft.menu.sezioni[si]?.voci[vi];
+    const removed = buf.removed.has(key);
+    const isNew = buf.added.has(key);
+    if (removed && isNew) return '';
+    const prices = voce.prezzi?.length ? voce.prezzi.map((entry) => `${textOf(entry.etichetta)} ${entry.prezzo}`).join(' · ') : voce.prezzo ? `€ ${voce.prezzo}` : '';
+    const edited = !isNew && orig && JSON.stringify(voce) !== JSON.stringify(orig);
+    const tag = removed ? '<em class="vtag off">TOLTA</em>' : isNew ? '<em class="vtag">NUOVA</em>' : edited ? '<em class="vtag">MODIFICATA</em>' : '';
+    if (removed) return `<div class="vrow mod removed" data-vrow><span class="vname">${escapeHtml(textOf(voce.nome))}</span>${tag}<button class="mini-button" type="button" data-action="edit-undo" data-key="${key}">Rimetti</button></div>`;
+    if (buf.open === key) {
+      const priceFields = voce.prezzi?.length
+        ? voce.prezzi.map((entry, index) => `<label class="field">Prezzo · ${escapeHtml(textOf(entry.etichetta))}<input inputmode="decimal" data-ep="${index}" value="${escapeHtml(entry.prezzo)}"></label>`).join('')
+        : voce.prezzo !== undefined ? `<label class="field">Prezzo in euro<input inputmode="decimal" data-ep="0" value="${escapeHtml(voce.prezzo)}"></label>` : '';
+      return `<div class="vrow edit" data-vrow><label class="field">Nome<input data-en value="${escapeHtml(textOf(voce.nome))}"></label>${priceFields}<div class="button-row"><button class="button small-button" type="button" data-action="edit-ok" data-key="${key}">Fatto</button><button class="button secondary small-button" type="button" data-action="edit-open" data-key="${key}">Annulla</button><button class="button secondary small-button" type="button" data-action="edit-del" data-key="${key}">Togli dal menu</button></div></div>`;
+    }
+    return `<button class="vrow ${edited || isNew ? 'mod' : ''}" type="button" data-vrow data-action="edit-open" data-key="${key}"><span class="vname">${escapeHtml(textOf(voce.nome))}</span>${tag}<span class="vprice">${escapeHtml(prices)}</span></button>`;
+  }).join('');
+  const add = (section, si) => buf.openAdd === si
+    ? `<div class="vrow edit"><label class="field">Nome della voce<input data-an autocomplete="off"></label><label class="field">Prezzo in euro<input data-ap inputmode="decimal" placeholder="12,00"></label><div class="button-row"><button class="button small-button" type="button" data-action="add-ok" data-si="${si}">Aggiungi</button><button class="button secondary small-button" type="button" data-action="add-cancel">Annulla</button></div></div>`
+    : `<button class="addrow" type="button" data-action="add-open" data-si="${si}">+ Aggiungi una voce</button>`;
+  const sections = buf.menu.sezioni.map((section, si) => `<details class="vsec" data-si="${si}" ${buf.openSecs.has(si) || buf.openAdd === si || String(buf.open || '').startsWith(`${si}.`) ? 'open' : ''}><summary>${escapeHtml(textOf(section.nome))}<small>${section.voci.length}</small></summary>${rows(section, si)}${add(section, si)}</details>`).join('');
+  return `<div class="view-wrap modifica"><button class="back-bar" type="button" data-route="pratica">← Pratica</button>${header('MODIFICA A MANO', request?.subject || 'Bozza', 'Tocca una voce per cambiare nome o prezzo. Salvando, la bozza torna da controllare.')}
+    <label class="field edit-search">Cerca una voce<input id="edit-search" type="search" placeholder="Es. prosciutto" autocomplete="off"></label>
+    ${sections}
+    <div class="savebar"><span>${changes ? `${changes} modifiche non salvate` : 'Nessuna modifica'}</span><button class="button" type="button" data-action="edit-save" ${changes ? '' : 'disabled'}>Salva e torna alla pratica</button></div></div>`;
+}
+function setVoceName(voce, value) { if (typeof voce.nome === 'string') voce.nome = value; else voce.nome = { ...(voce.nome || {}), it: value }; }
+async function handleOggiAction(action, trigger) {
+  const draft = draftForRequest();
+  if (action === 'pratiche-filtro') { praticheFilter = trigger.dataset.filtro; if (activeView === 'pratiche') render(); else navigate('pratiche'); return true; }
+  if (action === 'rileggi-online') { const request = requestById(); if (draft && request) { onlineMenus.delete(draft.id); render(); } return true; }
+  if (!action.startsWith('edit-') && !action.startsWith('add-')) return false;
+  if (!draft) return true;
+  const buf = editState(draft);
+  const key = trigger.dataset.key;
+  const rowOf = () => trigger.closest('.vrow');
+  if (action === 'edit-open') { buf.open = buf.open === key ? null : key; render(); return true; }
+  if (action === 'edit-undo') { buf.removed.delete(key); render(); return true; }
+  if (action === 'edit-del') { buf.removed.add(key); buf.open = null; render(); return true; }
+  if (action === 'edit-ok') {
+    const [si, vi] = key.split('.').map(Number);
+    const voce = buf.menu.sezioni[si].voci[vi];
+    const row = rowOf();
+    const name = row.querySelector('[data-en]').value.trim();
+    if (!name) { toast('Il nome non può restare vuoto.', 'error'); return true; }
+    const fields = [...row.querySelectorAll('[data-ep]')];
+    for (const field of fields) if (!PRICE_RE.test(field.value.trim()) || Number(field.value.replace(',', '.')) <= 0) { toast('Prezzo non valido: scrivi per esempio 12 oppure 12,50.', 'error'); return true; }
+    setVoceName(voce, name);
+    const norm = (value, original) => { const v = value.trim().replace('.', ','); return /^\d+$/.test(v) && /,/.test(String(original ?? '')) ? `${v},00` : v; };
+    if (voce.prezzi?.length) fields.forEach((field) => { const index = Number(field.dataset.ep); voce.prezzi[index].prezzo = norm(field.value, voce.prezzi[index].prezzo); });
+    else if (fields[0]) voce.prezzo = norm(fields[0].value, voce.prezzo);
+    buf.open = null; render(); return true;
+  }
+  if (action === 'add-open') { buf.openAdd = Number(trigger.dataset.si); buf.open = null; render(); return true; }
+  if (action === 'add-cancel') { buf.openAdd = null; render(); return true; }
+  if (action === 'add-ok') {
+    const si = Number(trigger.dataset.si);
+    const row = rowOf();
+    const name = row.querySelector('[data-an]').value.trim();
+    const price = row.querySelector('[data-ap]').value.trim().replace('.', ',');
+    const section = buf.menu.sezioni[si];
+    if (!name) { toast('Scrivi il nome della voce.', 'error'); return true; }
+    if (section.tipo !== 'degustazione' && (!PRICE_RE.test(price) || Number(price.replace(',', '.')) <= 0)) { toast('Scrivi un prezzo valido, per esempio 12,50.', 'error'); return true; }
+    const sample = section.voci[0];
+    const voce = { nome: sample && typeof sample.nome === 'string' ? name : { it: name } };
+    if (price) voce.prezzo = /^\d+$/.test(price) && /,/.test(String(sample?.prezzo ?? '')) ? `${price},00` : price;
+    section.voci.push(voce);
+    buf.added.add(`${si}.${section.voci.length - 1}`);
+    buf.openAdd = null; buf.openSecs.add(si); render(); return true;
+  }
+  if (action === 'edit-save') {
+    const menu = clone(buf.menu);
+    menu.sezioni.forEach((section, si) => { section.voci = section.voci.filter((_, vi) => !buf.removed.has(`${si}.${vi}`)); });
+    const check = validateMenu(menu);
+    if (!check.valid) { toast(`Non posso salvare: ${check.errors[0]?.message || 'menu non valido'}`, 'error'); return true; }
+    reviewEvidenceCache.delete(String(draft.id));
+    await doAction('saveDraft', { id: draft.id, revision: draft.revision, menu, slug: menu.id }, 'Modifica salvata: la bozza torna da controllare.');
+    editBuffer = null;
+    onlineMenus.delete(draft.id);
+    navigate('pratica');
+    return true;
+  }
+  return false;
+}
+function toolBackBar() {
+  const request = requestById();
+  if (!backToPratica || !request || !TOOL_VIEWS.has(activeView)) return '';
+  return `<button class="back-bar" type="button" data-select-request="${escapeHtml(request.id)}" data-route="pratica">← Torna alla pratica · ${escapeHtml(request.subject)}</button>`;
+}
+
 function renderView() {
-  const renderers = { command: renderCommand, richieste: renderRequests, clienti: renderClients, materiali: renderMaterials, builder: renderBuilder, revisione: renderReview, anteprima: renderPreview, approvazioni: renderApprovals, notifiche: renderNotifications, registro: renderAudit, voce: renderVoice };
-  view.innerHTML = renderers[activeView]() + (activeView === 'builder' ? renderAiPanel() : '');
+  const renderers = { sistema: renderSistema, pratica: renderPratica, pratiche: renderPratiche, modifica: renderModifica, command: renderCommand, richieste: renderRequests, clienti: renderClients, materiali: renderMaterials, builder: renderBuilder, revisione: renderReview, anteprima: renderPreview, approvazioni: renderApprovals, notifiche: renderNotifications, registro: renderAudit, voce: renderVoice };
+  view.innerHTML = toolBackBar() + renderers[activeView]() + (activeView === 'builder' ? renderAiPanel() : '');
   document.title = `${navItems.find(([id]) => id === activeView)?.[2] || 'Control Room'} · RenMenu`;
 }
 function render() {
@@ -960,6 +1221,7 @@ async function handleClick(event) {
   const action = trigger.dataset.action;
   if (!action) return;
   event.preventDefault();
+  if (await handleOggiAction(action, trigger)) return;
   if (action === 'ai-classify' || action === 'ai-extract') {
     if (isDemoMode) throw new Error('La demo locale non invia richieste al provider AI.');
     if (aiBusy) throw new Error('Un’analisi è già in corso; attendi il risultato.');
@@ -1445,7 +1707,24 @@ dialog.addEventListener('cancel', () => { pendingConfirm = null; });
 materialViewer?.addEventListener('close', releaseMaterialPreview);
 materialViewer?.addEventListener('cancel', () => { releaseMaterialPreview(); });
 window.addEventListener('beforeunload', releaseMaterialPreview);
-window.addEventListener('hashchange', () => { closeMaterialViewer(); activeView = routeFromHash(); mobileMenuOpen = false; render(); $('#main-content').focus(); });
+window.addEventListener('hashchange', () => { closeMaterialViewer(); const previous = activeView; activeView = routeFromHash(); backToPratica = previous === 'pratica' || (backToPratica && TOOL_VIEWS.has(previous) && TOOL_VIEWS.has(activeView)); mobileMenuOpen = false; render(); $('#main-content').focus(); });
+
+view.addEventListener('input', (event) => {
+  if (event.target.id !== 'edit-search') return;
+  const query = event.target.value.trim().toLowerCase();
+  document.querySelectorAll('.vsec').forEach((section) => {
+    let any = false;
+    section.querySelectorAll('[data-vrow]').forEach((row) => { const hit = !query || row.textContent.toLowerCase().includes(query); row.hidden = !hit; any = any || hit; });
+    section.hidden = Boolean(query) && !any;
+    if (query && any) section.open = true;
+  });
+});
+view.addEventListener('toggle', (event) => {
+  const section = event.target;
+  if (!editBuffer || !section.classList?.contains('vsec')) return;
+  const index = Number(section.dataset.si);
+  if (section.open) editBuffer.openSecs.add(index); else editBuffer.openSecs.delete(index);
+}, true);
 
 async function init() {
   initializeTheme();

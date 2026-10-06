@@ -19,7 +19,7 @@ with sync_playwright() as playwright:
         errors = []
         page.on('pageerror', lambda e: errors.append(str(e)))
         page.goto(BASE, wait_until='networkidle')
-        page.get_by_role('heading', name='Buonasera, Riccardo.').wait_for()
+        page.locator('h1', has_text=', Riccardo.').wait_for()
         dimensions = page.evaluate('({inner: window.innerWidth, scroll: document.documentElement.scrollWidth, body: document.body.scrollWidth})')
         assert dimensions['scroll'] <= width and dimensions['body'] <= width, f'overflow {width}: {dimensions}'
         assert not errors, f'JS error {width}: {errors}'
@@ -29,7 +29,9 @@ with sync_playwright() as playwright:
         if width in (390, 1280):
             page.screenshot(path=str(OUT / ('mobile-390.png' if width == 390 else 'desktop-1280.png')), full_page=True)
         nav = '#bottom-nav' if width <= 768 else '#primary-nav'
-        page.locator(f'{nav} [href="#richieste"]').click()
+        assert page.locator(f'{nav} .nav-link').count() == 3, 'tre voci: Oggi, Locali, Sistema'
+        page.locator(f'{nav} [href="#sistema"]').click()
+        page.get_by_role('button', name='Richieste').first.click()
         page.get_by_role('heading', name='Richieste', exact=True).wait_for()
         assert page.evaluate('document.documentElement.scrollWidth <= window.innerWidth'), f'overflow Richieste {width}'
         page.locator('#theme-toggle').click()

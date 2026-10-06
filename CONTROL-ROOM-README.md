@@ -4,6 +4,8 @@
 
 > **Regola di manutenzione.** Ogni modifica a Jarvis o alla Control Room aggiorna, nella stessa pull request, questo README, le policy in `docs/` quando cambia un comportamento e il registro in [`control-room/docs/CHANGELOG.md`](control-room/docs/CHANGELOG.md). Il funzionamento passo per passo è in [`control-room/docs/jarvis-funzionamento.md`](control-room/docs/jarvis-funzionamento.md).
 
+**Interfaccia (dal 6 ottobre 2026):** tre voci, Oggi, Locali e Sistema. Oggi elenca solo ciò che aspetta una decisione; ogni pratica ha la sua pagina (avanzamento, «Cosa cambia», «Modifica a mano», passo successivo). Gli strumenti completi (Revisione, Richieste, Approvazioni, Builder, Materiali, Anteprima, Notifiche, Registro, Voce) sono in Sistema. Dettagli in `control-room/docs/jarvis-funzionamento.md`.
+
 ## Ambienti e accesso
 
 | Ambiente | Origine | Dati e azioni |

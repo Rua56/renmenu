@@ -22,3 +22,5 @@ Aggiornata il 6 ottobre 2026. La Control Room lavora con dati reali dei clienti 
 - Jarvis scrive ai locali solo per anteprime, promemoria approvati da Riccardo ed email con link e QR dopo la pubblicazione; mai da `iuran56@gmail.com`.
 - Le richieste arrivano solo su `renmenu1569@gmail.com`.
 - Prima di accogliere più clienti vanno ancora definiti: informativa ai locali, durata di conservazione delle pratiche non concluse, cancellazione definitiva degli allegati in R2, copia di sicurezza e ripristino del database.
+
+La pagina di una pratica legge il menu online da GitHub in sola lettura per mostrare «Cosa cambia»; ogni lettura lascia una riga nel registro e non salva copie del menu.
