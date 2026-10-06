@@ -1,7 +1,7 @@
 import { seal, readSealedSetting } from '../../_lib/sealed.js';
 import { assistExtraction } from '../../_lib/assist.js';
 import { applyMenuChanges } from '../../_lib/changes.js';
-import { prepareUpdate } from '../../_lib/update.js';
+import { prepareBaseUpdate, prepareUpdate } from '../../_lib/update.js';
 import { GEMINI_PREFERRED, PHOTO_TYPES, readMenuPdf, readMenuPhoto } from '../../_lib/vision.js';
 import { linkMailFiles, receiveMailFiles } from '../../_lib/mail-files.js';
 import { deletionPlan, deletionStatements } from '../../_lib/delete-request.js';
@@ -573,7 +573,7 @@ async function action(db, type, input, env = {}) {
       try { live = await readCurrentMenu(env, slug, typeof (env?.GITHUB_FETCH || env?.fetch) === 'function' ? { fetch: env.GITHUB_FETCH || env.fetch } : {}); }
       catch (error) { assert(false, `Non riesco a leggere il menu online «${slug}» da GitHub (${String(error?.message || 'errore').slice(0, 120)}). Riprova tra poco.`, 503); }
       assert(live.exists, `Il menu «${slug}» non è online: controlla il Menu ID nella pratica o nella scheda cliente.`, 422);
-      const update = prepareUpdate({ slug, current: live.menu, sha: live.sha, sourceText: combinedSource, subject: request.subject });
+      const update = (p.baseOnly === true ? prepareBaseUpdate : prepareUpdate)({ slug, current: live.menu, sha: live.sha, sourceText: combinedSource, subject: request.subject });
       assert(update.ok, update.reason, 422);
       extraction = update.extraction;
       if (extraction.added && (extraction.menu.lingue || []).includes('en') && autoTranslationReady(env)) {
