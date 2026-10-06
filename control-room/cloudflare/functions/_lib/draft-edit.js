@@ -5,6 +5,7 @@
 // deve essere stato detto davvero (anche a parole) e ogni parola di un nome nuovo deve venire dalla
 // frase o dal nome precedente. Se una sola operazione non regge, non si applica nulla.
 import { CLOUDFLARE_FREE_MODEL } from './ai-live.js';
+import { normalizeHours } from './hours.js';
 import { DIREZIONI } from './premium.js';
 
 export const OP_TYPES = ['prezzo', 'varianti', 'aggiungi', 'rimuovi', 'rinomina', 'descrizione', 'sposta', 'rinomina_sezione', 'motto', 'aspetto', 'locale', 'storia'];
@@ -242,6 +243,16 @@ export function validateOps(rawOps, menu, utterance) {
       const field = plain(raw.campo);
       const FIELDS = ['indirizzo', 'telefono', 'instagram', 'maps', 'orari', 'sottotitolo'];
       if (!FIELDS.includes(field)) { problems.push('Dati del locale: il campo deve essere indirizzo, telefono, instagram, maps, orari o sottotitolo.'); continue; }
+      if (field === 'orari') {
+        // Orari: si leggono giorni e fasce e si scrivono in modo ordinato (italiano e inglese), partendo da quelli già nel menu.
+        const current = typeof menu?.orari === 'object' ? menu.orari?.it : menu?.orari;
+        const tidy = [raw.nome, raw.testo, utterance].map((text) => (text ? normalizeHours({ existing: current, text: String(text), utterance }) : null)).find(Boolean);
+        if (tidy) {
+          if (ops.some((o) => o.tipo === 'locale' && o.campo === 'orari')) { problems.push('Dati del locale (orari): uno solo per volta.'); continue; }
+          ops.push({ tipo: type, campo: 'orari', nome: tidy.it, en: tidy.en }); continue;
+        }
+        if (String(raw.nome ?? raw.testo ?? '').replace(/\s+/g, ' ').trim().length > 200) { problems.push('Dati del locale (orari): testo troppo lungo. Dimmi giorni e fasce, per esempio «mercoledì chiuso, gli altri giorni 12-15 e 19-22».'); continue; }
+      }
       let value = clip(raw.nome ?? raw.testo, field === 'orari' ? 200 : field === 'maps' ? 300 : 120);
       if (field === 'instagram') value = value.replace(/^https?:\/\/(?:www\.)?instagram\.com\//i, '').replace(/^@/, '').replace(/\/$/, '');
       const okShape = { telefono: /^\+?[0-9][0-9 ().-]{5,23}$/, instagram: /^[a-z0-9._]{1,30}$/i, maps: /^https:\/\/\S+$/ }[field];
@@ -311,6 +322,12 @@ export function validateOps(rawOps, menu, utterance) {
       ops.push({ tipo: type, si, vi, descrizione: text }); continue;
     }
   }
+  // Se la frase parla chiaramente di orari ma il modello non ha prodotto l'operazione, la ricavo io dalle parole dette.
+  if (!ops.some((o) => o.tipo === 'locale' && o.campo === 'orari') && !problems.some((p) => /orari/i.test(p)) && /\b(?:orari|orario|aperti|apriamo|apertura|chiusi|chiuso|chiusura|chiudiamo)\b/i.test(utterance)) {
+    const current = typeof menu?.orari === 'object' ? menu.orari?.it : menu?.orari;
+    const tidy = normalizeHours({ existing: current, text: utterance });
+    if (tidy) ops.push({ tipo: 'locale', campo: 'orari', nome: tidy.it, en: tidy.en });
+  }
   return { ops, problems };
 }
 
@@ -325,6 +342,7 @@ export function applyOps(menuIn, provenanceIn, ops, source) {
   const menu = structuredClone(menuIn);
   const summary = [];
   let needsEnglish = false;
+  const hoursRows = []; // provenienza di orari.it / orari.en quando Jarvis li riscrive
   // Identità stabile delle voci e delle sezioni, per ricostruire la provenienza dopo spostamenti e rimozioni.
   menu.sezioni.forEach((section, si) => { section.__s = si; section.voci.forEach((item, vi) => { item.__k = `${si}.${vi}`; }); });
   const byKey = (key) => { for (const section of menu.sezioni) for (const item of section.voci) if (item.__k === key) return { section, item }; return null; };
@@ -357,8 +375,12 @@ export function applyOps(menuIn, provenanceIn, ops, source) {
     }
     if (op.tipo === 'locale') {
       const localized = op.campo === 'orari' || op.campo === 'sottotitolo';
-      menu[op.campo] = localized ? { it: op.nome } : op.nome;
-      if (localized) needsEnglish = true;
+      menu[op.campo] = localized ? { it: op.nome, ...(op.en ? { en: op.en } : {}) } : op.nome;
+      if (localized && !op.en) needsEnglish = true;
+      if (op.campo === 'orari') {
+        hoursRows.push({ path: 'orari.it', source, value: op.nome, status: 'confermato' });
+        if (op.en) hoursRows.push({ path: 'orari.en', source: 'Orari italiani riscritti in inglese da Jarvis (nessuna traduzione automatica)', value: op.en, status: 'confermato' });
+      }
       summary.push(`${{ indirizzo: 'Indirizzo', telefono: 'Telefono', instagram: 'Instagram', maps: 'Link Google Maps', orari: 'Orari', sottotitolo: 'Sottotitolo' }[op.campo]}: «${op.nome}».`);
       continue;
     }
@@ -434,8 +456,10 @@ export function applyOps(menuIn, provenanceIn, ops, source) {
       provenance.push({ ...row, path: `sezioni.${at}.${sectionMatch[2]}` });
       continue;
     }
+    if (hoursRows.length && /^orari(\.|$)/.test(path)) continue;
     provenance.push(row);
   }
+  provenance.push(...hoursRows);
   // Fonte delle voci nuove o cambiate: Riccardo, via Telegram.
   menu.sezioni.forEach((section, si) => section.voci.forEach((item, vi) => {
     const isNew = fresh.includes(item), fields = changedFields.get(item.__k);
