@@ -2,6 +2,7 @@ import { createAiLiveAdapter } from './ai-live.js';
 import { approvalState, sha256Hex } from './approvals.js';
 import { GitHubLiveError, MANUAL_MERGE_CONFIRMATION, getPrStatus, listPrFiles, menuMediaFiles, mergeApprovedMenuPr, openApprovedMenuPr, readBaseSha, readCurrentMenu } from './github-live.js';
 import { reviewIssues } from './editorial.js';
+import { BLANCH_FILE_LIST, BlanchError, canonicalBlanch, isBlanchSlug, publicJsonToMenu, publicMenuJsonUrl, publicMenuPageUrl, semanticMenu } from './blanch.js';
 import { slugify, validateMenu } from './menu.js';
 const toBase64 = (bytes) => { let out = ''; for (let i = 0; i < bytes.length; i += 0x8000) out += String.fromCharCode(...bytes.subarray(i, i + 0x8000)); return btoa(out); };
 
@@ -409,6 +410,8 @@ async function loadPrContext(context, p) {
   try { menu = JSON.parse(draft.menu_json); } catch { fail('Bozza menu non leggibile.', 409); }
   const validation = validateMenu(menu);
   assert(!validation.errors.length, 'Validazione menù fallita.');
+  // Trattoria Blanch ha un formato proprio: ciò che non può contenere blocca qui, prima di riservare la PR.
+  if (isBlanchSlug(draft.slug)) { try { canonicalBlanch(menu); } catch (error) { if (error instanceof BlanchError) fail(error.message, 422); throw error; } }
   let checks;
   try { checks = JSON.parse(draft.checks_json); } catch { fail('Checklist editoriale non leggibile.', 409); }
   const review = reviewIssues(menu, checks, draft.request_plan);
@@ -553,11 +556,11 @@ async function reconcileLivePr(context, p) {
 // Indirizzo della pagina che vedono i clienti (quello del QR), salvato nella pratica.
 // Il file JSON resta solo l'oggetto della verifica tecnica.
 function customerMenuUrl(slug) {
-  return `${PUBLIC_MENU_ORIGIN}/menu/?m=${encodeURIComponent(slug)}`;
+  return publicMenuPageUrl(PUBLIC_MENU_ORIGIN, slug);
 }
 
 function publicMenuUrl(slug) {
-  return `${PUBLIC_MENU_ORIGIN}/menus/${encodeURIComponent(slug)}.json`;
+  return publicMenuJsonUrl(PUBLIC_MENU_ORIGIN, slug);
 }
 
 async function readPublishedMenu(context, slug) {
@@ -584,6 +587,7 @@ async function readPublishedMenu(context, slug) {
   try { menu = JSON.parse(await response.text()); }
   catch { fail('Il menu pubblico non contiene JSON valido.', 409); }
   assert(object(menu), 'Il menu pubblico non contiene un oggetto JSON valido.', 409);
+  try { menu = publicJsonToMenu(slug, menu); } catch (error) { if (error instanceof BlanchError) fail(error.message, 409); throw error; }
   assert(menu.id === slug, 'L’identificativo del menu pubblico non corrisponde allo slug verificato.', 409);
   const validation = validateMenu(menu);
   assert(!validation.errors.length, 'Il menu pubblico non supera la validazione.', 409);
@@ -658,15 +662,22 @@ async function mergeLivePr(context, p) {
   const prNumber = Number(record.pr_number);
   const status = await getPrStatus(context.env, prNumber, options);
   assert(status.headRef === record.branch_name && status.htmlUrl === record.pr_url, 'La PR GitHub non corrisponde a quella registrata.', 409);
+  const legacy = isBlanchSlug(record.slug);
   const filePath = `menus/${record.slug}.json`;
   const files = await listPrFiles(context.env, prNumber, options);
   // Oltre al menu, solo le foto che il menu approvato usa (menus/media/<sha256>.<ext>), aggiunte e mai modificate.
   const allowedMedia = new Set(menuMediaFiles(JSON.parse(record.draft_menu_json)).map((f) => f.path));
-  assert(files.filter((f) => f.filename === filePath).length === 1
-    && files.every((f) => f.filename === filePath || (allowedMedia.has(f.filename) && f.status === 'added')),
-  `La PR deve modificare solo ${filePath} e aggiungere le foto del menu approvato.`, 409);
+  if (legacy) {
+    // Blanch: solo i suoi tre file (food.json, wines.tsv, menu.json), ognuno al massimo una volta, nessun'altra modifica.
+    assert(files.length > 0 && files.every((f) => BLANCH_FILE_LIST.includes(f.filename) && f.status === 'modified') && new Set(files.map((f) => f.filename)).size === files.length,
+      'La PR deve modificare solo i file di Trattoria Blanch (food.json, wines.tsv, menu.json).', 409);
+  } else {
+    assert(files.filter((f) => f.filename === filePath).length === 1
+      && files.every((f) => f.filename === filePath || (allowedMedia.has(f.filename) && f.status === 'added')),
+    `La PR deve modificare solo ${filePath} e aggiungere le foto del menu approvato.`, 409);
+  }
   const head = await readCurrentMenu(context.env, record.slug, { ...options, ref: status.headSha });
-  assert(head.exists && sameMenuSemantics(head.menu, JSON.parse(record.draft_menu_json)), 'Il file nella PR non coincide con il menu approvato.', 409);
+  assert(head.exists && sameMenuSemantics(semanticMenu(record.slug, head.menu), semanticMenu(record.slug, JSON.parse(record.draft_menu_json))), 'Il file nella PR non coincide con il menu approvato.', 409);
   await auditOnly({ ...context, requestId: record.request_id, revision: record.request_revision,
     event: 'github.pr.merge.start', message: `Pubblicazione confermata da Riccardo: merge della PR #${prNumber} su main.` });
   const merged = await mergeApprovedMenuPr(context.env, {
@@ -706,7 +717,7 @@ async function verifyGitHubPublication(context, p) {
   assert(status.merged === true, 'La PR GitHub non risulta ancora merged.', 409);
 
   const published = await readPublishedMenu(context, record.slug);
-  assert(sameMenuSemantics(published.menu, prepared.expectedMenu),
+  assert(sameMenuSemantics(semanticMenu(record.slug, published.menu), semanticMenu(record.slug, prepared.expectedMenu)),
     'Il menu pubblico differisce semanticamente dalla bozza versionata merged.', 409);
 
   const stamp = context.now();
