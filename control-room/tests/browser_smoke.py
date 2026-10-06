@@ -50,6 +50,14 @@ with sync_playwright() as playwright:
             form.locator('button[type="submit"]').click()
             page.get_by_text('Cliente demo creato.').wait_for()
             context.set_offline(False)
+        if width == 390:
+            page.evaluate("location.hash = 'command'")
+            page.locator('.oggi-card', has_text='Nuova richiesta').first.click()
+            page.locator('.plan-choice').first.wait_for()
+            assert page.locator('.plan-choice').count() == 3 and page.locator('[data-action="generate-draft"]').count() == 0, 'piano da scegliere prima della bozza'
+            page.locator('[data-plan="standard"]').click()
+            page.locator('[data-action="generate-draft"]').wait_for()
+            assert page.locator('.plan-choice').count() == 0
         assert not errors, f'JS error after interactions {width}: {errors}'
         print(f'PASS {width}x{height}: viewport, navigazione, temi, focus, zero errori JS')
         context.close()
