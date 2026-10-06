@@ -1,0 +1,164 @@
+{
+  "id": "al-chiostro-bistrot",
+  "nome": "Al Chiostro Bistrot",
+  "lingue": [
+    "it",
+    "en"
+  ],
+  "sezioni": [
+    {
+      "nome": {
+        "it": "antipasti",
+        "en": "Starters"
+      },
+      "voci": [
+        {
+          "nome": {
+            "it": "Polpo scottato su crema di burrata, pomodorini confit e olive nere disidratate",
+            "en": "Seared octopus on burrata cream, confit cherry tomatoes and dehydrated black olives"
+          },
+          "prezzo": "16,00"
+        },
+        {
+          "nome": {
+            "it": "Flan di zucca e carote, salsa al formaggio Dolce capra e noci tostate",
+            "en": "Pumpkin and carrot flan, Dolce capra cheese sauce and toasted walnuts"
+          },
+          "prezzo": "14,00"
+        },
+        {
+          "nome": {
+            "it": "Tartare di manzo speziata con crostini di pane e riccioli di burro",
+            "en": "Spiced beef tartare with artisan bread croutons and butter curls"
+          },
+          "prezzo": "15,00"
+        }
+      ]
+    },
+    {
+      "nome": {
+        "it": "primi",
+        "en": "First courses"
+      },
+      "voci": [
+        {
+          "nome": {
+            "it": "Gnocchi della casa con fasolari, cozze e pomodorini",
+            "en": "Homemade gnocchi with dog cockles, mussels and cherry tomatoes"
+          },
+          "prezzo": "16,00"
+        },
+        {
+          "nome": {
+            "it": "Paccheri con crema di ricotta al profumo di tartufo e pomodorini confit",
+            "en": "Paccheri with truffle-scented ricotta cream and confit cherry tomatoes"
+          },
+          "prezzo": "15,00"
+        },
+        {
+          "nome": {
+            "it": "Tagliolini al prosciutto crudo “scur di lune” e semi di papavero",
+            "en": "Tagliolini with \"scur di lune\" cured ham and poppy seeds"
+          },
+          "prezzo": "15,00"
+        }
+      ]
+    },
+    {
+      "nome": {
+        "it": "secondi",
+        "en": "Main courses"
+      },
+      "voci": [
+        {
+          "nome": {
+            "it": "Seppie in umido con piselli e polenta socchievina morbida",
+            "en": "Stewed cuttlefish with peas and soft Socchieve polenta"
+          },
+          "prezzo": "18,00"
+        },
+        {
+          "nome": {
+            "it": "Polpette di lenticchie saporite, salsa allo zafferano su letto di rucola",
+            "en": "Flavourful lentil meatballs, saffron sauce on a bed of rocket"
+          },
+          "prezzo": "15,00"
+        },
+        {
+          "nome": {
+            "it": "Stinco di maiale al forno con salsa alla birra “Casamatta” e patate",
+            "en": "Roasted pork knuckle with \"Casamatta\" beer sauce and potatoes"
+          },
+          "prezzo": "18,00"
+        }
+      ]
+    },
+    {
+      "nome": {
+        "it": "dolci",
+        "en": "Desserts"
+      },
+      "voci": [
+        {
+          "nome": {
+            "it": "Chiostromisù",
+            "en": "Chiostromisù"
+          },
+          "prezzo": "6,00"
+        },
+        {
+          "nome": {
+            "it": "Mousse al cioccolato, crema alla vaniglia e noci",
+            "en": "Chocolate mousse, vanilla cream and walnuts"
+          },
+          "prezzo": "6,00"
+        },
+        {
+          "nome": {
+            "it": "Panna cotta con salsa al mango e granella di nocciole",
+            "en": "Panna cotta with mango sauce and hazelnut crumb"
+          },
+          "prezzo": "6,00"
+        }
+      ]
+    },
+    {
+      "nome": {
+        "it": "Bevande",
+        "en": "Drinks"
+      },
+      "voci": [
+        {
+          "nome": {
+            "it": "Bibite",
+            "en": "Soft drinks"
+          },
+          "prezzo": "5,00"
+        },
+        {
+          "nome": {
+            "it": "Calice di vino",
+            "en": "Glass of wine"
+          },
+          "prezzo": "6,00"
+        },
+        {
+          "nome": {
+            "it": "Caffè",
+            "en": "Coffee"
+          },
+          "prezzo": "1,00"
+        }
+      ]
+    }
+  ],
+  "tema": "notte",
+  "orari": {
+    "it": "12:00–15:00 e 19:00–22:00 · Chiuso il mercoledì",
+    "en": "12:00–15:00 and 19:00–22:00 · Closed on Wednesday"
+  },
+  "indirizzo": "Piazza S. Antonio 10, 34170 Gorizia",
+  "telefono": "0481227207",
+  "instagram": "alchiostro.bistro",
+  "coperto": "3,00"
+}
