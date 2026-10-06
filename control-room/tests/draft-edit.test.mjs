@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { applyOps, normalizePrice, spokenPrices, validateOps, wordNumber } from '../cloudflare/functions/_lib/draft-edit.js';
+import { applyOps, editFingerprints, normalizePrice, replayableOps, spokenPrices, validateOps, wordNumber } from '../cloudflare/functions/_lib/draft-edit.js';
 
 const menu = () => ({
   id: 'prova', nome: 'Prova', lingue: ['it', 'en'],
@@ -159,4 +159,36 @@ test('operazione con il tipo scritto come chiave viene riportata alla forma norm
   const out = validateOps([{ aspetto: { direzione: 'bistrot', colori: { accento: '#4a6b22' } } }], premium, 'aspetto bistrot accento #4a6b22');
   assert.deepEqual(out.problems, []);
   assert.equal(out.ops[0].tipo, 'aspetto');
+});
+
+test('dati del locale e storia: solo se scritti nella frase', () => {
+  const premium = { ...menu(), premium: { direzione: 'bistrot' } };
+  const said = 'telefono +39 351 917 0910, instagram @osteriacodelli23, orari Mer-Ven 18-22. storia: Paolo guida la cucina di pesce e carne, Eleonora segue la sala.';
+  const ok = validateOps([
+    { tipo: 'locale', campo: 'telefono', nome: '+39 351 917 0910' },
+    { tipo: 'locale', campo: 'instagram', nome: '@osteriacodelli23' },
+    { tipo: 'locale', campo: 'orari', nome: 'Mer-Ven 18-22' },
+    { tipo: 'storia', nome: 'Paolo guida la cucina di pesce e carne.\nEleonora segue la sala.' }
+  ], premium, said);
+  assert.deepEqual(ok.problems, []);
+  const out = applyOps(premium, [], ok.ops, 'R');
+  assert.equal(out.menu.telefono, '+39 351 917 0910');
+  assert.equal(out.menu.instagram, 'osteriacodelli23');
+  assert.deepEqual(out.menu.orari, { it: 'Mer-Ven 18-22' });
+  assert.equal(out.menu.premium.storia.it.split('\n').length, 2);
+  assert.equal(out.needsEnglish, true);
+  assert.match(validateOps([{ tipo: 'locale', campo: 'telefono', nome: '+39 333 111 2222' }], premium, said).problems[0], /non ho letto/);
+  assert.match(validateOps([{ tipo: 'locale', campo: 'wifi', nome: 'x' }], premium, said).problems[0], /campo/);
+  assert.match(validateOps([{ tipo: 'storia', nome: 'Fondato nel 1850 da un marinaio.' }], premium, said).problems[0], /non corrisponde/);
+  assert.match(validateOps([{ tipo: 'storia', nome: 'Paolo guida la cucina' }], menu(), said).problems[0], /non è Premium/);
+});
+
+test('correzioni dettate: si rimettono solo dove la voce è la stessa', () => {
+  const before = menu();
+  const ops = [{ tipo: 'prezzo', si: 0, vi: 0, prezzo: '9,00' }];
+  const fp = editFingerprints(before, ops);
+  assert.equal(replayableOps(before, ops, fp).keep.length, 1);
+  const other = structuredClone(before); other.sezioni[0].voci[0].nome = { it: 'Altro piatto' };
+  const r = replayableOps(other, ops, fp);
+  assert.equal(r.keep.length, 0); assert.equal(r.skipped.length, 1);
 });

@@ -27,7 +27,7 @@ import { dropRepeatedPages, notesSummary, reviewNotes, structureNotes } from '..
 import { briefLines, briefNotes, creativeBrief, premiumDirections, storyFromSource } from '../../_lib/premium.js';
 import { applyVenueInfo, extractVenueInfo } from '../../_lib/venue-info.js';
 import { applyPriceCorrections } from '../../_lib/corrections.js';
-import { applyOps as applyDraftOps } from '../../_lib/draft-edit.js';
+import { applyOps as applyDraftOps, editLogKey, replayableOps } from '../../_lib/draft-edit.js';
 async function draftNotes(db, requestId) {
   try { return parseList((await getOne(db, 'SELECT review_notes_json AS n FROM drafts WHERE request_id=? ORDER BY created_at DESC LIMIT 1', requestId))?.n); }
   catch { return []; }
@@ -362,7 +362,39 @@ async function missionRows(db) {
   try { return await rows(db, 'SELECT id,request_id AS requestId,draft_id AS draftId,status,note,rounds,step_started_at AS stepStartedAt,updated_at AS updatedAt FROM jarvis_missions ORDER BY updated_at DESC LIMIT 200'); }
   catch (error) { if (/no such table/i.test(String(error?.message))) return []; throw error; }
 }
-export async function action(db, type, input, env = {}) {
+export const textOf = (value) => (typeof value === 'string' ? value : value && typeof value === 'object' ? value.it || '' : '').trim();
+async function restoreAfterRebuild(db, env, requestId, newId, oldJson) {
+  if (!newId || !oldJson) return { restored: 0, skipped: 0 };
+  let old; try { old = JSON.parse(oldJson); } catch { return { restored: 0, skipped: 0 }; }
+  const current = async () => getOne(db, 'SELECT id,revision,menu_json FROM drafts WHERE id=?', newId);
+  const fresh = JSON.parse((await current()).menu_json);
+  const ops = [];
+  const premium = old.premium || {};
+  if (fresh.premium && premium.direzione && premium.colori) ops.push({ tipo: 'aspetto', direzione: premium.direzione, colori: premium.colori });
+  if (fresh.premium && textOf(premium.motto) && textOf(premium.motto) !== textOf(fresh.premium.motto)) ops.push({ tipo: 'motto', nome: textOf(premium.motto) });
+  if (fresh.premium && textOf(premium.storia) && textOf(premium.storia) !== textOf(fresh.premium.storia)) ops.push({ tipo: 'storia', nome: textOf(premium.storia) });
+  for (const campo of ['sottotitolo', 'indirizzo', 'telefono', 'instagram', 'maps', 'orari']) {
+    if (textOf(old[campo]) && textOf(old[campo]) !== textOf(fresh[campo])) ops.push({ tipo: 'locale', campo, nome: textOf(old[campo]) });
+  }
+  let restored = 0, skipped = 0, applied = false;
+  const apply = async (list) => {
+    if (!list.length) return;
+    const row = await current();
+    await action(db, 'editDraftOps', { id: row.id, revision: row.revision, ops: list, source: 'Ripristino dopo «Rifai la bozza»' }, env);
+    applied = true;
+  };
+  await apply(ops); restored += ops.length;
+  let log = []; try { log = JSON.parse((await getOne(db, 'SELECT value FROM jarvis_settings WHERE key=?', editLogKey(requestId)))?.value || '[]'); } catch { log = []; }
+  for (const entry of Array.isArray(log) ? log : []) {
+    const row = await current();
+    const { keep, skipped: dropped } = replayableOps(JSON.parse(row.menu_json), entry.ops, entry.fp);
+    skipped += dropped.length;
+    try { await apply(keep); restored += keep.length; } catch { skipped += keep.length; }
+  }
+  if (applied) { try { const row = await current(); await action(db, 'translateDraft', { id: row.id, revision: row.revision }, env); } catch { /* inglese da completare in Revisione */ } }
+  return { restored, skipped };
+}
+async function action(db, type, input, env = {}) {
   const p = input && typeof input === 'object' && !Array.isArray(input) ? input : {};
   const privateResult = await runPrivateIntegrationAction({
     db, env, auditedBatch, getOne, rows, now, uid
@@ -751,12 +783,17 @@ export async function action(db, type, input, env = {}) {
     assert(!sentOut, 'Anteprima già mandata al locale o approvata: non si rifà.', 409);
     const unread = await getOne(db, "SELECT COUNT(*) AS n FROM materials WHERE request_id=? AND processing_status='da_trascrivere' AND archived_at IS NULL", draft.request_id);
     assert(!Number(unread?.n), 'Jarvis sta ancora leggendo dei file di questa pratica: riprova tra un minuto.', 409);
+    const before = await getOne(db, 'SELECT menu_json FROM drafts WHERE id=?', draft.id);
     await auditedBatch(db, [db.prepare('DELETE FROM jarvis_outbox WHERE mission_id IN (SELECT id FROM jarvis_missions WHERE draft_id=?)').bind(draft.id),
       db.prepare('DELETE FROM jarvis_missions WHERE draft_id=?').bind(draft.id), db.prepare('DELETE FROM publication_approvals WHERE draft_id=?').bind(draft.id),
       db.prepare('DELETE FROM draft_versions WHERE draft_id=?').bind(draft.id), db.prepare('DELETE FROM drafts WHERE id=?').bind(draft.id)],
       'draft.rebuild', 'Bozza rifatta da capo con tutti i materiali della pratica, su richiesta di Riccardo.', draft.request_id);
     const rebuilt = await action(db, 'generateDraft', { requestId: draft.request_id }, env);
-    result = { ...rebuilt.result, rebuilt: true };
+    // Le decisioni già prese non tornano indietro: aspetto, frase d'apertura, storia, dati del locale
+    // e le correzioni dettate a Jarvis si rimettono sulla bozza nuova (solo dove la voce è la stessa).
+    let kept = { restored: 0, skipped: 0 };
+    try { kept = await restoreAfterRebuild(db, env, draft.request_id, rebuilt.result?.id, before?.menu_json); } catch { /* la bozza nuova resta valida */ }
+    result = { ...rebuilt.result, rebuilt: true, ...kept };
   } else if (type === 'deleteRequest') {
     // Elimina una pratica di prova o mai pubblicata (e il cliente, se resta senza pratiche e senza menu online).
     assert(p.confirmation === 'ELIMINA PRATICA', 'Conferma mancante.', 403);

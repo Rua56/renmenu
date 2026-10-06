@@ -7,7 +7,7 @@
 import { CLOUDFLARE_FREE_MODEL } from './ai-live.js';
 import { DIREZIONI } from './premium.js';
 
-export const OP_TYPES = ['prezzo', 'varianti', 'aggiungi', 'rimuovi', 'rinomina', 'descrizione', 'sposta', 'rinomina_sezione', 'motto', 'aspetto'];
+export const OP_TYPES = ['prezzo', 'varianti', 'aggiungi', 'rimuovi', 'rinomina', 'descrizione', 'sposta', 'rinomina_sezione', 'motto', 'aspetto', 'locale', 'storia'];
 
 const plain = (value) => String(value || '').toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '');
 const words = (value) => plain(value).replace(/[^a-z0-9]+/g, ' ').trim().split(/\s+/).filter(Boolean);
@@ -85,7 +85,7 @@ const OP_SCHEMA = {
       tipo: { type: 'string', enum: OP_TYPES },
       si: { type: 'integer' }, vi: { type: 'integer' }, nome: { type: 'string' }, prezzo: { type: 'string' },
       varianti: { type: 'array', items: { type: 'object', properties: { etichetta: { type: 'string' }, prezzo: { type: 'string' } }, required: ['etichetta', 'prezzo'] } },
-      direzione: { type: 'string' }, colori: { type: 'object', properties: { fondo: { type: 'string' }, testo: { type: 'string' }, accento: { type: 'string' }, secondario: { type: 'string' } } },
+      campo: { type: 'string' }, direzione: { type: 'string' }, colori: { type: 'object', properties: { fondo: { type: 'string' }, testo: { type: 'string' }, accento: { type: 'string' }, secondario: { type: 'string' } } },
       descrizione: { type: 'string' }, sezione: { type: 'string' }, a_si: { type: 'integer' }, dopo_vi: { type: 'integer' }
     }, required: ['tipo'] } },
     dubbio: { type: 'string' }
@@ -95,7 +95,7 @@ const OP_SCHEMA = {
 const SYSTEM = [
   'Sei Jarvis, assistente di Riccardo per RenMenu. Riccardo ti detta (anche a voce, con errori di trascrizione) una correzione alla BOZZA di un menu.',
   'Trasformala in operazioni, usando SOLO gli indici dell’elenco: [S2] è la sezione 2, [2.5] è la voce 5 della sezione 2 (si=2, vi=5).',
-  'Tipi consentiti: prezzo (si, vi, prezzo); varianti (si, vi, varianti[{etichetta, prezzo}]: più prezzi per la stessa voce, per esempio calice e bottiglia, piccola e grande, oppure vitello e maiale se il nome elenca le alternative); aggiungi (si, nome, prezzo oppure varianti, descrizione facoltativa, dopo_vi facoltativo; se la sezione è nuova scrivi il suo nome in sezione e ometti si); rimuovi (si, vi); rinomina (si, vi, nome); descrizione (si, vi, descrizione; stringa vuota per toglierla); sposta (si, vi, a_si; se la sezione di destinazione non esiste ancora scrivi il suo nome in sezione e ometti a_si); rinomina_sezione (si, nome); motto (nome: la frase che compare sotto il logo nell’apertura del menu Premium, per esempio uno slogan del locale; nessun indice); aspetto (direzione: editoriale, bistrot o moderno; colori: {fondo, testo, accento, secondario} in formato #rrggbb, solo quelli che Riccardo ha scritto; nessun indice).',
+  'Tipi consentiti: prezzo (si, vi, prezzo); varianti (si, vi, varianti[{etichetta, prezzo}]: più prezzi per la stessa voce, per esempio calice e bottiglia, piccola e grande, oppure vitello e maiale se il nome elenca le alternative); aggiungi (si, nome, prezzo oppure varianti, descrizione facoltativa, dopo_vi facoltativo; se la sezione è nuova scrivi il suo nome in sezione e ometti si); rimuovi (si, vi); rinomina (si, vi, nome); descrizione (si, vi, descrizione; stringa vuota per toglierla); sposta (si, vi, a_si; se la sezione di destinazione non esiste ancora scrivi il suo nome in sezione e ometti a_si); rinomina_sezione (si, nome); motto (nome: la frase che compare sotto il logo nell’apertura del menu Premium, per esempio uno slogan del locale; nessun indice); locale (campo: indirizzo, telefono, instagram, maps, orari o sottotitolo; nome: il valore scritto da Riccardo); storia (nome: il testo della storia del locale, solo menu Premium, paragrafi separati da una riga a capo; nessun indice); aspetto (direzione: editoriale, bistrot o moderno; colori: {fondo, testo, accento, secondario} in formato #rrggbb, solo quelli che Riccardo ha scritto; nessun indice).',
   'Regole ferree: non inventare nulla. Nomi, prezzi e descrizioni devono essere quelli detti da Riccardo (i prezzi in formato 12,00). Non toccare le voci che Riccardo non nomina. Non scrivere allergeni, ingredienti o traduzioni. Se la richiesta è incomprensibile o ambigua, restituisci operazioni vuote e spiega in «dubbio», in italiano, cosa ti serve sapere.',
   'Per dividere una voce in due piatti distinti: rimuovi la voce e aggiungi i due piatti nella stessa sezione. Se Riccardo dice di tenere una voce con due prezzi, usa varianti. Rispondi solo con JSON, in questa forma: {"operazioni":[{"tipo":"sposta","si":10,"vi":0,"sezione":"Bevande"},{"tipo":"prezzo","si":2,"vi":1,"prezzo":"9,00"}],"dubbio":""}. Ogni operazione ha sempre il campo «tipo».'
 ].join('\n');
@@ -238,6 +238,28 @@ export function validateOps(rawOps, menu, utterance) {
       if (Object.keys(colori).length) entry.colori = colori;
       ops.push(entry); continue;
     }
+    if (type === 'locale') {
+      const field = plain(raw.campo);
+      const FIELDS = ['indirizzo', 'telefono', 'instagram', 'maps', 'orari', 'sottotitolo'];
+      if (!FIELDS.includes(field)) { problems.push('Dati del locale: il campo deve essere indirizzo, telefono, instagram, maps, orari o sottotitolo.'); continue; }
+      let value = clip(raw.nome ?? raw.testo, field === 'orari' ? 200 : field === 'maps' ? 300 : 120);
+      if (field === 'instagram') value = value.replace(/^https?:\/\/(?:www\.)?instagram\.com\//i, '').replace(/^@/, '').replace(/\/$/, '');
+      const okShape = { telefono: /^\+?[0-9][0-9 ().-]{5,23}$/, instagram: /^[a-z0-9._]{1,30}$/i, maps: /^https:\/\/\S+$/ }[field];
+      if (!value || (okShape && !okShape.test(value))) { problems.push(`Dati del locale (${field}): valore mancante o non valido.`); continue; }
+      const strip = (t) => plain(t).replace(/[^a-z0-9]/g, '');
+      if (!strip(utterance).includes(strip(value))) { problems.push(`Dati del locale (${field}): non ho letto «${value}» nella tua frase.`); continue; }
+      if (ops.some((o) => o.tipo === 'locale' && o.campo === field)) { problems.push(`Dati del locale (${field}): uno solo per volta.`); continue; }
+      ops.push({ tipo: type, campo: field, nome: value }); continue;
+    }
+    if (type === 'storia') {
+      if (!menu?.premium) { problems.push('Storia: questo menu non è Premium.'); continue; }
+      const paragraphs = String(raw.nome ?? raw.testo ?? '').split(/\n+/).map((x) => clip(x, 600)).filter(Boolean).slice(0, 5);
+      const joined = paragraphs.join('\n');
+      if (!joined || joined.length > 1400) { problems.push('Storia: testo mancante o troppo lungo (massimo 1400 caratteri).'); continue; }
+      if (!textGrounded(joined, said, itText(menu.premium.storia))) { problems.push('Storia: il testo non corrisponde a quello che hai detto.'); continue; }
+      if (ops.some((o) => o.tipo === 'storia')) { problems.push('Storia: una sola per volta.'); continue; }
+      ops.push({ tipo: type, nome: joined }); continue;
+    }
     if (type === 'motto') {
       const text = clip(raw.nome ?? raw.testo ?? raw.descrizione, 160);
       if (!menu?.premium) { problems.push('Frase d’apertura: questo menu non è Premium.'); continue; }
@@ -333,6 +355,19 @@ export function applyOps(menuIn, provenanceIn, ops, source) {
       summary.push(`Aspetto: ${DIREZIONI[direzione].label}${op.colori ? `, colori ${Object.entries(op.colori).map(([k, v]) => `${k} ${v}`).join(', ')}` : ''}.`);
       continue;
     }
+    if (op.tipo === 'locale') {
+      const localized = op.campo === 'orari' || op.campo === 'sottotitolo';
+      menu[op.campo] = localized ? { it: op.nome } : op.nome;
+      if (localized) needsEnglish = true;
+      summary.push(`${{ indirizzo: 'Indirizzo', telefono: 'Telefono', instagram: 'Instagram', maps: 'Link Google Maps', orari: 'Orari', sottotitolo: 'Sottotitolo' }[op.campo]}: «${op.nome}».`);
+      continue;
+    }
+    if (op.tipo === 'storia') {
+      menu.premium = { ...(menu.premium || {}), storia: { it: op.nome } };
+      needsEnglish = true;
+      summary.push(`Storia del locale: ${op.nome.length} caratteri, da far approvare ai titolari.`);
+      continue;
+    }
     if (op.tipo === 'motto') {
       menu.premium = { ...(menu.premium || {}), motto: { it: op.nome } };
       needsEnglish = true;
@@ -415,3 +450,30 @@ export function applyOps(menuIn, provenanceIn, ops, source) {
 
 /** Frase breve per Telegram. */
 export function summaryText(summary) { return summary.map((line) => `• ${line}`).join('\n'); }
+
+
+/* ---------- memoria delle correzioni dettate (per non perderle se la bozza viene rifatta) ---------- */
+export const editLogKey = (requestId) => `edits_${requestId}`;
+const nameOf = (value) => plain(itText(value));
+/** Per ogni operazione: nome della voce, della sezione e della destinazione al momento della modifica. */
+export function editFingerprints(menu, ops) {
+  const sections = menu?.sezioni || [];
+  return (ops || []).map((op) => ({
+    n: Number.isInteger(op.si) && Number.isInteger(op.vi) ? nameOf(sections[op.si]?.voci?.[op.vi]?.nome) : null,
+    s: Number.isInteger(op.si) ? nameOf(sections[op.si]?.nome) : null,
+    a: Number.isInteger(op.a_si) ? nameOf(sections[op.a_si]?.nome) : null
+  }));
+}
+/** Le operazioni che puntano ancora alla stessa voce o sezione nella bozza rifatta; le altre si scartano. */
+export function replayableOps(menu, ops, prints) {
+  const sections = menu?.sezioni || [];
+  const keep = [], skipped = [];
+  (ops || []).forEach((op, index) => {
+    const fp = prints?.[index] || {};
+    const ok = (fp.n == null || nameOf(sections[op.si]?.voci?.[op.vi]?.nome) === fp.n)
+      && (fp.s == null || nameOf(sections[op.si]?.nome) === fp.s)
+      && (fp.a == null || nameOf(sections[op.a_si]?.nome) === fp.a);
+    (ok ? keep : skipped).push(op);
+  });
+  return { keep, skipped };
+}

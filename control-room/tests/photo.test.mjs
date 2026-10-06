@@ -135,7 +135,7 @@ describe('Foto del menu nella pratica', () => {
       assert.equal((await db.prepare('SELECT COUNT(*) AS n FROM drafts WHERE request_id=?').bind(requestId).first()).n, 1);
       // Riccardo modifica la bozza; poi arriva un'altra foto: la bozza NON si tocca e Jarvis lo dice.
       const draft = await db.prepare('SELECT * FROM drafts WHERE request_id=?').bind(requestId).first();
-      const edited = JSON.parse(draft.menu_json); edited.sezioni[0].voci[0].nome.it = 'Frico croccante con polenta';
+      const edited = JSON.parse(draft.menu_json); edited.sezioni[0].voci[0].nome.it = 'Frico croccante con polenta'; edited.telefono = '+39 0481 123456'; edited.orari = { it: 'Mar-Dom 18-22' };
       assert.equal((await act(db, 'saveDraft', { id: draft.id, revision: draft.revision, menu: edited, slug: draft.slug })).status, 200);
       store.set('k4', new Uint8Array([255, 216, 255, 4])); pages.k4 = '# Vini\nRefosco — 7';
       await add('p4', 'k4', '2026-10-03T00:09:00Z');
@@ -152,8 +152,15 @@ describe('Foto del menu nella pratica', () => {
       await db.prepare("UPDATE jarvis_missions SET status='ferma' WHERE id='m1'").bind().run();
       assert.equal((await act(db, 'rebuildDraft', { draftId: draft.id, confirmation: 'RIFAI BOZZA' })).status, 409, 'anteprima già dal locale');
       await db.prepare("UPDATE publication_approvals SET recipient='telegram:riccardo' WHERE id='ap1'").bind().run();
+      await db.prepare("INSERT INTO jarvis_settings (key,value,updated_at) VALUES (?,?,?)").bind(`edits_${requestId}`, JSON.stringify([
+        { at: t, ops: [{ tipo: 'prezzo', si: 1, vi: 0, prezzo: '6,00' }, { tipo: 'prezzo', si: 0, vi: 0, prezzo: '13,00' }], fp: [{ n: 'gubana', s: 'dolci', a: null }, { n: 'altro piatto', s: 'antipasti', a: null }] }]), t).run();
       const rebuilt = await act(db, 'rebuildDraft', { draftId: draft.id, confirmation: 'RIFAI BOZZA' });
       assert.equal(rebuilt.status, 200, JSON.stringify(rebuilt.body));
+      const after = JSON.parse((await db.prepare('SELECT menu_json FROM drafts WHERE request_id=?').bind(requestId).first()).menu_json);
+      assert.equal(after.telefono, '+39 0481 123456', 'i dati del locale non tornano indietro');
+      assert.deepEqual(after.orari, { it: 'Mar-Dom 18-22' });
+      assert.match(JSON.stringify(after.sezioni[1].voci[0].prezzo), /6/, 'la correzione dettata si rimette sulla stessa voce');
+      assert.doesNotMatch(JSON.stringify(after.sezioni[0].voci[0].prezzo), /13/, 'una voce diversa non viene toccata');
       assert.deepEqual(await names(), ['Frico con polenta', 'Gubana', 'Ribolla gialla', 'Refosco']);
       assert.equal((await db.prepare('SELECT COUNT(*) AS n FROM jarvis_missions WHERE request_id=?').bind(requestId).first()).n, 0);
       assert.equal((await db.prepare('SELECT COUNT(*) AS n FROM publication_approvals WHERE request_id=?').bind(requestId).first()).n, 0);

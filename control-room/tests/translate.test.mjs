@@ -141,3 +141,11 @@ describe('frase d’apertura Premium', () => {
     assert.equal(translationEntries({ sezioni: [], premium: { motto: { it: 'Nel cuore', en: 'In the heart' } } }, 'en').length, 0);
   });
 });
+
+it('la storia lunga con paragrafi si traduce e conserva le righe a capo', () => {
+  const storia = `${'Paolo guida la cucina con piatti di pesce e di carne. '.repeat(5)}\nEleonora cura la sala.`;
+  const entries = translationEntries({ premium: { storia: { it: storia } } }, 'en');
+  assert.equal(entries.length, 1); assert.equal(entries[0].path, 'premium.storia');
+  assert.equal(checkTranslation(storia, 'Paolo runs the kitchen.\nEleonora looks after the dining room.'), '');
+  assert.match(checkTranslation('una riga', 'a\nb'), /non ammessi/);
+});

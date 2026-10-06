@@ -673,7 +673,7 @@ function jarvisMissionPanel(draft) {
 function rebuildPanel(draft) {
   if (!['bozza', 'revisione'].includes(draft?.status) || (missionFor(draft) && !['ferma', 'annullata'].includes(missionFor(draft).status))) return '';
   const later = (state.materials || []).filter((m) => m.requestId === draft.requestId && !m.archivedAt && String(m.createdAt || '') > String(draft.createdAt || ''));
-  return `<form data-form="rebuild-draft" class="panel spaced-top-small"><input type="hidden" name="draftId" value="${escapeHtml(draft.id)}"><p class="eyebrow">RIFAI LA BOZZA</p>${later.length ? `<p class="notice warning small">${later.length} file arrivati dopo questa bozza (${later.map((m) => escapeHtml(m.filename)).join(', ')}): non sono nella bozza.</p>` : ''}<p class="small muted">Jarvis rilegge tutti i materiali della pratica e rifà la bozza da capo. Le modifiche fatte qui si perdono.</p><div class="button-row"><button class="button secondary" type="submit">Rifai la bozza con tutti i materiali</button></div></form>`;
+  return `<form data-form="rebuild-draft" class="panel spaced-top-small"><input type="hidden" name="draftId" value="${escapeHtml(draft.id)}"><p class="eyebrow">RIFAI LA BOZZA</p>${later.length ? `<p class="notice warning small">${later.length} file arrivati dopo questa bozza (${later.map((m) => escapeHtml(m.filename)).join(', ')}): non sono nella bozza.</p>` : ''}<p class="small muted">Jarvis rilegge tutti i materiali della pratica e rifà la bozza da capo. Aspetto, frase d’apertura, storia, dati del locale e correzioni dettate a Jarvis vengono rimessi; le modifiche fatte a mano qui in Revisione si perdono.</p><div class="button-row"><button class="button secondary" type="submit">Rifai la bozza con tutti i materiali</button></div></form>`;
 }
 function sourceExtrasPanel(draft) {
   const proposals = draft?.sourceExtras || [];
@@ -1243,7 +1243,7 @@ async function handleSubmit(event) {
   if (kind === 'venue-note') { await doAction('addVenueNote', { clientId: data.get('clientId'), text: data.get('text') }, 'Nota memorizzata: Jarvis la userà da ora.'); return; }
   if (kind === 'update-client') { await doAction('updateClient', { id: data.get('id'), revision: Number(data.get('revision')), patch: { plan: data.get('plan'), contactName: data.get('contactName'), contactRole: data.get('contactRole'), email: data.get('email'), phone: data.get('phone'), paymentStatus: data.get('paymentStatus'), menuId: data.get('menuId'), menuUrl: data.get('menuUrl'), trialEndsAt: data.get('trialEndsAt'), renewalAt: data.get('renewalAt'), internalNotes: data.get('internalNotes') } }, isDemoMode ? 'Scheda cliente demo aggiornata.' : 'Scheda cliente di staging aggiornata.'); return; }
   if (kind === 'rebuild-draft') {
-    if (!confirm('Rifaccio la bozza da capo con tutti i materiali della pratica? Le modifiche fatte a questa bozza si perdono.')) return;
+    if (!confirm('Rifaccio la bozza da capo con tutti i materiali della pratica? Aspetto, storia, dati del locale e correzioni dettate a Jarvis vengono rimessi; le modifiche fatte a mano in Revisione si perdono.')) return;
     await doAction('rebuildDraft', { draftId: data.get('draftId'), confirmation: 'RIFAI BOZZA' }, 'Bozza rifatta con tutti i materiali: ricontrollala.');
     return;
   }
