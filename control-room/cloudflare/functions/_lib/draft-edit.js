@@ -249,7 +249,8 @@ export function validateOps(rawOps, menu, utterance) {
       ops.push(entry); continue;
     }
     if (type === 'locale') {
-      const field = plain(raw.campo);
+      const written = plain(raw.campo).replace(/[^a-z]+/g, ' ').trim();
+      const field = ['indirizzo', 'telefono', 'instagram', 'maps', 'orari', 'sottotitolo', 'coperto'].find((f) => written === f || written.split(' ').includes(f)) || written;
       const FIELDS = ['indirizzo', 'telefono', 'instagram', 'maps', 'orari', 'sottotitolo', 'coperto'];
       if (!FIELDS.includes(field)) { problems.push('Dati del locale: il campo deve essere indirizzo, telefono, instagram, maps, orari, sottotitolo o coperto.'); continue; }
       if (field === 'coperto') {
@@ -354,9 +355,13 @@ export function validateOps(rawOps, menu, utterance) {
     }
   }
   // Il coperto detto con un solo importo chiaro, se il modello non ha prodotto l'operazione, lo ricavo io.
-  if (!ops.some((o) => o.tipo === 'locale' && o.campo === 'coperto') && !problems.some((p) => /coperto/i.test(p)) && /\bcoperto\b/i.test(utterance) && !ops.some((o) => o.tipo === 'rimuovi' || o.tipo === 'rimuovi_sezione')) {
+  if (!ops.some((o) => o.tipo === 'locale' && o.campo === 'coperto') && !problems.some((p) => /^Coperto/.test(p)) && /\bcoperto\b/i.test(utterance) && !ops.some((o) => o.tipo === 'rimuovi' || o.tipo === 'rimuovi_sezione')) {
     const cover = coverIn(utterance);
-    if (cover?.value && !cover.doubt) ops.push({ tipo: 'locale', campo: 'coperto', nome: cover.value });
+    if (cover?.value && !cover.doubt) {
+      ops.push({ tipo: 'locale', campo: 'coperto', nome: cover.value });
+      // Il modello aveva sbagliato il campo: l'operazione giusta l'ho ricavata dalle parole dette.
+      for (let i = problems.length - 1; i >= 0; i -= 1) if (/^Dati del locale: il campo/.test(problems[i])) problems.splice(i, 1);
+    }
   }
   // Se la frase parla chiaramente di orari ma il modello non ha prodotto l'operazione, la ricavo io dalle parole dette.
   if (!ops.some((o) => o.tipo === 'locale' && o.campo === 'orari') && !problems.some((p) => /orari/i.test(p)) && /\b(?:orari|orario|aperti|apriamo|apertura|chiusi|chiuso|chiusura|chiudiamo)\b/i.test(utterance)) {

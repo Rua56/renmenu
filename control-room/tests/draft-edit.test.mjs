@@ -256,3 +256,11 @@ test('il coperto non è mai una sezione: va nelle informazioni in fondo e toglie
   assert.match(validateOps([{ tipo: 'locale', campo: 'coperto', nome: '4,00' }], menu(), 'cambia il coperto').problems[0], /importo/);
 });
 const itName = (s) => s.nome.it;
+
+test('coperto: campo scritto male dal modello, l’operazione giusta si ricava dalla frase', () => {
+  const r = validateOps([{ tipo: 'locale', campo: 'coperto a persona', nome: '3 euro' }], menu(), 'Il coperto è 3 euro a persona');
+  assert.deepEqual(r.problems, []);
+  assert.deepEqual(r.ops, [{ tipo: 'locale', campo: 'coperto', nome: '3,00' }]);
+  const r2 = validateOps([{ tipo: 'locale', campo: 'prezzo del servizio', nome: '3' }], menu(), 'Il coperto è 3 euro a persona');
+  assert.deepEqual(r2.problems, []); assert.equal(r2.ops[0].nome, '3,00');
+});
