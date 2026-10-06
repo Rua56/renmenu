@@ -34,6 +34,18 @@ async function draftNotes(db, requestId) {
 }
 import { getMe, randomToken, sendTelegram, sendVoice, setWebhook, telegramReady } from '../../_lib/telegram.js';
 import { ACTIVATIONS, approvalEvidence, approvalState, assessReply, previewEmail, previewUrl, proposeReplyChanges, referenceCode, sha256Hex } from '../../_lib/approvals.js';
+
+// Nome pubblico del bot (serve solo a «Apri Telegram» nella Control Room): letto una volta e ricordato.
+async function botUsername(db, env) {
+  if (!telegramReady(env)) return '';
+  try {
+    const cached = await missions.setting(db, 'telegram_bot_username');
+    if (cached) return String(cached);
+    const username = (await getMe(env))?.result?.username;
+    if (username && /^[A-Za-z0-9_]{3,64}$/.test(username)) { await missions.putSetting(db, 'telegram_bot_username', username); return username; }
+  } catch { /* non blocca lo stato */ }
+  return '';
+}
 const headers = { 'Cache-Control': 'private, no-store', 'Content-Type': 'application/json; charset=utf-8' };
 const answer = (body, status = 200) => new Response(JSON.stringify(body), { status, headers });
 const failure = (status, message) => answer({ error: message }, status);
@@ -306,7 +318,7 @@ export async function state(db, env = {}) {
     notifications, messages, audit, autopilotPending: (await autopilotPending(db)).length,
     missions: await missionRows(db),
     venueMemory: await rows(db, 'SELECT id,client_id AS clientId,kind,text,source,created_at AS createdAt FROM venue_memory WHERE archived_at IS NULL ORDER BY created_at DESC LIMIT 400').catch(() => []),
-    telegram: { configured: telegramReady(env), linked: Boolean(await missions.setting(db, 'telegram_chat_id')) },
+    telegram: { configured: telegramReady(env), linked: Boolean(await missions.setting(db, 'telegram_chat_id')), bot: await botUsername(db, env) },
     reader: { gemini: Boolean(await missions.setting(db, 'gemini_api_key')), models: await missions.setting(db, 'gemini_models').then((v) => { try { return JSON.parse(v || '[]'); } catch { return []; } }) },
     voice: { provider: (await missions.setting(db, 'voice_provider')) || '', voiceId: (await missions.setting(db, 'voice_id')) || '', hasKey: Boolean(await missions.setting(db, 'voice_api_key')) },
     proposals: proposals.map(({ diffJson, ...p }) => ({ ...p, diff: JSON.parse(diffJson) })),

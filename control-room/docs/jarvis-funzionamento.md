@@ -61,7 +61,7 @@ Interfaccia mobile-first in HTML e JavaScript senza framework. Protetta da Cloud
 
 ### Le schermate
 
-Dal 6 ottobre 2026 la Control Room ha tre voci sempre visibili (telefono e computer): **Oggi**, **Locali**, **Sistema**. Gli strumenti di prima restano tutti, dentro Sistema.
+Dal 6 ottobre 2026 la Control Room ha tre voci sempre visibili (telefono e computer): **Oggi**, **Locali**, **Sistema**, in una barra in basso con sopra «Scrivi o parla a Jarvis…». L'aspetto segue il modello approvato (colonna stretta, sfera di Jarvis che diventa ambra quando aspetta il tuo SÌ, schede piatte, tema scuro). Gli strumenti di prima restano tutti, dentro Sistema, con i nuovi colori. La barra «Scrivi o parla a Jarvis…» apre un foglio con il link a Telegram e le frasi utili da copiare: la conversazione vera resta su Telegram.
 
 | Voce | Schermata | A cosa serve |
 |---|---|---|
@@ -69,7 +69,8 @@ Dal 6 ottobre 2026 la Control Room ha tre voci sempre visibili (telefono e compu
 | Oggi | Pratica | Una pratica sola: avanzamento (Richiesta, Bozza, Controllo, Il tuo SÌ, Online), «Cosa cambia» rispetto al menu online (lettura in sola lettura da GitHub, registrata nel registro), «Modifica a mano», anteprima e il passo successivo reale (affido a Jarvis o SÌ). Sotto «Dettagli e strumenti»: regole del piano, Revisione, Approvazioni, Materiali, richiesta originale, Registro. |
 | Oggi | Tutte le pratiche | Elenco unico con tre filtri: Da decidere, In corso, Chiuse (le archiviate restano in Sistema, Richieste). |
 | Oggi | Modifica a mano | Sezioni e voci della bozza leggibili: tocco su una voce per cambiare nome o prezzo, «Togli dal menu», «Aggiungi una voce», ricerca. Il salvataggio usa lo stesso comando della Revisione (blocco sulla revisione, validazione, nuova versione): la checklist si azzera e la bozza torna da controllare. Non pubblica nulla. |
-| Locali | Clienti | Schede dei locali: piano, email, link del menu, prova e rinnovo |
+| Locali | Elenco e Locale | Elenco dei locali con ricerca; la pagina di un locale mostra piano, menu, prova, email, le sue pratiche e «Apri il menu» (link pubblico, in sola lettura) |
+| Sistema | Schede cliente complete | Le schede dei locali con piano, email, link del menu, prova e rinnovo |
 | Sistema | Elenco strumenti | Revisione (controllo completo e modifica avanzata JSON, «Rifai la bozza»), Richieste, Approvazioni (PR, pubblicazione, verifica), Builder avanzato, Materiali, Anteprima, Notifiche, Registro, Voce del browser, più «Tutti i numeri e i dettagli» (numeri, coda, email al proprietario, casella Gmail) |
 
 Aprendo uno strumento da una pratica compare «Torna alla pratica». Nessuna azione è cambiata: «Approva e affida a Jarvis» e il SÌ usano gli stessi comandi di prima.
