@@ -126,3 +126,16 @@ test('operazione senza «tipo» ma con voce e destinazione è uno spostamento', 
   assert.equal(out.ops.length, 2);
   assert.match(validateOps([{ nome: 'x' }], menu(), said).problems[0], /vuoto/);
 });
+
+test('frase d’apertura Premium: solo con parole dette, solo in un menu Premium', () => {
+  const said = 'metti sotto il logo la frase Nel cuore del Collio, specialità di carne e pesce';
+  const premium = { ...menu(), premium: { direzione: 'editoriale' } };
+  const checked = validateOps([{ tipo: 'motto', nome: 'Nel cuore del Collio, specialità di carne e pesce' }], premium, said);
+  assert.deepEqual(checked.problems, []);
+  const out = applyOps(premium, [], checked.ops, 'R');
+  assert.deepEqual(out.menu.premium.motto, { it: 'Nel cuore del Collio, specialità di carne e pesce' });
+  assert.equal(out.menu.premium.direzione, 'editoriale');
+  assert.equal(out.needsEnglish, true);
+  assert.match(validateOps([{ tipo: 'motto', nome: 'Il miglior locale del mondo' }], premium, said).problems[0], /non corrisponde/);
+  assert.match(validateOps([{ tipo: 'motto', nome: 'Nel cuore del Collio' }], menu(), said).problems[0], /non è Premium/);
+});
