@@ -238,3 +238,21 @@ test('togliendo tutte le voci di una sezione, la sezione sparisce invece di rend
   assert.deepEqual(out.menu.sezioni.map((s) => s.voci.length), [1, 3]);
   assert.ok(out.summary.some((l) => /non aveva più piatti/.test(l)));
 });
+
+test('il coperto non è mai una sezione: va nelle informazioni in fondo e toglie la vecchia sezione «Coperto»', () => {
+  const m = () => ({ ...menu(), sezioni: [...menu().sezioni, { nome: { it: 'Coperto' }, voci: [{ nome: { it: 'Coperto' }, prezzo: '3,00' }] }, { nome: { it: 'Bevande' }, voci: [{ nome: { it: 'Acqua' }, prezzo: '2,00' }] }] });
+  // il modello propone una voce «Coperto» in una sezione: diventa il campo coperto
+  const a = validateOps([{ tipo: 'aggiungi', nome: 'Coperto', prezzo: '2,50', sezione: 'Coperto' }], menu(), 'manca il coperto a 2,50 euro');
+  assert.deepEqual(a.problems, []);
+  assert.deepEqual(a.ops, [{ tipo: 'locale', campo: 'coperto', nome: '2,50' }]);
+  assert.equal(applyOps(menu(), [], a.ops, 'R').menu.coperto, '2,50');
+  // se il modello non produce nulla, la frase chiara basta
+  const b = validateOps([], m(), 'il coperto è 3 euro');
+  assert.deepEqual(b.ops, [{ tipo: 'locale', campo: 'coperto', nome: '3,00' }]);
+  const out = applyOps(m(), [], b.ops, 'R');
+  assert.equal(out.menu.coperto, '3,00');
+  assert.deepEqual(out.menu.sezioni.map((s) => itName(s)), ['Secondi', 'Vini', 'Bevande']);
+  // un importo non detto non passa
+  assert.match(validateOps([{ tipo: 'locale', campo: 'coperto', nome: '4,00' }], menu(), 'cambia il coperto').problems[0], /importo/);
+});
+const itName = (s) => s.nome.it;

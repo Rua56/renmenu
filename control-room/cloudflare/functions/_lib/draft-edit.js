@@ -6,6 +6,7 @@
 // frase o dal nome precedente. Se una sola operazione non regge, non si applica nulla.
 import { CLOUDFLARE_FREE_MODEL } from './ai-live.js';
 import { normalizeHours } from './hours.js';
+import { coverIn } from './venue-info.js';
 import { DIREZIONI } from './premium.js';
 
 export const OP_TYPES = ['prezzo', 'varianti', 'aggiungi', 'rimuovi', 'rinomina', 'descrizione', 'sposta', 'rinomina_sezione', 'rimuovi_sezione', 'unisci_sezioni', 'motto', 'aspetto', 'locale', 'storia'];
@@ -97,7 +98,7 @@ const OP_SCHEMA = {
 const SYSTEM = [
   'Sei Jarvis, assistente di Riccardo per RenMenu. Riccardo ti detta (anche a voce, con errori di trascrizione) una correzione alla BOZZA di un menu.',
   'Trasformala in operazioni, usando SOLO gli indici dell’elenco: [S2] è la sezione 2, [2.5] è la voce 5 della sezione 2 (si=2, vi=5).',
-  'Tipi consentiti: prezzo (si, vi, prezzo); varianti (si, vi, varianti[{etichetta, prezzo}]: più prezzi per la stessa voce, per esempio calice e bottiglia, piccola e grande, oppure vitello e maiale se il nome elenca le alternative); aggiungi (si, nome, prezzo oppure varianti, descrizione facoltativa, dopo_vi facoltativo; se la sezione è nuova scrivi il suo nome in sezione e ometti si); rimuovi (si, vi); rinomina (si, vi, nome); descrizione (si, vi, descrizione; stringa vuota per toglierla); sposta (si, vi, a_si; se la sezione di destinazione non esiste ancora scrivi il suo nome in sezione e ometti a_si); rinomina_sezione (si, nome); rimuovi_sezione (si: toglie l’intera sezione con tutte le sue voci, solo se Riccardo chiede di togliere la sezione); unisci_sezioni (sezioni: [indici delle sezioni da unire, per esempio [5,6,7]]: le voci finiscono tutte nella prima, le altre spariscono; usalo quando Riccardo vuole una sola sezione al posto di più sezioni con lo stesso nome); motto (nome: la frase che compare sotto il logo nell’apertura del menu Premium, per esempio uno slogan del locale; nessun indice); locale (campo: indirizzo, telefono, instagram, maps, orari o sottotitolo; nome: il valore scritto da Riccardo); storia (nome: il testo della storia del locale, solo menu Premium, paragrafi separati da una riga a capo; nessun indice); aspetto (direzione: editoriale, bistrot o moderno; colori: {fondo, testo, accento, secondario} in formato #rrggbb, solo quelli che Riccardo ha scritto; nessun indice).',
+  'Tipi consentiti: prezzo (si, vi, prezzo); varianti (si, vi, varianti[{etichetta, prezzo}]: più prezzi per la stessa voce, per esempio calice e bottiglia, piccola e grande, oppure vitello e maiale se il nome elenca le alternative); aggiungi (si, nome, prezzo oppure varianti, descrizione facoltativa, dopo_vi facoltativo; se la sezione è nuova scrivi il suo nome in sezione e ometti si); rimuovi (si, vi); rinomina (si, vi, nome); descrizione (si, vi, descrizione; stringa vuota per toglierla); sposta (si, vi, a_si; se la sezione di destinazione non esiste ancora scrivi il suo nome in sezione e ometti a_si); rinomina_sezione (si, nome); rimuovi_sezione (si: toglie l’intera sezione con tutte le sue voci, solo se Riccardo chiede di togliere la sezione); unisci_sezioni (sezioni: [indici delle sezioni da unire, per esempio [5,6,7]]: le voci finiscono tutte nella prima, le altre spariscono; usalo quando Riccardo vuole una sola sezione al posto di più sezioni con lo stesso nome); motto (nome: la frase che compare sotto il logo nell’apertura del menu Premium, per esempio uno slogan del locale; nessun indice); locale (campo: indirizzo, telefono, instagram, maps, orari, sottotitolo o coperto; nome: il valore scritto da Riccardo; per orari scrivi le sue parole, Jarvis le riordina; per coperto nome è solo l’importo, per esempio 3,00: il coperto NON è mai una sezione né una voce, va sempre in locale con campo coperto); storia (nome: il testo della storia del locale, solo menu Premium, paragrafi separati da una riga a capo; nessun indice); aspetto (direzione: editoriale, bistrot o moderno; colori: {fondo, testo, accento, secondario} in formato #rrggbb, solo quelli che Riccardo ha scritto; nessun indice).',
   'Regole ferree: non inventare nulla. Nomi, prezzi e descrizioni devono essere quelli detti da Riccardo (i prezzi in formato 12,00). Non toccare le voci che Riccardo non nomina. Non scrivere allergeni, ingredienti o traduzioni. Se la richiesta è incomprensibile o ambigua, restituisci operazioni vuote e spiega in «dubbio», in italiano, cosa ti serve sapere.',
   'Una sezione nuova si crea una volta sola: se aggiungi più voci alla stessa sezione nuova, scrivi lo stesso nome in sezione e Jarvis le mette tutte insieme. Per dividere una voce in due piatti distinti: rimuovi la voce e aggiungi i due piatti nella stessa sezione. Se Riccardo dice di tenere una voce con due prezzi, usa varianti. Rispondi solo con JSON, in questa forma: {"operazioni":[{"tipo":"sposta","si":10,"vi":0,"sezione":"Bevande"},{"tipo":"prezzo","si":2,"vi":1,"prezzo":"9,00"}],"dubbio":""}. Ogni operazione ha sempre il campo «tipo».'
 ].join('\n');
@@ -199,6 +200,13 @@ export function validateOps(rawOps, menu, utterance) {
     const type = OP_TYPES.includes(written) ? written : OP_TYPES.slice().sort((x, y) => y.length - x.length).find((t) => written.startsWith(t)) || written;
     if (!OP_TYPES.includes(type)) { problems.push(`Operazione non riconosciuta (tipo «${clip(raw?.tipo, 30) || 'vuoto'}», ricevuto ${clip(JSON.stringify(raw ?? null), 110)}).`); continue; }
     const si = Number.isInteger(raw.si) ? raw.si : null, vi = Number.isInteger(raw.vi) ? raw.vi : null;
+    if (type === 'aggiungi' && plain(clip(raw.nome, 80)).replace(/[^a-z]/g, '') === 'coperto') {
+      // Il coperto non è una voce di menu: va nelle informazioni in fondo, sopra i contatti.
+      const p = normalizePrice(raw.prezzo);
+      if (!p || !prices.has(p)) { problems.push('Coperto: non ho sentito l’importo.'); continue; }
+      if (!ops.some((o) => o.tipo === 'locale' && o.campo === 'coperto')) ops.push({ tipo: 'locale', campo: 'coperto', nome: p });
+      continue;
+    }
     if (type === 'aggiungi') {
       const name = clip(raw.nome, 80);
       const label = `Nuova voce «${name || '?'}»`;
@@ -242,8 +250,14 @@ export function validateOps(rawOps, menu, utterance) {
     }
     if (type === 'locale') {
       const field = plain(raw.campo);
-      const FIELDS = ['indirizzo', 'telefono', 'instagram', 'maps', 'orari', 'sottotitolo'];
-      if (!FIELDS.includes(field)) { problems.push('Dati del locale: il campo deve essere indirizzo, telefono, instagram, maps, orari o sottotitolo.'); continue; }
+      const FIELDS = ['indirizzo', 'telefono', 'instagram', 'maps', 'orari', 'sottotitolo', 'coperto'];
+      if (!FIELDS.includes(field)) { problems.push('Dati del locale: il campo deve essere indirizzo, telefono, instagram, maps, orari, sottotitolo o coperto.'); continue; }
+      if (field === 'coperto') {
+        const p = normalizePrice(String(raw.nome ?? raw.testo ?? raw.prezzo ?? '').replace(/[^\d,.]/g, ''));
+        if (!p || !prices.has(p)) { problems.push('Coperto: non ho sentito l’importo.'); continue; }
+        if (ops.some((o) => o.tipo === 'locale' && o.campo === 'coperto')) { problems.push('Coperto: uno solo per volta.'); continue; }
+        ops.push({ tipo: 'locale', campo: 'coperto', nome: p }); continue;
+      }
       if (field === 'orari') {
         // Orari: si leggono giorni e fasce e si scrivono in modo ordinato (italiano e inglese), partendo da quelli già nel menu.
         const current = typeof menu?.orari === 'object' ? menu.orari?.it : menu?.orari;
@@ -339,6 +353,11 @@ export function validateOps(rawOps, menu, utterance) {
       ops.push({ tipo: type, si, vi, descrizione: text }); continue;
     }
   }
+  // Il coperto detto con un solo importo chiaro, se il modello non ha prodotto l'operazione, lo ricavo io.
+  if (!ops.some((o) => o.tipo === 'locale' && o.campo === 'coperto') && !problems.some((p) => /coperto/i.test(p)) && /\bcoperto\b/i.test(utterance) && !ops.some((o) => o.tipo === 'rimuovi' || o.tipo === 'rimuovi_sezione')) {
+    const cover = coverIn(utterance);
+    if (cover?.value && !cover.doubt) ops.push({ tipo: 'locale', campo: 'coperto', nome: cover.value });
+  }
   // Se la frase parla chiaramente di orari ma il modello non ha prodotto l'operazione, la ricavo io dalle parole dette.
   if (!ops.some((o) => o.tipo === 'locale' && o.campo === 'orari') && !problems.some((p) => /orari/i.test(p)) && /\b(?:orari|orario|aperti|apriamo|apertura|chiusi|chiuso|chiusura|chiudiamo)\b/i.test(utterance)) {
     const current = typeof menu?.orari === 'object' ? menu.orari?.it : menu?.orari;
@@ -359,6 +378,7 @@ export function applyOps(menuIn, provenanceIn, ops, source) {
   const menu = structuredClone(menuIn);
   const summary = [];
   let needsEnglish = false;
+  const coverRows = [];
   const hoursRows = []; // provenienza di orari.it / orari.en quando Jarvis li riscrive
   // Identità stabile delle voci e delle sezioni, per ricostruire la provenienza dopo spostamenti e rimozioni.
   menu.sezioni.forEach((section, si) => { section.__s = si; section.voci.forEach((item, vi) => { item.__k = `${si}.${vi}`; }); });
@@ -395,6 +415,14 @@ export function applyOps(menuIn, provenanceIn, ops, source) {
     if (op.tipo === 'locale') {
       const localized = op.campo === 'orari' || op.campo === 'sottotitolo';
       menu[op.campo] = localized ? { it: op.nome, ...(op.en ? { en: op.en } : {}) } : op.nome;
+      if (op.campo === 'coperto') {
+        coverRows.push({ path: 'coperto', source, value: op.nome, status: 'confermato' });
+        // Un vecchio «Coperto» scritto come sezione con la sola voce coperto passa nelle informazioni in fondo.
+        const legacy = menu.sezioni.filter((s) => plain(itText(s.nome)) === 'coperto' && s.voci.every((v) => plain(itText(v.nome)) === 'coperto'));
+        for (const old of legacy) menu.sezioni.splice(menu.sezioni.indexOf(old), 1);
+        summary.push(`Coperto: ${op.nome} € (in fondo al menu, nelle informazioni${legacy.length ? '; tolta la sezione «Coperto»' : ''}).`);
+        continue;
+      }
       if (localized && !op.en) needsEnglish = true;
       if (op.campo === 'orari') {
         hoursRows.push({ path: 'orari.it', source, value: op.nome, status: 'confermato' });
@@ -502,9 +530,10 @@ export function applyOps(menuIn, provenanceIn, ops, source) {
       continue;
     }
     if (hoursRows.length && /^orari(\.|$)/.test(path)) continue;
+    if (coverRows.length && path === 'coperto') continue;
     provenance.push(row);
   }
-  provenance.push(...hoursRows);
+  provenance.push(...hoursRows, ...coverRows);
   // Fonte delle voci nuove o cambiate: Riccardo, via Telegram.
   menu.sezioni.forEach((section, si) => section.voci.forEach((item, vi) => {
     const isNew = fresh.includes(item), fields = changedFields.get(item.__k);

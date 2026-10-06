@@ -91,7 +91,7 @@ function addressIn(text) {
   return city ? { value: `${street}, ${city}` } : { value: street, check: 'senza città: aggiungila se serve' };
 }
 
-function coverIn(text) {
+export function coverIn(text) {
   const t = plain(text);
   if (!/\bcoperto\b/.test(t)) return null;
   if (/\b(?:non|niente|senza|togli\w*|toglie\w*|rimuov\w*|elimin\w*|nessun)\b[^.]{0,30}\bcoperto\b|\bcoperto\b[^.]{0,20}\b(?:gratis|gratuito|non c'e|non ce)\b/.test(t)) return { doubt: 'Frase sul coperto negativa o da togliere: decidi tu.' };
