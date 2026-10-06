@@ -81,16 +81,24 @@ export function proposeSourceExtras(sourceText, menu) {
   return proposals;
 }
 
-/** Numeri di allergeni scritti dal locale in fondo alla descrizione («… panna acida (7)», «(1-3-4-7)»):
- * proposte NON preselezionate, valgono solo se la legenda del menu segue i numeri UE 1–14. */
+// Numeri di allergeni scritti dal locale sotto il piatto come «Allergeni: 1, 4, 7 *» (anche «Allergens: …» nella traduzione):
+// elenco di numeri UE 1–14, poi eventuali simboli di rimando (* @) che il menu spiega altrove.
+const LABEL_ALLERGENS = /\ballergen(?:i|s)?\b\s*:?\s*(\d{1,2}(?:\s*[-,/–]\s*\d{1,2})*)(?:\s*[*@]+)*/i;
+const LABEL_ALLERGENS_ALL = new RegExp(LABEL_ALLERGENS.source, 'gi');
+const listOf = (raw) => String(raw).split(/\s*[-,/–]\s*/);
+
+/** Numeri di allergeni scritti dal locale: «… panna acida (7)», «(1-3-4-7)» oppure «Allergeni: 1, 4, 7 *».
+ * Proposte NON preselezionate, valgono solo se la legenda del menu segue i numeri UE 1–14. */
 export function proposeMenuAllergens(menu) {
   const proposals = [];
   (menu?.sezioni || []).forEach((section, si) => (section?.voci || []).forEach((item, vi) => {
     const text = String(item?.descrizione?.it || '');
-    const m = text.match(/\((\d{1,2}(?:\s*[-,/]\s*\d{1,2})*)\)/);
-    if (!m || (Array.isArray(item.allergeni) && item.allergeni.length)) return;
-    const codes = [...new Set(m[1].split(/\s*[-,/]\s*/))].filter((c) => Number(c) >= 1 && Number(c) <= 14).sort((a, b) => Number(a) - Number(b));
-    if (!codes.length || codes.length !== m[1].split(/\s*[-,/]\s*/).length) return;
+    if (Array.isArray(item.allergeni) && item.allergeni.length) return;
+    const m = text.match(/\((\d{1,2}(?:\s*[-,/]\s*\d{1,2})*)\)/) || text.match(LABEL_ALLERGENS);
+    if (!m) return;
+    const parts = listOf(m[1]);
+    const codes = [...new Set(parts)].filter((c) => Number(c) >= 1 && Number(c) <= 14).sort((a, b) => Number(a) - Number(b));
+    if (!codes.length || codes.length !== parts.length) return;
     proposals.push({ id: `d${proposals.length + 1}`, line: null, type: 'allergeni', si, vi, name: nameOf(item.nome), codes, label: allergenLabel(codes), source: text.slice(0, 200), legend: true });
   }));
   return proposals;
@@ -111,9 +119,15 @@ export function applyExtras(menu, selected, sourceFor) {
       // Descrizione fatta solo dei numeri («(10)», «(1-2-4)»): ora sono icone degli allergeni, il testo doppio si toglie.
       if (entry.legend && /^\s*\(\s*\d{1,2}(?:\s*[-,/]\s*\d{1,2})*\s*\)\s*$/.test(String(item.descrizione?.it || ''))) delete item.descrizione;
       else if (entry.legend && item.descrizione?.it) {
-        // Numeri in fondo a una descrizione vera: restano solo le parole (in ogni lingua).
-        for (const lang of Object.keys(item.descrizione)) item.descrizione[lang] = String(item.descrizione[lang]).replace(/\s*\(\s*\d{1,2}(?:\s*[-,/]\s*\d{1,2})*\s*\)\s*$/, '').trim();
+        // Numeri in una descrizione vera (in fondo, davanti o «Allergeni: …»): restano solo le parole (in ogni lingua).
+        for (const lang of Object.keys(item.descrizione)) {
+          const before = String(item.descrizione[lang]);
+          const cleaned = before.replace(/\s*\(\s*\d{1,2}(?:\s*[-,/]\s*\d{1,2})*\s*\)\s*/g, ' ').replace(LABEL_ALLERGENS_ALL, ' ').replace(/\s+/g, ' ').trim();
+          // Se il testo cominciava con i numeri, la prima parola rimasta apre la frase.
+          item.descrizione[lang] = /^\s*(?:\(|allergen)/i.test(before) ? cleaned.replace(/^./, (c) => c.toLocaleUpperCase()) : cleaned;
+        }
       }
+      if (entry.legend && item.descrizione && !Object.values(item.descrizione).some((v) => String(v).trim())) delete item.descrizione;
       provenance.push({ path: `sezioni.${entry.si}.voci.${entry.vi}.allergeni`, source: sourceFor(entry), value: entry.codes.join(','), status: 'confermato' });
     }
   }
