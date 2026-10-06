@@ -1,0 +1,341 @@
+{
+  "id": "la-chincaglieria-gastronomica",
+  "nome": "La Chincaglieria Gastronomica",
+  "lingue": [
+    "it",
+    "en"
+  ],
+  "sezioni": [
+    {
+      "nome": {
+        "it": "Piatti",
+        "en": "Dishes"
+      },
+      "voci": [
+        {
+          "nome": {
+            "it": "Prosciutto crudo artigianale D’Osvaldo, pancetta arrotolata, ossocollo, salama, mortadella di Cinghiale al tartufo",
+            "en": "Artisanal D’Osvaldo cured ham, rolled pancetta, coppa, salama, wild boar truffle mortadella"
+          },
+          "prezzo": "18,00"
+        },
+        {
+          "nome": {
+            "it": "La nostra selezione di formaggi accompagnata dal miele e dalle confetture dei nostri artigiani",
+            "en": "Our selection of cheeses served with honey and artisan jams"
+          },
+          "prezzo": "12,00"
+        },
+        {
+          "nome": {
+            "it": "LA ZUCCA IN SAOR",
+            "en": "SWEET AND SOUR PUMPKIN"
+          },
+          "prezzo": "10,00",
+          "descrizione": {
+            "it": "Zucca al forno, cipolla rossa, pinoli e uvetta contiene prodotti naturalmente privi di glutine"
+          },
+          "allergeni": [
+            "12"
+          ]
+        },
+        {
+          "nome": {
+            "it": "LA TARTARA D’ASINO, CREMA AL CREN E FORMAGGIO, PETALI DI CIPOLLA E SUSINE",
+            "en": "Donkey tartare, horseradish cream and cheese, onion petals and plums"
+          },
+          "prezzo": "16,00",
+          "descrizione": {
+            "it": "Contiene prodotti naturalmente privi di glutine"
+          },
+          "allergeni": [
+            "7",
+            "12"
+          ]
+        },
+        {
+          "nome": {
+            "it": "LA “MILLEFOGLIE” DI SARDE SCOTTATE, PANE ALL’AGLIO E MOZZARELLA",
+            "en": "Sardine \"mille-feuille\", garlic bread and mozzarella"
+          },
+          "prezzo": "13,00",
+          "allergeni": [
+            "1",
+            "4",
+            "7"
+          ]
+        },
+        {
+          "nome": {
+            "it": "L’UOVO, I FUNGHI ED IL FORMAGGIO",
+            "en": "Egg, mushrooms and cheese"
+          },
+          "prezzo": "15,00",
+          "descrizione": {
+            "it": "uovo morbido, crema di funghi, funghi arrosto e Vecchio Zoff"
+          },
+          "allergeni": [
+            "7"
+          ]
+        },
+        {
+          "nome": {
+            "it": "GLI GNOCCHI DI RICOTTA, CREMA DI FAGIOLI, GUANCIALE E ACETO",
+            "en": "Ricotta gnocchi, bean cream, cured pork cheek and vinegar"
+          },
+          "prezzo": "14,00",
+          "allergeni": [
+            "1",
+            "3",
+            "7",
+            "9",
+            "12"
+          ]
+        },
+        {
+          "nome": {
+            "it": "IL RISOTTO MANTECATO CON IL CAPRINO, UVA, NOCCIOLE E CAPPERI (min. per2)",
+            "en": "Creamed risotto with goat's cheese, grapes, hazelnuts and capers (min. for 2)"
+          },
+          "prezzo": "14,00",
+          "descrizione": {
+            "it": "Contiene prodotti naturalmente privi di glutine"
+          },
+          "allergeni": [
+            "7",
+            "8",
+            "9"
+          ]
+        },
+        {
+          "nome": {
+            "it": "I TORTELLI FATTI IN CASA, PATE' DI FEGATO DI VITELLO E LA FONDUTA DI FORMAGGIO STAGIONATO AL TABACCO",
+            "en": "Homemade tortelli with veal liver pâté and aged cheese fondue with tobacco"
+          },
+          "prezzo": "14,00",
+          "allergeni": [
+            "1",
+            "3",
+            "7",
+            "9"
+          ]
+        },
+        {
+          "nome": {
+            "it": "LE TAGLIATELLE FATTE IN CASA, PITINA E ZUCCA",
+            "en": "Homemade tagliatelle with pitina and pumpkin"
+          },
+          "prezzo": "15,00",
+          "allergeni": [
+            "1",
+            "3",
+            "7",
+            "12"
+          ]
+        },
+        {
+          "nome": {
+            "it": "LA VELLUTATA DI SEDANO RAPA, L'ANGUILLA AFFUMICATA E CUBETTI DI PAN TOSTATO",
+            "en": "Celeriac cream soup, smoked eel and toasted bread cubes"
+          },
+          "prezzo": "14,00",
+          "allergeni": [
+            "1",
+            "4",
+            "7",
+            "9"
+          ]
+        },
+        {
+          "nome": {
+            "it": "GLI GNOCCHI DI PANE ED IL RAGU' DI CINGHIALE",
+            "en": "Bread gnocchi with wild boar ragù"
+          },
+          "prezzo": "15,00",
+          "allergeni": [
+            "1",
+            "3",
+            "7",
+            "9"
+          ]
+        },
+        {
+          "nome": {
+            "it": "LE SEPPIE MARINATE ALL'ANETO E AGRUMI E SCOTTATE IN PADELLA, JULIENNE DI VERDURE CROCCANTI",
+            "en": "Marinated cuttlefish with dill and citrus fruit, pan-seared, with crunchy vegetable julienne"
+          },
+          "prezzo": "14,00",
+          "descrizione": {
+            "it": "Contiene prodotti naturalmente privi di glutine",
+            "en": "Contains naturally gluten-free products"
+          },
+          "allergeni": [
+            "4",
+            "9"
+          ]
+        },
+        {
+          "nome": {
+            "it": "LA CIPOLLA: tortino alla cipolla, scalogno caramellato, petali di cipolla all'aceto di more ed uvetta, crema di tenerone",
+            "en": "The onion: onion tart, caramelized shallot, onion petals with blackberry vinegar and raisins, tenerone cream"
+          },
+          "prezzo": "12,00",
+          "descrizione": {
+            "it": "Contiene prodotti naturalmente privi di glutine",
+            "en": "Contains naturally gluten-free products"
+          },
+          "allergeni": [
+            "7"
+          ]
+        },
+        {
+          "nome": {
+            "it": "ANIMELLE AL BURRO, SUSINE E VERMOUTH",
+            "en": "Sweetbreads with butter, plums and vermouth"
+          },
+          "prezzo": "16,00",
+          "descrizione": {
+            "it": "Contiene prodotti naturalmente privi di glutine * @",
+            "en": "Contains naturally gluten-free products * @"
+          },
+          "allergeni": [
+            "7",
+            "12"
+          ]
+        },
+        {
+          "nome": {
+            "it": "TORTINO DI LJUBLJANSKA AL FORNO, CREN, MELE, SENAPE E AJVAR",
+            "en": "Baked Ljubljana pie, horseradish, apples, mustard and ajvar"
+          },
+          "prezzo": "15,00",
+          "descrizione": {
+            "it": "Contiene prodotti naturalmente privi di glutine"
+          },
+          "allergeni": [
+            "7",
+            "10",
+            "12"
+          ]
+        },
+        {
+          "nome": {
+            "it": "IL FRICO CON LA POLENTA",
+            "en": "Frico with polenta"
+          },
+          "prezzo": "10,00",
+          "descrizione": {
+            "it": "Contiene prodotti naturalmente privi di glutine",
+            "en": "Contains products naturally free of gluten"
+          },
+          "allergeni": [
+            "7"
+          ]
+        },
+        {
+          "nome": {
+            "it": "PATATE IN TECIA",
+            "en": "Pan-cooked potatoes"
+          },
+          "prezzo": "5,00",
+          "descrizione": {
+            "it": "Allergeni: --",
+            "en": "Allergens: --"
+          }
+        },
+        {
+          "nome": {
+            "it": "MELANZANE AL FUNGHETTO",
+            "en": "Pan-fried aubergines in tomato sauce"
+          },
+          "prezzo": "5,00",
+          "allergeni": [
+            "9"
+          ]
+        }
+      ]
+    },
+    {
+      "nome": {
+        "it": "Dolci",
+        "en": "Desserts"
+      },
+      "voci": [
+        {
+          "nome": {
+            "it": "GNOCCHI DI SUSINE DELLA TRADIZIONE MITTELEUROPEA",
+            "en": "Traditional Central European plum gnocchi"
+          },
+          "prezzo": "7,00",
+          "allergeni": [
+            "1",
+            "3",
+            "7"
+          ]
+        },
+        {
+          "nome": {
+            "it": "LA MELA",
+            "en": "THE APPLE"
+          },
+          "prezzo": "7,00",
+          "descrizione": {
+            "it": "Mela cotta al forno, crema alla vaniglia, crumble salato alle mandorle e gelato alla cannella",
+            "en": "Baked apple, vanilla cream, savoury almond crumble and cinnamon ice cream"
+          },
+          "allergeni": [
+            "3",
+            "7",
+            "8"
+          ]
+        },
+        {
+          "nome": {
+            "it": "IL CIOCCOLATO, OLIO E SALE",
+            "en": "CHOCOLATE, OIL AND SALT"
+          },
+          "prezzo": "7,00",
+          "descrizione": {
+            "it": "Mousse al cioccolato fondente, olio extravergine locale, sale e briciole di pane tostato al rosmarino",
+            "en": "Dark chocolate mousse, local extra virgin olive oil, salt and rosemary toasted breadcrumbs"
+          },
+          "allergeni": [
+            "1",
+            "7"
+          ]
+        },
+        {
+          "nome": {
+            "it": "IL “MONTEBIANCO” DELLA CHINCA",
+            "en": "CHINCA'S \"MONTEBIANCO\""
+          },
+          "prezzo": "7,00",
+          "descrizione": {
+            "it": "Castagna, mascarpone al caffè, cioccolato e grappa",
+            "en": "Chestnut, coffee mascarpone, chocolate and grappa"
+          },
+          "allergeni": [
+            "7"
+          ]
+        },
+        {
+          "nome": {
+            "it": "GUBANA DELL’ANTICA RICETTA",
+            "en": "TRADITIONAL RECIPE GUBANA"
+          },
+          "prezzo": "4,00",
+          "allergeni": [
+            "1",
+            "3",
+            "7",
+            "8"
+          ]
+        }
+      ]
+    }
+  ],
+  "tema": "sole",
+  "indirizzo": "via Rastello 60, 34170, Gorizia",
+  "telefono": "338 3595074",
+  "instagram": "chincaglieriagastronomica"
+}
