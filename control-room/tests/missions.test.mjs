@@ -403,6 +403,8 @@ describe('Correzioni dettate alla bozza su Telegram', () => {
       assert.equal(after.revision, before.revision);
       assert.equal(after.menu_json, before.menu_json);
       assert.match(lastSent().body.text, /non applico nulla/);
+      const miss = await db.prepare("SELECT summary FROM audit_events WHERE action='jarvis.not_understood'").bind().first();
+      assert.match(miss?.summary || '', /il frico con polenta costa 14 euro.*→/);
     } finally { db.close?.(); }
   });
 
