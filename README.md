@@ -7,6 +7,12 @@ RenMenu crea e mantiene menù digitali QR per bar, ristoranti e trattorie. Il lo
 
 Pagamenti: guida passo passo in [CONFIGURAZIONE-PAGAMENTI.md](CONFIGURAZIONE-PAGAMENTI.md); si compila solo `assets/pagamenti.js`.
 
+## Control Room e Jarvis (area privata)
+
+Il repository contiene anche la Control Room con Jarvis, l'assistente che prepara i menu e chiede conferma a Riccardo prima di pubblicare. Non fa parte del sito pubblico e non viene mai copiata nella build. Guida: [CONTROL-ROOM-README.md](CONTROL-ROOM-README.md); funzionamento: [control-room/docs/jarvis-funzionamento.md](control-room/docs/jarvis-funzionamento.md); registro degli aggiornamenti: [control-room/docs/CHANGELOG.md](control-room/docs/CHANGELOG.md). Ogni modifica a Jarvis aggiorna anche questi documenti.
+
+Trattoria Blanch usa un formato proprio (`blanch/`, vedi [blanch/README.md](blanch/README.md)), diverso da `menus/<id>.json`.
+
 ## Struttura
 
 ```text
@@ -14,10 +20,13 @@ index.html                    landing page del servizio
 menu/index.html               visualizzatore: menu/?m=<id> legge menus/<id>.json
 crea/index.html               generatore JSON, QR e cartello A5
 menus/*.json                  un file per ogni locale
+richard/index.html             menu privato interattivo con carrello e ordine WhatsApp
 scripts/validate-menus.py     controllo locale dei JSON, senza modifiche automatiche
 assets/                       stile, logo e helper comuni
 vendita/                      materiali commerciali e checklist operativa
 ```
+
+Il menu speciale di Richard è disponibile su `https://renmenu.pages.dev/richard/` (e sul corrispondente percorso GitHub Pages). È indipendente dai menu JSON standard: le scelte vengono salvate localmente nel browser e il pulsante finale apre WhatsApp con il messaggio precompilato; l'invio effettivo richiede un'azione dell'utente nella chat. La pagina è esclusa dall'indicizzazione e dalla sitemap.
 
 ## Aggiungere o aggiornare un locale
 

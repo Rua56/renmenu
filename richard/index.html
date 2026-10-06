@@ -1,0 +1,76 @@
+<!doctype html>
+<html lang="it">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <meta name="theme-color" content="#3d1725">
+  <meta name="robots" content="noindex, nofollow">
+  <meta name="description" content="I migliori punti del corpo di Richard su cui banchettare: scegli gli abbinamenti e prepara il tuo ordine per Antoine.">
+  <title>il corpo di Richard — Menu riservato ad Antoine</title>
+  <link rel="icon" href="../assets/favicon.png" type="image/png">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=Fraunces:opsz,wght,SOFT,WONK@9..144,400,0,1;9..144,600,0,1;9..144,700,0,1&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="./style.css">
+  <script src="./menu.js" defer></script>
+</head>
+<body>
+  <a class="skip" href="#menu">Vai al menu</a>
+  <header class="site-header">
+    <a class="brand" href="../" aria-label="RenMenu, torna alla pagina principale"><img src="../assets/renmenu-mark.png" alt="" width="32" height="32"><span>RenMenu</span></a>
+    <span class="header-note">Un invito da gustare</span>
+    <a class="header-cart" href="#carrello">Carrello <span id="header-count" aria-hidden="true">0</span></a>
+  </header>
+
+  <main>
+    <section class="hero" aria-labelledby="page-title">
+      <div class="hero-copy">
+        <div class="hero-kicker"><span class="kicker-line"></span> Menu privato <span class="kicker-line"></span></div>
+        <h1 id="page-title">il corpo<br>di <em><button id="richard-secret" class="secret-trigger" type="button">Richard</button></em><span class="title-dot">.</span></h1>
+        <p class="hero-description">i migliori punti del corpo di Richard su cui banchettare</p>
+        <a class="hero-link" href="#menu">Componi il tuo ordine <span aria-hidden="true">↘</span></a>
+      </div>
+      <div class="hero-art" aria-hidden="true">
+        <div class="orbit orbit-one"></div><div class="orbit orbit-two"></div>
+        <div class="plate"><span class="berry berry-one"></span><span class="berry berry-two"></span><span class="berry berry-three"></span><span class="cream cream-one"></span><span class="cream cream-two"></span><span class="leaf leaf-one"></span><span class="leaf leaf-two"></span></div>
+        <span class="art-caption">Un assaggio<br>alla volta.</span>
+        <span class="art-sparkle">✳</span>
+      </div>
+    </section>
+
+    <div class="private-banner" role="note"><span class="banner-star" aria-hidden="true">✳</span><strong>MENU RISERVATO AD ANTOINE</strong><span class="banner-star" aria-hidden="true">✳</span></div>
+
+    <div class="content-wrap" id="menu">
+      <div class="menu-column">
+        <div class="menu-heading"><div><span class="eyebrow">01 / Il menu</span><h2>Scegli dove e cosa.</h2></div><p>Spunta uno o più ingredienti per ogni parte del corpo. Gli abbinamenti li decidi tu.</p></div>
+        <div class="sections" id="sections">
+          <section class="body-section" data-section="collo" aria-labelledby="section-collo"><div class="section-heading"><span class="section-number">01</span><div><span class="section-overline">Il primo assaggio</span><h3 id="section-collo">Collo</h3></div><span class="section-flourish" aria-hidden="true">✳</span></div><div class="product-grid" data-options="collo"></div></section>
+          <section class="body-section" data-section="capezzoli" aria-labelledby="section-capezzoli"><div class="section-heading"><span class="section-number">02</span><div><span class="section-overline">Un tocco goloso</span><h3 id="section-capezzoli">Capezzoli</h3></div><span class="section-flourish" aria-hidden="true">✳</span></div><div class="product-grid" data-options="capezzoli"></div></section>
+          <section class="body-section" data-section="pancia" aria-labelledby="section-pancia"><div class="section-heading"><span class="section-number">03</span><div><span class="section-overline">La parte morbida</span><h3 id="section-pancia">Pancia</h3></div><span class="section-flourish" aria-hidden="true">✳</span></div><div class="product-grid" data-options="pancia"></div></section>
+          <section class="body-section" data-section="bimbin-riposo" aria-labelledby="section-bimbin-riposo"><div class="section-heading"><span class="section-number">04</span><div><span class="section-overline">Piano piano</span><h3 id="section-bimbin-riposo">Bimbin a riposo</h3></div><span class="section-flourish" aria-hidden="true">✳</span></div><div class="product-grid" data-options="bimbin-riposo"></div></section>
+          <section class="body-section" data-section="bimbin-attenti" aria-labelledby="section-bimbin-attenti"><div class="section-heading"><span class="section-number">05</span><div><span class="section-overline">Momento speciale</span><h3 id="section-bimbin-attenti">Bimbin sull'attenti</h3></div><span class="section-flourish" aria-hidden="true">✳</span></div><div class="product-grid" data-options="bimbin-attenti"></div></section>
+          <section class="body-section" data-section="piedi" aria-labelledby="section-piedi"><div class="section-heading"><span class="section-number">06</span><div><span class="section-overline">Il gran finale</span><h3 id="section-piedi">Piedi</h3></div><span class="section-flourish" aria-hidden="true">✳</span></div><div class="product-grid" data-options="piedi"></div></section>
+        </div>
+        <div class="add-wrap"><button id="add-to-cart" class="button button-add" type="button" disabled>Aggiungi all'ordine <span aria-hidden="true">↗</span></button><p id="selection-status" class="selection-status" role="status" aria-live="polite">Seleziona almeno un abbinamento per iniziare.</p></div>
+      </div>
+
+      <aside class="cart" id="carrello" aria-labelledby="cart-title">
+        <div class="cart-topline"><span class="eyebrow">02 / Il tuo ordine</span><span class="cart-count" id="cart-count" aria-label="0 abbinamenti">00</span></div>
+        <h2 id="cart-title">Il tuo carrello<span class="title-dot">.</span></h2>
+        <p class="cart-intro">I tuoi abbinamenti, pronti da mandare a Richard.</p>
+        <div id="cart-items" class="cart-items" aria-live="polite"><div class="cart-empty"><span aria-hidden="true">✳</span><p>Il carrello è ancora vuoto.</p><small>Il bello deve ancora cominciare.</small></div></div>
+        <a id="send-order" class="button button-send is-disabled" href="#carrello" aria-disabled="true">Invia il tuo ordine a Richard <span aria-hidden="true">↗</span></a>
+        <p class="cart-hint">Si aprirà WhatsApp con il messaggio già pronto. Controllalo e premi invia nella chat.</p>
+      </aside>
+    </div>
+  </main>
+  <div id="richard-easter-egg" class="easter-egg" role="dialog" aria-modal="true" aria-label="Sorpresa di Richard" hidden>
+    <div class="easter-egg-content">
+      <button id="close-easter-egg" class="easter-egg-close" type="button" aria-label="Chiudi la foto">×</button>
+      <img src="./richard-easter-egg.jpg" width="1200" height="1600" alt="Una persona di spalle in cucina, accanto a un gatto.">
+    </div>
+  </div>
+  <footer class="footer"><span>Preparato con un pizzico di ironia.</span><a href="../">Un menu creato con RenMenu</a></footer>
+  <a class="mobile-cart" href="#carrello" aria-label="Vai al carrello">Vedi il carrello <span id="mobile-count">0</span> <span aria-hidden="true">↗</span></a>
+</body>
+</html>

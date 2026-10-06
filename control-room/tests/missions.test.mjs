@@ -367,6 +367,18 @@ describe('Correzioni dettate alla bozza su Telegram', () => {
     } finally { db.close?.(); }
   });
 
+  it('un locale con menu in formato proprio (Blanch) è riconosciuto ma non modificato', async () => {
+    const db = database();
+    try {
+      await missions.putSetting(db, 'telegram_chat_id', '42');
+      await db.prepare("INSERT INTO clients (id,name,plan,menu_url,internal_notes,created_at,updated_at) VALUES ('c-bl','Trattoria Blanch','da_definire','https://renmenu.pages.dev/blanch/','',?,?)").bind('2026-10-06T10:00:00.000Z', '2026-10-06T10:00:00.000Z').run();
+      const ai = { run: async (model, input) => input?.response_format?.json_schema?.properties?.intent ? { response: { intent: 'aggiorna_menu', locale: 'Trattoria Blanch', risposta: '' } } : { response: 'ok' } };
+      await say(db, { ...env, AI: ai }, 'alla Trattoria Blanch il prosciutto costa 14 euro');
+      assert.match(lastSent().body.text, /formato proprio/);
+      assert.equal((await db.prepare('SELECT count(*) n FROM requests').bind().first()).n, 0);
+    } finally { db.close?.(); }
+  });
+
   it('se la pratica aspettava un SÌ, la modifica ferma la missione: nessun anteprima vecchia resta valida', async () => {
     const db = await draftDb();
     try {
