@@ -9,7 +9,7 @@ import { slugify } from './menu.js';
 import { geminiJson } from './gemini-json.js';
 
 export const STT_MODEL = '@cf/openai/whisper-large-v3-turbo';
-export const INTENTS = new Set(['risposta', 'stato', 'anteprima', 'aggiorna_menu', 'crea_pratica', 'pubblica', 'ricorda', 'non_chiaro']);
+export const INTENTS = new Set(['risposta', 'stato', 'anteprima', 'cancella_pratica', 'aggiorna_menu', 'crea_pratica', 'pubblica', 'ricorda', 'non_chiaro']);
 export const STATUS_CUTS = new Set(['breve', 'completo', 'buone_notizie']);
 export const VOICE_PRESETS = {
   // ElevenLabs, modello multilingue: voci maschili calme e calde (la prima è la predefinita).
@@ -66,6 +66,7 @@ export async function understand(ai, utterance, context, { timeoutMs = 25_000, g
     '- "risposta": domanda, saluto, chiacchiera, umore, battuta, richiesta di idee o di stupirlo («stupiscimi», «fammi sorridere», «mi sento creativo»), opinione o informazioni su qualsiasi argomento, anche non legato a RenMenu (locali, scadenze, cosa fare). In "risposta" scrivi 1-3 frasi in italiano parlato, usando SOLO i DATI; se un dato non c’è dillo. Niente elenchi puntati, niente emoji.',
     '- "stato": Riccardo vuole sapere come vanno le cose: punto della situazione, pratiche, aggiornamento, «tutto a posto?», «come siamo messi?», «ci sono problemi?», «qualcosa da segnalare?», «cosa richiede la mia attenzione?», resoconto, report, novità, «dammi buone notizie». Non scrivere la risposta: la prepara il sistema con i dati certi (lascia "risposta" vuota). In "dettaglio": "breve" per domande rapide (tutto a posto? come siamo messi? aggiornami), "completo" se chiede un resoconto, un report, il dettaglio o tutto, "buone_notizie" se chiede buone notizie, novità positive o qualcosa di bello da sapere.',
     '- "anteprima": chiede di vedere, mostrare o mandargli l’anteprima o la bozza di un menu (solo per guardarla: non è pubblicare né inviare al cliente). In "locale" il nome così come detto.',
+    '- "cancella_pratica": chiede di eliminare, cancellare o buttare una pratica o un cliente (di prova o non più utili); NON un piatto o una voce del menu (quello è aggiorna_menu). In "locale" il nome del locale.',
     '- "aggiorna_menu": Riccardo chiede di cambiare il menu online di un locale (prezzi, piatti da aggiungere o togliere, oppure il tema grafico/i colori: bordeaux, verde trattoria, blu mare, terracotta, nero elegante, ocra; oppure coperto, telefono, orari, Instagram o Facebook del locale). Capisci anche parole scritte o trascritte male (es. «copreto», «telfono», «instgram»). In "locale" il nome del locale così come detto. Non riscrivere le modifiche.',
     '- "crea_pratica": chiede di aprire una nuova pratica o un nuovo cliente per un locale (anche «crea un nuovo menu per …», «mi serve un menu per …»; se c’è fretta o urgenza, «in fretta», «subito», «urgente», metti "urgente": true). In "locale" il nome del locale esattamente come detto, senza parole come «locale» o «ristorante» se non fanno parte del nome.',
     '- "pubblica": chiede di pubblicare o mettere online un menu. In "locale" il nome se detto.',

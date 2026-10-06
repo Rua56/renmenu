@@ -321,4 +321,81 @@ describe('Comandi vocali di Jarvis', () => {
       assert.match(note.n, /URGENTE/);
     } finally { globalThis.fetch = previous; db.close(); }
   });
+
+  async function pratica(db, name) {
+    globalThis.fetch = previousFetch;
+    const stamp = '2026-10-05T10:00:00.000Z';
+    await db.prepare("INSERT INTO clients (id,name,email,plan,menu_id,internal_notes,revision,created_at,updated_at) VALUES ('cx',?,NULL,'standard','','',1,?,?)").bind(name, stamp, stamp).run();
+    const made = await action(db, 'createRequest', { clientId: 'cx', subject: `Nuovo menu Standard · ${name}`, sourceChannel: 'altro', sourceText: SOURCE.replace('Trattoria Nuova', name), kind: 'nuovo', plan: 'standard', category: 'nuovo_standard' });
+    const requestId = made.body.id || made.body.result?.id || made.body.data?.id;
+    await action(db, 'generateDraft', { requestId });
+    globalThis.fetch = fakeFetch;
+    return requestId;
+  }
+  it('«elimina la pratica di X»: prima chiede conferma con pulsante, poi cancella pratica, bozza, file e cliente, lasciando il registro', async () => {
+    const db = database();
+    const previous = globalThis.fetch;
+    globalThis.fetch = fakeFetch;
+    try {
+      calls.length = 0;
+      const requestId = await pratica(db, 'Trattoria Nuova');
+      await missions.putSetting(db, 'telegram_chat_id', '42');
+      await db.prepare("INSERT INTO materials (id,request_id,r2_key,filename,mime,size,source,processing_status,text_preview,created_at) VALUES ('mat1',?,'private/mat1.jpg','foto.jpg','image/jpeg',10,'telegram','letto_da_jarvis',NULL,'2026-10-05T10:00:00.000Z')").bind(requestId).run();
+      const removed = [];
+      const env = testEnv(db, { TELEGRAM_BOT_TOKEN: TOKEN, BUCKET: { delete: async (key) => { removed.push(key); } }, AI: aiSaying('', { intent: 'cancella_pratica', locale: 'Trattoria Nuova', risposta: '' }) });
+      await missions.telegramUpdate(db, env, { message: { chat: { id: 42, type: 'private' }, text: 'Jarvis elimina la pratica di Trattoria Nuova' } });
+      assert.match(calls.at(-1).body.text, /1 file caricato/);
+      const ask = calls.at(-1).body;
+      assert.match(ask.text, /Vuoi che elimini «Nuovo menu Standard · Trattoria Nuova»\?/);
+      assert.match(ask.text, /Elimino anche il cliente/);
+      assert.ok(JSON.stringify(ask.reply_markup).includes(`del:${requestId}`));
+      assert.equal((await db.prepare('SELECT COUNT(*) n FROM requests').bind().first()).n, 1, 'niente è cancellato prima del pulsante');
+      await missions.telegramUpdate(db, env, { callback_query: { id: 'c1', data: `delno:x`, message: { chat: { id: 42 }, message_id: 7 } } });
+      assert.equal((await db.prepare('SELECT COUNT(*) n FROM requests').bind().first()).n, 1);
+      await missions.telegramUpdate(db, env, { callback_query: { id: 'c2', data: `del:${requestId}`, message: { chat: { id: 42 }, message_id: 8 } } });
+      assert.match(calls.at(-1).body.text, /Fatto, Riccardo: ho eliminato/);
+      assert.match(calls.at(-1).body.text, /Prossimo passo: vuoi aprire una nuova pratica/);
+      for (const table of ['requests', 'drafts', 'materials', 'clients']) assert.equal((await db.prepare(`SELECT COUNT(*) n FROM ${table}`).bind().first()).n, 0, table);
+      assert.deepEqual(removed, ['private/mat1.jpg']);
+      assert.equal((await db.prepare("SELECT COUNT(*) n FROM audit_events WHERE action='request.deleted'").bind().first()).n, 1);
+      assert.ok((await db.prepare('SELECT COUNT(*) n FROM audit_events WHERE request_id IS NULL').bind().first()).n >= 2, 'il registro resta');
+    } finally { globalThis.fetch = previous; db.close(); }
+  });
+  it('non elimina una pratica pubblicata né un cliente con menu online', async () => {
+    const db = database();
+    const previous = globalThis.fetch;
+    globalThis.fetch = fakeFetch;
+    try {
+      calls.length = 0;
+      const requestId = await pratica(db, 'Osteria Online');
+      await db.prepare("UPDATE requests SET status='completata' WHERE id=?").bind(requestId).run();
+      await db.prepare("UPDATE clients SET menu_id='osteria-online' WHERE id='cx'").bind().run();
+      await missions.putSetting(db, 'telegram_chat_id', '42');
+      const env = testEnv(db, { TELEGRAM_BOT_TOKEN: TOKEN, AI: aiSaying('', { intent: 'cancella_pratica', locale: 'Osteria Online', risposta: '' }) });
+      await missions.telegramUpdate(db, env, { message: { chat: { id: 42, type: 'private' }, text: 'Jarvis cancella il cliente Osteria Online' } });
+      assert.match(calls.at(-1).body.text, /Non elimino .*il menu risulta già pubblicato|ha un menu online/);
+      assert.equal(calls.at(-1).body.reply_markup, undefined);
+      await missions.telegramUpdate(db, env, { callback_query: { id: 'c3', data: `del:${requestId}`, message: { chat: { id: 42 }, message_id: 9 } } });
+      assert.match(calls.at(-1).body.text, /Non elimino/);
+      assert.equal((await db.prepare('SELECT COUNT(*) n FROM requests').bind().first()).n, 1);
+    } finally { globalThis.fetch = previous; db.close(); }
+  });
+  it('la situazione propone il passo successivo: guardare la bozza in revisione, con il pulsante', async () => {
+    const db = database();
+    const previous = globalThis.fetch;
+    globalThis.fetch = fakeFetch;
+    try {
+      calls.length = 0;
+      await pratica(db, 'Bar Aurora');
+      await missions.putSetting(db, 'telegram_chat_id', '42');
+      const env = testEnv(db, { TELEGRAM_BOT_TOKEN: TOKEN, JARVIS_ORIGIN: 'https://jarvis.test', AI: aiSaying('', { intent: 'stato', locale: '', risposta: '', dettaglio: 'breve' }) });
+      await missions.telegramUpdate(db, env, { message: { chat: { id: 42, type: 'private' }, text: 'Jarvis tutto apposto?' } });
+      const msg = calls.at(-1).body;
+      assert.match(msg.text, /Prossimo passo: rivedi «Bar Aurora» in Revisione/);
+      const draft = await db.prepare('SELECT id FROM drafts').bind().first();
+      assert.ok(JSON.stringify(msg.reply_markup).includes(`peek:${draft.id}`));
+      await missions.telegramUpdate(db, env, { callback_query: { id: 'c4', data: `peek:${draft.id}`, message: { chat: { id: 42 }, message_id: 3 } } });
+      assert.match(calls.at(-1).body.text, /jarvis-hook\/bozza\/BZ-/);
+    } finally { globalThis.fetch = previous; db.close(); }
+  });
 });

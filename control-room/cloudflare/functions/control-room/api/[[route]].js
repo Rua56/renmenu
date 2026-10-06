@@ -4,6 +4,7 @@ import { applyMenuChanges } from '../../_lib/changes.js';
 import { prepareUpdate } from '../../_lib/update.js';
 import { GEMINI_PREFERRED, PHOTO_TYPES, readMenuPdf, readMenuPhoto } from '../../_lib/vision.js';
 import { linkMailFiles, receiveMailFiles } from '../../_lib/mail-files.js';
+import { deletionPlan, deletionStatements } from '../../_lib/delete-request.js';
 import { MEDIA_KINDS, PUBLIC_EXT, applyMedia, classifyPhoto, isMenuPhotoKind, parseLabel, proposeTargets, publicImageOk, reapplyConfirmed, removeMedia, resolveTarget, targetLabel } from '../../_lib/media.js';
 import { speak } from '../../_lib/voice.js';
 import { OWNER_REVIEW } from '../../_lib/missions.js';
@@ -756,6 +757,23 @@ export async function action(db, type, input, env = {}) {
       'draft.rebuild', 'Bozza rifatta da capo con tutti i materiali della pratica, su richiesta di Riccardo.', draft.request_id);
     const rebuilt = await action(db, 'generateDraft', { requestId: draft.request_id }, env);
     result = { ...rebuilt.result, rebuilt: true };
+  } else if (type === 'deleteRequest') {
+    // Elimina una pratica di prova o mai pubblicata (e il cliente, se resta senza pratiche e senza menu online).
+    assert(p.confirmation === 'ELIMINA PRATICA', 'Conferma mancante.', 403);
+    const plan = await deletionPlan(db, { getOne, rows }, { requestId: p.requestId ? identifier(p.requestId) : null, clientId: !p.requestId && p.clientId ? identifier(p.clientId) : null });
+    assert(plan.ok, plan.blockers[0] || 'Eliminazione non consentita.', 409);
+    const label = plan.request?.subject || plan.client?.name || 'pratica';
+    const writes = deletionStatements(db, { ...plan, deleteClient: plan.deleteClient && p.deleteClient !== false });
+    await auditedBatch(db, writes, 'request.deleted', `Eliminata «${label}»${plan.deleteClient && p.deleteClient !== false ? ` e il cliente «${plan.client.name}»` : ''}: ${plan.materials.length} file, ${plan.drafts.length} bozze. Il registro delle azioni resta.`, null);
+    // File privati e foto ridotte: solo dopo che il database è a posto (se la cancellazione di un file fallisce, il resto è comunque coerente).
+    if (env.BUCKET?.delete) {
+      for (const material of plan.materials) if (material.r2_key) await Promise.resolve(env.BUCKET.delete(material.r2_key)).catch(() => {});
+      for (const key of plan.mediaKeys) {
+        const shared = await getOne(db, 'SELECT 1 AS x FROM media_items WHERE public_key=? LIMIT 1', key).catch(() => null);
+        if (!shared) await Promise.resolve(env.BUCKET.delete(key)).catch(() => {});
+      }
+    }
+    result = { deleted: true, clientDeleted: plan.deleteClient && p.deleteClient !== false, files: plan.materials.length, drafts: plan.drafts.length };
   } else if (type === 'translateDraft') {
     // Completa le voci ancora senza inglese. Non tocca prezzi/allergeni né i testi EN già presenti;
     // la checklist si azzera perché i contenuti cambiano.
