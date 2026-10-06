@@ -63,7 +63,7 @@ async function call(db, path, payload, extra = {}) {
 const action = (db, type, payload) => call(db, 'actions', { type, payload });
 
 import { buildImportBatch, buildReplyBatch } from '../staging/gmail-import.mjs';
-import { OUTBOX_GET_SQL, outboxSent } from '../staging/jarvis-outbox.mjs';
+import { ONLINE_GET_SQL, OUTBOX_GET_SQL, outboxSent } from '../staging/jarvis-outbox.mjs';
 import { missions } from '../cloudflare/functions/control-room/api/[[route]].js';
 
 const TOKEN = '123456789:AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA';
@@ -426,5 +426,50 @@ describe('Rilettura di tutti i file di una pratica', () => {
       assert.equal(await missions.setting(db, 'tg_checks'), 'null', 'i dubbi vecchi non valgono più');
       assert.equal((await db.prepare("SELECT count(*) n FROM audit_events WHERE action='material.reread'").bind().first()).n, 1);
     } finally { db.close?.(); }
+  });
+});
+
+describe('Email al locale con link e QR dopo la pubblicazione', () => {
+  it('mette in coda l’email con allegati, la consegna all’automazione e avvisa Riccardo', async () => {
+    const db = database();
+    try {
+      await run(db, buildImportBatch(event('qm1', 'Nuovo menu', SOURCE)));
+      await call(db, 'state'); await action(db, 'runAutopilot', {});
+      const draft = (await call(db, 'state')).body.drafts[0];
+      const extras = draft.sourceExtras.filter((entry) => entry.type !== 'manuale').map((entry) => entry.id);
+      await action(db, 'entrustToJarvis', { draftId: draft.id, revision: draft.revision, accept: extras, confirmation: 'AFFIDO A JARVIS' });
+      const mission = await db.prepare('SELECT * FROM jarvis_missions').bind().first();
+      await db.prepare("UPDATE jarvis_missions SET status='completata'").bind().run();
+      const row = await db.prepare('SELECT r.*,c.name AS client_name,c.email AS client_email FROM requests r JOIN clients c ON c.id=r.client_id WHERE r.id=?').bind(mission.request_id).first();
+      const dr = await db.prepare('SELECT * FROM drafts WHERE id=?').bind(mission.draft_id).first();
+      const qr = await missions.makeMenuQr({ slug: dr.slug, name: 'Osteria Missione', plan: 'standard' });
+      const queued = await missions.queueOnlineEmail(db, env, { mission, request: row, draft: dr, menu: JSON.parse(dr.menu_json), qr });
+      assert.equal(queued.queued, true);
+      assert.equal(queued.to, 'locale@example.com');
+      const out = await db.prepare(ONLINE_GET_SQL).bind(queued.code).first();
+      assert.match(out.subject, /^Il tuo menu RenMenu è online · /);
+      assert.match(out.body, new RegExp(`https://renmenu.pages.dev/menu/\\?m=${dr.slug}`));
+      assert.match(out.body, /qr-.*\.png/);
+      assert.doesNotMatch(out.body, /€|prezzo di/i, 'niente prezzi o pagamenti nell’email');
+      const stored = JSON.parse((await db.prepare('SELECT value FROM jarvis_settings WHERE key=?').bind(`outbox_qr_${queued.code}`).first()).value);
+      assert.equal(Buffer.from(stored.png, 'base64').subarray(1, 4).toString(), 'PNG');
+      assert.match(stored.svg, /^<svg/);
+      assert.equal(await db.prepare(OUTBOX_GET_SQL).bind(queued.code).first(), null, 'l’anteprima e l’email online non si scambiano');
+      // Non ancora partita: nessun avviso.
+      const before = (await call(db, 'state')).body.notifications.length;
+      await missions.checkOnlineMails(db, env);
+      assert.equal((await call(db, 'state')).body.notifications.length, before);
+      // L'automazione la invia e segna la riga: Riccardo viene avvisato e gli allegati temporanei spariscono.
+      const sent = outboxSent(queued.code, 'gmail-9');
+      await db.prepare(sent.sql).bind(...sent.params).run();
+      await missions.checkOnlineMails(db, env);
+      const notes = (await call(db, 'state')).body.notifications;
+      assert.ok(notes.some((n) => /email del menu online/.test(n.subject) && /inviata al locale \(locale@example\.com\)/.test(n.body)));
+      assert.equal(await db.prepare('SELECT 1 FROM jarvis_settings WHERE key=?').bind(`outbox_qr_${queued.code}`).first(), null);
+      // Senza email del locale o con un indirizzo interno: nessuna coda.
+      for (const email of [null, 'iuran56@gmail.com']) {
+        assert.equal((await missions.queueOnlineEmail(db, env, { mission, request: { ...row, client_email: email }, draft: dr, menu: JSON.parse(dr.menu_json), qr })).queued, false);
+      }
+    } finally { db.close(); }
   });
 });
