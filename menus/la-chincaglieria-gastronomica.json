@@ -72,7 +72,8 @@
           },
           "prezzo": "15,00",
           "descrizione": {
-            "it": "uovo morbido, crema di funghi, funghi arrosto e Vecchio Zoff"
+            "it": "uovo morbido, crema di funghi, funghi arrosto e Vecchio Zoff",
+            "en": "Soft egg, mushroom cream, roasted mushrooms and Vecchio Zoff cheese"
           },
           "allergeni": [
             "7"
@@ -337,5 +338,9 @@
   "tema": "sole",
   "indirizzo": "via Rastello 60, 34170, Gorizia",
   "telefono": "338 3595074",
-  "instagram": "chincaglieriagastronomica"
+  "instagram": "chincaglieriagastronomica",
+  "orari": {
+    "it": "Lunedì–sabato 08:00–21:00 · Domenica 08:00–16:00",
+    "en": "Monday–Saturday 08:00–21:00 · Sunday 08:00–16:00"
+  }
 }
