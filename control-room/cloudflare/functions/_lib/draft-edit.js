@@ -187,7 +187,10 @@ export function validateOps(rawOps, menu, utterance) {
   };
   const list = Array.isArray(rawOps) ? rawOps.slice(0, 12) : [];
   const touched = new Set();
-  for (const raw of list) {
+  for (const item0 of list) {
+    // Se il modello scrive il tipo come chiave ({"aspetto": {...}}), si riporta alla forma normale.
+    const wrapped = item0 && typeof item0 === 'object' && !Array.isArray(item0) && item0.tipo === undefined && Object.keys(item0).length === 1 ? Object.keys(item0)[0] : null;
+    const raw = wrapped && OP_TYPES.includes(wrapped) && item0[wrapped] && typeof item0[wrapped] === 'object' ? { ...item0[wrapped], tipo: wrapped } : item0;
     // Alcuni modelli scrivono il tipo con maiuscole o varianti («sposta_voce», «Sposta»): riconduco al tipo esatto.
     // Se il modello dimentica «tipo» ma indica voce e destinazione, l'intenzione è lo spostamento.
     const written = String(raw?.tipo ?? raw?.operazione ?? raw?.op ?? (Number.isInteger(raw?.si) && Number.isInteger(raw?.vi) && (Number.isInteger(raw?.a_si) || raw?.sezione) && raw?.nome === undefined ? 'sposta' : '')).trim().toLowerCase();
