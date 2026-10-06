@@ -65,7 +65,7 @@ Gli orari, detti a Telegram o scritti in un'email, vengono letti per giorni e fa
 
 ### Il coperto
 
-Il coperto non è mai una sezione né una voce: si scrive nel campo coperto del menu e compare in fondo, sopra le informazioni del locale. Jarvis lo inserisce solo con un importo che hai detto davvero; se esiste già una sezione «Coperto» fatta solo da quella voce, la toglie e usa il campo. Frasi come «niente coperto» o con più importi restano un dubbio e Jarvis chiede.
+Il coperto non è mai una sezione né una voce: si scrive nel campo coperto del menu e compare in fondo, sopra le informazioni del locale. Jarvis lo inserisce solo con un importo che hai detto davvero; se esiste già una sezione «Coperto» fatta solo da quella voce, la toglie e usa il campo. Frasi come «niente coperto» o con più importi restano un dubbio e Jarvis chiede. Le frasi sui dati del locale con un valore («il coperto è 3 euro», «gli orari sono…», «il telefono è…») sono capite come correzione della bozza in primo piano.
 
 ### Sezioni e pratica in primo piano
 

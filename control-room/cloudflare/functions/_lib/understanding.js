@@ -102,6 +102,8 @@ export function guessIntent(text, { locales = [], dishes = [] } = {}) {
   if (RX.crea.test(t) && !dishes.length) return { intent: 'crea_pratica', locale: '' };
   if (RX.pubblica.test(t)) return { intent: 'pubblica', locale: venue };
   if (RX.domanda.test(String(text).toLowerCase()) && !/\b(cambi|togli|aggiung|metti|aument|abbass|alz|inserisc|aggiorn)\w*/.test(t)) return { intent: 'risposta', locale: venue };
+  // Dati del locale detti con un valore («il coperto è 3 euro», «orari 12-15 e 19-22», «il telefono è 0481…»): correzione della bozza.
+  if (/\b(coperto|orari|orario|instagram|telefono|indirizzo)\b/.test(t) && /\d/.test(t)) return { intent: 'aggiorna_menu', locale: venue };
   if ((venue || dishes.length) && RX.modifica.test(t)) return { intent: 'aggiorna_menu', locale: venue };
   return { intent: venue || dishes.length ? 'ambiguo' : 'non_chiaro', locale: venue };
 }
