@@ -190,7 +190,7 @@ export function validateOps(rawOps, menu, utterance) {
     // Se il modello dimentica «tipo» ma indica voce e destinazione, l'intenzione è lo spostamento.
     const written = String(raw?.tipo ?? raw?.operazione ?? raw?.op ?? (Number.isInteger(raw?.si) && Number.isInteger(raw?.vi) && (Number.isInteger(raw?.a_si) || raw?.sezione) && raw?.nome === undefined ? 'sposta' : '')).trim().toLowerCase();
     const type = OP_TYPES.includes(written) ? written : OP_TYPES.slice().sort((x, y) => y.length - x.length).find((t) => written.startsWith(t)) || written;
-    if (!OP_TYPES.includes(type)) { problems.push(`Operazione non riconosciuta (tipo «${clip(raw?.tipo, 30) || 'vuoto'}»).`); continue; }
+    if (!OP_TYPES.includes(type)) { problems.push(`Operazione non riconosciuta (tipo «${clip(raw?.tipo, 30) || 'vuoto'}», ricevuto ${clip(JSON.stringify(raw ?? null), 110)}).`); continue; }
     const si = Number.isInteger(raw.si) ? raw.si : null, vi = Number.isInteger(raw.vi) ? raw.vi : null;
     if (type === 'aggiungi') {
       const name = clip(raw.nome, 80);
