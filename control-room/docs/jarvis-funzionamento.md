@@ -63,6 +63,10 @@ Interfaccia mobile-first in HTML e JavaScript senza framework. Protetta da Cloud
 
 Gli orari, detti a Telegram o scritti in un'email, vengono letti per giorni e fasce e riscritti in una riga ordinata, uguale in italiano e in inglese, senza traduzione automatica. Esempio: «mercoledì chiuso, da giovedì a martedì dalle 12 alle 15 e dalle 19 alle 22» diventa «12:00–15:00 e 19:00–22:00 · Chiuso il mercoledì». Se dici solo le fasce («12-15 e 19-22») restano i giorni già scritti; se dici un solo giorno cambia solo quello. Ogni orario deve essere stato detto davvero: se la frase è ambigua (giorni senza orario, cifre che non sono orari) Jarvis non scrive nulla e chiede. Il codice è in `_lib/hours.js`. Anche i titoli di sezione scritti tutti in minuscolo («antipasti») prendono l'iniziale maiuscola.
 
+### Quando Jarvis non capisce
+
+Ogni frase che Jarvis non riesce ad applicare alla bozza (modifica non valida, nessuna modifica precisa, errore) viene registrata con il motivo nel registro delle attività (azione «jarvis.not_understood»): contiene solo il testo del comando e la ragione, e serve a migliorare Jarvis. Le frasi vere che hanno causato errori diventano test fissi in `tests/jarvis-corpus.test.mjs`. I modelli Gemini che falliscono vengono saltati per 10 minuti.
+
 ### Il coperto
 
 Il coperto non è mai una sezione né una voce: si scrive nel campo coperto del menu e compare in fondo, sopra le informazioni del locale. Jarvis lo inserisce solo con un importo che hai detto davvero; se esiste già una sezione «Coperto» fatta solo da quella voce, la toglie e usa il campo. Frasi come «niente coperto» o con più importi restano un dubbio e Jarvis chiede. Le frasi sui dati del locale con un valore («il coperto è 3 euro», «gli orari sono…», «il telefono è…») sono capite come correzione della bozza in primo piano.

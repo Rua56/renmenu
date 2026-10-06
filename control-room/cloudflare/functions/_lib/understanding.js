@@ -104,6 +104,7 @@ export function guessIntent(text, { locales = [], dishes = [] } = {}) {
   if (RX.domanda.test(String(text).toLowerCase()) && !/\b(cambi|togli|aggiung|metti|aument|abbass|alz|inserisc|aggiorn)\w*/.test(t)) return { intent: 'risposta', locale: venue };
   // Dati del locale detti con un valore («il coperto è 3 euro», «orari 12-15 e 19-22», «il telefono è 0481…»): correzione della bozza.
   if (/\b(coperto|orari|orario|instagram|telefono|indirizzo)\b/.test(t) && /\d/.test(t)) return { intent: 'aggiorna_menu', locale: venue };
+  if (/\b(?:instagram|facebook|insta)\b[^.]{0,30}?(?:è|e'|:|si chiama)\s*@?[\w.]{3,}/i.test(String(text))) return { intent: 'aggiorna_menu', locale: venue };
   if ((venue || dishes.length) && RX.modifica.test(t)) return { intent: 'aggiorna_menu', locale: venue };
   return { intent: venue || dishes.length ? 'ambiguo' : 'non_chiaro', locale: venue };
 }
