@@ -32,6 +32,7 @@ const ACTIVATION_BY_PLAN = { standard: 'prova_30_giorni', annuale: 'annuale_paga
 const PLAN_LABEL = { standard: 'Standard, prova gratuita di 30 giorni', annuale: 'Annuale (249 €/anno)', premium: 'Premium (acconto 490 € + 39 €/mese)' };
 const CONTROL_ROOM = 'https://renmenu-jarvis-stage.pages.dev/control-room/';
 export const OUTBOX_SUBJECT = 'Jarvis · invio anteprima';
+export const ONLINE_SUBJECT = 'Jarvis · invio menu online';
 
 const romeDate = (date = new Date()) => new Intl.DateTimeFormat('en-CA', { timeZone: 'Europe/Rome', year: 'numeric', month: '2-digit', day: '2-digit' }).format(date);
 const describeChange = (entry) => entry.type === 'prezzo' ? `${entry.name}: ${entry.before} → ${entry.after}`
@@ -401,13 +402,16 @@ export function createMissions(deps) {
   // ——— QR del menu: dopo il SÌ e la verifica online, link e QR su Telegram ———
   // Standard: QR classico. Premium e Annuale: logo del locale al centro (se il logo si legge).
   const QR_WITH_LOGO = new Set(['premium', 'annuale']);
-  async function sendMenuQr(db, env, { slug, name, plan, logoUrl, baseUrl }) {
-    const chat = await setting(db, 'telegram_chat_id');
-    if (!chat || !telegramReady(env)) return { ok: false, why: 'Telegram non collegato' };
+  async function makeMenuQr({ slug, name, plan, logoUrl, baseUrl }) {
     const wantsLogo = QR_WITH_LOGO.has(plan) && logoUrl;
     let absolute = '';
     try { absolute = wantsLogo ? new URL(logoUrl, baseUrl || menuLink(slug)).href : ''; } catch { absolute = ''; }
-    const qr = await buildMenuQr({ slug, name, logoUrl: absolute, fetchImpl: deps.fetchImpl || globalThis.fetch });
+    return buildMenuQr({ slug, name, logoUrl: absolute, fetchImpl: deps.fetchImpl || globalThis.fetch });
+  }
+  async function sendMenuQr(db, env, { slug, name, plan, logoUrl, baseUrl, qr = null }) {
+    qr = qr || await makeMenuQr({ slug, name, plan, logoUrl, baseUrl });
+    const chat = await setting(db, 'telegram_chat_id');
+    if (!chat || !telegramReady(env)) return { ok: false, why: 'Telegram non collegato', qr };
     const kind = qr.withLogo ? 'con il logo del locale' : 'classico';
     const note = QR_WITH_LOGO.has(plan) && !qr.withLogo ? `\nIl logo non l’ho potuto inserire (${qr.logoProblem || 'nessun logo nel menu'}): questo è il QR classico, dimmi se vuoi che lo rifaccia con il logo.` : '';
     await sendTelegram(env, chat, `QR del menu di «${name}» (${kind}).\nLink: ${qr.link}\nIl QR non cambia con gli aggiornamenti del menu: puoi stamparlo.${note}`, null, deps.fetchImpl);
@@ -415,7 +419,65 @@ export function createMissions(deps) {
     const photo = await sendPhoto(env, chat, qr.png, `QR ${name}`, deps.fetchImpl);
     await sendDocument(env, chat, qr.png, `qr-${slugName}.png`, 'image/png', 'Per stampare: file PNG a piena qualità.', deps.fetchImpl);
     await sendDocument(env, chat, qr.svg, `qr-${slugName}.svg`, 'image/svg+xml', 'Per la stampa professionale: file vettoriale SVG.', deps.fetchImpl);
-    return { ok: Boolean(photo?.ok), withLogo: qr.withLogo, link: qr.link };
+    return { ok: Boolean(photo?.ok), withLogo: qr.withLogo, link: qr.link, qr };
+  }
+  // ——— Email al locale con link e QR (la spedisce l'automazione Gmail di renmenu1569, come l'anteprima) ———
+  const INTERNAL_MAIL = /^(?:iuran56|renmenu1569)@gmail\.com$/i;
+  const b64 = (bytes) => { let t = ''; for (let i = 0; i < bytes.length; i += 0x8000) t += String.fromCharCode(...bytes.subarray(i, i + 0x8000)); return btoa(t); };
+  function onlineMailText(name, qr, slug) {
+    const file = String(slug).replace(/[^a-z0-9-]/gi, '').slice(0, 40) || 'menu';
+    return [
+      'Buongiorno,', '',
+      `il menu di «${name}» è online. Questo è il link da condividere con i vostri clienti:`, qr.link, '',
+      `In allegato trovate il QR code del menu${qr.withLogo ? ', con il logo del locale al centro' : ''}:`,
+      `- qr-${file}.png: per stamparlo o inviarlo dal telefono`,
+      `- qr-${file}.svg: per la stampa professionale (cartelli, adesivi, tovagliette)`, '',
+      'Il link e il QR non cambiano mai: quando il menu viene aggiornato, il QR resta lo stesso e non serve ristampare nulla.',
+      'Per modificare prezzi, piatti o lingue basta rispondere a questa email.', '',
+      'A presto,', 'Il Team RenMenu'
+    ].join('\n');
+  }
+  async function triggerOnlineMail(db, env, code, requestId, attempt) {
+    const sent = await sendOwnerNotification({ db: jarvisDb(db), env, requestId,
+      subject: `${ONLINE_SUBJECT} ${code}`,
+      text: `Comando interno di Jarvis per l'automazione Gmail di renmenu1569: invia l'email del menu online ${code} dalla coda di Jarvis. Tentativo ${attempt}. Nessun dato del cliente in questa email.`,
+      priority: 'urgente', now: new Date(), fetchImpl: deps.fetchImpl });
+    await db.prepare('UPDATE jarvis_outbox SET trigger_count=?,triggered_at=?,error=?,updated_at=? WHERE reference_code=?')
+      .bind(attempt, now(), sent?.ok ? null : String(sent?.reason || sent?.code || 'TRIGGER_FAILED').slice(0, 120), now(), code).run();
+  }
+  async function queueOnlineEmail(db, env, { mission, request, draft, menu, qr }) {
+    const to = String(request.client_email || '').trim();
+    if (!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(to) || INTERNAL_MAIL.test(to)) return { queued: false, why: 'il locale non ha un’email' };
+    const approval = await getOne(db, 'SELECT id FROM publication_approvals WHERE draft_id=?', mission.draft_id);
+    if (!approval) return { queued: false, why: 'approvazione non trovata' };
+    const code = referenceCode(), stamp = now();
+    const name = String(menu.nome || draft.slug).replace(/[\u0000-\u001f]/g, ' ').slice(0, 80);
+    await putSetting(db, `outbox_qr_${code}`, JSON.stringify({ slug: draft.slug, png: b64(qr.png), svg: qr.svg }));
+    await db.prepare("INSERT INTO jarvis_outbox (id,mission_id,request_id,approval_id,reference_code,recipient,subject,body,status,created_at,updated_at) VALUES (?,?,?,?,?,?,?,?,'in_coda',?,?)")
+      .bind(uid(), mission.id, mission.request_id, approval.id, code, to, `Il tuo menu RenMenu è online · ${name}`, onlineMailText(name, qr, draft.slug), stamp, stamp).run();
+    await putSetting(db, `onlinemail_${code}`, JSON.stringify({ requestId: mission.request_id, name, to, at: stamp }));
+    await triggerOnlineMail(db, env, code, mission.request_id, 1);
+    return { queued: true, code, to };
+  }
+  // Ogni minuto: l'email è partita? Riprova il comando dopo 6 minuti (al massimo 3 volte), poi avvisa Riccardo.
+  async function checkOnlineMails(db, env) {
+    const pending = await rows(db, "SELECT key,value FROM jarvis_settings WHERE key LIKE 'onlinemail\\_%' ESCAPE '\\' LIMIT 10").catch(() => []);
+    for (const row of pending) {
+      let info; try { info = JSON.parse(row.value); } catch { await db.prepare('DELETE FROM jarvis_settings WHERE key=?').bind(row.key).run(); continue; }
+      const code = row.key.slice('onlinemail_'.length);
+      const outbox = await getOne(db, 'SELECT status,trigger_count,triggered_at,error FROM jarvis_outbox WHERE reference_code=?', code);
+      const done = async (text) => {
+        await db.prepare('DELETE FROM jarvis_settings WHERE key IN (?,?)').bind(row.key, `outbox_qr_${code}`).run();
+        await tell(db, env, { request_id: info.requestId }, 'email del menu online', text, null, 'importante');
+      };
+      if (!outbox || outbox.status === 'annullata') { await db.prepare('DELETE FROM jarvis_settings WHERE key IN (?,?)').bind(row.key, `outbox_qr_${code}`).run(); continue; }
+      if (outbox.status === 'inviata') { await done(`Email con link e QR di «${info.name}» inviata al locale (${info.to}).`); continue; }
+      if (outbox.status === 'errore') { await done(`L’email con link e QR di «${info.name}» non è partita (${outbox.error || 'errore'}). Il QR l’hai su Telegram: inoltralo tu al locale (${info.to}).`); continue; }
+      const waited = Date.now() - Date.parse(outbox.triggered_at || info.at);
+      if (waited < 6 * 60_000) continue;
+      if (outbox.trigger_count >= 3) { await db.prepare("UPDATE jarvis_outbox SET status='errore',error='NON_PARTITA',updated_at=? WHERE reference_code=? AND status='in_coda'").bind(now(), code).run(); await done(`L’email con link e QR di «${info.name}» non è partita dopo tre tentativi. Il QR l’hai su Telegram: inoltralo tu al locale (${info.to}).`); continue; }
+      await triggerOnlineMail(db, env, code, info.requestId, outbox.trigger_count + 1);
+    }
   }
   // «mandami il QR di …»: stesso QR di sempre (il link del menu non cambia), per i locali già online.
   async function qrOnRequest(db, env, chat, text) {
@@ -444,10 +506,16 @@ export function createMissions(deps) {
       const next = await move(db, mission, 'completata', `Menu online e verificato: ${done.publicUrl}`);
       await watchRegister(db, mission, draft.slug, menu.nome, done.publicUrl).catch(() => null);
       await tell(db, env, next, 'menu online', `Fatto: «${menu.nome}» è online e verificato.\n${done.publicUrl}\nPR #${done.prNumber}.`, null, 'importante');
-      // Menu nuovo: link e QR subito su Telegram. Per un aggiornamento il QR resta quello già distribuito.
+      // Menu nuovo: link e QR su Telegram e, se il locale ha un'email, anche a lui. Per un aggiornamento il QR resta quello già distribuito.
       if (request.kind === 'nuovo') {
-        const sentQr = await sendMenuQr(db, env, { slug: draft.slug, name: menu.nome || draft.slug, plan: request.plan, logoUrl: menu.premium?.logo || '', baseUrl: done.publicUrl }).catch(() => null);
-        if (!sentQr?.ok) await tell(db, env, next, 'QR del menu', `Non sono riuscito a mandarti il QR di «${menu.nome}». Scrivimi «mandami il QR di ${menu.nome}» e lo rifaccio.`, null, 'importante').catch(() => {});
+        const info = { slug: draft.slug, name: menu.nome || draft.slug, plan: request.plan, logoUrl: menu.premium?.logo || '', baseUrl: done.publicUrl };
+        const sentQr = await sendMenuQr(db, env, info).catch(() => null);
+        if (!sentQr?.ok) await tell(db, env, next, 'QR del menu', `Non sono riuscito a mandarti il QR di «${info.name}». Scrivimi «mandami il QR di ${info.name}» e lo rifaccio.`, null, 'importante').catch(() => {});
+        const qr = sentQr?.qr || await makeMenuQr(info).catch(() => null);
+        const mail = qr ? await queueOnlineEmail(db, env, { mission, request, draft, menu, qr }).catch((error) => ({ queued: false, why: String(error?.message || 'errore').slice(0, 120) })) : { queued: false, why: 'QR non generato' };
+        await tell(db, env, next, 'email del menu online', mail.queued
+          ? `Sto mandando al locale (${mail.to}) l’email con link e QR in allegato: ti avviso appena parte.`
+          : `Al locale non ho mandato l’email (${mail.why}). Link e QR li hai qui sopra: inoltrali tu a «${info.name}».`, null, 'importante').catch(() => {});
       }
       return next;
     } catch (error) {
@@ -920,6 +988,7 @@ export function createMissions(deps) {
     await putSetting(db, `watch_${mission.id}`, JSON.stringify({ requestId: mission.request_id, slug, name: String(name || slug).slice(0, 80), url, sha: seen.sha, step: 0, fails: 0, next: new Date(first).toISOString() }));
   }
   async function watchTick(db, env) {
+    await checkOnlineMails(db, env).catch(() => null);
     const due = await rows(db, "SELECT key,value FROM jarvis_settings WHERE key LIKE 'watch\\_%' ESCAPE '\\' LIMIT 20").catch(() => []);
     const out = [];
     for (const row of due) {
@@ -1348,5 +1417,5 @@ export function createMissions(deps) {
     }
     return out;
   }
-  return { entrust, tick, watchTick, decide, telegramUpdate, probeIntents, setting, putSetting, briefing, notify, startChecks, answerCheck, draftAfterChecks, translateAfterEdit, undoDraftEdit, draftTarget, voiceEditDraft };
+  return { entrust, tick, watchTick, queueOnlineEmail, checkOnlineMails, makeMenuQr, decide, telegramUpdate, probeIntents, setting, putSetting, briefing, notify, startChecks, answerCheck, draftAfterChecks, translateAfterEdit, undoDraftEdit, draftTarget, voiceEditDraft };
 }
