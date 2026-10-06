@@ -153,3 +153,10 @@ test('aspetto Premium: direzione e colori solo se scritti nella frase', () => {
   assert.match(validateOps([{ tipo: 'aspetto', direzione: 'barocco' }], premium, said).problems[0], /direzione/);
   assert.match(validateOps([{ tipo: 'aspetto', direzione: 'bistrot' }], menu(), said).problems[0], /non è Premium/);
 });
+
+test('operazione con il tipo scritto come chiave viene riportata alla forma normale', () => {
+  const premium = { ...menu(), premium: { direzione: 'editoriale' } };
+  const out = validateOps([{ aspetto: { direzione: 'bistrot', colori: { accento: '#4a6b22' } } }], premium, 'aspetto bistrot accento #4a6b22');
+  assert.deepEqual(out.problems, []);
+  assert.equal(out.ops[0].tipo, 'aspetto');
+});
