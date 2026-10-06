@@ -6,7 +6,7 @@ const TAGS = new Set(['veg', 'vegan', 'spicy', 'gf', 'new', 'top', 'frozen']);
 const LEGACY = new Set(['hot', 'riserva']);
 const LANGS = new Set(['it', 'en', 'de', 'fr', 'es']);
 const PUBLIC_ROOT = new Set(['id', 'nome', 'sottotitolo', 'indirizzo', 'telefono', 'instagram', 'facebook', 'maps', 'orari', 'wifi', 'avviso', 'coperto', 'note', 'tema', 'premium', 'sezioni', 'lingue', 'url', 'sito', 'website']);
-const PUBLIC_SECTION = new Set(['nome', 'descrizione', 'voci', 'tipo', 'prezzo', 'unita', 'senzaTitolo']);
+const PUBLIC_SECTION = new Set(['nome', 'descrizione', 'voci', 'tipo', 'prezzo', 'unita']);
 const PUBLIC_ITEM = new Set(['nome', 'descrizione', 'prezzo', 'prezzi', 'allergeni', 'tag', 'foto', 'scheda']);
 // Foto e scheda (sommelier o piatto) dei menu su misura: stesse regole di scripts/validate-menus.py.
 const ITEM_IMAGE = /^(?:\.\.\/|\/)?[a-z0-9_./-]+\.(?:webp|png|jpe?g|svg|avif)$/i;
@@ -54,7 +54,6 @@ export function validateMenu(menu) {
     if (key in menu && typeof menu[key] !== 'string') errors.push(`menu.${key}: serve testo pubblico, non un oggetto tecnico.`);
   for (const [si, section] of (Array.isArray(menu.sezioni) ? menu.sezioni : []).entries()) {
     allowed(section, PUBLIC_SECTION, `sezioni.${si}`);
-    if (section && typeof section === 'object' && 'senzaTitolo' in section && typeof section.senzaTitolo !== 'boolean') errors.push(`sezioni.${si}.senzaTitolo: deve essere vero o falso.`);
     if (section && typeof section === 'object' && !Array.isArray(section)) {
       for (const key of ['nome', 'descrizione']) if (key in section) publicText(section[key], `sezioni.${si}.${key}`);
       for (const [vi, item] of (Array.isArray(section.voci) ? section.voci : []).entries()) {
@@ -268,13 +267,15 @@ export function sentenceCaseIfShouting(title) {
   return named.charAt(0).toLocaleUpperCase('it-IT') + named.slice(1);
 }
 
-/** Piatti senza alcun titolo di sezione sul materiale (elenco unico): restano in un solo elenco, senza titolo mostrato (`senzaTitolo: true`). */
-export const DEFAULT_SECTION = 'Dal materiale ricevuto';
+/** Piatti senza alcun titolo di sezione sul materiale (elenco unico): restano in una sola sezione, «Piatti». */
+export const DEFAULT_SECTION = 'Piatti';
+// «Dal materiale ricevuto» era il nome provvisorio di prima: nei testi già letti vale come «Piatti».
+const DEFAULT_SECTION_RE = /^(?:piatti|dal materiale ricevuto)$/i;
 
 export function extractMenuFromText(venue, source, requestedSlug) {
   const slug = slugify(requestedSlug || venue);
   const items = [], unknown = [], provenance = [], consumed = [], confirm = [];
-  let section = { nome: { it: DEFAULT_SECTION }, voci: [], senzaTitolo: true };
+  let section = { nome: { it: DEFAULT_SECTION }, voci: [], unnamed: true };
   const sections = [section];
   const lines = String(source || '').split(/\r?\n/);
   // Ultima voce letta (per descrizioni e righe «calice 5» subito sotto) e riga senza prezzo in attesa.
@@ -287,7 +288,7 @@ export function extractMenuFromText(venue, source, requestedSlug) {
   const openSection = (title, lineNumber, extra = {}) => {
     if (!section.voci.length && /\bmescita\b|by the glass|\bal calice\b|\bal bicchiere\b/i.test(section.nome?.it || '')) glassPage = true;
     else if (section.voci.length && !WINE_SECTION.test(section.nome?.it || '')) glassPage = false;
-    section = { nome: { it: title.slice(0, 100) }, voci: [], line: lineNumber, ...(title.trim() === DEFAULT_SECTION ? { senzaTitolo: true } : {}), ...extra };
+    section = { nome: { it: DEFAULT_SECTION_RE.test(title.trim()) ? DEFAULT_SECTION : title.slice(0, 100) }, voci: [], line: lineNumber, ...(DEFAULT_SECTION_RE.test(title.trim()) ? { unnamed: true } : {}), ...extra };
     if (glassPage && WINE_SECTION.test(title) && !/calice|bicchiere|mescita|bottiglia/i.test(title)) section.descrizione = { it: 'Al calice' };
     else if (glassPage && !WINE_SECTION.test(title)) glassPage = false;
     sections.push(section); last = null; pending = null;
@@ -464,8 +465,8 @@ export function extractMenuFromText(venue, source, requestedSlug) {
     last = null;
     unknown.push(row.slice(0, 220));
   }
-  // Più elenchi senza titolo (foto diverse, o un titolo «Dal materiale ricevuto» scritto da Jarvis) sono lo stesso elenco: uno solo, nell'ordine in cui sono arrivati.
-  const unnamed = sections.filter((s) => s.senzaTitolo && s.voci.length);
+  // Più elenchi senza titolo (foto diverse, o un titolo «Piatti» scritto da Jarvis) sono lo stesso elenco: uno solo, nell'ordine in cui sono arrivati.
+  const unnamed = sections.filter((s) => s.unnamed && s.voci.length);
   for (const extra of unnamed.slice(1)) {
     const target = unnamed[0], from = sections.indexOf(extra), offset = target.voci.length;
     for (const entry of items) if (entry.section === from) { entry.section = sections.indexOf(target); entry.index += offset; }
@@ -489,7 +490,7 @@ export function extractMenuFromText(venue, source, requestedSlug) {
       if (item.descrizione) provenance.push({ path: `sezioni.${sectionIndex}.voci.${itemIndex}.descrizione.it`, source: found?.descriptionLine ? `riga ${found.descriptionLine}` : where, value: item.descrizione.it, status: 'confermato' });
     });
   });
-  const menu = { id: slug, nome: venue.trim(), lingue: ['it'], sezioni: kept.map(({ nome, voci, tipo, prezzo, unita, descrizione, senzaTitolo }) => ({ nome, ...(senzaTitolo && nome.it === DEFAULT_SECTION ? { senzaTitolo: true } : {}), ...(descrizione ? { descrizione } : {}), ...(tipo ? { tipo } : {}), ...(prezzo ? { prezzo } : {}), ...(unita ? { unita } : {}), voci })) };
+  const menu = { id: slug, nome: venue.trim(), lingue: ['it'], sezioni: kept.map(({ nome, voci, tipo, prezzo, unita, descrizione }) => ({ nome, ...(descrizione ? { descrizione } : {}), ...(tipo ? { tipo } : {}), ...(prezzo ? { prezzo } : {}), ...(unita ? { unita } : {}), voci })) };
   const variantCount = items.filter((i) => i.variants).length, courses = kept.filter((s) => s.tipo === 'degustazione');
   return { menu, extracted: items.filter((i) => !i.course), courses: items.filter((i) => i.course), consumed, confirm, uncertain: unknown, provenance, warnings: [
     'Allergeni, ingredienti, coperto, contatti e traduzioni non sono stati dedotti.',
