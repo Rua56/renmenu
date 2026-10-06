@@ -92,7 +92,7 @@ I valori reali stanno solo nei Secret e nelle variabili di Cloudflare Pages, mai
 - Nessuna copia di sicurezza periodica del database: da predisporre prima di accogliere più clienti.
 - La spedizione reale dell'email con QR in allegato non è ancora stata provata su un cliente: la prima prova è la pubblicazione di Osteria Codelli 23.
 - Lingue: la traduzione automatica implementata è l'inglese; tedesco e sloveno richiedono preparazione aggiuntiva.
-- Trattoria Blanch usa un formato diverso da `menus/<id>.json` (vedi `blanch/README.md`): è registrata come cliente, ma le modifiche tramite Jarvis richiedono un adattatore dedicato.
+- Trattoria Blanch ha un formato proprio (`blanch/`): Jarvis lo legge e lo modifica con un adattatore dedicato. Non può contenere allergeni per piatto, telefono, coperto, tag o foto; il QR già stampato non cambia mai.
 - Con il piano gratuito di Gemini Google può usare i testi inviati per migliorare i suoi prodotti: va bene per menu pubblici, da valutare per materiali riservati.
 
 Licenze di terzi: `qrcode-generator` (MIT, anche in `control-room/cloudflare/functions/_lib/vendor/`) e `pdfjs-dist` (Apache 2.0), con i file di licenza accanto al codice.

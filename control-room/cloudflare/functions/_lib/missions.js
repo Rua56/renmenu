@@ -13,6 +13,7 @@ import { sendOwnerNotification } from './owner-notifications.js';
 import { briefingDue, buildBriefing, romeDay } from './briefing.js';
 import { answerCallback, clearButtons, downloadTelegramFile, sendDocument, sendPhoto, sendTelegram, sendVoice, telegramReady } from './telegram.js';
 import { buildMenuQr, menuLink } from './qr.js';
+import { isBlanchSlug, publicMenuJsonUrl, publicMenuPageUrl } from './blanch.js';
 import { CHAT_MODEL, chat as freeChat, matchVenue, planFromText, speak, transcribe, understand, venueSaid } from './voice.js';
 import { classifyRequest } from './autopilot.js';
 import { editFingerprints, editLogKey, proposeOps, validateOps } from './draft-edit.js';
@@ -492,6 +493,11 @@ export function createMissions(deps) {
       return;
     }
     const client = hits[0];
+    if (isBlanchSlug(client.menu_id)) {
+      // Menu in formato Blanch: il QR è quello già stampato e non si rigenera mai.
+      await sendTelegram(env, chat, `Il QR di «${client.name}» è quello già stampato e non cambia mai.\nLink: ${publicMenuPageUrl('https://renmenu.pages.dev', client.menu_id)}\nFile del QR: https://renmenu.pages.dev/blanch/qr/trattoria-blanch-qr.png (PNG) e https://renmenu.pages.dev/blanch/qr/trattoria-blanch-qr.svg (SVG).`, null, deps.fetchImpl);
+      return;
+    }
     let menu = null;
     try { const r = await (deps.fetchImpl || globalThis.fetch)(`https://renmenu.pages.dev/menus/${encodeURIComponent(client.menu_id)}.json`); if (r.ok) menu = await r.json(); } catch { menu = null; }
     if (!menu) { await sendTelegram(env, chat, `Non riesco a leggere il menu online di «${client.name}»: riprova tra poco.`, null, deps.fetchImpl); return; }
@@ -976,10 +982,10 @@ export function createMissions(deps) {
       const body = await response.text().catch(() => '');
       return { ok: true, body };
     };
-    const menuJson = await get(`${PUBLIC_ORIGIN}/menus/${encodeURIComponent(slug)}.json`, true);
-    const page = await get(`${PUBLIC_ORIGIN}/menu/?m=${encodeURIComponent(slug)}`, false);
+    const menuJson = await get(publicMenuJsonUrl(PUBLIC_ORIGIN, slug), true);
+    const page = await get(publicMenuPageUrl(PUBLIC_ORIGIN, slug), false);
     let sha = null, id = null;
-    if (menuJson.ok) { try { const parsed = JSON.parse(menuJson.body); id = parsed?.id; sha = await sha256Hex(JSON.stringify(parsed)); } catch { menuJson.ok = false; menuJson.why = 'non è un JSON valido'; } }
+    if (menuJson.ok) { try { const parsed = JSON.parse(menuJson.body); id = parsed?.id ?? (isBlanchSlug(slug) && parsed?.name ? slug : null); sha = await sha256Hex(JSON.stringify(parsed)); } catch { menuJson.ok = false; menuJson.why = 'non è un JSON valido'; } }
     return { menuJson, page, sha, id };
   }
   async function watchRegister(db, mission, slug, name, url) {
@@ -1004,7 +1010,7 @@ export function createMissions(deps) {
       if (problems.length) {
         const fails = (watch.fails || 0) + 1;
         if (fails >= 2) {
-          await tell(db, env, { request_id: watch.requestId }, 'controllo dopo la pubblicazione', `Attenzione, Riccardo: controllando «${watch.name}» dopo la pubblicazione ho trovato un problema: ${problems.join('; ')}.\nPagina del QR: ${watch.url || `${PUBLIC_ORIGIN}/menu/?m=${watch.slug}`}\nNon tocco niente: dimmi tu come procedere.`, null, 'importante');
+          await tell(db, env, { request_id: watch.requestId }, 'controllo dopo la pubblicazione', `Attenzione, Riccardo: controllando «${watch.name}» dopo la pubblicazione ho trovato un problema: ${problems.join('; ')}.\nPagina del QR: ${watch.url || publicMenuPageUrl(PUBLIC_ORIGIN, watch.slug)}\nNon tocco niente: dimmi tu come procedere.`, null, 'importante');
           await putSetting(db, row.key, JSON.stringify({ ...watch, fails: 0, next: new Date(Date.now() + 6 * 3600_000).toISOString() }));
         } else await putSetting(db, row.key, JSON.stringify({ ...watch, fails, next: new Date(Date.now() + 10 * 60_000).toISOString() }));
         out.push({ watch: watch.slug, ok: false });
@@ -1265,7 +1271,7 @@ export function createMissions(deps) {
     if (!draft) {
       const clients = await rows(db, "SELECT id,name,menu_id FROM clients WHERE menu_id IS NOT NULL AND menu_id<>''").catch(() => []);
       const { client } = pickLocale(spokenVenue, clues, clients);
-      if (client) return { text: `«${client.name}» non ha bozze aperte, ma ha il menu online: https://renmenu.pages.dev/menu/?m=${encodeURIComponent(client.menu_id)}` };
+      if (client) return { text: `«${client.name}» non ha bozze aperte, ma ha il menu online: ${publicMenuPageUrl('https://renmenu.pages.dev', client.menu_id)}` };
       return { text: `Non trovo una bozza né un menu online per «${spokenVenue || 'quel locale'}». Dimmi il nome esatto del locale.` };
     }
     return showDraft(db, env, draft);

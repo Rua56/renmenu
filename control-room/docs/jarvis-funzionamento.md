@@ -124,7 +124,15 @@ Stati della missione: affidata, attesa invio, attesa cliente, attesa SÌ, pubbli
 
 ## Menu in formato proprio (Trattoria Blanch)
 
-Trattoria Blanch è registrata come cliente (scheda, indirizzo del menu `/blanch/`, memoria con piatti e prezzi), ma il suo menu non è in `menus/<id>.json`: si compila da `blanch/data/food.json` e `blanch/data/wines.tsv` con `blanch/tools/build_menu.py`. Jarvis lo riconosce per nome e, se gli si chiede una modifica, risponde che non è ancora collegato e non apre nessuna pratica. Per renderlo modificabile serve un adattatore che aggiorni i tre file in modo coerente e mantenga invariato l'indirizzo del QR già stampato.
+Trattoria Blanch ha un formato proprio: il suo menu si compila da `blanch/data/food.json` e `blanch/data/wines.tsv` in `blanch/data/menu.json` (stesso risultato, byte per byte, di `blanch/tools/build_menu.py`). Jarvis lo legge e lo modifica con un adattatore (`_lib/blanch.js`), con identificativo `trattoria-blanch`.
+
+- **Lettura:** Jarvis legge i tre file da GitHub, controlla che `menu.json` coincida con la compilazione di cibo e vini e li presenta nella forma RenMenu (sezioni e voci). I due importi senza spiegazione («€ 10,00 / 13,00») restano due importi: «Primo prezzo» e «Secondo prezzo». Le varianti calice, quarto, mezzo litro e litro restano tali.
+- **Bozza e anteprima:** come per ogni locale. L'anteprima usa la grafica standard di RenMenu, non la pagina di Blanch.
+- **Pubblicazione (solo dopo il tuo SÌ):** una PR modifica soltanto le righe cambiate di `food.json` e `wines.tsv` e rigenera `menu.json`, mai altro. Un piatto o un vino nuovo ha l'inglese e il tedesco scritti da Jarvis oppure, se mancano, il testo italiano da rivedere. Le righe non toccate restano identiche, con le loro note interne e l'ordine originale.
+- **Cosa non può contenere:** allergeni per piatto, telefono, coperto, tag, foto, schede, tema. Se la bozza li contiene Jarvis si ferma prima di aprire la PR e lo dice. Gli avvisi su coperto e allergie non si cambiano da qui.
+- **Verifica dopo la pubblicazione:** Jarvis rilegge `https://renmenu.pages.dev/blanch/data/menu.json` e la pagina `/blanch/`, e confronta con il menu approvato; il controllo a 6 ore, 2 e 7 giorni e il briefing usano gli stessi indirizzi.
+- **QR:** non cambia mai. Quello stampato resta valido: su richiesta Jarvis manda il link e i file esistenti (`blanch/qr/`), senza generarne uno nuovo.
+- **Se qualcosa non torna** (menu compilato diverso dai sorgenti, formato inatteso): errore chiaro, nessuna scrittura.
 
 ## 6. Piani e regole di servizio
 
