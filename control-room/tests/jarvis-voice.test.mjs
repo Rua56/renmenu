@@ -211,6 +211,34 @@ describe('Comandi vocali di Jarvis', () => {
       assert.equal((await db.prepare('SELECT COUNT(*) AS n FROM requests').bind().first()).n, 1);
     } finally { globalThis.fetch = previous; db.close(); }
   });
+  it('«prepara la bozza» e «la bozza devi crearla per la chincaglieria»: vale per la pratica in primo piano o nominata a metà, mai per un altro locale', async () => {
+    const db = database();
+    const previous = globalThis.fetch;
+    globalThis.fetch = fakeFetch;
+    try {
+      calls.length = 0;
+      await missions.putSetting(db, 'telegram_chat_id', '42');
+      await db.prepare("INSERT INTO clients (id,name,plan,internal_notes,revision,created_at,updated_at) VALUES ('co','Osteria Codelli 23','premium','',1,'2026-10-01','2026-10-01')").bind().run();
+      await db.prepare("INSERT INTO requests (id,client_id,kind,subject,source_channel,status,plan,category,revision,created_at,updated_at) VALUES ('rco','co','nuovo','Nuovo menu Premium · Osteria Codelli 23','manuale','in_revisione','premium','nuovo_premium',1,'2026-10-01','2026-10-01')").bind().run();
+      let env = testEnv(db, { TELEGRAM_BOT_TOKEN: TOKEN, TRANSLATION_PROVIDER: 'disabled', AI: aiSaying('', { intent: 'risposta', locale: '', risposta: 'ok' }) });
+      await missions.telegramUpdate(db, env, { message: { chat: { id: 42, type: 'private' }, text: 'Il nome del locale è La Chincaglieria Gastronomica' } });
+      env = testEnv(db, { TELEGRAM_BOT_TOKEN: TOKEN, TRANSLATION_PROVIDER: 'disabled', AI: aiSaying('', { intent: 'crea_pratica', locale: 'La Chincaglieria Gastronomica', risposta: '' }) });
+      await missions.telegramUpdate(db, env, { message: { chat: { id: 42, type: 'private' }, text: 'Crea una nuova pratica per La Chincaglieria Gastronomica' } });
+      const request = await db.prepare("SELECT r.id FROM requests r JOIN clients c ON c.id=r.client_id WHERE c.name LIKE 'La Chincaglieria%'").bind().first();
+      assert.ok(request);
+      await db.prepare("INSERT INTO materials (id,request_id,r2_key,filename,mime,size,source,processing_status,created_at) VALUES ('mf1',?,'k','f.jpg','image/jpeg',5,'telegram','in_coda','2026-10-06T10:00:00Z')").bind(request.id).run();
+      env = testEnv(db, { TELEGRAM_BOT_TOKEN: TOKEN, TRANSLATION_PROVIDER: 'disabled', AI: aiSaying('', { intent: 'risposta', locale: '', risposta: 'Osteria Codelli 23' }) });
+      await missions.telegramUpdate(db, env, { message: { chat: { id: 42, type: 'private' }, text: 'Prepara la bozza' } });
+      assert.match(calls.at(-1).body.text, /Chincaglieria/);
+      assert.doesNotMatch(calls.at(-1).body.text, /Codelli/);
+      assert.match(calls.at(-1).body.text, /1 file da leggere/);
+      await missions.putSetting(db, 'tg_focus', 'null');
+      env = testEnv(db, { TELEGRAM_BOT_TOKEN: TOKEN, TRANSLATION_PROVIDER: 'disabled', AI: aiSaying('', { intent: 'anteprima', locale: 'chincaglieria', risposta: '' }) });
+      await missions.telegramUpdate(db, env, { message: { chat: { id: 42, type: 'private' }, text: 'La bozza devi crearla per la chincaglieria' } });
+      assert.match(calls.at(-1).body.text, /Chincaglieria/);
+      assert.doesNotMatch(calls.at(-1).body.text, /Non trovo una bozza|Codelli/);
+    } finally { globalThis.fetch = previous; db.close(); }
+  });
   it('nome non detto davvero o cliente simile: chiede, non crea', async () => {
     const db = database();
     const previous = globalThis.fetch;

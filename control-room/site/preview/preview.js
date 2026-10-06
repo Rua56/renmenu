@@ -26,10 +26,10 @@ async function main() {
     root.replaceChildren();
     const primary = draft.menu.lingue?.[0] || 'it';
     byId('preview-title').textContent = localized(draft.menu.nome, primary) || 'Bozza senza titolo';
-    root.append(element('p', `Pratica ${request.subject} · revisione ${draft.revision} · ${draft.menu.sezioni.length} sezioni`, 'preview-meta'));
+    root.append(element('p', `Pratica ${request.subject} · revisione ${draft.revision} · ${draft.menu.sezioni.filter((s) => !s.senzaTitolo).length} sezioni${draft.menu.sezioni.some((s) => s.senzaTitolo) ? ' (più un elenco senza titolo)' : ''}`, 'preview-meta'));
     for (const section of draft.menu.sezioni) {
       const block = document.createElement('section'); block.className = 'preview-section';
-      block.append(element('h2', localized(section.nome, primary)));
+      if (!section.senzaTitolo) block.append(element('h2', localized(section.nome, primary)));
       for (const item of section.voci || []) {
         const row = document.createElement('div'); row.className = 'preview-item';
         row.append(element('span', localized(item.nome, primary)),

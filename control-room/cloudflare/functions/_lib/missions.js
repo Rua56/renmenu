@@ -20,6 +20,7 @@ import { editFingerprints, editLogKey, proposeOps, validateOps } from './draft-e
 import { GEMINI_PREFERRED } from './vision.js';
 import { findDishes, findLocales, guessIntent, hintsText } from './understanding.js';
 import { memoryContext, memoryFor, menuStatements, noteStatement } from './memory.js';
+import { slugify } from './menu.js';
 
 export const PARTIAL_MARK = '[Testo parziale: leggi l’email completa in Gmail prima di decidere]';
 export const OWNER_REVIEW = 'telegram:riccardo';
@@ -784,6 +785,7 @@ export function createMissions(deps) {
     const planned = intent.intent === 'crea_pratica' ? null : await planForFocus(db, utterance, intent.locale);
     if (planned) { await answer(planned); return; }
     if (REREAD.test(said0)) { await answer(await voiceReread(db, env, intent.locale, utterance)); return; }
+    if (PREPARE_DRAFT.test(said0) && !EDIT_WORDS.test(said0)) { const prepared = await voicePrepareDraft(db, env, utterance, intent.locale); if (prepared) { await answer(prepared); return; } }
     // Correzione dettata a una bozza aperta («le braciole costano 9»), anche se il modello l'ha presa per una domanda.
     if (['risposta', 'non_chiaro'].includes(intent.intent) && EDIT_WORDS.test(said0)) {
       const target = await draftTarget(db, intent.locale, clues, utterance).catch(() => null);
@@ -998,6 +1000,46 @@ export function createMissions(deps) {
     } catch (error) {
       return `Non sono riuscito a segnare il piano: ${String(error?.message || 'errore').slice(0, 200)}`;
     }
+  }
+
+  // «Prepara la bozza» / «la bozza devi crearla per la chincaglieria»: vale per la pratica nominata (anche solo con una parte del nome)
+  // o, senza nome, per quella in primo piano. Mai per un altro locale.
+  const PREPARE_DRAFT = /\b(?:prepar\w*|cre[ai]\w*|gener\w*|fai|fammi|rifai|costruisc\w*)\b[^.?!]{0,40}\bbozza\b|\bbozza\b[^.?!]{0,30}\b(?:crear\w*|prepar\w*|gener\w*|far\w*)/i;
+  async function voicePrepareDraft(db, env, utterance, spokenVenue) {
+    const open = await rows(db, "SELECT r.id,r.subject,r.plan,r.kind,c.name AS client_name FROM requests r LEFT JOIN clients c ON c.id=r.client_id WHERE r.status NOT IN ('completata','archiviata','chiusa') AND r.kind='nuovo' ORDER BY r.created_at DESC LIMIT 20").catch(() => []);
+    if (!open.length) return null;
+    const plain = slugify(utterance);
+    const named = open.map((r) => ({ id: r.id, name: r.client_name || '', menu_id: '' }));
+    let request = null;
+    if (spokenVenue) { const m = matchVenue(spokenVenue, named); if (m.client) request = open.find((r) => r.id === m.client.id); else if (m.candidates.length > 1) return `Ci sono più pratiche che corrispondono: ${m.candidates.map((c) => `«${c.name}»`).join(', ')}. Di quale preparo la bozza?`; }
+    if (!request) {
+      // Nome detto dentro la frase senza che il modello l'abbia isolato: parole distintive del cliente (almeno 6 lettere).
+      const hit = open.filter((r) => slugify(r.client_name || '').split('-').some((w) => w.length >= 6 && plain.split('-').includes(w)));
+      if (hit.length === 1) request = hit[0]; else if (hit.length > 1) return `Ci sono più pratiche che corrispondono: ${hit.map((r) => `«${r.client_name}»`).join(', ')}. Di quale preparo la bozza?`;
+    }
+    if (!request && !spokenVenue) {
+      let focus = null; try { focus = JSON.parse(await setting(db, 'tg_focus') || 'null'); } catch {}
+      if (focus?.requestId && Date.now() - Date.parse(focus.at) < FOCUS_MINUTES * MINUTE) request = open.find((r) => r.id === focus.requestId) || null;
+      if (!request && open.length === 1) request = open[0];
+    }
+    if (!request) return spokenVenue ? null : `Per quale pratica preparo la bozza? Aperte: ${open.slice(0, 4).map((r) => `«${r.client_name || r.subject}»`).join(', ')}.`;
+    const label = request.client_name || request.subject;
+    await putSetting(db, 'tg_focus', JSON.stringify({ requestId: request.id, subject: request.subject || label, at: now() })).catch(() => {});
+    const existing = await getOne(db, "SELECT id,status,revision FROM drafts WHERE request_id=? AND status IN ('bozza','revisione','pronta_pr')", request.id);
+    if (existing) return `La bozza di «${label}» c’è già (versione ${existing.revision}): scrivimi «mostrami l’anteprima di ${label}» per vederla, oppure dimmi cosa correggere.`;
+    const mats = await getOne(db, 'SELECT COUNT(*) AS n FROM materials WHERE request_id=? AND archived_at IS NULL', request.id);
+    const read = await getOne(db, "SELECT COUNT(*) AS n FROM material_analyses a JOIN materials m ON m.id=a.material_id WHERE a.request_id=? AND m.archived_at IS NULL AND a.status IN ('complete','needs_review') AND length(a.source_text)>0", request.id);
+    const unread = await getOne(db, "SELECT COUNT(*) AS n FROM materials m WHERE m.request_id=? AND m.archived_at IS NULL AND NOT EXISTS (SELECT 1 FROM material_analyses a WHERE a.material_id=m.id)", request.id);
+    if (!(mats?.n > 0)) return `Per «${label}» non ho ancora nessun materiale (foto o PDF del menu): mandalo e preparo la bozza.`;
+    if (unread?.n > 0) {
+      await putSetting(db, 'draft_after_checks', JSON.stringify({ requestId: request.id, at: now() })).catch(() => {});
+      return `Per «${label}» ho ancora ${unread.n} ${unread.n === 1 ? 'file' : 'file'} da leggere: preparo la bozza appena ho finito e ti scrivo.`;
+    }
+    if (!(read?.n > 0)) return `Per «${label}» non sono riuscito a leggere il materiale: rimandami le foto, più nitide, e riprovo.`;
+    try {
+      await action(jarvisDb(db), 'generateDraft', { requestId: request.id }, env);
+      return `Bozza di «${label}» pronta, Riccardo, dalle ${read.n} ${read.n === 1 ? 'lettura' : 'letture'} del materiale. Scrivimi «mostrami l’anteprima di ${label}» per vederla: le voci dubbie restano da verificare e nulla è online.`;
+    } catch (error) { return `Non sono riuscito a preparare la bozza di «${label}»: ${String(error?.message || 'errore').slice(0, 200)}`; }
   }
 
   // Nuova pratica a voce: cliente (esistente o nuovo) + pratica «nuovo menu». Le foto e i PDF che
