@@ -69,6 +69,8 @@ Prima del confronto le due letture sono riportate allo stesso formato. Un piatto
 
 Se sul materiale i piatti sono un elenco unico, senza titoli di sezione, Jarvis li mette in una sola sezione «Piatti» e tiene solo i titoli scritti davvero, come «Dolci». Le foto si uniscono nell'ordine in cui sono state mandate e un file che comincia con piatti senza titolo apre la sezione «Piatti», senza finire nell'ultima sezione del file precedente. «Prepara la bozza» a Telegram vale per la pratica in primo piano o nominata, anche a metà nome.
 
+Allergeni scritti dal locale: Jarvis non li deduce mai dal nome del piatto. Riconosce i numeri UE 1–14 scritti tra parentesi o come «Allergeni: 1, 4, 7» (con o senza simboli * @) e li propone nella Revisione, non preselezionati; solo dopo il tuo tocco diventano icone allergeni e i numeri escono dal testo. Una riga letta una sola volta o tagliata resta da verificare.
+
 ### Modifiche a un menu già online senza prezzi né piatti
 
 Se la frase non contiene prezzi o piatti da cambiare (per esempio titoli delle sezioni, unione di sezioni, descrizioni), Jarvis crea comunque la pratica di aggiornamento con una bozza identica al menu online (stesso Menu ID, stesso QR) e vi applica la correzione come per ogni bozza. La pratica diventa quella in primo piano per 60 minuti. Pubblicazione e SÌ restano invariati.
