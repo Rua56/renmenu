@@ -740,6 +740,12 @@ export function createMissions(deps) {
   // Conversazione: ricorda gli ultimi scambi e, se Jarvis ha appena chiesto un chiarimento,
   // unisce la risposta di Riccardo al comando precedente (es. «cambia il frico a 12» → «quale locale?» → «Bakaro»).
   const PENDING_MINUTES = 10;
+  const plainText = (text) => String(text || '').toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/[^a-z0-9]+/g, '-');
+  const localeSaid = (venue, utterance) => {
+    const said = `-${plainText(utterance)}-`;
+    const key = plainText(venue).split('-').filter((w) => w.length > 2 && !['del', 'dell', 'della', 'dello', 'alla', 'allo', 'dal', 'per', 'menu', 'the'].includes(w));
+    return key.length > 0 && key.some((w) => said.includes(`-${w}-`) || (w.length >= 6 && said.includes(`-${w.slice(0, 5)}`)));
+  };
   async function converse(db, env, chat, said0, spoken) {
     const said = spoken ? `«${said0}»\n\n` : '';
     let pending = null; try { pending = JSON.parse(await setting(db, 'tg_pending') || 'null'); } catch {}
@@ -753,7 +759,9 @@ export function createMissions(deps) {
     if (understood.modelName) await putSetting(db, 'gemini_good', JSON.stringify([understood.modelName])).catch(() => {});
     // Se il modello non è sicuro (o risponde a parole a un ordine) ma le parole chiave indicano un compito chiaro, Jarvis procede.
     const fallbackUsed = (understood.intent === 'non_chiaro' || (understood.intent === 'risposta' && !fresh)) && !['non_chiaro', 'ambiguo', 'risposta'].includes(clues.guess.intent);
-    const intent = fallbackUsed ? { ...understood, intent: clues.guess.intent, locale: understood.locale || clues.guess.locale } : understood;
+    const intent0 = fallbackUsed ? { ...understood, intent: clues.guess.intent, locale: understood.locale || clues.guess.locale } : understood;
+    // Un locale che il modello nomina ma che Riccardo non ha detto (per esempio «Bevande» preso per un locale) non conta: la frase resta sulla pratica in primo piano.
+    const intent = intent0.locale && !localeSaid(intent0.locale, utterance) ? { ...intent0, locale: '' } : intent0;
     if (intent.intent === 'non_chiaro' && !intent.risposta && clues.guess.intent === 'ambiguo') {
       const venue = clues.locales[0]?.name || clues.dishes[0]?.client?.name;
       const dish = clues.dishes[0]?.dish?.name;
