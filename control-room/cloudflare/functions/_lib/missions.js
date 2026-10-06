@@ -11,7 +11,8 @@ import { allExtras } from './extras.js';
 import { assessReply, proposeReplyChanges, referenceCode, sha256Hex } from './approvals.js';
 import { sendOwnerNotification } from './owner-notifications.js';
 import { briefingDue, buildBriefing, romeDay } from './briefing.js';
-import { answerCallback, clearButtons, downloadTelegramFile, sendTelegram, sendVoice, telegramReady } from './telegram.js';
+import { answerCallback, clearButtons, downloadTelegramFile, sendDocument, sendPhoto, sendTelegram, sendVoice, telegramReady } from './telegram.js';
+import { buildMenuQr, menuLink } from './qr.js';
 import { CHAT_MODEL, chat as freeChat, matchVenue, planFromText, speak, transcribe, understand, venueSaid } from './voice.js';
 import { classifyRequest } from './autopilot.js';
 import { editFingerprints, editLogKey, proposeOps, validateOps } from './draft-edit.js';
@@ -38,6 +39,8 @@ const describeChange = (entry) => entry.type === 'prezzo' ? `${entry.name}: ${en
     : entry.type === 'coperto' ? `coperto ${entry.value}` : `${entry.name}: ${entry.label || entry.type}`;
 
 const EDIT_WORDS = /(?:\d|\beuro\b|€|\bcost\w*|\bprezz\w*|\baggiung\w*|\btogli\w*|\brimuov\w*|\belimin\w*|\bcancell\w*|\bcambia\w*|\bmetti\w*|\bsposta\w*|\brinomin\w*|\bdescrizion\w*|\bchiam\w*|\bdividi\w*|\bspezza\w*|\bsono\b)/i;
+// Frasi che chiedono di cambiare il menu, non il QR (es. «metti il QR nel menu»): non sono richieste di QR.
+const EDIT_WORDS_STRICT = /\b(?:aggiung\w*|togli\w*|rimuov\w*|prezzo|costa\w*|rinomin\w*)\b/i;
 const REREAD = /\b(?:rileggi\w*|rilegg\w+|rileggere|rifai la lettura|leggi(?:le|li)? (?:di nuovo|ancora))\b/i;
 const STATUS_WORDS = /^\W*(?:ok\s+)?(?:jarvis[\s,!.]*)?(?:\/)?stato[\s?!.]*$/i;
 
@@ -395,6 +398,43 @@ export function createMissions(deps) {
     let menu = null; try { menu = JSON.parse(draft.menu_json); } catch {}
     if (menu) await db.batch(menuStatements(db, client.id, menu, `pubblicazione ${draft.slug}`)).catch(() => {});
   }
+  // ——— QR del menu: dopo il SÌ e la verifica online, link e QR su Telegram ———
+  // Standard: QR classico. Premium e Annuale: logo del locale al centro (se il logo si legge).
+  const QR_WITH_LOGO = new Set(['premium', 'annuale']);
+  async function sendMenuQr(db, env, { slug, name, plan, logoUrl, baseUrl }) {
+    const chat = await setting(db, 'telegram_chat_id');
+    if (!chat || !telegramReady(env)) return { ok: false, why: 'Telegram non collegato' };
+    const wantsLogo = QR_WITH_LOGO.has(plan) && logoUrl;
+    let absolute = '';
+    try { absolute = wantsLogo ? new URL(logoUrl, baseUrl || menuLink(slug)).href : ''; } catch { absolute = ''; }
+    const qr = await buildMenuQr({ slug, name, logoUrl: absolute, fetchImpl: deps.fetchImpl || globalThis.fetch });
+    const kind = qr.withLogo ? 'con il logo del locale' : 'classico';
+    const note = QR_WITH_LOGO.has(plan) && !qr.withLogo ? `\nIl logo non l’ho potuto inserire (${qr.logoProblem || 'nessun logo nel menu'}): questo è il QR classico, dimmi se vuoi che lo rifaccia con il logo.` : '';
+    await sendTelegram(env, chat, `QR del menu di «${name}» (${kind}).\nLink: ${qr.link}\nIl QR non cambia con gli aggiornamenti del menu: puoi stamparlo.${note}`, null, deps.fetchImpl);
+    const slugName = String(slug).replace(/[^a-z0-9-]/gi, '').slice(0, 40) || 'menu';
+    const photo = await sendPhoto(env, chat, qr.png, `QR ${name}`, deps.fetchImpl);
+    await sendDocument(env, chat, qr.png, `qr-${slugName}.png`, 'image/png', 'Per stampare: file PNG a piena qualità.', deps.fetchImpl);
+    await sendDocument(env, chat, qr.svg, `qr-${slugName}.svg`, 'image/svg+xml', 'Per la stampa professionale: file vettoriale SVG.', deps.fetchImpl);
+    return { ok: Boolean(photo?.ok), withLogo: qr.withLogo, link: qr.link };
+  }
+  // «mandami il QR di …»: stesso QR di sempre (il link del menu non cambia), per i locali già online.
+  async function qrOnRequest(db, env, chat, text) {
+    const plain = (v) => String(v || '').toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/[^a-z0-9]+/g, ' ').trim();
+    const said = plain(text).split(' ');
+    const clients = await rows(db, "SELECT id,name,plan,menu_id FROM clients WHERE menu_id IS NOT NULL AND menu_id<>'' ORDER BY name LIMIT 200").catch(() => []);
+    const generic = new Set(['osteria', 'trattoria', 'ristorante', 'bar', 'enoteca', 'pizzeria', 'locale', 'menu', 'del', 'della', 'dello', 'dei', 'di', 'da', 'al', 'il', 'la', 'le']);
+    const hits = clients.filter((c) => plain(c.name).split(' ').some((w) => w.length >= 3 && !generic.has(w) && said.includes(w)));
+    if (hits.length !== 1) {
+      const names = (hits.length ? hits : clients).slice(0, 8).map((c) => `«${c.name}»`).join(', ');
+      await sendTelegram(env, chat, hits.length ? `Quale locale? ${names}.` : (clients.length ? `Di quale locale vuoi il QR? Quelli già online: ${names}.` : 'Nessun menu è ancora online: il QR lo preparo dopo la pubblicazione.'), null, deps.fetchImpl);
+      return;
+    }
+    const client = hits[0];
+    let menu = null;
+    try { const r = await (deps.fetchImpl || globalThis.fetch)(`https://renmenu.pages.dev/menus/${encodeURIComponent(client.menu_id)}.json`); if (r.ok) menu = await r.json(); } catch { menu = null; }
+    if (!menu) { await sendTelegram(env, chat, `Non riesco a leggere il menu online di «${client.name}»: riprova tra poco.`, null, deps.fetchImpl); return; }
+    await sendMenuQr(db, env, { slug: client.menu_id, name: client.name, plan: client.plan, logoUrl: menu.premium?.logo || '', baseUrl: menuLink(client.menu_id) });
+  }
   async function stepVerifying(db, env, mission) {
     if (Date.now() - Date.parse(mission.step_started_at) < 75_000) return mission;
     const { draft, request, menu } = await load(db, mission);
@@ -404,6 +444,11 @@ export function createMissions(deps) {
       const next = await move(db, mission, 'completata', `Menu online e verificato: ${done.publicUrl}`);
       await watchRegister(db, mission, draft.slug, menu.nome, done.publicUrl).catch(() => null);
       await tell(db, env, next, 'menu online', `Fatto: «${menu.nome}» è online e verificato.\n${done.publicUrl}\nPR #${done.prNumber}.`, null, 'importante');
+      // Menu nuovo: link e QR subito su Telegram. Per un aggiornamento il QR resta quello già distribuito.
+      if (request.kind === 'nuovo') {
+        const sentQr = await sendMenuQr(db, env, { slug: draft.slug, name: menu.nome || draft.slug, plan: request.plan, logoUrl: menu.premium?.logo || '', baseUrl: done.publicUrl }).catch(() => null);
+        if (!sentQr?.ok) await tell(db, env, next, 'QR del menu', `Non sono riuscito a mandarti il QR di «${menu.nome}». Scrivimi «mandami il QR di ${menu.nome}» e lo rifaccio.`, null, 'importante').catch(() => {});
+      }
       return next;
     } catch (error) {
       if (mission.attempts >= 15) return stop(db, env, mission, `il menu non risulta ancora online (${String(error?.message || 'errore').slice(0, 200)})`);
@@ -543,6 +588,7 @@ export function createMissions(deps) {
       let open = null; try { open = JSON.parse(await setting(db, 'tg_checks') || 'null'); } catch {}
       if (open?.queue && open.k < open.queue.length) { const outcome = await answerCheck(db, env, chat, open.k, normalizePrice(text)); if (!outcome.silent) await sendTelegram(env, chat, outcome.text, null, deps.fetchImpl); return; }
     }
+    if (/\bqr\b/i.test(text) && /\b(?:mand\w*|dammi|dai|gener\w*|invi\w*|rifai|prepar\w*|voglio|serve)\b/i.test(text) && !EDIT_WORDS_STRICT.test(text)) { await qrOnRequest(db, env, chat, text); return; }
     if (/^\/briefing\b/i.test(text)) { await briefing(db, env, { force: true }); return; }
     if (/^\/stato\b/i.test(text) || STATUS_WORDS.test(text)) {
       await sendTelegram(env, chat, await statusText(db), null, deps.fetchImpl);
