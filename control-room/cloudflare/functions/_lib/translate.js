@@ -22,6 +22,7 @@ export function translationEntries(menu, lang = 'en') {
     if (text && text.length <= MAX_TEXT && !hasLang(value, lang)) entries.push({ path, text });
   };
   for (const key of ROOT_FIELDS) if (key in (menu || {})) add(key, menu[key]);
+  if (menu?.premium && typeof menu.premium === 'object' && 'motto' in menu.premium) add('premium.motto', menu.premium.motto);
   for (const [si, section] of (menu?.sezioni || []).entries()) {
     add(`sezioni.${si}.nome`, section?.nome);
     if (section && 'descrizione' in section) add(`sezioni.${si}.descrizione`, section.descrizione);

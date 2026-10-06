@@ -134,3 +134,10 @@ describe('Allergeni dai numeri della descrizione', () => {
     assert.deepEqual(r.menu.sezioni[0].voci[1].descrizione, { it: 'con burro', en: 'with butter' });
   });
 });
+
+describe('frase d’apertura Premium', () => {
+  it('entra tra i testi da tradurre solo se manca l’inglese', () => {
+    assert.deepEqual(translationEntries({ sezioni: [], premium: { motto: { it: 'Nel cuore del Collio' } } }, 'en'), [{ path: 'premium.motto', text: 'Nel cuore del Collio' }]);
+    assert.equal(translationEntries({ sezioni: [], premium: { motto: { it: 'Nel cuore', en: 'In the heart' } } }, 'en').length, 0);
+  });
+});

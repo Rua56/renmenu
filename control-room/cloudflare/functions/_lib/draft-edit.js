@@ -6,7 +6,7 @@
 // frase o dal nome precedente. Se una sola operazione non regge, non si applica nulla.
 import { CLOUDFLARE_FREE_MODEL } from './ai-live.js';
 
-export const OP_TYPES = ['prezzo', 'varianti', 'aggiungi', 'rimuovi', 'rinomina', 'descrizione', 'sposta', 'rinomina_sezione'];
+export const OP_TYPES = ['prezzo', 'varianti', 'aggiungi', 'rimuovi', 'rinomina', 'descrizione', 'sposta', 'rinomina_sezione', 'motto'];
 
 const plain = (value) => String(value || '').toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '');
 const words = (value) => plain(value).replace(/[^a-z0-9]+/g, ' ').trim().split(/\s+/).filter(Boolean);
@@ -93,7 +93,7 @@ const OP_SCHEMA = {
 const SYSTEM = [
   'Sei Jarvis, assistente di Riccardo per RenMenu. Riccardo ti detta (anche a voce, con errori di trascrizione) una correzione alla BOZZA di un menu.',
   'Trasformala in operazioni, usando SOLO gli indici dell’elenco: [S2] è la sezione 2, [2.5] è la voce 5 della sezione 2 (si=2, vi=5).',
-  'Tipi consentiti: prezzo (si, vi, prezzo); varianti (si, vi, varianti[{etichetta, prezzo}]: più prezzi per la stessa voce, per esempio calice e bottiglia, piccola e grande, oppure vitello e maiale se il nome elenca le alternative); aggiungi (si, nome, prezzo oppure varianti, descrizione facoltativa, dopo_vi facoltativo; se la sezione è nuova scrivi il suo nome in sezione e ometti si); rimuovi (si, vi); rinomina (si, vi, nome); descrizione (si, vi, descrizione; stringa vuota per toglierla); sposta (si, vi, a_si; se la sezione di destinazione non esiste ancora scrivi il suo nome in sezione e ometti a_si); rinomina_sezione (si, nome).',
+  'Tipi consentiti: prezzo (si, vi, prezzo); varianti (si, vi, varianti[{etichetta, prezzo}]: più prezzi per la stessa voce, per esempio calice e bottiglia, piccola e grande, oppure vitello e maiale se il nome elenca le alternative); aggiungi (si, nome, prezzo oppure varianti, descrizione facoltativa, dopo_vi facoltativo; se la sezione è nuova scrivi il suo nome in sezione e ometti si); rimuovi (si, vi); rinomina (si, vi, nome); descrizione (si, vi, descrizione; stringa vuota per toglierla); sposta (si, vi, a_si; se la sezione di destinazione non esiste ancora scrivi il suo nome in sezione e ometti a_si); rinomina_sezione (si, nome); motto (nome: la frase che compare sotto il logo nell’apertura del menu Premium, per esempio uno slogan del locale; nessun indice).',
   'Regole ferree: non inventare nulla. Nomi, prezzi e descrizioni devono essere quelli detti da Riccardo (i prezzi in formato 12,00). Non toccare le voci che Riccardo non nomina. Non scrivere allergeni, ingredienti o traduzioni. Se la richiesta è incomprensibile o ambigua, restituisci operazioni vuote e spiega in «dubbio», in italiano, cosa ti serve sapere.',
   'Per dividere una voce in due piatti distinti: rimuovi la voce e aggiungi i due piatti nella stessa sezione. Se Riccardo dice di tenere una voce con due prezzi, usa varianti. Rispondi solo con JSON, in questa forma: {"operazioni":[{"tipo":"sposta","si":10,"vi":0,"sezione":"Bevande"},{"tipo":"prezzo","si":2,"vi":1,"prezzo":"9,00"}],"dubbio":""}. Ogni operazione ha sempre il campo «tipo».'
 ].join('\n');
@@ -213,6 +213,13 @@ export function validateOps(rawOps, menu, utterance) {
       ops.push(entry);
       continue;
     }
+    if (type === 'motto') {
+      const text = clip(raw.nome ?? raw.testo ?? raw.descrizione, 160);
+      if (!menu?.premium) { problems.push('Frase d’apertura: questo menu non è Premium.'); continue; }
+      if (!text || !textGrounded(text, said, itText(menu.premium.motto))) { problems.push('Frase d’apertura: il testo non corrisponde a quello che hai detto.'); continue; }
+      if (ops.some((o) => o.tipo === 'motto')) { problems.push('Frase d’apertura: una sola per volta.'); continue; }
+      ops.push({ tipo: type, nome: text }); continue;
+    }
     if (type === 'rinomina_sezione') {
       const name = clip(raw.nome, 60);
       if (!section(si)) { problems.push('Rinomina sezione: sezione inesistente.'); continue; }
@@ -291,6 +298,12 @@ export function applyOps(menuIn, provenanceIn, ops, source) {
       fresh.push(item);
       needsEnglish = true;
       summary.push(`Aggiunto «${op.nome}» (${priceText(item)}) in «${itText(section.nome)}».`);
+      continue;
+    }
+    if (op.tipo === 'motto') {
+      menu.premium = { ...(menu.premium || {}), motto: { it: op.nome } };
+      needsEnglish = true;
+      summary.push(`Frase d’apertura sotto il logo: «${op.nome}».`);
       continue;
     }
     if (op.tipo === 'rinomina_sezione') {
