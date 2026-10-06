@@ -30,4 +30,6 @@ La voce è una comodità di navigazione e proposta, non vale come consenso per p
 
 Per aggiornare un menu si conserva sempre l'identificativo (e quindi il QR) e si legge la versione online corrente prima di modificare.
 
+**Sezioni (6 ottobre 2026).** Unire o togliere sezioni, da Telegram o a mano, modifica solo la bozza e azzera la checklist come ogni altra modifica; Jarvis agisce solo su sezioni che Riccardo nomina e la pubblicazione resta una conferma sua.
+
 **Modifica a mano (6 ottobre 2026).** Salvare una modifica dalla pagina «Modifica a mano» crea una nuova versione della bozza e azzera la checklist: la bozza torna da controllare e va riaffidata a Jarvis. La pagina non pubblica nulla e non apre pull request.
