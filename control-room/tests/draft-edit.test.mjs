@@ -113,3 +113,9 @@ test('sposta più voci in una sezione nuova, creata una sola volta', () => {
   // se la sezione esiste già, si usa quella
   assert.equal(validateOps([{ tipo: 'sposta', si: 0, vi: 1, sezione: 'Vini' }], menu(), 'sposta il frico con polenta nei vini').ops[0].a_si, 1);
 });
+
+test('il tipo di operazione scritto con varianti viene ricondotto, uno sconosciuto è segnalato', () => {
+  const said = 'sposta lo strudel di mele nei vini';
+  assert.equal(validateOps([{ tipo: 'Sposta_voce', si: 0, vi: 2, a_si: 1 }], menu(), said).ops.length, 1);
+  assert.match(validateOps([{ tipo: 'cancella_tutto' }], menu(), said).problems[0], /tipo «cancella_tutto»/);
+});
