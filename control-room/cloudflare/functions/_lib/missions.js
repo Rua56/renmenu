@@ -760,6 +760,11 @@ export function createMissions(deps) {
     // Se il modello non è sicuro (o risponde a parole a un ordine) ma le parole chiave indicano un compito chiaro, Jarvis procede.
     const fallbackUsed = (understood.intent === 'non_chiaro' || (understood.intent === 'risposta' && !fresh)) && !['non_chiaro', 'ambiguo', 'risposta'].includes(clues.guess.intent);
     const intent0 = fallbackUsed ? { ...understood, intent: clues.guess.intent, locale: understood.locale || clues.guess.locale } : understood;
+    // Comando chiaro ma il modello è incerto, e c'è una bozza in primo piano: è una correzione di quella bozza.
+    if (intent0.intent === 'non_chiaro' && !intent0.risposta && !/\?/.test(said0) && /\b(aggiung\w*|togli\w*|tolg\w*|rimuov\w*|elimin\w*|unisc\w*|unific\w*|cambia\w*|metti\w*|mett\w*|sposta\w*|rinomina\w*|chiama\w*|sostituisc\w*|modific\w*|scrivi|correggi\w*)\b/i.test(said0)) {
+      let focus = null; try { focus = JSON.parse(await setting(db, 'tg_focus') || 'null'); } catch {}
+      if (focus?.requestId && Date.now() - Date.parse(focus.at) < FOCUS_MINUTES * MINUTE) intent0.intent = 'aggiorna_menu';
+    }
     // Un locale che il modello nomina ma che Riccardo non ha detto (per esempio «Bevande» preso per un locale) non conta: la frase resta sulla pratica in primo piano.
     const intent = intent0.locale && !localeSaid(intent0.locale, utterance) ? { ...intent0, locale: '' } : intent0;
     if (intent.intent === 'non_chiaro' && !intent.risposta && clues.guess.intent === 'ambiguo') {
@@ -822,7 +827,10 @@ export function createMissions(deps) {
       let good = []; try { good = JSON.parse(await setting(db, 'gemini_good') || '[]'); } catch {}
       let bad = []; try { bad = JSON.parse(await setting(db, 'gemini_bad') || '[]'); } catch {}
       const chain = [...new Set([...good, ...models, ...GEMINI_PREFERRED])].filter((m) => good.includes(m) || !bad.includes(m));
-      return key && chain.length ? { key, models: chain, fetchImpl: deps.fetchImpl } : null;
+      // Un modello che da poco risponde con errori o scade viene saltato per 10 minuti: meno attese a vuoto (se restano solo quelli, si provano tutti).
+      let cool = {}; try { cool = JSON.parse(await setting(db, 'gemini_cool') || '{}'); } catch {}
+      const live = chain.filter((m) => !(cool[m] > Date.now()));
+      return key && chain.length ? { key, models: live.length ? live : chain, fetchImpl: deps.fetchImpl } : null;
     } catch { return null; }
   }
   const OPEN_DRAFTS = "SELECT d.id,d.request_id,d.slug,d.status,d.revision,d.menu_json,d.provenance_json,r.subject,c.id AS client_id,c.name AS client_name FROM drafts d JOIN requests r ON r.id=d.request_id LEFT JOIN clients c ON c.id=r.client_id WHERE d.status IN ('bozza','revisione','pronta_pr') AND r.status NOT IN ('completata','archiviata','chiusa') ORDER BY d.updated_at DESC LIMIT 20";
@@ -853,6 +861,10 @@ export function createMissions(deps) {
     if (mentioned.length > 1) return { ask: `Quel piatto compare in più bozze aperte: ${mentioned.map((d) => `«${d.client_name || d.subject}»`).join(', ')}. Di quale locale parliamo?` };
     return null;
   }
+  /** Frasi che Jarvis non ha saputo applicare: restano nel registro, così si vedono i punti da migliorare. */
+  async function noteMiss(db, utterance, reason, requestId = null) {
+    try { await auditedBatch(jarvisDb(db), [], 'jarvis.not_understood', `«${String(utterance).replace(/\s+/g, ' ').slice(0, 220)}» → ${String(reason).replace(/\s+/g, ' ').slice(0, 260)}`, requestId); } catch { /* solo diagnostica */ }
+  }
   async function voiceEditDraft(db, env, utterance, draft) {
     let menu; try { menu = JSON.parse(draft.menu_json); } catch { return { text: 'La bozza non si legge: aprila in Revisione.' }; }
     const name = draft.client_name || menu.nome || draft.subject || 'la bozza';
@@ -861,6 +873,14 @@ export function createMissions(deps) {
     if (plan.tries?.length) {
       try {
         const missing = plan.tries.filter((t) => t.status === 404).map((t) => t.model);
+        const slow = plan.tries.filter((t) => [429, 500, 502, 503, 504, 'tempo scaduto'].includes(t.status)).map((t) => t.model);
+        if (slow.length || plan.modelName) {
+          let cool = {}; try { cool = JSON.parse(await setting(db, 'gemini_cool') || '{}'); } catch {}
+          for (const m of slow) cool[m] = Date.now() + 10 * MINUTE;
+          if (plan.modelName) delete cool[plan.modelName];
+          for (const m of Object.keys(cool)) if (!(cool[m] > Date.now())) delete cool[m];
+          await putSetting(db, 'gemini_cool', JSON.stringify(cool));
+        }
         if (missing.length) { let bad = []; try { bad = JSON.parse(await setting(db, 'gemini_bad') || '[]'); } catch {} await putSetting(db, 'gemini_bad', JSON.stringify([...new Set([...bad, ...missing])].slice(0, 12))); }
         await auditedBatch(jarvisDb(db), [], 'jarvis.edit_models', `Correzione bozza: ${plan.model === 'gemini' ? `risposto ${plan.modelName}` : plan.unavailable ? 'nessun modello ha risposto' : 'ripiego su Cloudflare'}; tentativi Gemini falliti: ${plan.tries.map((t) => `${t.model} ${t.status}`).join(', ').slice(0, 300)}.`, null);
       } catch { /* solo diagnostica */ }
@@ -868,12 +888,14 @@ export function createMissions(deps) {
     if (plan.modelName) await putSetting(db, 'gemini_good', JSON.stringify([plan.modelName])).catch(() => {});
     if (plan.unavailable) return { text: `Non riesco a interpretare la modifica adesso: i modelli non rispondono. Riprova tra qualche minuto, oppure correggi la bozza di «${name}» in Revisione.` };
     const checked = validateOps(plan.ops, menu, utterance);
+    if (checked.problems.length) await noteMiss(db, utterance, checked.problems.slice(0, 3).join(' | '), draft.request_id);
     if (checked.problems.length) return { text: `Per la bozza di «${name}» non applico nulla, perché:\n${checked.problems.slice(0, 5).map((p) => `• ${p}`).join('\n')}\n\nRiscrivimi la correzione con i nomi e i prezzi precisi.` };
+    if (!checked.ops.length) await noteMiss(db, utterance, plan.dubbio || 'nessuna modifica precisa', draft.request_id);
     if (!checked.ops.length) return { text: plan.dubbio ? plan.dubbio : `Non trovo una modifica precisa per la bozza di «${name}». Dimmi per esempio «le braciole costano 9» o «aggiungi il tiramisù a 5 euro nei dolci».`, keep: true };
     const snapshot = { draftId: draft.id, menu_json: draft.menu_json, provenance_json: draft.provenance_json, at: now() };
     let saved;
     try { saved = (await action(jarvisDb(db), 'editDraftOps', { id: draft.id, revision: draft.revision, ops: checked.ops, source: 'Riccardo (Telegram)' }, env)).result; }
-    catch (error) { return { text: `Non sono riuscito a modificare la bozza di «${name}»: ${String(error?.message || 'errore').slice(0, 200)}` }; }
+    catch (error) { await noteMiss(db, utterance, String(error?.message || 'errore'), draft.request_id); return { text: `Non sono riuscito a modificare la bozza di «${name}»: ${String(error?.message || 'errore').slice(0, 200)}` }; }
     await putSetting(db, 'draft_undo', JSON.stringify({ ...snapshot, revision: saved.revision })).catch(() => {});
     // Chi lavora su una bozza continua a lavorarci: ogni correzione rinnova la pratica «in primo piano».
     await putSetting(db, 'tg_focus', JSON.stringify({ requestId: draft.request_id, subject: draft.subject || name, at: now() })).catch(() => {});
