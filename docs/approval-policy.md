@@ -29,3 +29,5 @@ Le frasi di conferma richieste dalle API interne (per esempio per aprire la pull
 La voce è una comodità di navigazione e proposta, non vale come consenso per pubblicazioni, invii, cancellazioni o pagamenti. La validazione tecnica non certifica la verità di prezzi, allergeni, ingredienti, orari, contatti o traduzioni: restano da confermare con il locale.
 
 Per aggiornare un menu si conserva sempre l'identificativo (e quindi il QR) e si legge la versione online corrente prima di modificare.
+
+**Modifica a mano (6 ottobre 2026).** Salvare una modifica dalla pagina «Modifica a mano» crea una nuova versione della bozza e azzera la checklist: la bozza torna da controllare e va riaffidata a Jarvis. La pagina non pubblica nulla e non apre pull request.

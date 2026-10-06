@@ -9,7 +9,7 @@ Pagamenti: guida passo passo in [CONFIGURAZIONE-PAGAMENTI.md](CONFIGURAZIONE-PAG
 
 ## Control Room e Jarvis (area privata)
 
-Il repository contiene anche la Control Room con Jarvis, l'assistente che prepara i menu e chiede conferma a Riccardo prima di pubblicare. Non fa parte del sito pubblico e non viene mai copiata nella build. Guida: [CONTROL-ROOM-README.md](CONTROL-ROOM-README.md); funzionamento: [control-room/docs/jarvis-funzionamento.md](control-room/docs/jarvis-funzionamento.md); registro degli aggiornamenti: [control-room/docs/CHANGELOG.md](control-room/docs/CHANGELOG.md). Ogni modifica a Jarvis aggiorna anche questi documenti.
+Il repository contiene anche la Control Room con Jarvis, l'assistente che prepara i menu e chiede conferma a Riccardo prima di pubblicare. Non fa parte del sito pubblico e non viene mai copiata nella build. Guida: [CONTROL-ROOM-README.md](CONTROL-ROOM-README.md); funzionamento: [control-room/docs/jarvis-funzionamento.md](control-room/docs/jarvis-funzionamento.md); registro degli aggiornamenti: [control-room/docs/CHANGELOG.md](control-room/docs/CHANGELOG.md). Ogni modifica a Jarvis aggiorna anche questi documenti. Dal 6 ottobre 2026 la Control Room si usa da tre voci (Oggi, Locali, Sistema), pensate per l'iPhone.
 
 Trattoria Blanch usa un formato proprio (`blanch/`, vedi [blanch/README.md](blanch/README.md)), diverso da `menus/<id>.json`; Jarvis lo gestisce con un adattatore dedicato che lascia invariati sito e QR.
 

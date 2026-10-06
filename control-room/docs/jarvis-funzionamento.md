@@ -61,17 +61,18 @@ Interfaccia mobile-first in HTML e JavaScript senza framework. Protetta da Cloud
 
 ### Le schermate
 
-| Gruppo | Schermata | A cosa serve |
+Dal 6 ottobre 2026 la Control Room ha tre voci sempre visibili (telefono e computer): **Oggi**, **Locali**, **Sistema**. Gli strumenti di prima restano tutti, dentro Sistema.
+
+| Voce | Schermata | A cosa serve |
 |---|---|---|
-| Ogni giorno | Jarvis | Riquadro con messaggi e notifiche di Jarvis, stato delle pratiche |
-| Ogni giorno | Revisione | Controllo della bozza: voci, prezzi, allergeni, lingue, foto, checklist, modifica avanzata, «Rifai la bozza» |
-| Ogni giorno | Richieste | Le pratiche (categoria, piano, fonte, prossimo passo) |
-| Ogni giorno | Clienti | Schede dei locali: piano, email, link del menu, prova e rinnovo |
-| Strumenti | Approvazioni | Anteprima mandata, risposta del locale, SÌ finale |
-| Strumenti | Builder | Estrazione del menu da testo |
-| Strumenti | Materiali | File ricevuti, letture, riletture |
-| Strumenti | Anteprima | Anteprima privata della bozza |
-| Sistema | Notifiche, Registro, Voce | Messaggi, registro di ogni azione, voce del browser |
+| Oggi | Oggi | Saluto di Jarvis, «Da decidere» (cosa aspetta un tuo gesto, in ordine di urgenza), «In corso» (cosa segue Jarvis) e il conteggio di tutte le pratiche. Messaggi e Telegram di Jarvis sotto. |
+| Oggi | Pratica | Una pratica sola: avanzamento (Richiesta, Bozza, Controllo, Il tuo SÌ, Online), «Cosa cambia» rispetto al menu online (lettura in sola lettura da GitHub, registrata nel registro), «Modifica a mano», anteprima e il passo successivo reale (affido a Jarvis o SÌ). Sotto «Dettagli e strumenti»: regole del piano, Revisione, Approvazioni, Materiali, richiesta originale, Registro. |
+| Oggi | Tutte le pratiche | Elenco unico con tre filtri: Da decidere, In corso, Chiuse (le archiviate restano in Sistema, Richieste). |
+| Oggi | Modifica a mano | Sezioni e voci della bozza leggibili: tocco su una voce per cambiare nome o prezzo, «Togli dal menu», «Aggiungi una voce», ricerca. Il salvataggio usa lo stesso comando della Revisione (blocco sulla revisione, validazione, nuova versione): la checklist si azzera e la bozza torna da controllare. Non pubblica nulla. |
+| Locali | Clienti | Schede dei locali: piano, email, link del menu, prova e rinnovo |
+| Sistema | Elenco strumenti | Revisione (controllo completo e modifica avanzata JSON, «Rifai la bozza»), Richieste, Approvazioni (PR, pubblicazione, verifica), Builder avanzato, Materiali, Anteprima, Notifiche, Registro, Voce del browser, più «Tutti i numeri e i dettagli» (numeri, coda, email al proprietario, casella Gmail) |
+
+Aprendo uno strumento da una pratica compare «Torna alla pratica». Nessuna azione è cambiata: «Approva e affida a Jarvis» e il SÌ usano gli stessi comandi di prima.
 
 ### I dati (database D1, 12 migrazioni)
 
