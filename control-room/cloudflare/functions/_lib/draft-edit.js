@@ -93,7 +93,7 @@ const OP_SCHEMA = {
 const SYSTEM = [
   'Sei Jarvis, assistente di Riccardo per RenMenu. Riccardo ti detta (anche a voce, con errori di trascrizione) una correzione alla BOZZA di un menu.',
   'Trasformala in operazioni, usando SOLO gli indici dell’elenco: [S2] è la sezione 2, [2.5] è la voce 5 della sezione 2 (si=2, vi=5).',
-  'Tipi consentiti: prezzo (si, vi, prezzo); varianti (si, vi, varianti[{etichetta, prezzo}]: più prezzi per la stessa voce, per esempio calice e bottiglia, piccola e grande, oppure vitello e maiale se il nome elenca le alternative); aggiungi (si, nome, prezzo oppure varianti, descrizione facoltativa, dopo_vi facoltativo; se la sezione è nuova scrivi il suo nome in sezione e ometti si); rimuovi (si, vi); rinomina (si, vi, nome); descrizione (si, vi, descrizione; stringa vuota per toglierla); sposta (si, vi, a_si); rinomina_sezione (si, nome).',
+  'Tipi consentiti: prezzo (si, vi, prezzo); varianti (si, vi, varianti[{etichetta, prezzo}]: più prezzi per la stessa voce, per esempio calice e bottiglia, piccola e grande, oppure vitello e maiale se il nome elenca le alternative); aggiungi (si, nome, prezzo oppure varianti, descrizione facoltativa, dopo_vi facoltativo; se la sezione è nuova scrivi il suo nome in sezione e ometti si); rimuovi (si, vi); rinomina (si, vi, nome); descrizione (si, vi, descrizione; stringa vuota per toglierla); sposta (si, vi, a_si; se la sezione di destinazione non esiste ancora scrivi il suo nome in sezione e ometti a_si); rinomina_sezione (si, nome).',
   'Regole ferree: non inventare nulla. Nomi, prezzi e descrizioni devono essere quelli detti da Riccardo (i prezzi in formato 12,00). Non toccare le voci che Riccardo non nomina. Non scrivere allergeni, ingredienti o traduzioni. Se la richiesta è incomprensibile o ambigua, restituisci operazioni vuote e spiega in «dubbio», in italiano, cosa ti serve sapere.',
   'Per dividere una voce in due piatti distinti: rimuovi la voce e aggiungi i due piatti nella stessa sezione. Se Riccardo dice di tenere una voce con due prezzi, usa varianti. Rispondi solo con JSON.'
 ].join('\n');
@@ -227,8 +227,15 @@ export function validateOps(rawOps, menu, utterance) {
       touched.add(key); ops.push({ tipo: type, si, vi }); continue;
     }
     if (type === 'sposta') {
-      if (!section(raw.a_si) || raw.a_si === si) { problems.push(`${label}: sezione di destinazione non valida.`); continue; }
-      ops.push({ tipo: type, si, vi, a_si: raw.a_si }); continue;
+      if (Number.isInteger(raw.a_si) && raw.a_si !== si && section(raw.a_si)) { ops.push({ tipo: type, si, vi, a_si: raw.a_si }); continue; }
+      // Destinazione nuova: il nome deve venire dalla frase; se esiste già una sezione con quel nome si usa quella.
+      const title = clip(raw.sezione, 60);
+      if (raw.a_si === undefined && title && textGrounded(title, said)) {
+        const existing = sections.findIndex((s) => plain(itText(s.nome)) === plain(title));
+        if (existing === si) { problems.push(`${label}: è già nella sezione «${title}».`); continue; }
+        ops.push(existing >= 0 ? { tipo: type, si, vi, a_si: existing } : { tipo: type, si, vi, sezione: title }); continue;
+      }
+      problems.push(`${label}: sezione di destinazione non valida.`); continue;
     }
     if (type === 'prezzo') { const p = price(raw.prezzo, label); if (!p) continue; ops.push({ tipo: type, si, vi, prezzo: p }); continue; }
     if (type === 'varianti') {
@@ -315,7 +322,8 @@ export function applyOps(menuIn, provenanceIn, ops, source) {
       summary.push(`Tolto «${name}».`);
       if (!section.voci.length) summary.push(`Attenzione: la sezione «${itText(section.nome)}» è rimasta senza piatti.`);
     } else if (op.tipo === 'sposta') {
-      const dest = menu.sezioni.find((s) => s.__s === op.a_si);
+      let dest = op.a_si !== undefined ? menu.sezioni.find((s) => s.__s === op.a_si) : menu.sezioni.find((s) => s.__new && plain(itText(s.nome)) === plain(op.sezione));
+      if (!dest && op.sezione) { dest = { nome: { it: op.sezione }, voci: [], __new: true, __s: `n${menu.sezioni.length}` }; menu.sezioni.push(dest); needsEnglish = true; summary.push(`Nuova sezione «${op.sezione}».`); }
       section.voci.splice(section.voci.indexOf(item), 1); dest.voci.push(item); mark(item.__k, '*');
       summary.push(`«${name}» spostato in «${itText(dest.nome)}».`);
     }
@@ -352,7 +360,7 @@ export function applyOps(menuIn, provenanceIn, ops, source) {
     if ((isNew || fields?.has('prezzo')) && item.prezzo !== undefined) provenance.push({ path: `${base}.prezzo`, source, value: String(item.prezzo), status: 'confermato' });
     if ((isNew || fields?.has('prezzo')) && item.prezzi) item.prezzi.forEach((v, pi) => provenance.push({ path: `${base}.prezzi.${pi}.prezzo`, source, value: String(v.prezzo), status: 'confermato' }));
   }));
-  for (const section of menu.sezioni) { delete section.__s; for (const item of section.voci) delete item.__k; }
+  for (const section of menu.sezioni) { delete section.__s; delete section.__new; for (const item of section.voci) delete item.__k; }
   return { menu, provenance, summary, needsEnglish };
 }
 
