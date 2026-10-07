@@ -525,6 +525,23 @@ describe('Comandi vocali di Jarvis', () => {
     } finally { publicState = 'ok'; globalThis.fetch = previous; db.close(); }
   });
 
+  it('controllo dopo la pubblicazione: un nuovo aggiornamento dello stesso menu sostituisce la sorveglianza vecchia (niente falso allarme)', async () => {
+    const db = database();
+    const previous = globalThis.fetch;
+    globalThis.fetch = fakeFetch;
+    try {
+      calls.length = 0;
+      await missions.putSetting(db, 'telegram_chat_id', '42');
+      const env = testEnv(db, { TELEGRAM_BOT_TOKEN: TOKEN });
+      publicState = 'ok';
+      await missions.watchRegister(db, { id: 'm-vecchia', request_id: null }, 'prova', 'Prova', 'https://renmenu.pages.dev/menu/?m=prova');
+      await missions.watchRegister(db, { id: 'm-altro', request_id: null }, 'altro-locale', 'Altro', 'https://renmenu.pages.dev/menu/?m=altro-locale');
+      await missions.watchRegister(db, { id: 'm-nuova', request_id: null }, 'prova', 'Prova', 'https://renmenu.pages.dev/menu/?m=prova');
+      const keys = (await db.prepare("SELECT key FROM jarvis_settings WHERE key LIKE 'watch\\_%' ESCAPE '\\' ORDER BY key").bind().all()).results.map((r) => r.key);
+      assert.deepEqual(keys, ['watch_m-altro', 'watch_m-nuova'], 'una sola sorveglianza per menu; gli altri locali non si toccano');
+    } finally { publicState = 'ok'; globalThis.fetch = previous; db.close(); }
+  });
+
   it('giro mattutino: propone il promemoria con il testo, lo manda in coda solo al tocco e lo segnala quando è inviato', async () => {
     const db = database();
     const previous = globalThis.fetch;

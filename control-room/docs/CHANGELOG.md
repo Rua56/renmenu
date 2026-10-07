@@ -2,6 +2,10 @@
 
 Si aggiunge una voce a ogni pull request che cambia un comportamento di Jarvis o della Control Room, insieme all'aggiornamento di README, policy e funzionamento quando serve. Le voci più recenti stanno in alto.
 
+## 7 ottobre 2026
+
+- **Falso allarme dopo la pubblicazione.** Il controllo a 6 ore, 2 e 7 giorni confrontava il menu online con quello della prima pubblicazione. Se poi Riccardo pubblicava una correzione (titoli, telefono, orari), la vecchia sorveglianza restava attiva e segnalava «il contenuto è diverso», ogni 6 ore. Ora una nuova pubblicazione dello stesso menu sostituisce la sorveglianza precedente: l'allarme resta solo per cambiamenti che Jarvis non ha pubblicato.
+
 ## 6 ottobre 2026
 
 - **Allergeni scritti come «Allergeni: 1, 4, 7 *».** Jarvis proponeva solo i numeri tra parentesi («(3-7-8)»); quelli scritti sotto il piatto con la parola «Allergeni» restavano nel testo descrittivo e nel menu comparivano come frase. Ora anche questi sono proposti (non preselezionati: valgono solo se la legenda del menu segue i numeri UE 1–14) e, accettandoli, i numeri passano alle icone degli allergeni e spariscono dal testo; restano le parole vere, come «contiene prodotti naturalmente privi di glutine». Tolti anche i numeri tra parentesi messi davanti alla descrizione. I simboli di rimando (* @) vengono tolti dal testo e restano nella fonte; il loro significato va controllato sulla legenda del menu. Nessun allergene viene dedotto dal nome del piatto.
