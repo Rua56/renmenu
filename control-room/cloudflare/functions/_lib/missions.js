@@ -1066,6 +1066,10 @@ export function createMissions(deps) {
   async function watchRegister(db, mission, slug, name, url) {
     const seen = await readPublic(slug);
     const first = Date.now() + WATCH_AFTER_HOURS[0] * 3600_000;
+    // Una nuova pubblicazione dello stesso menu sostituisce la sorveglianza precedente: il suo riferimento è il contenuto che
+    // Riccardo ha appena pubblicato, non quello di prima (altrimenti ogni aggiornamento fa scattare un falso allarme).
+    const older = await rows(db, "SELECT key,value FROM jarvis_settings WHERE key LIKE 'watch\\_%' ESCAPE '\\' AND key<>?", `watch_${mission.id}`).catch(() => []);
+    for (const row of older) { let w = null; try { w = JSON.parse(row.value); } catch { /* ignorata */ } if (w?.slug === slug) await Promise.resolve().then(() => db.prepare('DELETE FROM jarvis_settings WHERE key=?').bind(row.key).run()).catch(() => null); }
     await putSetting(db, `watch_${mission.id}`, JSON.stringify({ requestId: mission.request_id, slug, name: String(name || slug).slice(0, 80), url, sha: seen.sha, step: 0, fails: 0, next: new Date(first).toISOString() }));
   }
   async function watchTick(db, env) {
@@ -1517,5 +1521,5 @@ export function createMissions(deps) {
     }
     return out;
   }
-  return { entrust, tick, watchTick, queueOnlineEmail, checkOnlineMails, makeMenuQr, decide, telegramUpdate, probeIntents, setting, putSetting, briefing, notify, startChecks, answerCheck, draftAfterChecks, translateAfterEdit, undoDraftEdit, draftTarget, voiceEditDraft };
+  return { entrust, tick, watchTick, watchRegister, queueOnlineEmail, checkOnlineMails, makeMenuQr, decide, telegramUpdate, probeIntents, setting, putSetting, briefing, notify, startChecks, answerCheck, draftAfterChecks, translateAfterEdit, undoDraftEdit, draftTarget, voiceEditDraft };
 }
