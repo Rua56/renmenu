@@ -606,7 +606,7 @@ export function createMissions(deps) {
         return;
       }
       if (verb === 'peek') {
-        const found = (await rows(db, OPEN_DRAFTS).catch(() => [])).find((d) => d.id === missionId);
+        const found = (await openDrafts(db).catch(() => [])).find((d) => d.id === missionId);
         const shown = found ? await showDraft(db, env, found) : { text: 'Quella bozza non è più aperta.' };
         await answerCallback(env, query.id, 'Ecco la bozza', deps.fetchImpl);
         await sendTelegram(env, chat, shown.text, shown.buttons || null, deps.fetchImpl);
@@ -836,6 +836,13 @@ export function createMissions(deps) {
     } catch { return null; }
   }
   const OPEN_DRAFTS = "SELECT d.id,d.request_id,d.slug,d.status,d.revision,d.menu_json,d.provenance_json,r.subject,c.id AS client_id,c.name AS client_name FROM drafts d JOIN requests r ON r.id=d.request_id LEFT JOIN clients c ON c.id=r.client_id WHERE d.status IN ('bozza','revisione','pronta_pr') AND r.status NOT IN ('completata','archiviata','chiusa') ORDER BY d.updated_at DESC LIMIT 20";
+  // Cliente arrivato via email senza nome («Nuovo contatto email»): per parlare della bozza vale il nome del locale scritto nel menu.
+  const GENERIC_CLIENT = /^nuovo contatto email$/i;
+  const withVenueName = (list) => list.map((d) => {
+    if (!GENERIC_CLIENT.test(String(d.client_name || '').trim())) return d;
+    try { const venue = JSON.parse(d.menu_json)?.nome; return typeof venue === 'string' && venue.trim() ? { ...d, client_name: venue.trim() } : d; } catch { return d; }
+  });
+  const openDrafts = async (db) => withVenueName(await rows(db, OPEN_DRAFTS));
   const plainWords = (text) => String(text || '').toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/[^a-z0-9]+/g, ' ').trim().split(/\s+/).filter((w) => w.length >= 4);
   function draftMentions(draft, utterance) {
     const said = plainWords(utterance);
@@ -844,7 +851,7 @@ export function createMissions(deps) {
   }
   /** Quale bozza aperta riguarda il comando: null se il comando riguarda un menu già online. */
   async function draftTarget(db, spokenVenue, clues, utterance) {
-    const drafts = await rows(db, OPEN_DRAFTS).catch(() => []);
+    const drafts = await openDrafts(db).catch(() => []);
     if (!drafts.length) return null;
     const named = drafts.map((d) => ({ id: d.id, name: d.client_name || '', menu_id: '' }));
     const bySpoken = spokenVenue ? matchVenue(spokenVenue, named) : { client: null, candidates: [] };
@@ -1159,7 +1166,7 @@ export function createMissions(deps) {
   }
   // ——— «Affido a Jarvis» da Telegram: riepilogo da confermare con un tocco (stessa conferma della Control Room) ———
   async function voiceEntrust(db, env, spokenVenue, clues, utterance) {
-    const drafts = await rows(db, OPEN_DRAFTS).catch(() => []);
+    const drafts = await openDrafts(db).catch(() => []);
     const target = await draftTarget(db, spokenVenue, clues, utterance).catch(() => null);
     if (target?.ask) return { text: target.ask };
     let draft = target?.draft || null;
@@ -1179,9 +1186,11 @@ export function createMissions(deps) {
     if (mission && ACTIVE.includes(mission.status)) return { text: `Jarvis sta già seguendo «${request.client_name}» (stato: ${mission.status.replace(/_/g, ' ')}).` };
     if (request.kind === 'nuovo' && !ACTIVATION_BY_PLAN[request.plan]) return { text: `Il piano di «${request.client_name}» non è confermato: dimmi se è Standard, Annuale o Premium (da Control Room, scheda cliente) e poi riprovo.` };
     let menu, saved = {}; try { menu = JSON.parse(draft.menu_json); } catch { return { text: 'La bozza non si legge: aprila in Revisione.' }; }
+    if (GENERIC_CLIENT.test(String(request.client_name || '').trim()) && typeof menu?.nome === 'string' && menu.nome.trim()) request.client_name = menu.nome.trim();
     try { saved = JSON.parse(draft.checks_json || '{}') || {}; } catch { saved = {}; }
     const note = 'Riepilogo su Telegram: prezzi, allergeni e lingue controllati da Riccardo.';
     const probe = { prices: true, allergens: true, languages: true, clientApproval: false, allergenOmissionConfirmed: true, fieldEvidence: { prices: note, allergens: note, languages: note }, ...(saved.creativeApproval === true ? { creativeApproval: true, creativeApprovalEvidence: saved.creativeApprovalEvidence } : {}) };
+    await putSetting(db, 'tg_focus', JSON.stringify({ requestId: request.id, subject: request.subject || request.client_name || '', at: now() })).catch(() => {});
     const { issues, missing } = reviewIssues(menu, probe, request.plan);
     const blockers = issues.filter((issue) => !/checklist contiene conferme/i.test(issue));
     const items = (menu.sezioni || []).reduce((t, section) => t + (section.voci || []).length, 0);
@@ -1338,7 +1347,7 @@ export function createMissions(deps) {
   }
   // ——— «Mostrami l’anteprima di X»: link di sola visione alla bozza (nessuna approvazione, nessuna pubblicazione) ———
   async function voiceShowPreview(db, env, spokenVenue, clues, utterance) {
-    const drafts = await rows(db, OPEN_DRAFTS).catch(() => []);
+    const drafts = await openDrafts(db).catch(() => []);
     const target = await draftTarget(db, spokenVenue, clues, utterance).catch(() => null);
     if (target?.ask) return { text: target.ask };
     let draft = target?.draft || null;
@@ -1367,6 +1376,8 @@ export function createMissions(deps) {
     const link = await peekUrl(db, env, draft.id);
     const sections = (menu.sezioni || []).length, items = (menu.sezioni || []).reduce((t, s2) => t + (s2.voci || []).length, 0);
     const checks = await Promise.resolve().then(() => getOne(db, 'SELECT checks_json FROM drafts WHERE id=?', draft.id)).then((row) => { try { return JSON.parse(row?.checks_json || '{}') || {}; } catch { return {}; } }).catch(() => ({}));
+    // Chi guarda la bozza ci sta lavorando: le frasi senza nome del locale («cappesante 18,50») valgono per questa pratica.
+    if (draft.request_id) await putSetting(db, 'tg_focus', JSON.stringify({ requestId: draft.request_id, subject: draft.subject || draft.client_name || '', at: now() })).catch(() => {});
     const undecided = missingPriceNames(menu).slice(0, 3);
     const ask = undecided.length ? `\n\nMi serve una tua decisione: manca il prezzo di ${undecided.map((n) => `«${n.slice(0, 60)}»`).join(', ')} (il locale non lo ha deciso). Scrivimi o dettami il prezzo, per esempio «${undecided[0].split(/[\s,]+/)[0].toLowerCase()} 18,50», e lo inserisco: senza prezzo non posso procedere.` : '';
     return { text: `Ecco la bozza di «${draft.client_name || menu.nome || draft.subject}» (versione ${draft.revision}, ${items} voci in ${sections} sezioni):\n${link}\n\nÈ solo da guardare: non è pubblicata e non è stata inviata a nessuno. Il link vale 24 ore.${['prices', 'allergens', 'languages'].every((key) => checks[key]) ? '' : ' La checklist di revisione (prezzi, allergeni, lingue) non è ancora confermata.'}\n\nProssimo passo: se la bozza ti va bene, affidami la pratica: ti faccio il riepilogo da confermare qui, con un tocco.${ask}`, keep: false, buttons: [['Affida a Jarvis', `affq:${draft.id}`]] };
@@ -1418,7 +1429,7 @@ export function createMissions(deps) {
         try {
           await action(jarvis, 'generateDraft', { requestId, baseOnly: true }, env);
           await putSetting(db, 'tg_focus', JSON.stringify({ requestId, subject: `Richiesta a voce · ${client.name}`, at: now() }));
-          const base = (await rows(db, OPEN_DRAFTS)).find((d) => d.request_id === requestId);
+          const base = (await openDrafts(db)).find((d) => d.request_id === requestId);
           if (base) {
             const edited = await voiceEditDraft(db, env, utterance, base);
             return `Ho preparato la bozza di «${client.name}» partendo dal menu online. ${edited.text}`;
