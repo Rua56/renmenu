@@ -1,5 +1,5 @@
 import { premiumErrors } from './premium.js';
-import { WINE_SECTION, allergenNumbers, degustazioneNote, namelessVariants, columnsHeader, degustazioneHeading, degustazionePrice, descriptionLike, fmt, labelOnlyRow, labelSuffix, labeledVariants, pairingRow, unlabeledVariants } from './menu-structure.js';
+import { PAGE_TITLE, WINE_SECTION, allergenNumbers, cleanMeta, degustazioneNote, namelessVariants, columnsHeader, degustazioneHeading, degustazionePrice, descriptionLike, fmt, labelOnlyRow, labelSuffix, labeledVariants, marketPrice, pairingRow, proseLike, splitAvailability, tastingTier, undecidedPrice, unlabeledVariants } from './menu-structure.js';
 // Independent server-side rules. scripts/validate-menus.py remains the publication authority.
 const PRICE = /^\d+(?:[,.]\d{1,2})?$/;
 const TAGS = new Set(['veg', 'vegan', 'spicy', 'gf', 'new', 'top', 'frozen']);
@@ -241,6 +241,20 @@ export function priceRow(row) {
   if (!currency && Number(loose[3].replace(',', '.')) < 1) return null;
   return { name: loose[1].trim(), amount: loose[3], loose: !currency };
 }
+/** Prezzi scritti in modo «a mano»: «10,-» (= 10), e una nota dopo il prezzo: «14 € (surgelato in inverno)»,
+ *  «18 € / con rucola e grana», «15 (per 2 persone)». La riga torna a «nome + prezzo» e la nota diventa la descrizione,
+ *  con le parole del cliente. Solo se la riga che resta è davvero «nome + prezzo». */
+export function priceTail(raw) {
+  const text = String(raw || '').trim().replace(/^[-•*]\s*/, '');
+  if (!text || /^[#>\[]/.test(text)) return null;
+  const dashed = text.replace(/(\d)\s*[,.]\s*-{1,2}(?=\s*(?:€|euro|eur)?\s*(?:$|\(|\/))/i, '$1');
+  const m = dashed.match(/^(.{2,150}?[A-Za-zÀ-ÿ)'’.](?:\s*[—–\-:]\s*|\s+|\.{2,}\s*)(?:€\s*)?\d{1,3}(?:[,.]\d{1,2})?(?:\s*(?:€|euro|eur))?)\s*(?:\(([^()]{3,80})\)|[/|]\s*([^\d€/][^€/]{2,80}))\s*\.?$/i);
+  const note = m && (m[2] || m[3] || '').trim().replace(/[.\s]+$/, '');
+  if (m && note && (/[A-Za-zÀ-ÿ]{3}/.test(note) && !/^(?:calice|bottiglia|bicchiere|caraffa|litro|mezzo|quarto|\d)/i.test(note) && priceRow(m[1]))) {
+    return { row: m[1].trim(), note: note.replace(/^./, (c) => c.toLocaleUpperCase('it-IT')) };
+  }
+  return dashed !== text && priceRow(dashed) ? { row: dashed, note: '' } : null;
+}
 const SENTENCE_WORDS = /\b(?:ecco|vorrei|vorremmo|grazie|buongiorno|buonasera|salve|ciao|allego|allegato|allegati|cordiali|saluti|gentile|gentili|seguito|seguono|questo|questi|nostro|nostri|test|interno|cliente|attivare)\b/i;
 export function isPlainHeading(row, nextRow) {
   const title = row.replace(/:\s*$/, '').trim();
@@ -274,10 +288,16 @@ const DEFAULT_SECTION_RE = /^(?:piatti|dal materiale ricevuto)$/i;
 
 export function extractMenuFromText(venue, source, requestedSlug) {
   const slug = slugify(requestedSlug || venue);
-  const items = [], unknown = [], provenance = [], consumed = [], confirm = [];
+  const items = [], unknown = [], provenance = [], consumed = [], confirm = [], inferred = new Map();
   let section = { nome: { it: DEFAULT_SECTION }, voci: [], unnamed: true };
   const sections = [section];
-  const lines = String(source || '').split(/\r?\n/);
+  const tailNotes = new Map();
+  const lines = String(source || '').split(/\r?\n/).map((raw, i) => {
+    const tail = priceTail(raw);
+    if (!tail) return raw;
+    if (tail.note) tailNotes.set(i + 1, tail.note);
+    return tail.row;
+  });
   // Ultima voce letta (per descrizioni e righe «calice 5» subito sotto) e riga senza prezzo in attesa.
   let last = null, pending = null;
   const sectionName = () => section.nome?.it || '';
@@ -294,6 +314,20 @@ export function extractMenuFromText(venue, source, requestedSlug) {
     sections.push(section); last = null; pending = null;
   };
   const addItem = (item, entry) => {
+    // Osservazioni del cliente dentro il nome («(nome inventato)») e disponibilità «(solo in primavera)»:
+    // non fanno parte del nome del piatto.
+    if (item.nome?.it) {
+      const meta = cleanMeta(item.nome.it), avail = splitAvailability(meta.name);
+      if (avail.name && avail.name !== item.nome.it) {
+        item.nome = { it: avail.name }; entry.name = avail.name;
+        if (meta.removed) confirm.push({ text: entry.sourceLine || entry.name, line: entry.line, hint: `Tolta dal nome l’osservazione ${meta.removed}: era un commento del cliente, non parte del nome.` });
+        if (avail.availability && !item.descrizione) {
+          item.descrizione = { it: avail.availability };
+          confirm.push({ text: entry.sourceLine || entry.name, line: entry.line, hint: `«${avail.availability}» scritto dal cliente tra parentesi: l’ho messo come descrizione di «${avail.name}», non nel nome. Controlla.` });
+        }
+      }
+    }
+    if (tailNotes.has(entry.line) && !item.descrizione) item.descrizione = { it: tailNotes.get(entry.line) };
     section.voci.push(item);
     const record = { ...entry, section: sections.indexOf(section), index: section.voci.length - 1 };
     items.push(record);
@@ -303,7 +337,11 @@ export function extractMenuFromText(venue, source, requestedSlug) {
   const variantItem = (name, variants, lineNumber, row, how) => {
     const item = { nome: { it: name }, prezzi: variants.map((v) => ({ etichetta: { it: v.label }, prezzo: fmt(v.amount) })) };
     const record = addItem(item, { name, price: '', variants: item.prezzi.map((v) => `${v.etichetta.it} ${v.prezzo}`), sourceLine: row, line: lineNumber, loose: false });
-    if (how) confirm.push({ text: row, line: lineNumber, hint: how });
+    if (how) {
+      // Etichette dedotte (due prezzi senza «calice/bottiglia»): una sola nota per sezione, non una per vino.
+      const group = inferred.get(section) || inferred.set(section, { rows: [], line: lineNumber, fallback: how }).get(section);
+      group.rows.push(item.nome.it);
+    }
     return record;
   };
   for (let index = 0; index < lines.length; index += 1) {
@@ -315,11 +353,18 @@ export function extractMenuFromText(venue, source, requestedSlug) {
     const nextClean = nextRow.trim().replace(/^[-•*]\s*/, '');
     // Percorso degustazione: titolo (con o senza prezzo) seguito da portate senza prezzo.
     const degu = row.startsWith('[da verificare]') ? null : degustazioneHeading(row);
-    if (degu && nextClean && !priceRow(nextClean) && !degustazioneHeading(nextClean)) {
+    if (degu && nextClean && (!priceRow(nextClean) || tastingTier(nextClean)) && !degustazioneHeading(nextClean)) {
       openSection(sectionTitleCase(degu.name), lineNumber, { tipo: 'degustazione' });
       if (degu.amount) section.prezzo = fmt(degu.amount);
       if (degu.unit) section.unita = { it: degu.unit };
       if (degu.ambiguous) confirm.push({ text: row, line: lineNumber, hint: 'Percorso con più prezzi nella stessa riga: scegli tu il prezzo del percorso.' });
+      continue;
+    }
+    // «Carta dei vini (la struttura è questa)»: titolo di pagina. Chiude il percorso o la sezione prima;
+    // se sotto non c'è un altro titolo, le voci seguenti stanno sotto di lui.
+    if (!row.startsWith('[da verificare]') && PAGE_TITLE.test(row) && !priceRow(row)) {
+      openSection(sectionTitleCase(row.replace(/\s*\([^)]*\)/g, '').replace(/:\s*$/, '').trim()), lineNumber);
+      consumed.push(lineNumber);
       continue;
     }
     // Intestazione di colonne («calice  bottiglia», anche dopo il titolo della sezione).
@@ -332,8 +377,10 @@ export function extractMenuFromText(venue, source, requestedSlug) {
     }
     // Titolo di sezione: "# Primi" o "#Primi" (come nella demo) oppure "[Primi]".
     const nextIsVariantOnly = Boolean(labelOnlyRow(nextClean) || namelessVariants(nextClean));
-    const plainHeading = !nextIsVariantOnly && (isPlainHeading(row, nextRow) || (!last && !pending && isWineHeading(row, nextClean)))
-      && (section.tipo !== 'degustazione' || KNOWN_SECTION.test(row) || isShouting(row));
+    // «Bianchi del Collio», «Rossi», «Vini dolci»: categorie dei vini, titolo anche subito dopo un altro vino.
+    const wineCategory = WINE_CATEGORY.test(row.replace(/:\s*$/, '').trim()) && !/\d/.test(row);
+    const plainHeading = !nextIsVariantOnly && (isPlainHeading(row, nextRow) || (!pending && (!last || wineCategory) && isWineHeading(row, nextClean)))
+      && (section.tipo !== 'degustazione' || KNOWN_SECTION.test(row) || isShouting(row) || wineCategory);
     const knownHeading = section.tipo !== 'degustazione' && row.length <= 40 && !/\d/.test(row) && KNOWN_SECTION.test(row) && row.replace(/:\s*$/, '').trim().split(/\s+/).length <= 4 && !nextIsVariantOnly;
     if (/^#{1,3}\s*[^\s#]/.test(row) || /^\[[^\]]+\]$/.test(row) || plainHeading || knownHeading) {
       const title = sectionTitleCase(row.replace(/^#{1,3}\s*|^\[|\]$/g, '').replace(/:\s*$/, '').trim());
@@ -341,10 +388,13 @@ export function extractMenuFromText(venue, source, requestedSlug) {
       continue;
     }
     // Coperto, telefono, orari e social non sono piatti: li gestisce venue-info.js.
-    if (/^(?:il\s+)?coperto\b/i.test(row)) { unknown.push(row.slice(0, 220)); last = null; continue; }
-    if (/^(?:orari\w*|pranzo|cena|aperti|apertura|chiusi|chiuso|tutti i giorni|dal\s|lun|mar|mer|gio|ven|sab|dom)\b.*\d{1,2}(?:[:.]\d{2})?\s*[-–]\s*\d{1,2}/i.test(row)) { unknown.push(row.slice(0, 220)); last = null; continue; }
-    if (row.startsWith('[da verificare]')) { unknown.push(row.slice(0, 220)); last = null; continue; }
+    if (/^(?:il\s+)?coperto\b/i.test(row)) { unknown.push(row.slice(0, 700)); last = null; continue; }
+    if (/^(?:orari\w*|pranzo|cena|aperti|apertura|chiusi|chiuso|tutti i giorni|dal\s|lun|mar|mer|gio|ven|sab|dom)\b.*\d{1,2}(?:[:.]\d{2})?\s*[-–]\s*\d{1,2}/i.test(row)) { unknown.push(row.slice(0, 700)); last = null; continue; }
+    if (row.startsWith('[da verificare]')) { unknown.push(row.slice(0, 700)); last = null; continue; }
     if (section.tipo === 'degustazione') {
+      // Più formule del percorso, ognuna coi suoi prezzi: «5 portate: 65 € a persona (85 € con abbinamento di 4 calici)».
+      const tier = tastingTier(row);
+      if (tier) { variantItem(tier.name, tier.variants, lineNumber, row); continue; }
       const price = degustazionePrice(row);
       if (price && !section.prezzo) {
         section.prezzo = fmt(price.amount);
@@ -363,11 +413,23 @@ export function extractMenuFromText(venue, source, requestedSlug) {
       const pairing = pairingRow(row);
       if (pairing) { addItem({ nome: { it: pairing.name }, prezzo: fmt(pairing.amount) }, { name: pairing.name, price: fmt(pairing.amount), sourceLine: row, line: lineNumber, loose: false }); continue; }
     }
+    // «Cappesante…: prezzo da decidere, circa 18-19 €»: il prezzo non c'è, non si sceglie un numero dell'intervallo.
+    const undecided = section.tipo === 'degustazione' ? null : undecidedPrice(row);
+    if (undecided) {
+      addItem({ nome: { it: undecided.name } }, { name: undecided.name, price: '', sourceLine: row, line: lineNumber, loose: false, undecided: true });
+      confirm.push({ text: row, line: lineNumber, hint: `Prezzo da decidere${undecided.hint ? `: il cliente scrive «${undecided.hint}»` : ''}. Non l’ho inserito: scegli tu il prezzo di «${undecided.name}».` });
+      continue;
+    }
+    const market = section.tipo === 'degustazione' ? null : marketPrice(row);
+    if (market) {
+      addItem({ nome: { it: market.name }, descrizione: { it: market.note } }, { name: market.name, price: '', sourceLine: row, line: lineNumber, loose: false, special: 'variabile', note: market.note });
+      continue;
+    }
     // Più prezzi sulla stessa voce: con etichette scritte, o due prezzi in una sezione vini/colonne.
     const labeled = labeledVariants(row);
     if (labeled) { variantItem(labeled.name, labeled.variants, lineNumber, row); continue; }
     // «Franciacorta Satèn — bottiglia 48», «Rosso della casa: calice 4»: un solo prezzo con la sua etichetta.
-    const tail = row.match(/^(.*?[A-Za-zÀ-ÿ]{3}.*?)\s+[—–-]\s+(.+)$/) || row.match(/^(.*?[A-Za-zÀ-ÿ]{3}[^:]*?):\s+(.+)$/);
+    const tail = tailOf(row);
     const single = tail && labelOnlyRow(tail[2]);
     if (single && /^(?:Calice|Bottiglia|Mezza bottiglia|Magnum)$/.test(single.label) && !/\d/.test(tail[1].replace(/\b(?:19|20)\d{2}\b/g, ''))) { variantItem(tail[1].trim(), [single], lineNumber, row); continue; }
     const unlabeled = unlabeledVariants(row, { section: sectionName(), columns: section.columns });
@@ -404,7 +466,7 @@ export function extractMenuFromText(venue, source, requestedSlug) {
         continue;
       }
       // Prezzi senza il nome del piatto: non si indovina a cosa appartengono.
-      unknown.push(row.slice(0, 220)); last = null; pending = null;
+      unknown.push(row.slice(0, 700)); last = null; pending = null;
       continue;
     }
     // Nel percorso una portata «secondo stagione» senza importo è una portata, non un prezzo variabile.
@@ -446,7 +508,7 @@ export function extractMenuFromText(venue, source, requestedSlug) {
     }
     // Descrizione o portata: riga senza prezzo subito sotto una voce (o dentro un percorso).
     const contiguous = last && last.line >= lineNumber - 1;
-    const desc = contiguous ? descriptionLike(row, { wine: isWine() }) : null;
+    const desc = contiguous && !proseLike(row) ? descriptionLike(row, { wine: isWine() }) : null;
     if (desc && last && !last.descLocked) {
       const item = last.item;
       const text = sentenceCaseIfShouting(desc);
@@ -457,13 +519,13 @@ export function extractMenuFromText(venue, source, requestedSlug) {
       if (allergens) confirm.push({ type: 'allergeni', name: item.nome.it, text: row, line: lineNumber, hint: `Numeri di allergeni scritti dal locale per «${item.nome.it}» (${allergens.join(', ')}): sono rimasti nella descrizione. Se seguono la legenda UE 1–14 inseriscili negli allergeni del piatto.` });
       continue;
     }
-    if (section.tipo === 'degustazione' && courseLike(row)) {
+    if (section.tipo === 'degustazione' && courseLike(row) && !proseLike(row)) {
       addItem({ nome: { it: sentenceCaseIfShouting(row.replace(/^>\s*/, '')).slice(0, 150) } }, { name: row.slice(0, 150), price: '', sourceLine: row, line: lineNumber, loose: false, course: true });
       continue;
     }
     pending = { row: row.replace(/[\s—–\-:]+$/, ''), line: lineNumber, unknownIndex: unknown.length };
     last = null;
-    unknown.push(row.slice(0, 220));
+    unknown.push(row.slice(0, 700));
   }
   // Più elenchi senza titolo (foto diverse, o un titolo «Piatti» scritto da Jarvis) sono lo stesso elenco: uno solo, nell'ordine in cui sono arrivati.
   const unnamed = sections.filter((s) => s.unnamed && s.voci.length);
@@ -473,9 +535,16 @@ export function extractMenuFromText(venue, source, requestedSlug) {
     target.voci.push(...extra.voci); extra.voci = [];
   }
   const kept = sections.filter((s) => s.voci.length);
+  for (const [sec, group] of inferred) {
+    if (!sec.voci.length) continue;
+    const names = group.rows.slice(0, 4).map((n) => `«${n}»`).join(', ') + (group.rows.length > 4 ? '…' : '');
+    confirm.push({ text: `${sec.nome.it}: ${names}`, line: group.line, hint: group.rows.length === 1 ? group.fallback : `In «${sec.nome.it}» ${group.rows.length} vini hanno due prezzi senza etichetta (${names}): li ho messi come calice (il più basso) e bottiglia (il più alto). Conferma l’ordine.` });
+  }
   for (const s of kept) if (s.tipo === 'degustazione') {
-    if (!s.prezzo) confirm.push({ text: s.nome.it, line: s.line, hint: `Percorso «${s.nome.it}» senza prezzo scritto: inseriscilo tu (prezzo del percorso).` });
-    if (!s.voci.some((v) => !v.prezzo)) confirm.push({ text: s.nome.it, line: s.line, hint: `Percorso «${s.nome.it}» senza portate lette: controlla il testo.` });
+    const formulas = s.voci.filter((v) => v.prezzi?.length), courses = s.voci.filter((v) => !v.prezzo && !v.prezzi);
+    if (formulas.length) confirm.push({ text: s.nome.it, line: s.line, hint: `Percorso «${s.nome.it}» con ${formulas.length} formule, ognuna coi suoi prezzi come scritti dal cliente (${formulas.map((v) => v.nome.it).join(', ')}). Il cliente non elenca le portate: chiedigli i piatti di ogni formula. Controlla in anteprima come si vedono i prezzi.` });
+    else if (!s.prezzo) confirm.push({ text: s.nome.it, line: s.line, hint: `Percorso «${s.nome.it}» senza prezzo scritto: inseriscilo tu (prezzo del percorso).` });
+    if (!formulas.length && !courses.length) confirm.push({ text: s.nome.it, line: s.line, hint: `Percorso «${s.nome.it}» senza portate lette: controlla il testo.` });
   }
   // Provenienza: ogni nome e prezzo punta alla riga del testo ricevuto da cui è stato letto.
   kept.forEach((s, sectionIndex) => {
@@ -496,11 +565,14 @@ export function extractMenuFromText(venue, source, requestedSlug) {
     'Allergeni, ingredienti, coperto, contatti e traduzioni non sono stati dedotti.',
     ...items.filter((i) => i.special).map((i) => `«${i.name}»: ${i.special === 'variabile' ? 'senza prezzo fisso' : `${i.price} €`} con la nota «${i.note}» (dalla riga ${i.line}: “${i.sourceLine.slice(0, 90)}”). Controlla la nota.`),
     ...(variantCount ? [`${variantCount} voci con più prezzi (es. calice e bottiglia): ${items.filter((i) => i.variants).slice(0, 4).map((i) => `«${i.name}» ${i.variants.join(' · ')}`).join('; ')}${variantCount > 4 ? '…' : ''}. Controllale.`] : []),
-    ...courses.map((s) => `Percorso degustazione «${s.nome.it}»: ${s.voci.filter((v) => !v.prezzo).length} portate${s.prezzo ? `, ${s.prezzo} €${s.unita ? ` ${s.unita.it}` : ''}` : ', prezzo da inserire'}. Controllalo.`),
+    ...courses.map((s) => `Percorso degustazione «${s.nome.it}»: ${s.voci.filter((v) => !v.prezzo && !v.prezzi).length} portate${s.prezzo ? `, ${s.prezzo} €${s.unita ? ` ${s.unita.it}` : ''}` : ', prezzo da inserire'}. Controllalo.`),
     ...(items.some((i) => i.loose) ? [`${items.filter((i) => i.loose).length} prezzi scritti senza €, controlla che siano davvero prezzi: ${items.filter((i) => i.loose).map((i) => `«${i.name}» ${i.price}`).join(', ')}.`] : []),
     ...(unknown.length ? [`${unknown.length} righe senza prezzo o formato riconosciuto richiedono controllo.`] : [])
   ] };
 }
+// Nome del piatto + etichetta e prezzo («Franciacorta Satèn — bottiglia 48», «Picolit: solo calice, 12 €»).
+const tailOf = (row) => row.match(/^(.*?[A-Za-zÀ-ÿ]{3}.*?)\s+[—–-]\s+(.+)$/) || row.match(/^(.*?[A-Za-zÀ-ÿ]{3}[^:]*?):\s+(.+)$/);
+const WINE_CATEGORY = /^(?:(?:i|le|gli|il|la)\s+)?(?:vini\s+)?(?:bollicin\w*|spumant\w*|bianch\w*|ross\w*|rosat\w*|arancion\w*|orange|dolc\w*|passit\w*|liquoros\w*|da dessert|della casa|champagne|metodo classico)(?:\s+(?:del|della|dei|delle|di|d['’])\s*[\p{L}' ]{2,30})?$/iu;
 const KNOWN_SECTION = /^(?:#\s*)?(?:(?:gli |i |le |il |la )?(?:antipasti|primi|secondi|contorni|dolci|dessert|formaggi|pizze|bevande|bibite|vini|birre|cocktail|caffetteria|amari|distillati|insalate|panini|crudi|bollicine|spumanti)\b|menu bambini|piatti del giorno)/i;
 const isShouting = (row) => { const l = row.replace(/[^A-Za-zÀ-ÿ]/g, ''); return l.length >= 4 && l === l.toUpperCase(); };
 // Etichette della stessa famiglia (vino: calice/bottiglia/caraffa; taglie: piccola/media/grande; porzioni).
@@ -515,7 +587,9 @@ function courseLike(row) {
 function isWineHeading(row, nextRow) {
   const title = row.replace(/:\s*$/, '').trim();
   if (title.length < 3 || title.length > 40 || title.split(/\s+/).length > 5 || /[.?!,;@\d]/.test(title) || !WINE_SECTION.test(title)) return false;
-  return Boolean(labeledVariants(nextRow) || unlabeledVariants(nextRow, { section: title }) || priceRow(nextRow));
+  const next = String(nextRow || '').trim();
+  const tail = tailOf(next);
+  return Boolean(labeledVariants(nextRow) || unlabeledVariants(nextRow, { section: title }) || priceRow(nextRow) || (tail && labelOnlyRow(tail[2])));
 }
 
 export function menuDiff(before, after) {

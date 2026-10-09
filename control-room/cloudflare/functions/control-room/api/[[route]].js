@@ -19,6 +19,7 @@ import { purgePublishedEmail } from '../../_lib/email-retention.js';
 import { resolveCategory, draftBlocker, PLAN_RULES } from '../../_lib/service-rules.js';
 import { translateMenu, translationEntries, translationSummary } from '../../_lib/translate.js';
 import { allExtras, applyExtras, proposeSourceExtras } from '../../_lib/extras.js';
+import { prepareEmailSource } from '../../_lib/email-text.js';
 import { autopilotMessage, autopilotPreview, classifyRequest } from '../../_lib/autopilot.js';
 import { createMissions } from '../../_lib/missions.js';
 import { noteStatement } from '../../_lib/memory.js';
@@ -549,7 +550,9 @@ async function action(db, type, input, env = {}) {
     // pratica; la provenienza indica il file e la riga, non la riga del testo combinato.
     const allAnalyses = await rows(db, "SELECT a.source_text AS text,a.provenance_json AS prov,m.filename FROM material_analyses a JOIN materials m ON m.id=a.material_id WHERE a.request_id=? AND m.archived_at IS NULL AND a.status IN ('needs_review','complete') AND length(a.source_text)>0 ORDER BY m.created_at, a.created_at", requestId);
     const { kept: analyses, repeated: repeatedPages } = dropRepeatedPages(allAnalyses);
-    let combinedSource = String(request.source_text || '');
+    // Email a capo automatico (~75 caratteri): le righe spezzate si riuniscono, il numero di righe resta uguale.
+    const emailSource = prepareEmailSource(request.source_text);
+    let combinedSource = emailSource;
     const segments = [];
     for (const analysis of analyses) {
       // Un file che comincia con piatti senza titolo non deve finire nell'ultima sezione del file precedente: apre l'elenco senza titolo.
@@ -591,7 +594,7 @@ async function action(db, type, input, env = {}) {
       // Menu scritto a parole: lettura assistita, verificata riga per riga (nessun valore inventato).
       // Le righe dubbie delle foto non passano dal modello: le controlla Riccardo sulla foto.
       // Telefono, orari, indirizzo, coperto e frasi di presentazione non sono piatti: niente lettura assistita per loro.
-      const menuLike = (row) => /\d/.test(row) && !row.startsWith('[da verificare]') && !/^(?:tel\w*|cell\w*|orari\w*|instagram|facebook|indirizzo|via\b|piazza\b|il coperto|coperto|p\.?\s?iva)\b/i.test(row)
+      const menuLike = (row) => /\d/.test(row) && !row.startsWith('[da verificare]') && !/^(?:\d{1,2}\s+[a-zà-ÿ ]+,\s*){3,}/i.test(row) && !/\b(?:allergen\w*|legenda|numeri accanto|servizio|ferie|acconto|galleria|whatsapp)\b/i.test(row) && !/^(?:tel\w*|cell\w*|orari\w*|instagram|facebook|indirizzo|via\b|piazza\b|il coperto|coperto|p\.?\s?iva)\b/i.test(row)
         && !/\b(?:sono|siamo|vorremmo|vorrei|buongiorno|buonasera|salve|titolare|abbonamento)\b/i.test(row) && !/\b\d{1,2}[:.]\d{2}\s*[-–]\s*\d{1,2}[:.]\d{2}\b/.test(row);
       if (autoTranslationReady(env) && extraction.uncertain.some(menuLike)) {
         extraction = await assistExtraction(env.AI, venue, combinedSource, desiredSlug, extraction);
@@ -619,11 +622,11 @@ async function action(db, type, input, env = {}) {
     let creative = null;
     if (request.plan === 'premium' && !['aggiornamento', 'sostituzione'].includes(extraction.mode)) {
       const images = await getOne(db, "SELECT COUNT(*) AS n FROM materials WHERE request_id=? AND archived_at IS NULL AND mime LIKE 'image/%'", requestId);
-      const brief = creativeBrief(request.source_text, { attachments: Number(images?.n || 0) });
+      const brief = creativeBrief(emailSource, { attachments: Number(images?.n || 0) });
       const directions = premiumDirections(brief);
       delete extraction.menu.tema;
       extraction.menu.premium = structuredClone(directions[0].premium);
-      const story = storyFromSource(request.source_text);
+      const story = storyFromSource(emailSource);
       if (story) {
         extraction.menu.premium.storia = { it: story };
         extraction.warnings.push('«La nostra storia»: testo preso parola per parola dall’email del cliente. Controllalo; la versione inglese è da preparare.');
@@ -655,6 +658,9 @@ async function action(db, type, input, env = {}) {
     // Etichette dedotte (calice/bottiglia), percorsi senza prezzo, numeri di allergeni: da confermare.
     extraction.notes = [...extraction.notes, ...structureNotes(extraction)];
     for (const r of repeatedPages) extraction.notes.push({ kind: 'conferma', text: `File «${r.filename}»`, hint: `Stessa pagina di «${r.keptFilename}»: Jarvis l’ha usata una volta sola (la lettura più chiara). Se erano pagine diverse, dimmelo.`, line: null });
+    // Premium: storia, galleria, schede vini, diciture, preventivo e stile sono già nella scheda creativa (briefNotes): niente note doppie.
+    const inBrief = new Set(['storia', 'galleria', 'schede', 'dicitura', 'preventivo', 'stile', 'logo']);
+    if (creative) extraction.notes = extraction.notes.filter((n) => !inBrief.has(n.kind));
     if (creative) extraction.notes = [...extraction.notes.map((n) => (n.kind === 'tema' ? { ...n, hint: 'Richiesta grafica: è nella scheda creativa Premium, scegli la direzione in Revisione.' } : n)), ...briefNotes(creative.brief)];
     // Bozza rifatta: le foto già confermate da Riccardo tornano al loro posto (ritrovato per nome).
     let lostMedia = [];

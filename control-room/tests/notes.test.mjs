@@ -36,7 +36,8 @@ test('email complessa: sezioni giuste, note sui prezzi, niente inventato', () =>
 test('note di revisione: ogni riga non inserita è elencata e divisa per tipo', () => {
   const r = extractMenuFromText('Ristorante Al Faro', FARO);
   const notes = reviewNotes({ sourceText: FARO, uncertain: r.uncertain, extracted: r.extracted });
-  assert.equal(notes.length, r.uncertain.length);
+  // Un paragrafo con più frasi (lingue + piano) diventa una nota per frase: mai meno note delle righe.
+  assert.ok(notes.length >= r.uncertain.length);
   const kind = (rx) => notes.find((n) => rx.test(n.text))?.kind;
   assert.equal(kind(/^Coperto/), 'coperto');
   assert.equal(kind(/fritto misto in realtà/), 'correzione');
@@ -46,7 +47,7 @@ test('note di revisione: ogni riga non inserita è elencata e divisa per tipo', 
   assert.equal(kind(/toni del blu/), 'tema');
   assert.equal(kind(/piano da 25/), 'piano');
   assert.equal(kind(/^Buongiorno/), 'testo');
-  assert.match(notesSummary(notes), /Da sistemare o confermare \(6\)/);
+  assert.match(notesSummary(notes), /Da sistemare o confermare \(7\)/);
 });
 
 test('piano citato ma non deciso: resta da confermare', () => {

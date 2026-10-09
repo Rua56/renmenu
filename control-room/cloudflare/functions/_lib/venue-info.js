@@ -95,12 +95,19 @@ export function coverIn(text) {
   const t = plain(text);
   if (!/\bcoperto\b/.test(t)) return null;
   if (/\b(?:non|niente|senza|togli\w*|toglie\w*|rimuov\w*|elimin\w*|nessun)\b[^.]{0,30}\bcoperto\b|\bcoperto\b[^.]{0,20}\b(?:gratis|gratuito|non c'e|non ce)\b/.test(t)) return { doubt: 'Frase sul coperto negativa o da togliere: decidi tu.' };
-  const amounts = [...t.matchAll(/(\d{1,2})(?:[,.](\d{1,2}))?\s*(?:€|euro|eur)?/g)].filter((m) => !/\d[:.]\d{2}\s*[-–]/.test(t.slice(m.index, m.index + 8)));
+  // Numeri che non sono importi: età («sotto i 6 anni»), persone, ore.
+  const notMoney = /^\s*(?:anni|anno|mesi|persone|ore|tavol)/;
+  const amounts = [...t.matchAll(/(\d{1,2})(?:[,.](\d{1,2}))?\s*(?:€|euro|eur)?/g)].filter((m) => !/\d[:.]\d{2}\s*[-–]/.test(t.slice(m.index, m.index + 8))
+    && (/(?:€|euro|eur)/.test(m[0]) || !notMoney.test(t.slice(m.index + m[0].length))));
+  if (!amounts.length && /\b(?:non\s+(?:lo\s+|la\s+)?(?:facciamo|applichiamo|prevediamo|c['’]è|abbiamo|paghiamo|si paga)|senza\s+coperto|niente\s+coperto|nessun\s+coperto|coperto\s+(?:gratuito|gratis|non previsto))\b/.test(t)) return { doubt: 'Il locale scrive che non fa pagare il coperto: non ho inserito nulla.' };
   if (amounts.length !== 1) return amounts.length ? { doubt: 'Più importi nella frase sul coperto: quale è giusto?' } : { doubt: 'Coperto citato senza importo: chiedilo al locale.' };
   const [, euro, cents = ''] = amounts[0];
   const value = `${Number(euro)},${cents.padEnd(2, '0')}`;
+  // Precisazioni del cliente (esenzioni, servizio): il campo coperto accetta solo l'importo, la precisazione va riferita a Riccardo.
+  const remark = /\b(?:bambin\w*|ragazz\w*|under|sotto i\s+\d+|esent\w*|gratis|gratuit\w*|non lo pagano|non pagano|servizio\s+(?:compreso|incluso))/.test(t)
+    ? `Il cliente precisa sul coperto: «${String(text).trim().replace(/\s+/g, ' ').slice(0, 160)}». Nel menu c’è solo l’importo: se vuoi mostrare la precisazione, scrivila nelle note del menu.` : '';
   if (Number(value.replace(',', '.')) > 10 || Number(value.replace(',', '.')) <= 0) return { value, doubt: `Coperto di ${value} €: importo insolito, confermalo.` };
-  return { value };
+  return { value, ...(remark ? { remark } : {}) };
 }
 
 function hoursIn(text) {
@@ -143,6 +150,12 @@ export function extractVenueInfo(sourceText, { protectedWords = [] } = {}) {
         if (!result || found[field]?.value && !result.doubt) { if (result && found[field] && found[field].value !== result.value && field !== 'orari') found[field] = { doubt: `Due valori diversi per ${field} («${found[field].value}» e «${result.value}»): quale tengo?`, line: index + 1, source: original, fixed }; return; }
         found[field] = { ...result, line: index + 1, source: original, fixed, clause };
       };
+      // Chiusura per ferie («ad agosto chiudiamo due settimane»): non è un orario settimanale, non va nel campo orari.
+      if (FERIE.test(plain(clause)) && !/\b(?:aperti|apriamo)\b.*\d{1,2}[:.]\d{2}/.test(plain(clause))) {
+        const undecided = /\b(?:non\s+(?:sono\s+|è\s+|e\s+)?(?:ancora\s+)?(?:decis|stabilit|defin)\w*|da (?:decidere|definire|stabilire))\b/.test(plain(clause));
+        found.ferie = { doubt: `Chiusura per ferie scritta dal locale («${clause.trim().replace(/\.$/, '')}»): non è un orario settimanale, non l’ho inserita nel menu. ${undecided ? 'Le date non sono decise: chiedile al cliente prima di mostrarla.' : 'Se vuoi mostrarla, scrivila tu nelle note del menu.'}`, line: index + 1, source: original, fixed: false, clause };
+        continue;
+      }
       if (/\bcoperto\b/i.test(clause)) { put('coperto', coverIn(clause)); continue; }
       const fb = facebookIn(clause); if (fb) { put('facebook', fb); continue; }
       const ig = instagramIn(clause); if (ig) { put('instagram', ig); continue; }
@@ -181,7 +194,8 @@ export function withoutVenueInfo(sourceText, info) {
   }).join('\n');
 }
 
-export const INFO_LABELS = { coperto: 'Coperto', telefono: 'Telefono', orari: 'Orari', instagram: 'Instagram', facebook: 'Facebook', indirizzo: 'Indirizzo' };
+const FERIE = new RegExp(`\\bferie\\b|\\bchiusura\\s+(?:estiva|invernale|annuale|per ferie)\\b|\\b(?:ad|in|a|per|durante)\\s+(?:gennaio|febbraio|marzo|aprile|maggio|giugno|luglio|agosto|settembre|ottobre|novembre|dicembre)\\b.*\\bchi(?:us|ud)\\w*|\\bchi(?:us|ud)\\w*.*\\b(?:ad|in|a|per|durante)\\s+(?:gennaio|febbraio|marzo|aprile|maggio|giugno|luglio|agosto|settembre|ottobre|novembre|dicembre)\\b`);
+export const INFO_LABELS = { ferie: 'Chiusura per ferie', coperto: 'Coperto', telefono: 'Telefono', orari: 'Orari', instagram: 'Instagram', facebook: 'Facebook', indirizzo: 'Indirizzo' };
 const show = (field, value) => (field === 'coperto' ? `${value} €` : field === 'instagram' ? `@${value}` : value);
 
 /**
@@ -196,7 +210,7 @@ export function applyVenueInfo(menu, info, { source = 'testo ricevuto', overwrit
     if (String(current || '') === entry.value) continue;
     if (current && !overwrite) { doubts.push({ field, ...entry, doubt: `${INFO_LABELS[field]}: nel menu c’è «${current}», nel testo «${entry.value}». Quale tengo?` }); continue; }
     next[field] = field === 'orari' ? { it: entry.value, ...(entry.en ? { en: entry.en } : {}) } : entry.value;
-    applied.push({ field, value: entry.value, before: current || null, line: entry.line, source: entry.source, fixed: entry.fixed, check: entry.check || null });
+    applied.push({ field, value: entry.value, before: current || null, line: entry.line, source: entry.source, fixed: entry.fixed, check: entry.check || null, ...(entry.remark ? { remark: entry.remark } : {}) });
     provenance.push({ path: field === 'orari' ? 'orari.it' : field, source: entry.line ? `riga ${entry.line}` : source, value: entry.value, status: 'confermato' });
     if (field === 'orari' && entry.en) provenance.push({ path: 'orari.en', source: 'Orari italiani riscritti in inglese da Jarvis (nessuna traduzione automatica)', value: entry.en, status: 'confermato' });
   }

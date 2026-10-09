@@ -2,6 +2,10 @@
 
 Si aggiunge una voce a ogni pull request che cambia un comportamento di Jarvis o della Control Room, insieme all'aggiornamento di README, policy e funzionamento quando serve. Le voci più recenti stanno in alto.
 
+## 9 ottobre 2026
+
+- **Email complesse e poco chiare.** Una email di prova per un menu su misura (Osteria Ponte Vecchio: tre sezioni, percorso degustazione con due formule, carta dei vini con «solo bottiglia», coperto con eccezioni, legenda allergeni, storia, galleria e domanda sui prezzi) produceva una bozza sbagliata. Cause e correzioni: le righe spezzate dal programma di posta ora si riuniscono (numero di righe invariato); «5 tempi», «6 anni», «4 calici» non sono più prezzi; il percorso degustazione non assorbe più il resto dell'email, ha le formule con i loro prezzi e le regole in descrizione; carta dei vini, «solo bottiglia» e «solo calice», categorie dei vini; «prezzo da decidere, circa 18-19» non diventa un prezzo; «prezzo al mercato» e «chiedere al cameriere» entrano senza prezzo; «(solo in primavera)» e «(nome inventato)» escono dal nome; prezzi «10,-» e note dopo il prezzo; coperto con eccezioni e servizio compreso in una nota; ferie senza date come nota di conferma; allergeni dalla legenda e dai numeri per piatto, verificati sulla legenda UE e mai preselezionati; storia, galleria, schede dei vini, dicitura, domanda su tempi e prezzi e acconto hanno una nota ciascuno (nel Premium sono nella scheda creativa). Nuovi test con l'email reale e con una seconda email scritta male. Nessuna modifica al sito pubblico, ai QR o ai pagamenti.
+
 ## 7 ottobre 2026
 
 - **Falso allarme dopo la pubblicazione.** Il controllo a 6 ore, 2 e 7 giorni confrontava il menu online con quello della prima pubblicazione. Se poi Riccardo pubblicava una correzione (titoli, telefono, orari), la vecchia sorveglianza restava attiva e segnalava «il contenuto è diverso», ogni 6 ore. Ora una nuova pubblicazione dello stesso menu sostituisce la sorveglianza precedente: l'allarme resta solo per cambiamenti che Jarvis non ha pubblicato.
