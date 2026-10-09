@@ -217,3 +217,16 @@ test('numeri tra parentesi dopo il prezzo restano allergeni, non diventano descr
   const gnocchi = r.menu.sezioni.flatMap((s) => s.voci).find((v) => /Gnocchi/.test(v.nome.it));
   assert.ok(!/1,3,7/.test(gnocchi?.descrizione?.it || ''), 'nessuna descrizione «1,3,7»');
 });
+
+test('prezzi attestati: formule del degustazione con i loro importi e prezzi inseriti a mano da Riccardo', async () => {
+  const { criticalFields, reviewIssues } = await import('../cloudflare/functions/_lib/editorial.js');
+  const { menu } = run();
+  assert.equal(criticalFields(menu).pricesMissing.length, 1, 'prima: solo le cappesante senza prezzo (il branzino è «secondo il mercato»)');
+  dish(menu, /Cappesante/).prezzo = '18,00';
+  dish(menu, /Branzino/).prezzo = '24,00';
+  assert.deepEqual(criticalFields(menu).pricesMissing, [], 'le formule 5 e 7 portate hanno i loro importi: nessun prezzo mancante');
+  const evidence = 'Email del cliente del 9 ottobre 2026, riga per riga';
+  const checks = { prices: true, allergens: true, languages: true, clientApproval: true, allergenOmissionConfirmed: true, fieldEvidence: { prices: evidence, allergens: evidence, languages: evidence }, clientApprovalEvidence: evidence };
+  const { issues } = reviewIssues(menu, checks, 'premium');
+  assert.ok(!issues.some((i) => /prezzi non attestati/.test(i)), issues.join(' | '));
+});
