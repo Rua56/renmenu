@@ -72,7 +72,9 @@ test('percorso degustazione: titolo intero, due formule con i prezzi, regole in 
   assert.deepEqual(prices(tasting.voci[0]), ['A persona 65,00', 'Con abbinamento di 4 calici 85,00']);
   assert.deepEqual(prices(tasting.voci[1]), ['A persona 85,00', 'Con abbinamento di 5 calici 115,00']);
   assert.match(tasting.descrizione.it, /minimo 2 persone/);
-  assert.match(tasting.descrizione.it, /non è disponibile la domenica/);
+  assert.match(tasting.descrizione.it, /minimo 2 persone/);
+  assert.doesNotMatch(tasting.descrizione.it, /domenica/, 'la regola della domenica vale per le 7 portate: sta sotto quella formula');
+  assert.match(dish(menu, /^7 portate/).descrizione.it, /non è disponibile la domenica/);
 });
 
 test('carta dei vini: categorie, calice/bottiglia, «solo bottiglia», «solo calice», osservazioni tolte dal nome', () => {
@@ -235,7 +237,23 @@ test('formule del degustazione: i prezzi sono visibili anche nella descrizione (
   const { menu } = run();
   const cinque = dish(menu, /^5 portate/), sette = dish(menu, /^7 portate/);
   assert.equal(cinque.descrizione.it, 'A persona: 65,00 € · Con abbinamento di 4 calici: 85,00 €');
-  assert.equal(sette.descrizione.it, 'A persona: 85,00 € · Con abbinamento di 5 calici: 115,00 €');
+  assert.equal(sette.descrizione.it, 'A persona: 85,00 € · Con abbinamento di 5 calici: 115,00 € · Il percorso da 7 portate non è disponibile la domenica');
   assert.equal(cinque.prezzi.length, 2, 'restano anche i prezzi strutturati');
   assert.deepEqual(validateMenu(menu).errors, []);
+});
+
+test('cappesante: prezzo chiesto per nome; branzino: resta «prezzo al mercato» con le parole della titolare', async () => {
+  const { reviewIssues, missingPriceNames } = await import('../cloudflare/functions/_lib/editorial.js');
+  const { menu, notes } = run();
+  assert.equal(dish(menu, /Cappesante/).prezzo, undefined);
+  assert.equal(dish(menu, /Branzino/).prezzo, undefined);
+  assert.equal(dish(menu, /Branzino/).descrizione.it, 'Prezzo al mercato, cambia ogni giorno');
+  assert.deepEqual(missingPriceNames(menu), ['Cappesante scottate, crema di topinambur']);
+  assert.ok(notes.some((n) => /Cappesante/.test(n.text) && /serve il tuo prezzo/.test(n.hint)));
+  const evidence = 'Email del cliente del 9 ottobre 2026, riga per riga';
+  const checks = { prices: true, allergens: true, languages: true, clientApproval: true, allergenOmissionConfirmed: true, fieldEvidence: { prices: evidence, allergens: evidence, languages: evidence }, clientApprovalEvidence: evidence };
+  const priceIssue = reviewIssues(menu, checks, 'premium').issues.find((i) => /prezzi non attestati/.test(i));
+  assert.match(priceIssue, /Cappesante scottate/);
+  assert.match(priceIssue, /«cappesante 18,50»/);
+  assert.ok(!/Branzino/.test(priceIssue), 'il branzino non è un prezzo mancante');
 });

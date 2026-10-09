@@ -223,7 +223,11 @@ export function marketPrice(row) {
   const m = String(row || '').match(MARKET);
   if (!m || !/[A-Za-zÀ-ÿ]{3}/.test(m[1]) || /\d/.test(m[1].replace(/\b(?:19|20)\d{2}\b/g, ''))) return null;
   const why = /pescato/i.test(row) ? 'Prezzo variabile secondo il pescato del giorno' : /chiedere|chiedi|richiesta|disponibil/i.test(row) ? 'Prezzo da chiedere al personale' : 'Prezzo secondo il mercato del giorno';
-  return { name: m[1].replace(/[\s—–\-:,]+$/, '').trim(), note: why };
+  // Le parole della titolare, se dicono chiaramente che il prezzo varia: «Prezzo al mercato, cambia ogni giorno».
+  const said = String(row).slice(String(row).indexOf(m[1]) + m[1].length).replace(/^\s*[—–\-:,]\s*\(?\s*/, '').replace(/[)\s.]+$/, '').replace(/^(?:il\s+)?prezzo\s+/i, '').trim();
+  const verbatim = /^(?:al\s+mercato|di\s+mercato|secondo\s+(?:il\s+)?(?:mercato|pescato)|variabile|a\s+seconda\s+(?:del\s+)?(?:mercato|pescato))/i.test(said) && said.length <= 90 && !/\d/.test(said);
+  const note = verbatim ? `Prezzo ${said}` : why;
+  return { name: m[1].replace(/[\s—–\-:,]+$/, '').trim(), note };
 }
 
 /** Percorso con più formule: «5 portate: 65 € a persona (85 € con abbinamento di 4 calici)».

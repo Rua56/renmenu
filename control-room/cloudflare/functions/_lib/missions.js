@@ -6,7 +6,7 @@ import { notesSummary } from './notes.js';
 // operazioni (con gli stessi controlli) dell'interfaccia, con «jarvis» come autore nel registro.
 // Si ferma e chiede a Riccardo quando qualcosa non è chiaro; pubblica solo dopo il suo SÌ.
 import { deletionPlan } from './delete-request.js';
-import { reviewIssues } from './editorial.js';
+import { missingPriceNames, reviewIssues } from './editorial.js';
 import { allExtras } from './extras.js';
 import { assessReply, proposeReplyChanges, referenceCode, sha256Hex } from './approvals.js';
 import { sendOwnerNotification } from './owner-notifications.js';
@@ -1367,7 +1367,9 @@ export function createMissions(deps) {
     const link = await peekUrl(db, env, draft.id);
     const sections = (menu.sezioni || []).length, items = (menu.sezioni || []).reduce((t, s2) => t + (s2.voci || []).length, 0);
     const checks = await Promise.resolve().then(() => getOne(db, 'SELECT checks_json FROM drafts WHERE id=?', draft.id)).then((row) => { try { return JSON.parse(row?.checks_json || '{}') || {}; } catch { return {}; } }).catch(() => ({}));
-    return { text: `Ecco la bozza di «${draft.client_name || menu.nome || draft.subject}» (versione ${draft.revision}, ${items} voci in ${sections} sezioni):\n${link}\n\nÈ solo da guardare: non è pubblicata e non è stata inviata a nessuno. Il link vale 24 ore.${['prices', 'allergens', 'languages'].every((key) => checks[key]) ? '' : ' La checklist di revisione (prezzi, allergeni, lingue) non è ancora confermata.'}\n\nProssimo passo: se la bozza ti va bene, affidami la pratica: ti faccio il riepilogo da confermare qui, con un tocco.`, keep: false, buttons: [['Affida a Jarvis', `affq:${draft.id}`]] };
+    const undecided = missingPriceNames(menu).slice(0, 3);
+    const ask = undecided.length ? `\n\nMi serve una tua decisione: manca il prezzo di ${undecided.map((n) => `«${n.slice(0, 60)}»`).join(', ')} (il locale non lo ha deciso). Scrivimi o dettami il prezzo, per esempio «${undecided[0].split(/[\s,]+/)[0].toLowerCase()} 18,50», e lo inserisco: senza prezzo non posso procedere.` : '';
+    return { text: `Ecco la bozza di «${draft.client_name || menu.nome || draft.subject}» (versione ${draft.revision}, ${items} voci in ${sections} sezioni):\n${link}\n\nÈ solo da guardare: non è pubblicata e non è stata inviata a nessuno. Il link vale 24 ore.${['prices', 'allergens', 'languages'].every((key) => checks[key]) ? '' : ' La checklist di revisione (prezzi, allergeni, lingue) non è ancora confermata.'}\n\nProssimo passo: se la bozza ti va bene, affidami la pratica: ti faccio il riepilogo da confermare qui, con un tocco.${ask}`, keep: false, buttons: [['Affida a Jarvis', `affq:${draft.id}`]] };
   }
   async function voiceCreate(db, utterance, spokenVenue, urgent = false) {
     const venue = String(spokenVenue || '').replace(/^[«"“']|[»"”']$/g, '').trim();
