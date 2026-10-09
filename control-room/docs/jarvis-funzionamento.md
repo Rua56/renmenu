@@ -77,6 +77,10 @@ Allergeni scritti dal locale: Jarvis non li deduce mai dal nome del piatto. Rico
 
 Se la frase non contiene prezzi o piatti da cambiare (per esempio titoli delle sezioni, unione di sezioni, descrizioni), Jarvis crea comunque la pratica di aggiornamento con una bozza identica al menu online (stesso Menu ID, stesso QR) e vi applica la correzione come per ogni bozza. La pratica diventa quella in primo piano per 60 minuti. Pubblicazione e SÌ restano invariati.
 
+### Cliente senza nome (arrivato via email)
+
+Se il cliente si chiama «Nuovo contatto email», Jarvis a voce usa il nome del locale scritto nella bozza (per esempio «Osteria Ponte Vecchio»). Mostrare la bozza su Telegram o provare ad affidarla la mette in primo piano per un'ora: le frasi senza nome del locale («cappesante 18,50») valgono per quella pratica. La scheda cliente non viene rinominata da Jarvis.
+
 ### Quando Jarvis non capisce
 
 Ogni frase che Jarvis non riesce ad applicare alla bozza (modifica non valida, nessuna modifica precisa, errore) viene registrata con il motivo nel registro delle attività (azione «jarvis.not_understood»): contiene solo il testo del comando e la ragione, e serve a migliorare Jarvis. Le frasi vere che hanno causato errori diventano test fissi in `tests/jarvis-corpus.test.mjs`. I modelli Gemini che falliscono vengono saltati per 10 minuti.

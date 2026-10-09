@@ -367,6 +367,27 @@ describe('Correzioni dettate alla bozza su Telegram', () => {
     } finally { db.close?.(); }
   });
 
+  it('cliente arrivato via email senza nome: la bozza si chiama col nome del locale scritto nel menu (anche a voce)', async () => {
+    const db = await draftDb();
+    try {
+      const draft = await db.prepare('SELECT id,request_id,menu_json FROM drafts').bind().first();
+      const venue = JSON.parse(draft.menu_json).nome;
+      await db.prepare("UPDATE clients SET name='Nuovo contatto email' WHERE id=(SELECT client_id FROM requests WHERE id=?)").bind(draft.request_id).run();
+      const frico = JSON.parse(draft.menu_json).sezioni[0].voci.findIndex((v) => /frico/i.test(v.nome.it));
+      const ai = { run: async (model, input) => {
+        const schema = input?.response_format?.json_schema;
+        if (schema?.properties?.operazioni) return { response: { operazioni: [{ tipo: 'prezzo', si: 0, vi: frico, prezzo: '14' }], dubbio: '' } };
+        if (schema?.properties?.intent) return { response: { intent: 'aggiorna_menu', locale: venue, risposta: '' } };
+        return { response: 'ok' };
+      } };
+      await say(db, { ...env, AI: ai }, `al ${venue} il frico con polenta costa 14 euro`);
+      const after = await db.prepare('SELECT menu_json FROM drafts').bind().first();
+      assert.equal(JSON.parse(after.menu_json).sezioni[0].voci[frico].prezzo, '14,00');
+      assert.match(lastSent().body.text, new RegExp(venue.replace(/[.*+?^${}()|[\\]\\\\]/g, '\\\\$&')));
+      assert.doesNotMatch(lastSent().body.text, /Nuovo contatto email/);
+    } finally { db.close?.(); }
+  });
+
   it('un locale con menu in formato proprio (Blanch) è riconosciuto ma non modificato', async () => {
     const db = database();
     try {
