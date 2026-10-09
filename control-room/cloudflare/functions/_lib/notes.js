@@ -17,7 +17,7 @@ const RULES = [
   ['allegati', /\b(?:in allegato|allego|allegat[aoie])\b/, 'Il cliente cita degli allegati: controlla che siano arrivati tra i materiali, altrimenti chiedili.'],
   ['piano', /\b(?:piano|abbonament\w*|annual\w*|standard|premium|al mese|mensil\w*|prova gratuita)\b/, 'Piano: il cliente ne parla qui, sceglilo tu.'],
   ['coperto', /\bcoperto\b/, 'Coperto: non inserito, mettilo nel campo «coperto» se è giusto.'],
-  ['allergeni', /\ballergen\w*/, 'Allergeni: non inseriti, servono i dati dal locale.'],
+  ['allergeni', /\ballergen\w*|(?:\b\d{1,2}\s+[a-z][a-z ]{2,24},\s*){5,}|\bnumeri\b[^:]{0,60}\b(?:piatti|accanto|sotto)\b/, 'Allergeni: non inseriti nel menu. Se il cliente ha scritto legenda e numeri per piatto, sono nei «Dati scritti dal locale» già divisi piatto per piatto: confermali tu. Per gli altri servono i dati dal locale.'],
   ['orari', /\b(?:aperti|apriamo|chiusi|chiuso|chiusura|orari\w*)\b|\d{1,2}[:.]\d{2}\s*[-–]/, 'Orari: non inseriti, copiali nel campo «orari».'],
   ['contatti', /\b(?:telefono|tel|cell\w*|whatsapp|instagram|facebook|email|mail|indirizzo|via|piazza)\b|@[a-z0-9_.]{3,}|\b\d{3,4}\s?\d{5,7}\b/, 'Contatti: non inseriti, copiali nei campi del menu.'],
   ['lingue', /\b(?:inglese|tedesc\w*|frances\w*|spagnol\w*|slovenian?\w*|english|traduzion\w*)\b/, 'Lingue: il cliente le chiede qui, controlla quelle della bozza.']

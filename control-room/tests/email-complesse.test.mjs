@@ -146,6 +146,9 @@ test('richieste e domande del cliente: una nota per ciascuna, mai una risposta d
   assert.equal(find(/Le foto ve le mando/).kind, 'galleria');
   assert.ok(notes.some((n) => n.kind === 'storia'));
   assert.equal(find(/servizio è compreso/i).kind, 'servizio');
+  assert.equal(find(/^1 glutine/).kind, 'allergeni');
+  assert.equal(find(/^I numeri accanto ai piatti/).kind, 'allergeni');
+  assert.match(find(/^I numeri accanto ai piatti/).hint, /Dati scritti dal locale/);
   assert.ok(notes.every((n) => n.text.length < 400), 'nessuna nota gigante');
 });
 
