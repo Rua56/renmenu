@@ -441,7 +441,7 @@ ${isDemoMode ? '' : `<form data-form="venue-note" class="memory-form spaced-top-
 <details class="details-more"><summary>${menu ? `Ultimo menu online · ${time(menu.createdAt)}` : 'Ultimo menu online · non ancora memorizzato'}</summary>${menu ? `<pre class="memory-menu">${escapeHtml(menu.text)}</pre>` : '<p class="muted">Lo memorizzo da solo alla prossima pubblicazione verificata.</p>'}</details></section>`;
 }
 // Cosa Jarvis non ha inserito nella bozza: elenco già diviso per tipo, con il numero di riga.
-const NOTE_LABELS = { premium: 'Premium su misura', inserito: 'Inserito da Jarvis', conferma: 'Da confermare', piatto: 'Righe del menu non lette', correzione: 'Correzioni da applicare', foto: 'Righe dubbie delle foto', piano: 'Piano', tema: 'Tema grafico', coperto: 'Coperto', orari: 'Orari', contatti: 'Contatti', allergeni: 'Allergeni', lingue: 'Lingue', testo: 'Altro testo dell’email' };
+const NOTE_LABELS = { premium: 'Premium su misura', inserito: 'Inserito da Jarvis', conferma: 'Da confermare', piatto: 'Righe del menu non lette', correzione: 'Correzioni da applicare', foto: 'Righe dubbie delle foto', piano: 'Piano', tema: 'Tema grafico', coperto: 'Coperto', orari: 'Orari', contatti: 'Contatti', allergeni: 'Allergeni', lingue: 'Lingue', testo: 'Altro testo dell’email', preventivo: 'Domanda su prezzi e tempi', ferie: 'Chiusura per ferie', storia: 'Storia del locale', galleria: 'Foto e galleria', schede: 'Schede dei vini', dicitura: 'Dicitura richiesta', stile: 'Stile richiesto', logo: 'Logo', allegati: 'Allegati citati', servizio: 'Servizio compreso' };
 function notesPanel(draft) {
   const notes = Array.isArray(draft?.notes) ? draft.notes : [];
   if (!notes.length) return '';

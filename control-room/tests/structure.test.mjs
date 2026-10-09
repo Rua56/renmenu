@@ -25,7 +25,8 @@ describe('Vini e bevande con più prezzi', () => {
   it('due prezzi senza etichetta: calice/bottiglia solo in una sezione vini, e da confermare', () => {
     const wine = read('Vini rossi\nMerlot 5/25\nRefosco 6,00 30,00');
     assert.deepEqual(wine.menu.sezioni[0].voci.map(prices), [['Calice 5,00', 'Bottiglia 25,00'], ['Calice 6,00', 'Bottiglia 30,00']]);
-    assert.equal(wine.confirm.length, 2);
+    // Una sola nota per sezione (non una per vino).
+    assert.equal(wine.confirm.length, 1);
     assert.match(wine.confirm[0].hint, /Conferma/);
     // Fuori da una sezione vini o con prezzi al contrario: nessuna etichetta inventata.
     const food = read('Primi\nGnocchi 10/12\nTagliatelle 9');

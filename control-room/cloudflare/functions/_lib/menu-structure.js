@@ -24,7 +24,7 @@ const labelOf = (text) => LABELS.find(([, rx]) => rx.test(text))?.[0] || null;
 export const WINE_SECTION = /vin[io]\b|\bvini\b|bollicin|spumant|champagne|prosecco|franciacorta|metodo classico|bianch[io]|ross[io]|rosat[io]|orange|macerat|cantina|calic[ei]|mescita|bottigli|enoteca|carta dei vini/i;
 const YEAR = /^(?:19|20)\d{2}$/;
 // Importo: non un anno, non una quantità (0,75 l, 33 cl, 12%, 18 mesi…), non parte di una frazione.
-const AMOUNT = /(?<![\d,.])(€\s*)?(\d{1,4}(?:[,.]\d{1,2})?)(?![\d])(\s*(?:€|euro|eur)(?![a-z]))?(?!\s*(?:%|cl\b|ml\b|lt\b|l\b|gr\b|g\b|kg\b|anni\b|mesi\b|gg\b|°|persone\b|pers\b|porzion))/gi;
+const AMOUNT = /(?<![\d,.])(€\s*)?(\d{1,4}(?:[,.]\d{1,2})?)(?![\d])(\s*(?:€|euro|eur)(?![a-z]))?(?!\s*(?:%|cl\b|ml\b|lt\b|l\b|gr\b|g\b|kg\b|anni\b|mesi\b|gg\b|°|persone\b|pers\b|porzion|tempi\b|portat[ae]\b|piatti\b|calici\b|giorni\b|ore\b|settimane\b|volte\b|tavoli\b|ospiti\b|bambini\b|foto\b))/gi;
 export const fmt = (amount) => { const [w, c = ''] = String(amount).replace('.', ',').split(','); return `${w},${c.padEnd(2, '0')}`; };
 const positive = (amount) => Number(String(amount).replace(',', '.')) > 0;
 const STOP = /\b(?:costa|costano|viene|vengono|vendiamo|facciamo|mettiamo|invece|prezzo|prezzi|adesso|ora|diventa|passa|vorrei|vorremmo|abbiamo|offriamo|proponiamo|grazie|buongiorno|salve|ciao)\b/i;
@@ -45,7 +45,7 @@ function labels(text) {
   for (const m of text.matchAll(LABEL_ANY)) out.push({ start: m.index, end: m.index + m[0].length, label: labelOf(m[0]), raw: m[0] });
   return out.filter((l) => l.label);
 }
-const GLUE = /\b(?:al|la|il|lo|a|per|in|da|e|ed|oppure|o)\b|[€\s:—–\-/|,.()[\]+]|euro|eur/gi;
+const GLUE = /\b(?:al|la|il|lo|a|per|in|da|e|ed|oppure|o|solo|soltanto|unicamente)\b|[€\s:—–\-/|,.()[\]+]|euro|eur/gi;
 const glue = (text) => !String(text).replace(GLUE, '').trim();
 
 /** «Nome — calice 5 / bottiglia 40», «Nome: 5 € al calice, 40 € la bottiglia», «Nome (calice) 5 (bottiglia) 40». */
@@ -155,8 +155,8 @@ export function degustazionePrice(row) {
 /** Riga senza prezzo dentro il percorso che è una regola o una nota, non una portata. */
 export function degustazioneNote(row) {
   const text = row.replace(/^>\s*/, '').trim();
-  if (amounts(text).length || text.length > 200) return null;
-  const rule = /\b(?:per tutto il tavolo|intero tavolo|tutti i commensali|minimo\s+\d+\s+persone|almeno\s+\d+\s+persone|bevande\s+(?:escluse|incluse)|vini\s+(?:esclusi|inclusi)|acqua e caff[eè]|su prenotazione|prenotazione obbligatoria)\b/i;
+  if (amounts(text).some((a) => a.currency) || text.length > 200) return null;
+  const rule = /\b(?:per tutto il tavolo|intero tavolo|tutti i commensali|minimo\s+\d+\s+persone|almeno\s+\d+\s+persone|bevande\s+(?:escluse|incluse)|vini\s+(?:esclusi|inclusi)|acqua e caff[eè]|su prenotazione|prenotazione obbligatoria|si prenota|da prenotare|prenotabile|non\s+(?:è\s+)?disponibil[ei]|non\s+per\s+tavoli|non\s+si\s+(?:serve|fa|effettua)|entro le\s+\d{1,2})\b/i;
   const sentence = /\.$/.test(text) && text.split(/\s+/).length >= 5 && /\b(?:è|sono|viene|vengono|servit\w*|può|possono|richiede|prevede)\b/i.test(text);
   return rule.test(text) || sentence ? text : null;
 }
@@ -187,4 +187,79 @@ export function allergenNumbers(text) {
   if (!m) return null;
   const list = m[1].split(/\s*[-,/]\s*/).map(Number);
   return list.every((n) => n >= 1 && n <= 14) ? list : null;
+}
+
+/* ——— Righe scritte a parole dai clienti (email del 9 ottobre 2026, Osteria Ponte Vecchio) ——— */
+
+/** Osservazioni del cliente dentro il nome, non parte del nome: «(nome inventato)», «(esempio)», «(prova)». */
+const META_REMARK = /\s*\(\s*(?:nome|dato|prezzo|vino|piatto)?\s*(?:inventat\w*|fittizi\w*|di prova|d['’]esempio|esempio|di test|test|prova)\s*\)/gi;
+export function cleanMeta(name) {
+  const text = String(name || '');
+  const cleaned = text.replace(META_REMARK, '').replace(/\s{2,}/g, ' ').trim();
+  return { name: cleaned, removed: cleaned !== text.trim() ? text.match(META_REMARK)?.[0].trim() || '' : '' };
+}
+
+/** «Risotto … (solo in primavera)»: la disponibilità scritta dal cliente non è il nome del piatto, diventa la descrizione. */
+const AVAILABILITY = /\s*[(\[]\s*((?:solo|soltanto)\s+(?:in|a|di|d['’]|nei|nel|il|la|le)\s*[^()[\]]{2,40}|stagionale|di stagione|su (?:richiesta|ordinazione|prenotazione)|fino a esaurimento)\s*[)\]]\s*$/i;
+export function splitAvailability(name) {
+  const m = String(name || '').match(AVAILABILITY);
+  if (!m) return { name: String(name || '').trim(), availability: '' };
+  const text = m[1].trim();
+  return { name: String(name).slice(0, m.index).trim(), availability: text.charAt(0).toUpperCase() + text.slice(1) };
+}
+
+/** «Cappesante…: prezzo da decidere, circa 18-19 €»: il prezzo NON c'è. Mai scegliere un numero dell'intervallo. */
+const TO_DECIDE = /^(.{2,150}?)\s*(?:[—–\-:]\s*)?\(?\s*(?:il\s+)?(?:prezzo\s+)?(?:ancora\s+)?(?:da\s+(?:decidere|definire|stabilire|confermare|concordare|vedere)|non\s+(?:ancora\s+)?(?:deciso|definito|stabilito)|tbd|n\.?\s?d\.?)\s*(?:[,;(]\s*(?:circa|più o meno|intorno a|sui|sugli|tra|forse|probabilmente)?\s*([^)]*?))?\s*\)?\.?$/i;
+export function undecidedPrice(row) {
+  const m = String(row || '').match(TO_DECIDE);
+  if (!m || !/[A-Za-zÀ-ÿ]{3}/.test(m[1]) || /\d{1,3}\s*(?:€|euro)\s*$/.test(m[1].trim())) return null;
+  const hint = (m[2] || '').replace(/^[\s,;:]+|[\s,;:.]+$/g, '').trim();
+  return { name: m[1].replace(/[\s—–\-:,]+$/, '').trim(), hint };
+}
+
+/** «Branzino…: prezzo al mercato, cambia ogni giorno»: prezzo variabile, scritto dal cliente. */
+const MARKET = /^(.{2,150}?)\s*[—–\-:,]\s*\(?\s*(?:il\s+)?(?:prezzo\s+)?(?:al\s+mercato|di\s+mercato|secondo\s+(?:il\s+)?mercato|variabile|stagionale|a\s+seconda\s+(?:del\s+)?(?:mercato|pescato)|secondo\s+(?:il\s+)?pescato|secondo\s+disponibilit[àa]|chiedere\s+(?:al\s+)?(?:cameriere|personale|staff|banco)|chiedi\s+(?:al\s+)?(?:cameriere|personale)|su\s+richiesta)(?:\s*[,;]\s*(?:cambia|varia|dipende|che\s+cambia)[^()]{0,60})?\s*\)?\.?$/i;
+export function marketPrice(row) {
+  const m = String(row || '').match(MARKET);
+  if (!m || !/[A-Za-zÀ-ÿ]{3}/.test(m[1]) || /\d/.test(m[1].replace(/\b(?:19|20)\d{2}\b/g, ''))) return null;
+  const why = /pescato/i.test(row) ? 'Prezzo variabile secondo il pescato del giorno' : /chiedere|chiedi|richiesta|disponibil/i.test(row) ? 'Prezzo da chiedere al personale' : 'Prezzo secondo il mercato del giorno';
+  return { name: m[1].replace(/[\s—–\-:,]+$/, '').trim(), note: why };
+}
+
+/** Percorso con più formule: «5 portate: 65 € a persona (85 € con abbinamento di 4 calici)».
+ *  Ogni formula è una voce con i suoi prezzi (etichetta = come scritto dal cliente). */
+export function tastingTier(row) {
+  const text = String(row || '').trim().replace(/^>\s*/, '');
+  const head = text.match(/^((?:\d{1,2}|[a-zà-ÿ]+)\s+(?:portate|portata|tempi|piatti|assaggi|calici)(?:\s+[a-zà-ÿ]+){0,2})\s*[:\-–—]\s*(.+)$/i);
+  if (!head) return null;
+  const rest = head[2];
+  const prices = amounts(rest).filter((p) => p.currency);
+  if (!prices.length || prices.some((p) => !positive(p.amount))) return null;
+  const variants = [];
+  for (let i = 0; i < prices.length; i += 1) {
+    const after = rest.slice(prices[i].end, prices[i + 1]?.start ?? rest.length)
+      .replace(/^[\s,;(]+|[\s,;()]+$/g, '').replace(/\s*\($/, '').trim();
+    let label = after.replace(/^\(|\)$/g, '').trim();
+    if (!label || /^(?:a|per)\s+(?:persona|testa)$/i.test(label)) label = 'A persona';
+    else if (/^(?:a|per)\s+persona\b/i.test(label)) label = label.replace(/^(?:a|per)\s+persona[\s,;]*/i, '').trim() || 'A persona';
+    label = label.charAt(0).toUpperCase() + label.slice(1);
+    if (label.length > 60 || variants.some((v) => v.label === label)) return null;
+    variants.push({ label, amount: prices[i].amount });
+  }
+  // Prima del primo prezzo ci devono essere solo i due punti: niente testo in mezzo che il nome non spiega.
+  if (rest.slice(0, prices[0].start).replace(/[\s€:]/g, '')) return null;
+  const name = head[1].trim().replace(/^./, (c) => c.toUpperCase());
+  return { name, variants };
+}
+
+/** Titolo di pagina senza piatti sotto: «Carta dei vini (la struttura è questa)». Apre le sezioni dopo, non è una voce. */
+export const PAGE_TITLE = /^(?:la\s+)?carta\s+(?:dei|delle|del|degli)\s+[a-zà-ÿ]+(?:\s*\([^)]*\))?\s*:?$/i;
+
+/** Frase del cliente, non una voce: mai un piatto, un percorso o una descrizione. */
+export function proseLike(row) {
+  const text = String(row || '').trim();
+  if (text.length < 25) return false;
+  const words = text.split(/\s+/).length;
+  const verb = /\b(?:è|sono|siamo|abbiamo|vorremmo|vorrei|vogliamo|possiamo|dovrei|posso|puoi|potete|vi|ci|mi|mando|allego|scrivo|chiedere|sapere|decidere|pagano|pagare|compreso|compresa|inclus[oa]|escluso|esclusa)\b/i;
+  return words >= 6 && verb.test(text) && (/[.?!]$/.test(text) || words >= 9);
 }
