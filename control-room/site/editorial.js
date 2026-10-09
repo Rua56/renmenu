@@ -20,7 +20,15 @@ export function criticalFields(menu) {
     }
     for (const [itemIndex, item] of (section?.voci || []).entries()) {
       const path = `sezioni.${sectionIndex}.voci.${itemIndex}`;
-      if (!item?.prezzo && item?.prezzo !== 0) pricesMissing.push(`${path}.prezzo`);
+      // Prezzo variabile dichiarato dal locale («secondo il pescato», «a peso»): niente importo, ma è attestato.
+      const variable = /^Prezzo (?:variabile|secondo|a peso|al mercato|di mercato|a seconda|da chiedere)/.test(typeof item?.descrizione === 'string' ? item.descrizione : item?.descrizione?.it || '');
+      // Più prezzi con etichetta (calice / bottiglia): attestati se ogni variante ha il suo importo.
+      const variants = Array.isArray(item?.prezzi) && item.prezzi.length && item.prezzi.every((v) => v?.prezzo);
+      // Portata di un percorso degustazione: il prezzo è quello del percorso (a persona), non del piatto.
+      // Una formula con i suoi prezzi («5 portate: 65 € / 85 € con abbinamento») non è una portata: è attestata dai suoi importi.
+      const course = section?.tipo === 'degustazione' && !item?.prezzo && !variants;
+      if (course) { if (!section?.prezzo && !pricesMissing.includes(`sezioni.${sectionIndex}.prezzo`)) pricesMissing.push(`sezioni.${sectionIndex}.prezzo`); }
+      else if (!item?.prezzo && item?.prezzo !== 0 && !variable && !variants) pricesMissing.push(`${path}.prezzo`);
       if (!Array.isArray(item?.allergeni) || item.allergeni.length === 0) allergensMissing.push(`${path}.allergeni`);
     }
   }
@@ -31,6 +39,17 @@ export function criticalFields(menu) {
   return { pricesMissing, allergensMissing, translationsMissing };
 }
 
+/** Nomi delle voci senza prezzo (e dei percorsi senza prezzo), per chiederli a Riccardo per nome. */
+export function missingPriceNames(menu, missing = criticalFields(menu).pricesMissing) {
+  const text = (value) => (typeof value === 'string' ? value : value?.it || '');
+  return missing.map((path) => {
+    const m = /^sezioni\.(\d+)\.voci\.(\d+)\.prezzo$/.exec(path), s = /^sezioni\.(\d+)\.prezzo$/.exec(path);
+    if (m) return text(menu?.sezioni?.[Number(m[1])]?.voci?.[Number(m[2])]?.nome);
+    if (s) return text(menu?.sezioni?.[Number(s[1])]?.nome);
+    return '';
+  }).filter(Boolean);
+}
+
 export const EVIDENCE_LABELS = Object.freeze({ prices: 'Evidenza prezzi', allergens: 'Evidenza allergeni', languages: 'Evidenza lingue' });
 
 // `plan` is optional for backward compatibility; every production caller passes it.
@@ -39,7 +58,11 @@ export function reviewIssues(menu, checks, plan) {
   const missing = criticalFields(menu);
   const required = ['prices', 'allergens', 'languages', 'clientApproval'];
   if (!checks || required.some((key) => checks[key] !== true)) issues.push('La checklist contiene conferme ancora mancanti.');
-  if (missing.pricesMissing.length) issues.push(`${missing.pricesMissing.length} prezzi non attestati: correggili prima della PR.`);
+  if (missing.pricesMissing.length) {
+    const all = missingPriceNames(menu, missing.pricesMissing), names = all.slice(0, 3).map((name) => `«${name.slice(0, 60)}»`).join(', ');
+    const example = (all[0] || 'il piatto').split(/[\s,]+/)[0].toLowerCase();
+    issues.push(`${missing.pricesMissing.length} prezzi non attestati${names ? ` (${names})` : ''}: serve il tuo prezzo. Scrivilo a Jarvis su Telegram (per esempio «${example} 18,50») o inseriscilo in Modifica a mano, poi riprova.`);
+  }
   if (missing.translationsMissing.length) issues.push(`${missing.translationsMissing.length} nomi senza traduzione dichiarata: completa o rimuovi la lingua.`);
   if (missing.allergensMissing.length && checks?.allergenOmissionConfirmed !== true)
     issues.push('ALLERGENI NON CONFERMATI DAL LOCALE: serve una conferma esplicita sull’omissione oppure la fonte per ogni voce.');

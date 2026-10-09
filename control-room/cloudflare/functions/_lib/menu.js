@@ -408,6 +408,15 @@ export function extractMenuFromText(venue, source, requestedSlug) {
       // «Il percorso è servito per tutto il tavolo», «Minimo 2 persone», «Bevande escluse»: nota del percorso, non una portata.
       const note = degustazioneNote(row);
       if (note) {
+        // «Il percorso da 7 portate non è disponibile la domenica»: vale per quella formula, sta sotto di lei (e non nelle regole di tutto il percorso).
+        const count = note.match(/\b(\d{1,2})\s+portate\b/i)?.[1];
+        const formula = count && section.voci.find((v) => v.prezzi?.length && new RegExp(`^${count}\\s+portate\\b`, 'i').test(v.nome?.it || ''));
+        if (formula) {
+          formula.descrizione = { it: `${formula.descrizione?.it ? `${formula.descrizione.it} · ` : ''}${note.replace(/\.$/, '')}` };
+          consumed.push(lineNumber);
+          confirm.push({ text: row, line: lineNumber, hint: `Nota messa sotto la formula «${formula.nome.it}», a cui si riferisce: «${note}».` });
+          continue;
+        }
         section.descrizione = { it: section.descrizione?.it ? `${section.descrizione.it} ${note}` : note };
         consumed.push(lineNumber);
         confirm.push({ text: row, line: lineNumber, hint: `Nota del percorso «${section.nome.it}» messa come descrizione del percorso (non come portata): «${note}».` });
@@ -420,7 +429,7 @@ export function extractMenuFromText(venue, source, requestedSlug) {
     const undecided = section.tipo === 'degustazione' ? null : undecidedPrice(row);
     if (undecided) {
       addItem({ nome: { it: undecided.name } }, { name: undecided.name, price: '', sourceLine: row, line: lineNumber, loose: false, undecided: true });
-      confirm.push({ text: row, line: lineNumber, hint: `Prezzo da decidere${undecided.hint ? `: il cliente scrive «${undecided.hint}»` : ''}. Non l’ho inserito: scegli tu il prezzo di «${undecided.name}».` });
+      confirm.push({ text: row, line: lineNumber, hint: `Prezzo da decidere${undecided.hint ? `: il cliente scrive «${undecided.hint}»` : ''}. Non l’ho inserito: serve il tuo prezzo per «${undecided.name}» (scrivilo a Jarvis, per esempio «${undecided.name.split(/[\s,]+/)[0].toLowerCase()} 18,50», o inseriscilo in Modifica a mano). Senza non si può affidare la pratica.` });
       continue;
     }
     const market = section.tipo === 'degustazione' ? null : marketPrice(row);
