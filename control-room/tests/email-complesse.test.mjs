@@ -230,3 +230,12 @@ test('prezzi attestati: formule del degustazione con i loro importi e prezzi ins
   const { issues } = reviewIssues(menu, checks, 'premium');
   assert.ok(!issues.some((i) => /prezzi non attestati/.test(i)), issues.join(' | '));
 });
+
+test('formule del degustazione: i prezzi sono visibili anche nella descrizione (il visualizzatore Premium non mostra i prezzi in variante)', () => {
+  const { menu } = run();
+  const cinque = dish(menu, /^5 portate/), sette = dish(menu, /^7 portate/);
+  assert.equal(cinque.descrizione.it, 'A persona: 65,00 € · Con abbinamento di 4 calici: 85,00 €');
+  assert.equal(sette.descrizione.it, 'A persona: 85,00 € · Con abbinamento di 5 calici: 115,00 €');
+  assert.equal(cinque.prezzi.length, 2, 'restano anche i prezzi strutturati');
+  assert.deepEqual(validateMenu(menu).errors, []);
+});

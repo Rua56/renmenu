@@ -336,6 +336,9 @@ export function extractMenuFromText(venue, source, requestedSlug) {
   };
   const variantItem = (name, variants, lineNumber, row, how) => {
     const item = { nome: { it: name }, prezzi: variants.map((v) => ({ etichetta: { it: v.label }, prezzo: fmt(v.amount) })) };
+    // Formula di un percorso degustazione: il visualizzatore Premium non mostra i prezzi in variante delle portate,
+    // quindi gli importi, come li ha scritti il cliente, stanno anche nella descrizione («A persona: 65,00 € · Con abbinamento…: 85,00 €»).
+    if (section.tipo === 'degustazione') item.descrizione = { it: item.prezzi.map((v) => `${v.etichetta.it}: ${v.prezzo} €`).join(' · ') };
     const record = addItem(item, { name, price: '', variants: item.prezzi.map((v) => `${v.etichetta.it} ${v.prezzo}`), sourceLine: row, line: lineNumber, loose: false });
     if (how) {
       // Etichette dedotte (due prezzi senza «calice/bottiglia»): una sola nota per sezione, non una per vino.
@@ -542,7 +545,7 @@ export function extractMenuFromText(venue, source, requestedSlug) {
   }
   for (const s of kept) if (s.tipo === 'degustazione') {
     const formulas = s.voci.filter((v) => v.prezzi?.length), courses = s.voci.filter((v) => !v.prezzo && !v.prezzi);
-    if (formulas.length) confirm.push({ text: s.nome.it, line: s.line, hint: `Percorso «${s.nome.it}» con ${formulas.length} formule, ognuna coi suoi prezzi come scritti dal cliente (${formulas.map((v) => v.nome.it).join(', ')}). Il cliente non elenca le portate: chiedigli i piatti di ogni formula. Controlla in anteprima come si vedono i prezzi.` });
+    if (formulas.length) confirm.push({ text: s.nome.it, line: s.line, hint: `Percorso «${s.nome.it}» con ${formulas.length} formule, ognuna coi suoi prezzi come scritti dal cliente (${formulas.map((v) => v.nome.it).join(', ')}). Gli importi sono anche scritti sotto ogni formula, così si vedono in anteprima: se cambi un prezzo, cambia anche quella riga. Il cliente non elenca le portate: chiedigli i piatti di ogni formula.` });
     else if (!s.prezzo) confirm.push({ text: s.nome.it, line: s.line, hint: `Percorso «${s.nome.it}» senza prezzo scritto: inseriscilo tu (prezzo del percorso).` });
     if (!formulas.length && !courses.length) confirm.push({ text: s.nome.it, line: s.line, hint: `Percorso «${s.nome.it}» senza portate lette: controlla il testo.` });
   }
