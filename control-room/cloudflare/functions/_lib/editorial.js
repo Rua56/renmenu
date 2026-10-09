@@ -25,7 +25,8 @@ export function criticalFields(menu) {
       // Più prezzi con etichetta (calice / bottiglia): attestati se ogni variante ha il suo importo.
       const variants = Array.isArray(item?.prezzi) && item.prezzi.length && item.prezzi.every((v) => v?.prezzo);
       // Portata di un percorso degustazione: il prezzo è quello del percorso (a persona), non del piatto.
-      const course = section?.tipo === 'degustazione' && !item?.prezzo;
+      // Una formula con i suoi prezzi («5 portate: 65 € / 85 € con abbinamento») non è una portata: è attestata dai suoi importi.
+      const course = section?.tipo === 'degustazione' && !item?.prezzo && !variants;
       if (course) { if (!section?.prezzo && !pricesMissing.includes(`sezioni.${sectionIndex}.prezzo`)) pricesMissing.push(`sezioni.${sectionIndex}.prezzo`); }
       else if (!item?.prezzo && item?.prezzo !== 0 && !variable && !variants) pricesMissing.push(`${path}.prezzo`);
       if (!Array.isArray(item?.allergeni) || item.allergeni.length === 0) allergensMissing.push(`${path}.allergeni`);
