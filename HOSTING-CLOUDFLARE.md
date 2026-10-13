@@ -1,19 +1,19 @@
 # RenMenu su Cloudflare Pages
 
-**Origine ufficiale del sito RenMenu:** https://renmenu.pages.dev/. Il codice resta nel repository `Rua56/renmenu`, branch `main`; il progetto Cloudflare Pages `renmenu` lo distribuisce automaticamente. GitHub Pages resta online per i QR e i messaggi già distribuiti, ma i canonical delle pagine puntano alla nuova origine.
+**Origine ufficiale del sito RenMenu:** https://renmenu.com/ (dal 13 ottobre 2026; dominio registrato su Cloudflare, `www.renmenu.com` rimanda al dominio principale). Il codice resta nel repository `Rua56/renmenu`, branch `main`; il progetto Cloudflare Pages `renmenu` lo distribuisce automaticamente. `https://renmenu.pages.dev/` e GitHub Pages restano online per i QR e i messaggi già distribuiti, ma i canonical delle pagine puntano a `renmenu.com`.
 
 ## Build e pagine
 
 - Build command: `sh scripts/build-cloudflare.sh`; output directory: `dist`; root: radice del repository.
 - Il build copia solo i file pubblici: home, anteprima, caso studio Blanch, demo, menù, pagamento, asset, dati JSON pubblicati e menù Blanch. Non invia `.git`, documenti commerciali, foto grezze, `blanch/data/food.json`, `blanch/data/wines.tsv` o script di manutenzione.
-- `crea/` è già una pagina pubblica, non un pannello riservato: ora propone `https://renmenu.pages.dev/` per i nuovi QR, ma il campo URL può essere cambiato per un menù legacy.
+- `crea/` è già una pagina pubblica, non un pannello riservato: ora propone `https://renmenu.com/` per i nuovi QR, ma il campo URL può essere cambiato per un menù legacy.
 - L'output Pages contiene `robots.txt` e `sitemap.xml` con **home, anteprima e il caso studio `/casi-studio/trattoria-blanch/`**. Demo incorporata, pagamenti, generatore interno e menù cliente restano `noindex` e fuori sitemap. L'elenco va aggiornato quando si creano pagine di marketing con contenuti autonomi.
 - Il menù Blanch non viene reindirizzato né spostato: il QR già stampato punta a `https://rua56.github.io/renmenu/blanch/`, che deve rimanere raggiungibile. Il menù esiste anche su Pages.
-- In Cloudflare esiste separatamente un Worker chiamato `renmenu`: non è il progetto Pages e non serve al sito qui documentato.
+- In Cloudflare esiste separatamente un Worker chiamato `renmenu`: non è il progetto Pages e non serve al sito qui documentato. Dal 13 ottobre 2026 non è più collegato a GitHub e non viene ricostruito.
 
 ## Search Console
 
-Usare una proprietà **Prefisso URL** con `https://renmenu.pages.dev/` (lo slash finale incluso). Verificare la proprietà con il metodo Google disponibile al proprietario, poi inviare `https://renmenu.pages.dev/sitemap.xml` nella sezione Sitemap. Un sitemap pubblicato non equivale alla sua registrazione in Search Console e non garantisce l'indicizzazione.
+Usare una proprietà **Prefisso URL** con `https://renmenu.com/` (lo slash finale incluso). Verificare la proprietà con il metodo Google disponibile al proprietario, poi inviare `https://renmenu.com/sitemap.xml` nella sezione Sitemap. Un sitemap pubblicato non equivale alla sua registrazione in Search Console e non garantisce l'indicizzazione.
 
 ## Aggiornamenti e controllo
 

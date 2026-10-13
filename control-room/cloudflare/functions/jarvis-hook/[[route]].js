@@ -7,6 +7,7 @@ import { sameSecret, sendTelegram, telegramReady } from '../_lib/telegram.js';
 import { chat } from '../_lib/voice.js';
 import { serveMedia } from '../_lib/public-media.js';
 import { previewUrl } from '../_lib/approvals.js';
+import { dailyBackup } from '../_lib/backup.js';
 
 const reply = (body, status = 200) => new Response(JSON.stringify(body), { status, headers: { 'Content-Type': 'application/json', 'Cache-Control': 'no-store' } });
 
@@ -103,7 +104,12 @@ export async function onRequest(context) {
       const done = await missions.tick(env.DB, env);
       await missions.watchTick(env.DB, env).catch(() => null);
       const briefed = await missions.briefing(env.DB, env).catch(() => null);
-      return reply({ ok: true, autopilot: drafted.length, briefing: Boolean(briefed), missions: done.map(({ from, to, error }) => ({ from, to, error: error ? 'errore' : undefined })) });
+      const backup = await dailyBackup(env.DB, env.BUCKET).catch(() => null);
+      if (backup && !backup.ok && backup.attempts >= 3) {
+        const owner = await missions.setting(env.DB, 'telegram_chat_id');
+        if (owner && telegramReady(env)) await sendTelegram(env, owner, `Copia di sicurezza del database non riuscita oggi (${backup.error}). Ritento domattina alle 3: se si ripete, controlla il bucket R2 dello staging.`);
+      }
+      return reply({ ok: true, autopilot: drafted.length, briefing: Boolean(briefed), backup: backup ? Boolean(backup.ok) : undefined, missions: done.map(({ from, to, error }) => ({ from, to, error: error ? 'errore' : undefined })) });
     }
     return reply({ ok: false }, 404);
   } catch {

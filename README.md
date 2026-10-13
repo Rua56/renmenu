@@ -1,7 +1,7 @@
 # RenMenu
 
-**Origine pubblica principale per i nuovi link:** https://renmenu.pages.dev/
-**Compatibilità legacy:** GitHub Pages resta attivo per i QR e gli URL già distribuiti, che non devono essere modificati o interrotti.
+**Origine pubblica principale per i nuovi link:** https://renmenu.com/ (dominio collegato al progetto Cloudflare Pages `renmenu` il 13 ottobre 2026).
+**Compatibilità legacy:** https://renmenu.pages.dev/ e GitHub Pages restano attivi per i QR e gli URL già distribuiti, che non devono essere modificati o interrotti.
 
 RenMenu crea e mantiene menù digitali QR per bar, ristoranti e trattorie. Il locale invia foto, PDF o modifiche via WhatsApp/email; il Team RenMenu prepara e pubblica il menù. Non è previsto alcun pannello o account per il ristoratore.
 
@@ -26,7 +26,7 @@ assets/                       stile, logo e helper comuni
 vendita/                      materiali commerciali e checklist operativa
 ```
 
-Il menu speciale di Richard è disponibile su `https://renmenu.pages.dev/richard/` (e sul corrispondente percorso GitHub Pages). È indipendente dai menu JSON standard: le scelte vengono salvate localmente nel browser e il pulsante finale apre WhatsApp con il messaggio precompilato; l'invio effettivo richiede un'azione dell'utente nella chat. La pagina è esclusa dall'indicizzazione e dalla sitemap.
+Il menu speciale di Richard è disponibile su `https://renmenu.com/richard/` (e sul corrispondente percorso GitHub Pages). È indipendente dai menu JSON standard: le scelte vengono salvate localmente nel browser e il pulsante finale apre WhatsApp con il messaggio precompilato; l'invio effettivo richiede un'azione dell'utente nella chat. La pagina è esclusa dall'indicizzazione e dalla sitemap.
 
 ## Aggiungere o aggiornare un locale
 

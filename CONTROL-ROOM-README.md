@@ -89,7 +89,7 @@ I valori reali stanno solo nei Secret e nelle variabili di Cloudflare Pages, mai
 
 ## Limiti noti e da fare
 
-- Nessuna copia di sicurezza periodica del database: da predisporre prima di accogliere più clienti.
+- Copia di sicurezza: ogni notte alle 3 il database D1 viene salvato nel bucket R2 (`backups/d1/AAAA-MM-GG.json.gz`, 30 giorni di storico). Il ripristino su un database nuovo si fa con `node control-room/staging/d1-restore.mjs` (istruzioni nel file). La prima copia reale va controllata dopo la distribuzione.
 - La spedizione reale dell'email con QR in allegato non è ancora stata provata su un cliente: la prima prova è la pubblicazione di Osteria Codelli 23.
 - Lingue: la traduzione automatica implementata è l'inglese; tedesco e sloveno richiedono preparazione aggiuntiva.
 - Trattoria Blanch usa un formato diverso da `menus/<id>.json` (vedi `blanch/README.md`): è registrata come cliente, ma le modifiche tramite Jarvis richiedono un adattatore dedicato.
