@@ -4,7 +4,7 @@
 // - /jarvis-hook/mail-in: le email di menu@renmenu.com dal Worker email, con il segreto degli allegati.
 // Nessun dato viene restituito: solo esiti sintetici.
 import { linkPendingMailFiles, missions, readPendingMaterials, receivePendingMail, runAutopilot } from '../control-room/api/[[route]].js';
-import { sameSecret, sendTelegram, telegramReady } from '../_lib/telegram.js';
+import { sameSecret } from '../_lib/telegram.js';
 import { chat } from '../_lib/voice.js';
 import { serveMedia } from '../_lib/public-media.js';
 import { previewUrl } from '../_lib/approvals.js';
@@ -83,6 +83,7 @@ export async function onRequest(context) {
           { receiveFiles: (payload) => receivePendingMail(env.DB, env, payload) });
       } catch (error) {
         await remember({ ok: false, error: String(error?.message || error).slice(0, 300) });
+        await missions.alertOnce(env.DB, env, 'mail_in', 'email non importata', `Non sono riuscito a registrare un'email arrivata a menu@renmenu.com (${String(error?.message || 'errore').slice(0, 120)}). Il server di posta la ritenta e la copia resta in renmenu1569@gmail.com: controllala lì.`, { minutes: 30 }).catch(() => null);
         return reply({ ok: false, error: 'IMPORT_FAILED' }, 500);
       }
       await remember({ ok: outcome.ok, kind: outcome.kind, error: outcome.error, attachments: outcome.attachments });
@@ -97,6 +98,7 @@ export async function onRequest(context) {
     }
     if (path === '/jarvis-hook/tick') {
       if (!sameSecret(request.headers.get('X-Jarvis-Clock'), env.JARVIS_CLOCK_SECRET)) return reply({ ok: false }, 403);
+      await missions.announceExternal(env.DB, env).catch(() => 0);
       const linked = await linkPendingMailFiles(env.DB, env).catch(() => []);
       for (const notice of linked) await missions.notify(env.DB, env, notice.requestId, 'allegato', notice.text);
       const read = await readPendingMaterials(env.DB, env).catch(() => []);
@@ -122,20 +124,20 @@ export async function onRequest(context) {
       await missions.draftAfterChecks(env.DB, env).catch(() => null);
       await missions.translateAfterEdit(env.DB, env).catch(() => null);
       const drafted = await runAutopilot(env.DB, env);
-      const chat = drafted.length ? await missions.setting(env.DB, 'telegram_chat_id') : null;
-      if (chat && telegramReady(env)) for (const entry of drafted) await sendTelegram(env, chat, entry.message);
+      for (const entry of drafted) await missions.ping(env.DB, env, entry.message, null, entry.outcome === 'bozza' ? 'importante' : 'normale').catch(() => null);
       const done = await missions.tick(env.DB, env);
       await missions.watchTick(env.DB, env).catch(() => null);
       const briefed = await missions.briefing(env.DB, env).catch(() => null);
       const backup = await dailyBackup(env.DB, env.BUCKET).catch(() => null);
       if (backup && !backup.ok && backup.attempts >= 3) {
-        const owner = await missions.setting(env.DB, 'telegram_chat_id');
-        if (owner && telegramReady(env)) await sendTelegram(env, owner, `Copia di sicurezza del database non riuscita oggi (${backup.error}). Ritento domattina alle 3: se si ripete, controlla il bucket R2 dello staging.`);
+        await missions.alertOnce(env.DB, env, 'backup', 'copia di sicurezza', `Copia di sicurezza del database non riuscita oggi (${backup.error}). Ritento domattina alle 3: se si ripete, controlla il bucket R2 dello staging.`, { minutes: 20 * 60 }).catch(() => null);
       }
       return reply({ ok: true, autopilot: drafted.length, briefing: Boolean(briefed), backup: backup ? Boolean(backup.ok) : undefined, missions: done.map(({ from, to, error }) => ({ from, to, error: error ? 'errore' : undefined })) });
     }
     return reply({ ok: false }, 404);
-  } catch {
+  } catch (error) {
+    // L'orologio che si inceppa non deve restare muto: un avviso all'ora al massimo, e il diario lo conta.
+    if (path === '/jarvis-hook/tick') await missions.alertOnce(env.DB, env, 'orologio', 'orologio fermo', `L'orologio di Jarvis si è inceppato (${String(error?.message || 'errore').slice(0, 120)}). Riprovo ogni minuto; finché non riparte pratiche, foto e pubblicazioni restano ferme.`).catch(() => null);
     // Per Telegram rispondiamo comunque 200: evita ripetizioni infinite dello stesso aggiornamento.
     return reply({ ok: path === '/jarvis-hook/telegram' }, path === '/jarvis-hook/telegram' ? 200 : 500);
   }

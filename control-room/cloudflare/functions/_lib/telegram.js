@@ -19,6 +19,8 @@ async function call(env, method, body, fetchImpl = globalThis.fetch) {
 // Testo semplice (niente HTML/Markdown): nessun rischio di formattazione rotta dai nomi dei locali.
 export function sendTelegram(env, chatId, text, buttons = null, fetchImpl, options = {}) {
   const body = { chat_id: chatId, text: String(text).slice(0, 3900), disable_web_page_preview: true };
+  // silent: arriva senza suono (avvisi normali di notte).
+  if (options.silent) body.disable_notification = true;
   const button = ([label, data]) => ({ text: String(label).slice(0, 60), callback_data: String(data).slice(0, 64) });
   // stacked: un pulsante per riga (elenchi di pratiche); altrimenti tutti sulla stessa riga.
   if (buttons?.length) body.reply_markup = { inline_keyboard: options.stacked ? buttons.map((b) => [button(b)]) : [buttons.map(button)] };

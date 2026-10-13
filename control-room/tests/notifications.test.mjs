@@ -1,0 +1,120 @@
+import test from 'node:test';
+import assert from 'node:assert/strict';
+import { readFileSync, readdirSync } from 'node:fs';
+import { DatabaseSync } from 'node:sqlite';
+import { missions } from '../cloudflare/functions/control-room/api/[[route]].js';
+
+const TOKEN = '123456789:AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA';
+
+function database() {
+  const sqlite = new DatabaseSync(':memory:');
+  const dir = new URL('../cloudflare/migrations/', import.meta.url);
+  for (const file of readdirSync(dir).filter((f) => f.endsWith('.sql')).sort()) sqlite.exec(readFileSync(new URL(file, dir), 'utf8'));
+  return {
+    sqlite,
+    prepare(sql) {
+      return { bind(...params) {
+        const statement = sqlite.prepare(sql);
+        return { first: () => statement.get(...params) || null, all: () => ({ results: statement.all(...params) }), run: () => ({ meta: { changes: statement.run(...params).changes } }) };
+      } };
+    },
+    async batch(statements) {
+      sqlite.exec('BEGIN TRANSACTION');
+      try { const results = statements.map((s) => s.run()); sqlite.exec('COMMIT'); return results; }
+      catch (error) { sqlite.exec('ROLLBACK'); throw error; }
+    }
+  };
+}
+
+// Telegram ed ElevenLabs finti: registrano ogni chiamata.
+async function withServices(fn) {
+  const calls = [];
+  const previous = globalThis.fetch;
+  globalThis.fetch = async (url, options = {}) => {
+    const href = String(url);
+    calls.push({ href, body: typeof options.body === 'string' ? JSON.parse(options.body) : options.body });
+    if (href.startsWith('https://api.elevenlabs.io/')) return new Response(new Uint8Array(600), { headers: { 'Content-Type': 'audio/mpeg' } });
+    return Response.json({ ok: true, result: { message_id: calls.length } });
+  };
+  try { return await fn(calls); } finally { globalThis.fetch = previous; }
+}
+const sent = (calls) => calls.filter((c) => c.href.endsWith('/sendMessage')).map((c) => c.body);
+const voices = (calls) => calls.filter((c) => c.href.endsWith('/sendVoice'));
+const speech = (calls) => calls.filter((c) => c.href.startsWith('https://api.elevenlabs.io/')).map((c) => c.body.text);
+
+async function linked(db, { voice = true } = {}) {
+  await missions.putSetting(db, 'telegram_chat_id', '42');
+  if (voice) { await missions.putSetting(db, 'voice_provider', 'elevenlabs'); await missions.putSetting(db, 'voice_api_key', 'el-test'); }
+  return { DB: db, TELEGRAM_BOT_TOKEN: TOKEN };
+}
+
+test('avvisi: di giorno suonano; gli importanti arrivano anche a voce, senza link', async (t) => {
+  t.mock.timers.enable({ apis: ['Date'], now: Date.parse('2026-10-13T10:00:00Z') }); // 12:00 a Roma
+  await withServices(async (calls) => {
+    const db = database(), env = await linked(db);
+    await missions.notify(db, env, null, 'foto letta', 'Ho letto «menu.jpg».');
+    assert.equal(sent(calls)[0].disable_notification, undefined);
+    assert.equal(voices(calls).length, 0, 'gli avvisi normali restano scritti');
+    await missions.notify(db, env, null, 'menu online', 'Il menu di Al Bakaro è online e verificato: https://renmenu.com/al-bakaro. Ti mando il QR.\n1. riga di elenco', 'importante');
+    assert.equal(voices(calls).length, 1);
+    assert.equal(speech(calls)[0], 'Riccardo, il menu di Al Bakaro è online e verificato: Ti mando il QR.');
+    assert.equal(db.sqlite.prepare("SELECT COUNT(*) n FROM notifications WHERE channel='in_app'").get().n, 2, 'restano anche nella Control Room');
+  });
+});
+
+test('avvisi: di notte i normali arrivano senza suono e senza voce; gli importanti suonano', async (t) => {
+  t.mock.timers.enable({ apis: ['Date'], now: Date.parse('2026-10-13T21:30:00Z') }); // 23:30 a Roma
+  await withServices(async (calls) => {
+    const db = database(), env = await linked(db);
+    await missions.putSetting(db, 'voice_alerts', 'tutti');
+    await missions.notify(db, env, null, 'allegato', 'Collegato un allegato.');
+    assert.equal(sent(calls)[0].disable_notification, true);
+    assert.equal(voices(calls).length, 0);
+    await missions.notify(db, env, null, 'missione ferma', 'Mi sono fermato.', 'importante');
+    assert.equal(sent(calls)[1].disable_notification, undefined);
+    assert.equal(voices(calls).length, 1);
+  });
+});
+
+test('avvisi: /voce mostra la scelta, «nessuno» a parole spegne la voce', async (t) => {
+  t.mock.timers.enable({ apis: ['Date'], now: Date.parse('2026-10-13T10:00:00Z') });
+  await withServices(async (calls) => {
+    const db = database(), env = await linked(db);
+    await missions.telegramUpdate(db, env, { message: { chat: { id: 42, type: 'private' }, text: '/voce' } });
+    assert.match(sent(calls).at(-1).text, /Avvisi a voce: solo gli avvisi importanti/);
+    assert.ok(JSON.stringify(sent(calls).at(-1).reply_markup).includes('voce:nessuno'));
+    await missions.telegramUpdate(db, env, { message: { chat: { id: 42, type: 'private' }, text: 'nessuno' } });
+    assert.match(sent(calls).at(-1).text, /avvisi a voce per nessun avviso/);
+    await missions.notify(db, env, null, 'menu online', 'Online.', 'importante');
+    assert.equal(voices(calls).length, 0);
+  });
+});
+
+test('avvisi: un guasto che si ripete avvisa una volta sola e finisce nel diario', async () => {
+  await withServices(async (calls) => {
+    const db = database(), env = await linked(db, { voice: false });
+    assert.equal(await missions.alertOnce(db, env, 'orologio', 'orologio fermo', 'L’orologio si è inceppato.'), true);
+    assert.equal(await missions.alertOnce(db, env, 'orologio', 'orologio fermo', 'L’orologio si è inceppato.'), false);
+    assert.equal(sent(calls).length, 1);
+    assert.equal(db.sqlite.prepare("SELECT COUNT(*) n FROM jarvis_events WHERE kind='errore.orologio'").get().n, 2);
+  });
+});
+
+test('avvisi: i messaggi WhatsApp arrivati dal webhook vengono annunciati una volta, senza lo storico', async () => {
+  await withServices(async (calls) => {
+    const db = database(), env = await linked(db, { voice: false });
+    const s = db.sqlite, at = (m) => new Date(Date.now() + m * 60_000).toISOString();
+    const event = (id, minutes, text) => {
+      s.prepare("INSERT INTO clients (id,name,phone,plan,created_at,updated_at) VALUES (?,?,?,'da_definire',?,?)").run(`c${id}`, 'Nuovo contatto WhatsApp', `+39${id}`, at(minutes), at(minutes));
+      s.prepare("INSERT INTO requests (id,client_id,subject,source_channel,source_text,kind,status,created_at,updated_at) VALUES (?,?,?,'whatsapp',?,'altro','nuova',?,?)").run(`r${id}`, `c${id}`, 'Richiesta WhatsApp da verificare', text, at(minutes), at(minutes));
+      s.prepare("INSERT INTO external_events (id,source,source_event_id,request_id,status,received_at) VALUES (?,?,?,?,'imported',?)").run(`e${id}`, 'whatsapp', `w${id}`, `r${id}`, at(minutes));
+    };
+    event(1, -60, 'Vecchio messaggio');
+    assert.equal(await missions.announceExternal(db, env), 0, 'la prima volta segna solo il punto di partenza');
+    event(2, 1, 'Ciao, il prezzo dello spritz ora è 4 euro');
+    assert.equal(await missions.announceExternal(db, env), 1);
+    assert.match(sent(calls)[0].text, /^Nuovo messaggio WhatsApp da Nuovo contatto WhatsApp: «Ciao, il prezzo dello spritz ora è 4 euro»/);
+    assert.equal(await missions.announceExternal(db, env), 0, 'mai due volte');
+    assert.doesNotMatch(JSON.stringify(sent(calls)), /Vecchio messaggio/);
+  });
+});
