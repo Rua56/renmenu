@@ -155,3 +155,25 @@ test('riflessione: senza chiave il lunedì tace; /rifletti spiega cosa manca', a
     assert.match(services.telegram().at(-1).text, /Nessuna proposta aperta/);
   } finally { globalThis.fetch = previous; }
 });
+
+test('riflessione: alla proposta si può rispondere a parole («non ora», poi «sì» alla seguente)', async () => {
+  const db = database();
+  const services = fakeServices({ proposals: [good('Ricontatta i locali silenziosi'), good('Prepara il menu del giorno')] });
+  const previous = globalThis.fetch;
+  globalThis.fetch = services.fetchImpl;
+  try {
+    await missions.putSetting(db, 'telegram_chat_id', '42');
+    const env = { DB: db, TELEGRAM_BOT_TOKEN: TOKEN, ANTHROPIC_API_KEY: 'sk-test' };
+    const out = await missions.reflect(db, env, { now: NOW });
+    const [first, second] = out.proposals;
+    // L'ultima proposta inviata è la seconda: «non ora» vale per quella.
+    await missions.telegramUpdate(db, env, { message: { chat: { id: 42, type: 'private' }, text: 'non ora' } });
+    assert.match(services.telegram().at(-1).text, /la tengo da parte/);
+    assert.equal(db.sqlite.prepare('SELECT status FROM jarvis_proposals WHERE id=?').get(second.id).status, 'rimandata');
+    assert.equal(db.sqlite.prepare('SELECT status FROM jarvis_proposals WHERE id=?').get(first.id).status, 'nuova');
+    assert.ok(services.calls.some((c) => c.href.endsWith('/editMessageReplyMarkup')), 'i pulsanti del messaggio spariscono');
+    assert.match(db.sqlite.prepare("SELECT summary FROM audit_events WHERE action='jarvis.conversation' ORDER BY created_at DESC").get().summary, /Risposta breve «non ora» → pulsante «Non ora»/);
+    // Scelta già usata: un altro «no» non tocca più niente e va alla conversazione normale.
+    assert.equal(db.sqlite.prepare("SELECT value FROM jarvis_settings WHERE key='tg_buttons'").get().value, 'null');
+  } finally { globalThis.fetch = previous; }
+});
