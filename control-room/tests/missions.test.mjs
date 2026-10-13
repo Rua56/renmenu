@@ -508,3 +508,81 @@ describe('Email al locale con link e QR dopo la pubblicazione', () => {
     } finally { db.close(); }
   });
 });
+
+describe('Email ai locali spedite da Jarvis su renmenu.com', () => {
+  const direct = { TELEGRAM_BOT_TOKEN: TOKEN, CLIENT_MAIL_FROM: 'RenMenu <menu@renmenu.com>', CLIENT_MAIL_BCC: 'renmenu1569@gmail.com', EMAIL_LIVE_ENABLED: 'true', RESEND_API_KEY: 're_test_123456' };
+  const resend = [];
+  let answers = [];
+  const patched = globalThis.fetch;
+  const withResend = async (fn) => {
+    globalThis.fetch = async (url, options) => {
+      if (String(url) === 'https://api.resend.com/emails') {
+        resend.push({ key: options.headers['Idempotency-Key'], body: JSON.parse(options.body) });
+        const next = answers.shift() || { status: 200, body: { id: `re-${resend.length}` } };
+        return Response.json(next.body, { status: next.status });
+      }
+      return patched(url, options);
+    };
+    try { await fn(); } finally { globalThis.fetch = patched; resend.length = 0; answers = []; }
+  };
+  it('anteprima: parte subito da menu@renmenu.com, con copia nascosta; un rifiuto si riprova con una chiave nuova', async () => withResend(async () => {
+    const db = database();
+    try {
+      await run(db, buildImportBatch(event('dm1', 'Nuovo menu', SOURCE)));
+      await call(db, 'state'); await action(db, 'runAutopilot', {});
+      const draft = (await call(db, 'state')).body.drafts[0];
+      const extras = draft.sourceExtras.filter((entry) => entry.type !== 'manuale').map((entry) => entry.id);
+      answers = [{ status: 500, body: { message: 'boom' } }];
+      const entrusted = await call(db, 'actions', { type: 'entrustToJarvis', payload: { draftId: draft.id, revision: draft.revision, accept: extras, confirmation: 'AFFIDO A JARVIS' } }, direct);
+      assert.equal(entrusted.body.result.status, 'attesa_invio');
+      assert.equal(resend.length, 1);
+      const first = resend[0];
+      assert.equal(first.body.from, 'RenMenu <menu@renmenu.com>');
+      assert.deepEqual(first.body.to, ['locale@example.com']);
+      assert.deepEqual(first.body.bcc, ['renmenu1569@gmail.com']);
+      assert.match(first.body.subject, /rif\. RM-/);
+      assert.match(first.body.text, /Riferimento anteprima: RM-/);
+      let row = await db.prepare('SELECT * FROM jarvis_outbox').bind().first();
+      assert.equal(row.status, 'in_coda');
+      assert.match(row.error, /^RESEND_500/);
+      // L'orologio riprova con la stessa chiave (errore temporaneo: niente doppioni) e registra l'invio.
+      await call(db, 'actions', { type: 'jarvisTick', payload: {} }, direct);
+      assert.equal(resend[1].key, first.key);
+      row = await db.prepare('SELECT * FROM jarvis_outbox').bind().first();
+      assert.equal(row.status, 'inviata');
+      assert.equal(row.gmail_message_id, 'resend:re-2');
+      await call(db, 'actions', { type: 'jarvisTick', payload: {} }, direct);
+      const state = (await call(db, 'state')).body;
+      assert.equal(state.missions[0].status, 'attesa_cliente');
+      assert.equal(state.approvals[0].status, 'anteprima_inviata');
+      assert.ok(state.notifications.every((n) => !/Comando interno/.test(n.body)), 'nessun comando all’automazione Gmail');
+      assert.equal(resend.length, 2);
+    } finally { db.close(); }
+  }));
+  it('menu online: QR in allegato (PNG e SVG) e avviso a Riccardo', async () => withResend(async () => {
+    const db = database();
+    try {
+      await run(db, buildImportBatch(event('dm2', 'Nuovo menu', SOURCE)));
+      await call(db, 'state'); await action(db, 'runAutopilot', {});
+      const draft = (await call(db, 'state')).body.drafts[0];
+      const extras = draft.sourceExtras.filter((entry) => entry.type !== 'manuale').map((entry) => entry.id);
+      await action(db, 'entrustToJarvis', { draftId: draft.id, revision: draft.revision, accept: extras, confirmation: 'AFFIDO A JARVIS' });
+      const mission = await db.prepare('SELECT * FROM jarvis_missions').bind().first();
+      await db.prepare("UPDATE jarvis_missions SET status='completata'").bind().run();
+      const row = await db.prepare('SELECT r.*,c.name AS client_name,c.email AS client_email FROM requests r JOIN clients c ON c.id=r.client_id WHERE r.id=?').bind(mission.request_id).first();
+      const dr = await db.prepare('SELECT * FROM drafts WHERE id=?').bind(mission.draft_id).first();
+      const qr = await missions.makeMenuQr({ slug: dr.slug, name: 'Osteria Missione', plan: 'standard' });
+      resend.length = 0;
+      const queued = await missions.queueOnlineEmail(db, { ...direct, DB: db }, { mission, request: row, draft: dr, menu: JSON.parse(dr.menu_json), qr });
+      assert.equal(queued.queued, true);
+      assert.equal(resend.length, 1);
+      const files = resend[0].body.attachments;
+      assert.deepEqual(files.map((f) => f.filename), [`qr-${dr.slug}.png`, `qr-${dr.slug}.svg`]);
+      assert.equal(Buffer.from(files[0].content, 'base64').subarray(1, 4).toString(), 'PNG');
+      assert.match(Buffer.from(files[1].content, 'base64').toString(), /^<svg/);
+      await missions.checkOnlineMails(db, { ...direct, DB: db });
+      const notes = (await call(db, 'state')).body.notifications;
+      assert.ok(notes.some((n) => /email del menu online/.test(n.subject) && /inviata al locale \(locale@example\.com\)/.test(n.body)));
+    } finally { db.close(); }
+  }));
+});

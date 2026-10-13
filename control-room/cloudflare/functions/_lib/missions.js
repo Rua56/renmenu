@@ -10,6 +10,7 @@ import { missingPriceNames, reviewIssues } from './editorial.js';
 import { allExtras } from './extras.js';
 import { assessReply, proposeReplyChanges, referenceCode, sha256Hex } from './approvals.js';
 import { sendOwnerNotification } from './owner-notifications.js';
+import { clientMailConfig, sendClientMail } from './client-mail.js';
 import { briefingDue, buildBriefing, romeDay } from './briefing.js';
 import { answerCallback, clearButtons, downloadTelegramFile, sendDocument, sendPhoto, sendTelegram, sendVoice, telegramReady } from './telegram.js';
 import { buildMenuQr, menuLink } from './qr.js';
@@ -259,7 +260,7 @@ export function createMissions(deps) {
     await db.prepare("UPDATE jarvis_outbox SET status='annullata',updated_at=? WHERE mission_id=? AND status='in_coda'").bind(stamp, mission.id).run();
     await db.prepare("INSERT INTO jarvis_outbox (id,mission_id,request_id,approval_id,reference_code,recipient,subject,body,status,created_at,updated_at) VALUES (?,?,?,?,?,?,?,?,'in_coda',?,?)")
       .bind(uid(), mission.id, mission.request_id, approval.id, prepared.referenceCode, prepared.recipient, prepared.subject, prepared.body, stamp, stamp).run();
-    const next = await move(db, mission, 'attesa_invio', `Anteprima ${prepared.referenceCode} in coda per Gmail.`);
+    const next = await move(db, mission, 'attesa_invio', `Anteprima ${prepared.referenceCode} in partenza da ${senderName(env)}.`);
     await trigger(db, env, next, prepared.referenceCode);
     return next;
   }
@@ -278,9 +279,29 @@ export function createMissions(deps) {
       [['SÌ, pubblica', `pub:${mission.id}`], ['Non ancora', `no:${mission.id}`]], 'importante');
     return next;
   }
-  // L'invio parte dall'automazione Gmail di renmenu1569: Jarvis le manda un comando interno
-  // (via Resend, solo alla casella RenMenu) con il solo codice; il testo resta nella coda D1.
+  // Chi spedisce: Jarvis stesso da renmenu.com (CLIENT_MAIL_FROM impostato) oppure, come prima,
+  // l'automazione Gmail di renmenu1569, che riceve un comando interno con il solo codice.
+  const directMail = (env) => clientMailConfig(env).ok;
+  const senderName = (env) => directMail(env) ? clientMailConfig(env).sender : 'renmenu1569';
+  // Invio diretto di una riga della coda: «inviata» con l'ID di Resend, oppure l'errore annotato
+  // (l'orologio riprova). Stessa chiave a ogni tentativo finché il fornitore non rifiuta: niente doppioni.
+  async function deliverOutbox(db, env, code) {
+    const outbox = await getOne(db, "SELECT * FROM jarvis_outbox WHERE reference_code=? AND status='in_coda'", code);
+    if (!outbox) return null;
+    const attempt = outbox.trigger_count + 1;
+    let attachments = [];
+    const qr = await setting(db, `outbox_qr_${code}`).catch(() => null);
+    if (qr) { try { const v = JSON.parse(qr); const file = String(v.slug || 'menu').replace(/[^a-z0-9-]/gi, '').slice(0, 40) || 'menu'; attachments = [{ filename: `qr-${file}.png`, content: v.png }, { filename: `qr-${file}.svg`, content: b64(new TextEncoder().encode(v.svg)) }]; } catch { attachments = []; } }
+    const rejected = /^RESEND_4/.test(String(outbox.error || '')) && !/^RESEND_429/.test(String(outbox.error || ''));
+    const sent = await sendClientMail({ env, to: outbox.recipient, subject: outbox.subject, text: outbox.body, attachments,
+      idempotencyKey: `renmenu-${code}${rejected ? `-${attempt}` : ''}`, fetchImpl: deps.fetchImpl });
+    const stamp = now();
+    if (sent.ok) await db.prepare("UPDATE jarvis_outbox SET status='inviata',sent_at=?,gmail_message_id=?,trigger_count=?,triggered_at=?,error=NULL,updated_at=? WHERE id=? AND status='in_coda'").bind(stamp, `resend:${sent.id}`, attempt, stamp, stamp, outbox.id).run();
+    else await db.prepare('UPDATE jarvis_outbox SET trigger_count=?,triggered_at=?,error=?,updated_at=? WHERE id=?').bind(attempt, stamp, String(sent.reason || 'INVIO_FALLITO').slice(0, 120), stamp, outbox.id).run();
+    return sent;
+  }
   async function trigger(db, env, mission, code) {
+    if (directMail(env)) { await deliverOutbox(db, env, code); return; }
     const outbox = await getOne(db, "SELECT * FROM jarvis_outbox WHERE reference_code=? AND status='in_coda'", code);
     if (!outbox) return;
     const attempt = outbox.trigger_count + 1;
@@ -295,20 +316,20 @@ export function createMissions(deps) {
   async function stepSending(db, env, mission) {
     const outbox = await getOne(db, 'SELECT * FROM jarvis_outbox WHERE mission_id=? ORDER BY created_at DESC LIMIT 1', mission.id);
     if (!outbox) return stop(db, env, mission, 'coda di invio vuota');
-    if (outbox.status === 'errore') return stop(db, env, mission, `Gmail non ha inviato l’anteprima ${outbox.reference_code} (${outbox.error || 'errore'})`);
+    if (outbox.status === 'errore') return stop(db, env, mission, `l’anteprima ${outbox.reference_code} non è partita (${outbox.error || 'errore'})`);
     if (outbox.status === 'inviata') {
       const approval = await getOne(db, 'SELECT * FROM publication_approvals WHERE id=?', outbox.approval_id);
       if (approval.status === 'anteprima_pronta') await action(jarvisDb(db), 'markPreviewSent', { id: approval.id, revision: approval.revision }, env);
       const venue = await venueOf(db, mission);
       const reminder = /^Promemoria:/.test(outbox.subject || '');
       const next = await move(db, mission, 'attesa_cliente', reminder ? 'Promemoria inviato; attendo la risposta del locale.' : `Anteprima ${outbox.reference_code} inviata; attendo la risposta del locale.`, reminder ? { reminded_at: now() } : {});
-      await tell(db, env, next, reminder ? 'promemoria inviato' : 'anteprima inviata', reminder ? `Promemoria inviato a «${venue}» da renmenu1569. Ti scrivo appena risponde.` : `Anteprima di «${venue}» inviata al locale da renmenu1569 (rif. ${outbox.reference_code}). Ti scrivo appena risponde.`);
+      await tell(db, env, next, reminder ? 'promemoria inviato' : 'anteprima inviata', reminder ? `Promemoria inviato a «${venue}» da ${senderName(env)}. Ti scrivo appena risponde.` : `Anteprima di «${venue}» inviata al locale da ${senderName(env)} (rif. ${outbox.reference_code}). Ti scrivo appena risponde.`);
       return next;
     }
     const waited = Date.now() - Date.parse(outbox.triggered_at || outbox.created_at);
     if (outbox.status === 'in_coda' && outbox.error) {
-      // Il comando non è partito (es. Resend non raggiungibile): si riprova al minuto successivo.
-      if (outbox.trigger_count >= 5) return stop(db, env, mission, `non riesco a mandare il comando di invio (${outbox.error})`);
+      // Invio o comando non partito (es. Resend non raggiungibile): si riprova al minuto successivo.
+      if (outbox.trigger_count >= 5) return stop(db, env, mission, `non riesco a spedire l’email (${outbox.error})`);
       await trigger(db, env, mission, outbox.reference_code);
       return mission;
     }
@@ -425,7 +446,7 @@ export function createMissions(deps) {
     await sendDocument(env, chat, qr.svg, `qr-${slugName}.svg`, 'image/svg+xml', 'Per la stampa professionale: file vettoriale SVG.', deps.fetchImpl);
     return { ok: Boolean(photo?.ok), withLogo: qr.withLogo, link: qr.link, qr };
   }
-  // ——— Email al locale con link e QR (la spedisce l'automazione Gmail di renmenu1569, come l'anteprima) ———
+  // ——— Email al locale con link e QR (parte come l'anteprima: da Jarvis su renmenu.com, o dal ponte Gmail) ———
   const INTERNAL_MAIL = /^(?:iuran56|renmenu1569)@gmail\.com$/i;
   const b64 = (bytes) => { let t = ''; for (let i = 0; i < bytes.length; i += 0x8000) t += String.fromCharCode(...bytes.subarray(i, i + 0x8000)); return btoa(t); };
   function onlineMailText(name, qr, slug) {
@@ -442,6 +463,7 @@ export function createMissions(deps) {
     ].join('\n');
   }
   async function triggerOnlineMail(db, env, code, requestId, attempt) {
+    if (directMail(env)) { await deliverOutbox(db, env, code); return; }
     const sent = await sendOwnerNotification({ db: jarvisDb(db), env, requestId,
       subject: `${ONLINE_SUBJECT} ${code}`,
       text: `Comando interno di Jarvis per l'automazione Gmail di renmenu1569: invia l'email del menu online ${code} dalla coda di Jarvis. Tentativo ${attempt}. Nessun dato del cliente in questa email.`,
@@ -1170,7 +1192,7 @@ export function createMissions(deps) {
       const mail = reminderDraft(nameOf(m), approval);
       const days = Math.floor((Date.now() - Date.parse(approval.sent_at)) / DAY_MS);
       await db.prepare('UPDATE jarvis_missions SET attempts=attempts+1,reminded_at=?,updated_at=? WHERE id=? AND revision=?').bind(now(), now(), m.id, m.revision).run();
-      items.push({ text: `«${nameOf(m)}» non ha risposto all’anteprima da ${days} giorni. Ti propongo questo promemoria, da renmenu1569:\n\n«${mail.body.split('\n').slice(0, 6).join(' ').replace(/\s+/g, ' ')}»\n\nLo mando solo se tocchi il pulsante.`, buttons: [['Manda il promemoria', `soll:${m.id}`], ['Aspetto ancora', 'sollno:x']] });
+      items.push({ text: `«${nameOf(m)}» non ha risposto all’anteprima da ${days} giorni. Ti propongo questo promemoria, da ${senderName(env)}:\n\n«${mail.body.split('\n').slice(0, 6).join(' ').replace(/\s+/g, ' ')}»\n\nLo mando solo se tocchi il pulsante.`, buttons: [['Manda il promemoria', `soll:${m.id}`], ['Aspetto ancora', 'sollno:x']] });
     }
     for (const m of missionRows.filter((x) => x.status === 'ferma')) items.push({ text: `«${nameOf(m)}» è ferma${m.note ? `: ${String(m.note).slice(0, 200)}` : ''}. Guardala e, se vuoi riprendere, riaffidamela.`, buttons: [['Mostrami la bozza', `peek:${m.draft_id}`], ['Affida a Jarvis', `affq:${m.draft_id}`]] });
     const followed = new Set((await safe('SELECT request_id FROM jarvis_missions')).map((x) => x.request_id));
@@ -1191,9 +1213,9 @@ export function createMissions(deps) {
     await db.prepare("UPDATE jarvis_outbox SET status='annullata',updated_at=? WHERE mission_id=? AND status='in_coda'").bind(stamp, mission.id).run();
     await db.prepare("INSERT INTO jarvis_outbox (id,mission_id,request_id,approval_id,reference_code,recipient,subject,body,status,created_at,updated_at) VALUES (?,?,?,?,?,?,?,?,'in_coda',?,?)")
       .bind(uid(), mission.id, mission.request_id, approval.id, code, recipient, mail.subject, mail.body, stamp, stamp).run();
-    const next = await move(db, mission, 'attesa_invio', `Promemoria ${code} in coda per Gmail.`);
+    const next = await move(db, mission, 'attesa_invio', `Promemoria ${code} in partenza da ${senderName(env)}.`);
     await trigger(db, env, next, code);
-    return { text: `Fatto: il promemoria per «${venue}» è in coda e parte da renmenu1569 a minuti. Ti scrivo quando è inviato.` };
+    return { text: `Fatto: il promemoria per «${venue}» è in coda e parte da ${senderName(env)} a minuti. Ti scrivo quando è inviato.` };
   }
   // ——— «Affido a Jarvis» da Telegram: riepilogo da confermare con un tocco (stessa conferma della Control Room) ———
   async function voiceEntrust(db, env, spokenVenue, clues, utterance) {
@@ -1345,7 +1367,7 @@ export function createMissions(deps) {
     return { text: `${ok.length ? `Fatto, Riccardo: ho eliminato ${ok.length === 1 ? 'la pratica' : `le ${ok.length} pratiche`} di «${client.name}»${files ? `, con ${files} file` : ''}${gone ? ', e anche il cliente' : ''}.` : `Non ho eliminato niente di «${client.name}».`}${kept.length ? ` ${kept.length === 1 ? 'Una resta' : `${kept.length} restano`}: ${kept[0].why}` : ''}` };
   }
   // ——— Punto della situazione: scritto da dati certi del database, mai inventato dal modello ———
-  const MISSION_LABEL = { affidata: 'la sto preparando io', attesa_cliente: 'anteprima inviata, aspetto la risposta del locale', attesa_invio: 'anteprima in coda per Gmail', attesa_si: 'aspetta il tuo SÌ per pubblicare', ferma: 'ferma, serve il tuo intervento', pubblicazione: 'in pubblicazione', verifica: 'in verifica dopo la pubblicazione' };
+  const MISSION_LABEL = { affidata: 'la sto preparando io', attesa_cliente: 'anteprima inviata, aspetto la risposta del locale', attesa_invio: 'anteprima in partenza', attesa_si: 'aspetta il tuo SÌ per pubblicare', ferma: 'ferma, serve il tuo intervento', pubblicazione: 'in pubblicazione', verifica: 'in verifica dopo la pubblicazione' };
   async function statusReport(db, env, cut = 'breve') {
     const safe = async (fn, fallback) => { try { return await fn(); } catch { return fallback; } };
     const stamp = new Date(), day = stamp.toISOString().slice(0, 10), weekAgo = new Date(stamp.getTime() - 7 * 24 * 3600_000).toISOString();
