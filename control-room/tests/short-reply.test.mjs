@@ -45,3 +45,10 @@ test('risposte brevi: i comandi veri non vengono scambiati per una scelta', () =
   }
   assert.equal(pickButton('sì', []), null);
 });
+
+test('risposte brevi: «nessuno» e «tutti» su una scelta a tre', () => {
+  const modes = [['Solo importanti', 'voce:importanti'], ['Tutti', 'voce:tutti'], ['Nessuno', 'voce:nessuno']];
+  assert.equal(pick('nessuno', modes), 'voce:nessuno');
+  assert.equal(pick('tutti', modes), 'voce:tutti');
+  assert.equal(pick('solo importanti', modes), 'voce:importanti');
+});

@@ -171,12 +171,38 @@ export function createMissions(deps) {
   }
 
   // Ogni messaggio va sia nella Control Room (riquadro JARVIS) sia su Telegram, se collegato.
+  // Di notte (22-7) gli avvisi normali arrivano senza suono; quelli importanti suonano sempre e, se la
+  // voce è configurata, Jarvis li dice anche a voce (impostazione /voce: importanti, tutti, nessuno).
   async function tell(db, env, mission, subject, text, buttons = null, priority = 'normale') {
     const id = uid();
     await db.prepare('INSERT INTO notifications (id,request_id,channel,subject,body,priority,due_at,status,created_at) VALUES (?,?,?,?,?,?,?,?,?)')
       .bind(id, mission?.request_id || null, 'in_app', `Jarvis · ${subject}`, String(text).slice(0, 5000), priority, null, 'mock', now()).run();
+    await ping(db, env, text, buttons, priority);
+  }
+  // Solo Telegram (per chi ha già scritto la riga della Control Room, come l'autopilota).
+  async function ping(db, env, text, buttons = null, priority = 'normale') {
     const chat = await setting(db, 'telegram_chat_id');
-    if (chat && telegramReady(env)) await sendTg(db, env, chat, `${text}`, buttons, deps.fetchImpl);
+    if (!chat || !telegramReady(env)) return;
+    const important = priority === 'importante' || priority === 'urgente';
+    const night = isNight(new Date(now()));
+    await sendTg(db, env, chat, `${text}`, buttons, deps.fetchImpl, { silent: !important && night });
+    const mode = await voiceAlerts(db);
+    if ((mode === 'tutti' && !night) || (mode !== 'nessuno' && important)) await speakAlert(db, env, chat, text).catch(() => null);
+  }
+  const isNight = (at) => { const hour = Number(new Intl.DateTimeFormat('en-GB', { timeZone: 'Europe/Rome', hour: '2-digit', hourCycle: 'h23' }).format(at)); return hour >= 22 || hour < 7; };
+  const VOICE_ALERT_MODES = { importanti: 'solo gli avvisi importanti', tutti: 'tutti gli avvisi (di giorno)', nessuno: 'nessun avviso' };
+  async function voiceAlerts(db) { const mode = await setting(db, 'voice_alerts').catch(() => null); return VOICE_ALERT_MODES[mode] ? mode : 'importanti'; }
+  // L'avviso a voce: le prime frasi, senza link né elenchi, come lo direbbe Jarvis.
+  async function speakAlert(db, env, chat, text) {
+    const plain = String(text).replace(/https?:\/\/\S+/g, '').split('\n').filter((line) => line.trim() && !/^\s*(\d+\.|[-•])\s/.test(line)).join(' ');
+    const short = (plain.match(/[^.!?]+[.!?]+/g) || [plain]).reduce((out, sentence) => (out.length + sentence.length <= 320 ? out + sentence : out), '').trim() || plain.slice(0, 320);
+    const audio = await speak(await voiceSettings(db, env), `Riccardo, ${short.charAt(0).toLowerCase()}${short.slice(1)}`, deps.fetchImpl);
+    if (audio) await sendVoice(env, chat, audio, '', deps.fetchImpl);
+  }
+  async function voiceAlertsMenu(db) {
+    const mode = await voiceAlerts(db);
+    return { text: `Avvisi a voce: ${VOICE_ALERT_MODES[mode]}. Di notte, dalle 22 alle 7, gli avvisi normali arrivano senza suono; quelli importanti suonano sempre.${(await setting(db, 'voice_api_key')) ? '' : ' La voce non è ancora configurata: impostala nella Control Room, sezione Jarvis.'}`,
+      buttons: [['Solo importanti', 'voce:importanti'], ['Tutti', 'voce:tutti'], ['Nessuno', 'voce:nessuno']] };
   }
 
   async function move(db, mission, status, note, extra = {}) {
@@ -633,6 +659,13 @@ export function createMissions(deps) {
       if (!outcome.silent) await sendTg(db, env, chat, outcome.text, null, deps.fetchImpl);
       return;
     }
+    if (verb === 'voce') {
+      if (VOICE_ALERT_MODES[missionId]) await putSetting(db, 'voice_alerts', missionId);
+      await ack('Fatto');
+      await clear();
+      await sendTg(db, env, chat, `Va bene: avvisi a voce per ${VOICE_ALERT_MODES[await voiceAlerts(db)]}.`, null, deps.fetchImpl);
+      return;
+    }
     if (verb === 'undo') {
       const outcome = await undoDraftEdit(db, env, missionId);
       await ack(outcome.text);
@@ -732,13 +765,14 @@ export function createMissions(deps) {
       await sendTg(db, env, chat, out.ok ? `Email di prova partita da ${config.sender} a ${to}. Controlla la casella (anche lo spam).` : `L’email di prova non è partita: ${out.reason}.`, null, deps.fetchImpl);
       return;
     }
+    if (/^\/voce\b/i.test(text) || (/\b(avvis\w*|notific\w*)\b/i.test(text) && /\b(a\s+voce|vocal[ei])\b/i.test(text) && text.split(/\s+/).length <= 12)) { const menu = await voiceAlertsMenu(db); await sendTg(db, env, chat, menu.text, menu.buttons, deps.fetchImpl); return; }
     if (/^\/settimana\b/i.test(text)) { await sendTg(db, env, chat, digestText(await buildDigest(db)), null, deps.fetchImpl); return; }
     if (/^\/stato\b/i.test(text) || STATUS_WORDS.test(text)) {
       await sendTg(db, env, chat, await statusText(db), null, deps.fetchImpl);
       return;
     }
     if (/^\/aiuto\b|^\/help\b/i.test(text) || text.startsWith('/')) {
-      await sendTg(db, env, chat, 'Puoi scrivermi o mandarmi un vocale: «com’è la situazione?», «al Bakaro il frico ora costa 14», «crea una nuova pratica per il locale … con piano Standard», «pubblica il menu di …». Capisco anche /stato, /briefing, /settimana, /provaemail, /proposte, /rifletti, le foto e i PDF dei menu. Pubblicare richiede sempre il tuo SÌ col pulsante.', null, deps.fetchImpl);
+      await sendTg(db, env, chat, 'Puoi scrivermi o mandarmi un vocale: «com’è la situazione?», «al Bakaro il frico ora costa 14», «crea una nuova pratica per il locale … con piano Standard», «pubblica il menu di …». Capisco anche /stato, /briefing, /settimana, /voce, /provaemail, /proposte, /rifletti, le foto e i PDF dei menu. Pubblicare richiede sempre il tuo SÌ col pulsante.', null, deps.fetchImpl);
       return;
     }
     await converse(db, env, chat, text, false);
@@ -1678,7 +1712,32 @@ export function createMissions(deps) {
     return { proposals: saved };
   }
 
-  const notify = (db, env, requestId, subject, text) => tell(db, env, { request_id: requestId }, subject, text);
+  const notify = (db, env, requestId, subject, text, priority = 'normale') => tell(db, env, { request_id: requestId }, subject, text, null, priority);
+  // Messaggi arrivati dai webhook (WhatsApp, Gmail): i webhook non chiamano nessuno, l'orologio li annuncia.
+  // Alla prima esecuzione segna solo il punto di partenza, per non riversare su Telegram lo storico.
+  async function announceExternal(db, env) {
+    const seen = await setting(db, 'external_seen_at').catch(() => null);
+    if (!seen) { await putSetting(db, 'external_seen_at', now()); return 0; }
+    const fresh = await rows(db, `SELECT e.source,e.received_at,e.status,r.id AS request_id,r.source_text,c.name FROM external_events e
+      LEFT JOIN requests r ON r.id=e.request_id LEFT JOIN clients c ON c.id=r.client_id
+      WHERE e.received_at>? AND e.status IN ('imported','needs_review') ORDER BY e.received_at ASC LIMIT 20`, seen).catch(() => []);
+    for (const event of fresh) {
+      const from = event.source === 'whatsapp' ? 'WhatsApp' : 'Gmail';
+      const said = String(event.source_text || '').replace(/\s+/g, ' ').trim();
+      await notify(db, env, event.request_id || null, `messaggio ${from}`, `Nuovo messaggio ${from} da ${event.name || 'un contatto nuovo'}${said ? `: «${said.slice(0, 300)}${said.length > 300 ? '…' : ''}»` : ' (non è un testo: guardalo nella Control Room)'}. L'ho messo tra le pratiche da verificare.`, 'importante').catch(() => null);
+    }
+    if (fresh.length) await putSetting(db, 'external_seen_at', fresh.at(-1).received_at);
+    return fresh.length;
+  }
+  // Un guasto che si ripete (orologio, email in arrivo) avvisa una volta ogni `minutes`, non a ogni minuto.
+  async function alertOnce(db, env, key, subject, text, { minutes = 60, priority = 'importante' } = {}) {
+    await recordEvent(db, `errore.${key}`, { detail: { text: String(text).slice(0, 300) } });
+    const last = Date.parse(await setting(db, `alert_${key}`).catch(() => null) || '');
+    if (Number.isFinite(last) && Date.now() - last < minutes * MINUTE) return false;
+    await putSetting(db, `alert_${key}`, now());
+    await tell(db, env, null, subject, text, null, priority);
+    return true;
+  }
   /** Bozza in coda dopo i dubbi: la prepara il giro dell'orologio. */
   async function draftAfterChecks(db, env) {
     let queued = null; try { queued = JSON.parse(await setting(db, 'draft_after_checks') || 'null'); } catch {}
@@ -1707,5 +1766,5 @@ export function createMissions(deps) {
     }
     return out;
   }
-  return { entrust, tick, watchTick, watchRegister, reflect, queueOnlineEmail, checkOnlineMails, makeMenuQr, decide, telegramUpdate, probeIntents, setting, putSetting, briefing, notify, startChecks, answerCheck, draftAfterChecks, translateAfterEdit, undoDraftEdit, draftTarget, voiceEditDraft };
+  return { alertOnce, announceExternal, ping, entrust, tick, watchTick, watchRegister, reflect, queueOnlineEmail, checkOnlineMails, makeMenuQr, decide, telegramUpdate, probeIntents, setting, putSetting, briefing, notify, startChecks, answerCheck, draftAfterChecks, translateAfterEdit, undoDraftEdit, draftTarget, voiceEditDraft };
 }

@@ -26,7 +26,7 @@ const ORDINALS = ['prim[ao]|1', 'second[ao]|2', 'terz[ao]|3', 'quart[ao]|4', 'qu
 const LAST = exact('ultim[ao]');
 const STOP = new Set(['la', 'il', 'lo', 'le', 'gli', 'una', 'uno', 'quella', 'quello', 'quelle', 'quelli', 'per', 'con', 'del', 'della', 'dei', 'delle', 'pure', 'grazie', 'jarvis', 'riccardo']);
 
-const isNo = (label, data) => /no$/.test(verbOf(data)) || /:(no|dopo|x)$/.test(String(data)) || /^(no|non|nessun|aspetto|lascia)\b/.test(plain(label));
+const isNo = (label, data) => /no$/.test(verbOf(data)) || /:(no|dopo|x)$/.test(String(data)) || /^(no|non|nessun\w*|aspett\w*|lascia)\b/.test(plain(label));
 const isNever = (label, data) => /:mai$/.test(String(data)) || /^mai\b/.test(plain(label));
 const isAll = (label) => /\btutt[ei]\b/.test(plain(label));
 const isYes = (label) => /^(si|fallo|ok|affida|manda|usa|collega|conferma|metti|procedi)\b/.test(plain(label));
