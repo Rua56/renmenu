@@ -14,13 +14,13 @@ import { briefLines, creativeBrief } from './premium.js';
 const plain = (value) => String(value || '').toLocaleLowerCase('it-IT').normalize('NFD').replace(/[\u0300-\u036f]/g, '');
 const RECEIVED_SUBJECT = /^Oggetto ricevuto:\s*/i;
 
-const PLAN_PATTERNS = [
+export const PLAN_PATTERNS = [
   ['standard', /\b(?:piano |menu |menù |formula )?standard\b|\b25 ?(?:€|euro)(?: al mese| mensili)?\b/],
   ['annuale', /\b(?:piano |formula |abbonamento )?annual[ei]\b|\b249 ?(?:€|euro)/],
   ['premium', /\bpremium\b|\bsu misura\b|\b490 ?(?:€|euro)/]
 ];
 // Il cliente cita un piano ma non ha deciso («forse», «non abbiamo ancora deciso»): il piano resta da confermare.
-const HESITANT = /\b(?:forse|non (?:abbiamo|ho|hanno) ancora deciso|non sappiamo|indecis\w*|stiamo valutando|valutando|stiamo pensando|ci pensiamo|magari|oppure|in alternativa)\b/;
+export const HESITANT = /\b(?:forse|non (?:abbiamo|ho|hanno) ancora deciso|non sappiamo|indecis\w*|stiamo valutando|valutando|stiamo pensando|ci pensiamo|magari|oppure|in alternativa)\b/;
 const NEW_MENU = /\bnuovo menu\b|\bmenu nuovo\b|\bmenu digitale\b|\b(?:attivare|creare|fare|realizzare|vorrei|vorremmo)\b[^.\n]{0,40}\bmenu\b|\bprova gratuita\b/;
 const UPDATE_RULES = [
   ['prezzo', /\b(?:cambi\w*|aggiorn\w*|modific\w*|alz\w*|abbass\w*)\b[^.\n]{0,40}\bprezz\w*|\bprezz\w*\b[^.\n]{0,30}\b(?:diventa|passa|ora|nuovo)\b/],
@@ -66,8 +66,9 @@ const where = (row) => (row.line === 0 ? 'oggetto' : `riga ${row.line}`);
 export const reasonText = (proposal) => proposal.reasons.map((row) => `${where(row)} «${row.text.slice(0, 60)}»`).join('; ');
 
 /** Cosa Jarvis può fare da solo su questa pratica: bozza, solo proposta, o niente. */
-export function autopilotPlan(request) {
-  const proposal = classifyRequest(request.subject, request.source_text ?? request.sourceText);
+// `understood`: proposta già pronta (per esempio quella letta dal modello gratuito in request-ai.js).
+export function autopilotPlan(request, understood = null) {
+  const proposal = understood || classifyRequest(request.subject, request.source_text ?? request.sourceText);
   const entry = proposal.category ? categoryByCode(proposal.category) : null;
   if (!entry && proposal.kind === 'nuovo') return { proposal, action: 'proponi', why: proposal.ambiguousPlan ? (proposal.hesitant ? 'Il cliente cita un piano ma non ha ancora deciso: piano da confermare.' : 'Il testo cita più piani: scegli tu.') : 'Il piano non è scritto nella richiesta: scegli tu Standard, Annuale o Premium.' };
   if (!entry) return { proposal, action: 'chiedi', why: 'Richiesta non riconosciuta: decidi tu la categoria.' };
@@ -88,8 +89,8 @@ export function autopilotPlan(request) {
 }
 
 /** Anteprima pura di ciò che Jarvis troverà (usata anche dall'importatore per la notifica). */
-export function autopilotPreview(request) {
-  const plan = autopilotPlan(request);
+export function autopilotPreview(request, understood = null) {
+  const plan = autopilotPlan(request, understood);
   const text = prepareEmailSource(request.source_text ?? request.sourceText ?? '');
   const extraction = extractMenuFromText(plan.proposal.venue || 'Locale', text, plan.proposal.venue || 'locale');
   const extras = proposeSourceExtras(text, extraction.menu);
@@ -101,7 +102,8 @@ export function autopilotPreview(request) {
     items: extraction.extracted.length, uncertain: extraction.uncertain.length,
     notes: [...reviewNotes({ sourceText: text, uncertain: extraction.uncertain, extracted: extraction.extracted, info: applyVenueInfo(extraction.menu, extractVenueInfo(text)) }), ...structureNotes(extraction)],
     brief: plan.proposal.plan === 'premium' ? briefLines(creativeBrief(text, { attachments: Number(request.attachments || 0) })) : [],
-    extras: extras.filter((entry) => entry.type !== 'manuale').map((entry) => (entry.type === 'coperto' ? `coperto ${entry.value}` : `allergeni ${entry.name}`))
+    extras: extras.filter((entry) => entry.type !== 'manuale').map((entry) => (entry.type === 'coperto' ? `coperto ${entry.value}` : `allergeni ${entry.name}`)),
+    ai: plan.proposal.ai || null
   };
 }
 
@@ -110,12 +112,21 @@ export function autopilotMessage(subject, preview, outcome = preview.action) {
   const base = autopilotBase(subject, preview, outcome);
   const todo = preview.kind === 'nuovo' && Array.isArray(preview.notes) ? notesSummary(preview.notes, 6, { preview: outcome !== 'bozza' }) : '';
   const brief = Array.isArray(preview.brief) && preview.brief.length ? `Scheda creativa (dal testo del cliente):\n${preview.brief.map((line) => `• ${line}`).join('\n')}` : '';
-  return [base, brief, todo].filter(Boolean).join('\n\n');
+  return [base, understandingLines(preview.ai), brief, todo].filter(Boolean).join('\n\n');
+}
+
+/** Cosa ha capito il modello gratuito della richiesta (request-ai.js), se è stato usato. */
+export function understandingLines(ai) {
+  if (!ai) return '';
+  const parts = [];
+  if (ai.summary) parts.push(`Ho capito: ${ai.summary}`);
+  if (ai.changes?.length) parts.push(`Modifiche chieste:\n${ai.changes.map((c) => `• ${c}`).join('\n')}`);
+  return parts.join('\n');
 }
 function autopilotBase(subject, preview, outcome) {
   const head = String(subject || 'Nuova richiesta').slice(0, 70);
   const facts = preview.kind !== 'nuovo' ? '' : `${preview.items} piatti letti${Array.isArray(preview.notes) ? '' : `${preview.uncertain ? `, ${preview.uncertain} righe da verificare` : ''}${preview.extras.length ? `, trovati ${preview.extras.join(' e ')}` : ''}`}`;
-  if (outcome === 'bozza' && preview.menuId) return `Riccardo, aggiornamento pronto per il menu online «${preview.menuId}» (${preview.categoryLabel}): ho applicato solo le modifiche scritte nell’email, QR invariato. Apri Revisione per controllarle.`;
+  if (outcome === 'bozza' && preview.menuId) return `Riccardo, aggiornamento pronto per il menu online «${preview.menuId}» (${preview.categoryLabel}): ho applicato solo le modifiche scritte dal locale, QR invariato. Apri Revisione per controllarle.`;
   if (outcome === 'bozza') return `Riccardo, bozza pronta per «${preview.venue}» (${preview.categoryLabel}): ${facts}. Apri Revisione per controllarla.`;
   if (outcome === 'proponi') return `Riccardo, nuova richiesta «${head}». Propongo: ${preview.categoryLabel}. ${preview.why}${facts ? ` ${facts}.` : ''}`;
   return `Riccardo, nuova richiesta «${head}»: non l’ho riconosciuta. ${preview.why}`;
