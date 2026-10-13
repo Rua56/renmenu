@@ -37,3 +37,9 @@ test('comprensione: il nome del locale non viene scambiato per un numero o un or
   assert.equal(guessIntent('ricordami cosa devo fare oggi').intent, 'risposta');
   assert.equal(guessIntent('senti, il frico alzamelo a quindici euro', { dishes: findDishes('il frico alzamelo', menus) }).intent, 'aggiorna_menu');
 });
+
+test('dati del locale detti con un valore sono una correzione della bozza, anche senza nome del locale', () => {
+  for (const phrase of ['Il coperto è 3 euro a persona', 'Gli orari sono 12-15 e 19-22', 'Il numero di telefono è 0481227207', 'L’indirizzo è Piazza S. Antonio 10'])
+    assert.equal(guessIntent(phrase, {}).intent, 'aggiorna_menu', phrase);
+  assert.equal(guessIntent('quanto è il coperto?', {}).intent, 'risposta');
+});

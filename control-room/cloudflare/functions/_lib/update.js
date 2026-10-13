@@ -93,6 +93,17 @@ function prepareUpdateCore({ slug, current, sha, sourceText, subject }) {
  * se l'email o la frase a voce li indicano in modo chiaro (i dubbi diventano domande).
  * @returns {{ ok: true, extraction } | { ok: false, reason }}
  */
+/** Bozza identica al menu online: serve quando la modifica non riguarda piatti e prezzi (titoli, sezioni, aspetto) e si applica dopo, a voce o a mano. */
+export function prepareBaseUpdate({ slug, current, sha }) {
+  const short = String(sha || '').slice(0, 7);
+  return { ok: true, extraction: {
+    menu: { ...current, id: slug }, mode: 'aggiornamento', added: 0,
+    extracted: [{ name: 'menu online', price: '', sourceLine: 'copia del menu online, da modificare' }],
+    uncertain: [], provenance: baseProvenance(current, `Menu online (main${short ? ` ${short}` : ''})`),
+    warnings: [`Aggiornamento del menu online «${slug}»${short ? ` (versione ${short})` : ''}: la bozza parte identica al menu online e cambia solo con le correzioni che applichi. Stesso QR.`]
+  } };
+}
+
 export function prepareUpdate(input) {
   const body = updateBody(input.sourceText);
   const found = extractVenueInfo(body);

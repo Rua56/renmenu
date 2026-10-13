@@ -1,6 +1,7 @@
 // Briefing di Jarvis: il punto della situazione per Riccardo, ogni mattina (lun–sab, 8:00 ora
 // italiana) su Telegram e su richiesta con /briefing. Solo letture: D1, elenco dei menu su main
 // (GitHub) e controllo dei menu pubblici. Nessun dato di contatto nel testo.
+import { BLANCH_SLUG, publicJsonToMenu, publicMenuJsonUrl } from './blanch.js';
 import { validateMenu } from './menu.js';
 
 const DAY = 86_400_000;
@@ -28,13 +29,15 @@ async function menuHealth(env, fetchImpl) {
     const response = await fetchImpl(REPO_MENUS, { headers: { Authorization: `Bearer ${token}`, Accept: 'application/vnd.github+json', 'User-Agent': 'RenMenu-Jarvis-Control-Room', 'X-GitHub-Api-Version': '2022-11-28' } });
     if (!response.ok) return { error: `elenco dei menu non disponibile (GitHub ${response.status})` };
     list = (await response.json()).filter((f) => f.type === 'file' && /^[a-z0-9-]+\.json$/.test(f.name)).map((f) => f.name.slice(0, -5));
+    if (!list.includes(BLANCH_SLUG)) list.push(BLANCH_SLUG); // Trattoria Blanch ha il suo formato, fuori da menus/
   } catch { return { error: 'elenco dei menu non disponibile (rete)' }; }
   const results = await Promise.all(list.map(async (slug) => {
     try {
-      const response = await fetchImpl(`${PUBLIC}/menus/${slug}.json`, { redirect: 'manual', headers: { 'Cache-Control': 'no-cache' } });
+      const response = await fetchImpl(publicMenuJsonUrl(PUBLIC, slug), { redirect: 'manual', headers: { 'Cache-Control': 'no-cache' } });
       if (response.status !== 200) return { slug, problem: `risponde ${response.status}` };
-      const menu = await response.json().catch(() => null);
+      let menu = await response.json().catch(() => null);
       if (!menu) return { slug, problem: 'file non leggibile' };
+      try { menu = publicJsonToMenu(slug, menu); } catch { return { slug, problem: 'file non leggibile' }; }
       const errors = validateMenu(menu).errors;
       return errors.length ? { slug, name: menu.nome, problem: errors[0] } : { slug, name: menu.nome };
     } catch { return { slug, problem: 'non raggiungibile' }; }

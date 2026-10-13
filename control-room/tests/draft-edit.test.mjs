@@ -174,7 +174,7 @@ test('dati del locale e storia: solo se scritti nella frase', () => {
   const out = applyOps(premium, [], ok.ops, 'R');
   assert.equal(out.menu.telefono, '+39 351 917 0910');
   assert.equal(out.menu.instagram, 'osteriacodelli23');
-  assert.deepEqual(out.menu.orari, { it: 'Mer-Ven 18-22' });
+  assert.deepEqual(out.menu.orari, { it: 'Mercoledì–venerdì 18:00–22:00', en: 'Wednesday–Friday 18:00–22:00' });
   assert.equal(out.menu.premium.storia.it.split('\n').length, 2);
   assert.equal(out.needsEnglish, true);
   assert.match(validateOps([{ tipo: 'locale', campo: 'telefono', nome: '+39 333 111 2222' }], premium, said).problems[0], /non ho letto/);
@@ -191,4 +191,76 @@ test('correzioni dettate: si rimettono solo dove la voce è la stessa', () => {
   const other = structuredClone(before); other.sezioni[0].voci[0].nome = { it: 'Altro piatto' };
   const r = replayableOps(other, ops, fp);
   assert.equal(r.keep.length, 0); assert.equal(r.skipped.length, 1);
+});
+
+// ——— Sezioni: una sola sezione nuova, unire, togliere ———
+const drinkMenu = () => ({
+  id: 'prova', nome: 'Prova', lingue: ['it', 'en'],
+  sezioni: [
+    { nome: { it: 'Primi' }, voci: [{ nome: { it: 'Gnocchi' }, prezzo: '12,00' }] },
+    { nome: { it: 'bevande' }, voci: [{ nome: { it: 'bibite' }, prezzo: '5,00' }] },
+    { nome: { it: 'bevande' }, voci: [{ nome: { it: 'calice di vino' }, prezzo: '6,00' }, { nome: { it: 'Bibite' }, prezzo: '5,00' }, { nome: { it: 'Caffe' }, prezzo: '1,00' }] },
+    { nome: { it: 'bevande' }, voci: [{ nome: { it: 'caffè' }, prezzo: '1,00' }] }
+  ]
+});
+
+test('tre voci nella stessa sezione nuova: la sezione si crea una volta sola, con l’iniziale maiuscola', () => {
+  const said = 'le bevande sono: bibite 5€ calice di vino 6€ caffè 1€';
+  const raw = ['bibite|5,00', 'calice di vino|6,00', 'caffè|1,00'].map((x) => ({ tipo: 'aggiungi', nome: x.split('|')[0], prezzo: x.split('|')[1], sezione: 'bevande' }));
+  const { ops, problems } = validateOps(raw, menu(), said);
+  assert.deepEqual(problems, []);
+  const out = applyOps(menu(), [], ops, 'Riccardo');
+  assert.equal(out.menu.sezioni.length, 3);
+  assert.equal(out.menu.sezioni[2].nome.it, 'Bevande');
+  assert.deepEqual(out.menu.sezioni[2].voci.map((v) => v.nome.it), ['bibite', 'calice di vino', 'caffè']);
+});
+
+test('unire le sezioni con lo stesso nome: voci insieme, doppioni tolti', () => {
+  const { ops, problems } = validateOps([{ tipo: 'unisci_sezioni', sezioni: [1, 2, 3] }], drinkMenu(), 'unifica le tre sezioni bevande');
+  assert.deepEqual(problems, []);
+  const out = applyOps(drinkMenu(), [], ops, 'Riccardo');
+  assert.equal(out.menu.sezioni.length, 2);
+  assert.deepEqual(out.menu.sezioni[1].voci.map((v) => v.nome.it), ['bibite', 'calice di vino', 'Caffe']);
+});
+
+test('togliere una sezione: serve che la frase la nomini', () => {
+  const ok = validateOps([{ tipo: 'rimuovi_sezione', si: 3 }], drinkMenu(), 'rimuovi la sezione bevande');
+  assert.deepEqual(ok.problems, []);
+  assert.equal(applyOps(drinkMenu(), [], ok.ops, 'R').menu.sezioni.length, 3);
+  const no = validateOps([{ tipo: 'rimuovi_sezione', si: 0 }], drinkMenu(), 'rimuovi la sezione bevande');
+  assert.equal(no.ops.length, 0); assert.match(no.problems[0], /non l’hai nominata/);
+});
+
+test('togliendo tutte le voci di una sezione, la sezione sparisce invece di rendere il menu non valido', () => {
+  const { ops, problems } = validateOps([{ tipo: 'rimuovi', si: 1, vi: 0 }, { tipo: 'rimuovi', si: 3, vi: 0 }], drinkMenu(), 'rimuovi bibite e caffè');
+  assert.deepEqual(problems, []);
+  const out = applyOps(drinkMenu(), [], ops, 'R');
+  assert.deepEqual(out.menu.sezioni.map((s) => s.voci.length), [1, 3]);
+  assert.ok(out.summary.some((l) => /non aveva più piatti/.test(l)));
+});
+
+test('il coperto non è mai una sezione: va nelle informazioni in fondo e toglie la vecchia sezione «Coperto»', () => {
+  const m = () => ({ ...menu(), sezioni: [...menu().sezioni, { nome: { it: 'Coperto' }, voci: [{ nome: { it: 'Coperto' }, prezzo: '3,00' }] }, { nome: { it: 'Bevande' }, voci: [{ nome: { it: 'Acqua' }, prezzo: '2,00' }] }] });
+  // il modello propone una voce «Coperto» in una sezione: diventa il campo coperto
+  const a = validateOps([{ tipo: 'aggiungi', nome: 'Coperto', prezzo: '2,50', sezione: 'Coperto' }], menu(), 'manca il coperto a 2,50 euro');
+  assert.deepEqual(a.problems, []);
+  assert.deepEqual(a.ops, [{ tipo: 'locale', campo: 'coperto', nome: '2,50' }]);
+  assert.equal(applyOps(menu(), [], a.ops, 'R').menu.coperto, '2,50');
+  // se il modello non produce nulla, la frase chiara basta
+  const b = validateOps([], m(), 'il coperto è 3 euro');
+  assert.deepEqual(b.ops, [{ tipo: 'locale', campo: 'coperto', nome: '3,00' }]);
+  const out = applyOps(m(), [], b.ops, 'R');
+  assert.equal(out.menu.coperto, '3,00');
+  assert.deepEqual(out.menu.sezioni.map((s) => itName(s)), ['Secondi', 'Vini', 'Bevande']);
+  // un importo non detto non passa
+  assert.match(validateOps([{ tipo: 'locale', campo: 'coperto', nome: '4,00' }], menu(), 'cambia il coperto').problems[0], /importo/);
+});
+const itName = (s) => s.nome.it;
+
+test('coperto: campo scritto male dal modello, l’operazione giusta si ricava dalla frase', () => {
+  const r = validateOps([{ tipo: 'locale', campo: 'coperto a persona', nome: '3 euro' }], menu(), 'Il coperto è 3 euro a persona');
+  assert.deepEqual(r.problems, []);
+  assert.deepEqual(r.ops, [{ tipo: 'locale', campo: 'coperto', nome: '3,00' }]);
+  const r2 = validateOps([{ tipo: 'locale', campo: 'prezzo del servizio', nome: '3' }], menu(), 'Il coperto è 3 euro a persona');
+  assert.deepEqual(r2.problems, []); assert.equal(r2.ops[0].nome, '3,00');
 });
