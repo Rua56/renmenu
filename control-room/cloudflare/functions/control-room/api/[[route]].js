@@ -1,7 +1,7 @@
 import { seal, readSealedSetting } from '../../_lib/sealed.js';
 import { assistExtraction } from '../../_lib/assist.js';
 import { applyMenuChanges } from '../../_lib/changes.js';
-import { prepareUpdate } from '../../_lib/update.js';
+import { prepareBaseUpdate, prepareUpdate } from '../../_lib/update.js';
 import { GEMINI_PREFERRED, PHOTO_TYPES, readMenuPdf, readMenuPhoto } from '../../_lib/vision.js';
 import { linkMailFiles, receiveMailFiles } from '../../_lib/mail-files.js';
 import { deletionPlan, deletionStatements } from '../../_lib/delete-request.js';
@@ -10,7 +10,7 @@ import { speak } from '../../_lib/voice.js';
 import { OWNER_REVIEW } from '../../_lib/missions.js';
 import { readCurrentMenu } from '../../_lib/github-live.js';
 import { isSameOriginWrite, verifyOwner } from '../../_lib/auth.js';
-import { slugify, validateMenu, venueFromSource } from '../../_lib/menu.js';
+import { DEFAULT_SECTION, slugify, validateMenu, venueFromSource } from '../../_lib/menu.js';
 import { integrations } from '../../_lib/integrations.js';
 import { reviewIssues, EVIDENCE_LABELS } from '../../_lib/editorial.js';
 import { runPrivateIntegrationAction } from '../../_lib/operations.js';
@@ -19,6 +19,7 @@ import { purgePublishedEmail } from '../../_lib/email-retention.js';
 import { resolveCategory, draftBlocker, PLAN_RULES } from '../../_lib/service-rules.js';
 import { translateMenu, translationEntries, translationSummary } from '../../_lib/translate.js';
 import { allExtras, applyExtras, proposeSourceExtras } from '../../_lib/extras.js';
+import { prepareEmailSource } from '../../_lib/email-text.js';
 import { autopilotMessage, autopilotPreview, classifyRequest } from '../../_lib/autopilot.js';
 import { createMissions } from '../../_lib/missions.js';
 import { noteStatement } from '../../_lib/memory.js';
@@ -34,6 +35,18 @@ async function draftNotes(db, requestId) {
 }
 import { getMe, randomToken, sendTelegram, sendVoice, setWebhook, telegramReady } from '../../_lib/telegram.js';
 import { ACTIVATIONS, approvalEvidence, approvalState, assessReply, previewEmail, previewUrl, proposeReplyChanges, referenceCode, sha256Hex } from '../../_lib/approvals.js';
+
+// Nome pubblico del bot (serve solo a «Apri Telegram» nella Control Room): letto una volta e ricordato.
+async function botUsername(db, env) {
+  if (!telegramReady(env)) return '';
+  try {
+    const cached = await missions.setting(db, 'telegram_bot_username');
+    if (cached) return String(cached);
+    const username = (await getMe(env))?.result?.username;
+    if (username && /^[A-Za-z0-9_]{3,64}$/.test(username)) { await missions.putSetting(db, 'telegram_bot_username', username); return username; }
+  } catch { /* non blocca lo stato */ }
+  return '';
+}
 const headers = { 'Cache-Control': 'private, no-store', 'Content-Type': 'application/json; charset=utf-8' };
 const answer = (body, status = 200) => new Response(JSON.stringify(body), { status, headers });
 const failure = (status, message) => answer({ error: message }, status);
@@ -306,7 +319,7 @@ export async function state(db, env = {}) {
     notifications, messages, audit, autopilotPending: (await autopilotPending(db)).length,
     missions: await missionRows(db),
     venueMemory: await rows(db, 'SELECT id,client_id AS clientId,kind,text,source,created_at AS createdAt FROM venue_memory WHERE archived_at IS NULL ORDER BY created_at DESC LIMIT 400').catch(() => []),
-    telegram: { configured: telegramReady(env), linked: Boolean(await missions.setting(db, 'telegram_chat_id')) },
+    telegram: { configured: telegramReady(env), linked: Boolean(await missions.setting(db, 'telegram_chat_id')), bot: await botUsername(db, env) },
     reader: { gemini: Boolean(await missions.setting(db, 'gemini_api_key')), models: await missions.setting(db, 'gemini_models').then((v) => { try { return JSON.parse(v || '[]'); } catch { return []; } }) },
     voice: { provider: (await missions.setting(db, 'voice_provider')) || '', voiceId: (await missions.setting(db, 'voice_id')) || '', hasKey: Boolean(await missions.setting(db, 'voice_api_key')) },
     proposals: proposals.map(({ diffJson, ...p }) => ({ ...p, diff: JSON.parse(diffJson) })),
@@ -535,11 +548,16 @@ async function action(db, type, input, env = {}) {
     if (request.kind === 'nuovo') await assertSlugFree(db, slugify(desiredSlug), requestId, request.client_id);
     // Foto e PDF già letti (da Jarvis o trascritti a mano): si aggiungono in coda al testo della
     // pratica; la provenienza indica il file e la riga, non la riga del testo combinato.
-    const allAnalyses = await rows(db, "SELECT a.source_text AS text,a.provenance_json AS prov,m.filename FROM material_analyses a JOIN materials m ON m.id=a.material_id WHERE a.request_id=? AND m.archived_at IS NULL AND a.status IN ('needs_review','complete') AND length(a.source_text)>0 ORDER BY a.created_at", requestId);
+    const allAnalyses = await rows(db, "SELECT a.source_text AS text,a.provenance_json AS prov,m.filename FROM material_analyses a JOIN materials m ON m.id=a.material_id WHERE a.request_id=? AND m.archived_at IS NULL AND a.status IN ('needs_review','complete') AND length(a.source_text)>0 ORDER BY m.created_at, a.created_at", requestId);
     const { kept: analyses, repeated: repeatedPages } = dropRepeatedPages(allAnalyses);
-    let combinedSource = String(request.source_text || '');
+    // Email a capo automatico (~75 caratteri): le righe spezzate si riuniscono, il numero di righe resta uguale.
+    const emailSource = prepareEmailSource(request.source_text);
+    let combinedSource = emailSource;
     const segments = [];
     for (const analysis of analyses) {
+      // Un file che comincia con piatti senza titolo non deve finire nell'ultima sezione del file precedente: apre l'elenco senza titolo.
+      const firstLine = String(analysis.text).split(/\r?\n/).find((l) => l.trim());
+      if (combinedSource.trim() && firstLine && !/^\s*#/.test(firstLine)) combinedSource += `\n# ${DEFAULT_SECTION}`;
       const start = combinedSource.split(/\r?\n/).length + 1;
       combinedSource += `\n${analysis.text}`;
       const method = parseList(analysis.prov)[0]?.method || 'manual';
@@ -561,7 +579,7 @@ async function action(db, type, input, env = {}) {
       try { live = await readCurrentMenu(env, slug, typeof (env?.GITHUB_FETCH || env?.fetch) === 'function' ? { fetch: env.GITHUB_FETCH || env.fetch } : {}); }
       catch (error) { assert(false, `Non riesco a leggere il menu online «${slug}» da GitHub (${String(error?.message || 'errore').slice(0, 120)}). Riprova tra poco.`, 503); }
       assert(live.exists, `Il menu «${slug}» non è online: controlla il Menu ID nella pratica o nella scheda cliente.`, 422);
-      const update = prepareUpdate({ slug, current: live.menu, sha: live.sha, sourceText: combinedSource, subject: request.subject });
+      const update = (p.baseOnly === true ? prepareBaseUpdate : prepareUpdate)({ slug, current: live.menu, sha: live.sha, sourceText: combinedSource, subject: request.subject });
       assert(update.ok, update.reason, 422);
       extraction = update.extraction;
       if (extraction.added && (extraction.menu.lingue || []).includes('en') && autoTranslationReady(env)) {
@@ -576,7 +594,7 @@ async function action(db, type, input, env = {}) {
       // Menu scritto a parole: lettura assistita, verificata riga per riga (nessun valore inventato).
       // Le righe dubbie delle foto non passano dal modello: le controlla Riccardo sulla foto.
       // Telefono, orari, indirizzo, coperto e frasi di presentazione non sono piatti: niente lettura assistita per loro.
-      const menuLike = (row) => /\d/.test(row) && !row.startsWith('[da verificare]') && !/^(?:tel\w*|cell\w*|orari\w*|instagram|facebook|indirizzo|via\b|piazza\b|il coperto|coperto|p\.?\s?iva)\b/i.test(row)
+      const menuLike = (row) => /\d/.test(row) && !row.startsWith('[da verificare]') && !/^(?:\d{1,2}\s+[a-zà-ÿ ]+,\s*){3,}/i.test(row) && !/\b(?:allergen\w*|legenda|numeri accanto|servizio|ferie|acconto|galleria|whatsapp)\b/i.test(row) && !/^(?:tel\w*|cell\w*|orari\w*|instagram|facebook|indirizzo|via\b|piazza\b|il coperto|coperto|p\.?\s?iva)\b/i.test(row)
         && !/\b(?:sono|siamo|vorremmo|vorrei|buongiorno|buonasera|salve|titolare|abbonamento)\b/i.test(row) && !/\b\d{1,2}[:.]\d{2}\s*[-–]\s*\d{1,2}[:.]\d{2}\b/.test(row);
       if (autoTranslationReady(env) && extraction.uncertain.some(menuLike)) {
         extraction = await assistExtraction(env.AI, venue, combinedSource, desiredSlug, extraction);
@@ -604,11 +622,11 @@ async function action(db, type, input, env = {}) {
     let creative = null;
     if (request.plan === 'premium' && !['aggiornamento', 'sostituzione'].includes(extraction.mode)) {
       const images = await getOne(db, "SELECT COUNT(*) AS n FROM materials WHERE request_id=? AND archived_at IS NULL AND mime LIKE 'image/%'", requestId);
-      const brief = creativeBrief(request.source_text, { attachments: Number(images?.n || 0) });
+      const brief = creativeBrief(emailSource, { attachments: Number(images?.n || 0) });
       const directions = premiumDirections(brief);
       delete extraction.menu.tema;
       extraction.menu.premium = structuredClone(directions[0].premium);
-      const story = storyFromSource(request.source_text);
+      const story = storyFromSource(emailSource);
       if (story) {
         extraction.menu.premium.storia = { it: story };
         extraction.warnings.push('«La nostra storia»: testo preso parola per parola dall’email del cliente. Controllalo; la versione inglese è da preparare.');
@@ -640,6 +658,9 @@ async function action(db, type, input, env = {}) {
     // Etichette dedotte (calice/bottiglia), percorsi senza prezzo, numeri di allergeni: da confermare.
     extraction.notes = [...extraction.notes, ...structureNotes(extraction)];
     for (const r of repeatedPages) extraction.notes.push({ kind: 'conferma', text: `File «${r.filename}»`, hint: `Stessa pagina di «${r.keptFilename}»: Jarvis l’ha usata una volta sola (la lettura più chiara). Se erano pagine diverse, dimmelo.`, line: null });
+    // Premium: storia, galleria, schede vini, diciture, preventivo e stile sono già nella scheda creativa (briefNotes): niente note doppie.
+    const inBrief = new Set(['storia', 'galleria', 'schede', 'dicitura', 'preventivo', 'stile', 'logo']);
+    if (creative) extraction.notes = extraction.notes.filter((n) => !inBrief.has(n.kind));
     if (creative) extraction.notes = [...extraction.notes.map((n) => (n.kind === 'tema' ? { ...n, hint: 'Richiesta grafica: è nella scheda creativa Premium, scegli la direzione in Revisione.' } : n)), ...briefNotes(creative.brief)];
     // Bozza rifatta: le foto già confermate da Riccardo tornano al loro posto (ritrovato per nome).
     let lostMedia = [];

@@ -11,6 +11,7 @@ Aggiornata il 6 ottobre 2026. La Control Room lavora con dati reali dei clienti 
 | Testi e foto inviati ai modelli | Lettura, traduzione, comprensione dei comandi | Gemini (piano gratuito) e Workers AI | Con il piano gratuito Google può usare i testi per migliorare i suoi prodotti: accettabile per menu pubblici, da valutare per materiali riservati. Prezzi, allergeni, contatti e nome del locale non vengono inviati ai modelli di traduzione |
 | Diario e proposte di Jarvis | Riflessione settimanale | D1 (`jarvis_events`, `jarvis_proposals`); i numeri della settimana vanno a Claude (API Anthropic) | Solo conteggi, nomi dei locali e titoli delle proposte passate: nessuna email, telefono o testo dei clienti |
 | Messaggi e vocali con Riccardo | Comandi e conferme | Telegram (una sola chat collegata) e cronologia breve nel database | Il vocale è trascritto da Whisper su Workers AI; la voce di risposta è generata da ElevenLabs a partire dal solo testo della risposta |
+| Nome pubblico del bot Telegram | Mostrare il link «Parla con Jarvis» | Impostazione `telegram_bot_username` nel database, letta una volta da Telegram | È un'informazione pubblica del bot, non un segreto; non cambia il collegamento della chat. |
 | Memoria dei locali | Orientarsi nelle modifiche | D1 (`venue_memory`) | Note scritte da Riccardo («ricorda che…», eliminabili con «dimentica») e riassunto dell'ultimo menu online; la fonte di verità resta il file pubblicato |
 | Coda di invio email e QR | Anteprime, promemoria, email con link e QR | D1 (`jarvis_outbox`, `jarvis_settings`) | I QR allegati restano nel database solo finché l'email non è partita, poi vengono cancellati. L'automazione scrive in `/tmp` e li elimina a fine esecuzione |
 | Chiavi di servizi esterni | Gemini, voce | D1, cifrate con `SETTINGS_SECRET` | Mai in chiaro, mai nel codice |
@@ -23,3 +24,7 @@ Aggiornata il 6 ottobre 2026. La Control Room lavora con dati reali dei clienti 
 - Jarvis scrive ai locali solo per anteprime, promemoria approvati da Riccardo ed email con link e QR dopo la pubblicazione; mai da `iuran56@gmail.com`.
 - Le richieste arrivano solo su `renmenu1569@gmail.com`.
 - Prima di accogliere più clienti vanno ancora definiti: informativa ai locali, durata di conservazione delle pratiche non concluse, cancellazione definitiva degli allegati in R2, copia di sicurezza e ripristino del database.
+
+La pagina di una pratica legge il menu online da GitHub in sola lettura per mostrare «Cosa cambia»; ogni lettura lascia una riga nel registro e non salva copie del menu.
+
+**Frasi non capite (6 ottobre 2026).** Quando Jarvis non applica una correzione alla bozza, nel registro delle attività restano il testo del comando di Riccardo (massimo 220 caratteri) e il motivo. Non contiene dati dei clienti oltre a quelli già scritti nel comando e serve solo a migliorare Jarvis.

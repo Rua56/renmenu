@@ -4,6 +4,14 @@
 
 > **Regola di manutenzione.** Ogni modifica a Jarvis o alla Control Room aggiorna, nella stessa pull request, questo README, le policy in `docs/` quando cambia un comportamento e il registro in [`control-room/docs/CHANGELOG.md`](control-room/docs/CHANGELOG.md). Il funzionamento passo per passo è in [`control-room/docs/jarvis-funzionamento.md`](control-room/docs/jarvis-funzionamento.md).
 
+**Comprensione (6 ottobre 2026):** i comandi chiari vanno alla bozza in primo piano anche se il modello è incerto; le frasi non capite restano nel registro e diventano test (`tests/jarvis-corpus.test.mjs`); i modelli lenti sono saltati per 10 minuti.
+
+**Coperto (6 ottobre 2026):** detto a Telegram va nel campo coperto, in fondo al menu sopra le informazioni, mai in una sezione propria.
+
+**Sezioni (6 ottobre 2026):** da Telegram si possono unire o togliere sezioni, e dalla Modifica a mano togliere voci e sezioni intere (con «Rimetti» prima di salvare); una frase senza nome del locale riguarda la pratica in primo piano.
+
+**Interfaccia (dal 6 ottobre 2026):** tre voci in una barra in basso (Oggi, Locali, Sistema), con l'aspetto del modello approvato e la barra «Scrivi o parla a Jarvis…» che rimanda a Telegram. Oggi elenca solo ciò che aspetta una decisione; ogni pratica ha la sua pagina (avanzamento, «Cosa cambia», «Modifica a mano», passo successivo). Gli strumenti completi (Revisione, Richieste, Approvazioni, Builder, Materiali, Anteprima, Notifiche, Registro, Voce) sono in Sistema. Dettagli in `control-room/docs/jarvis-funzionamento.md`.
+
 ## Ambienti e accesso
 
 | Ambiente | Origine | Dati e azioni |
@@ -94,7 +102,7 @@ I valori reali stanno solo nei Secret e nelle variabili di Cloudflare Pages, mai
 - Copia di sicurezza: ogni notte alle 3 il database D1 viene salvato nel bucket R2 (`backups/d1/AAAA-MM-GG.json.gz`, 30 giorni di storico). Il ripristino su un database nuovo si fa con `node control-room/staging/d1-restore.mjs` (istruzioni nel file). La prima copia reale va controllata dopo la distribuzione.
 - La spedizione reale dell'email con QR in allegato non è ancora stata provata su un cliente: la prima prova è la pubblicazione di Osteria Codelli 23.
 - Lingue: la traduzione automatica implementata è l'inglese; tedesco e sloveno richiedono preparazione aggiuntiva.
-- Trattoria Blanch usa un formato diverso da `menus/<id>.json` (vedi `blanch/README.md`): è registrata come cliente, ma le modifiche tramite Jarvis richiedono un adattatore dedicato.
+- Trattoria Blanch ha un formato proprio (`blanch/`): Jarvis lo legge e lo modifica con un adattatore dedicato. Non può contenere allergeni per piatto, telefono, coperto, tag o foto; il QR già stampato non cambia mai.
 - Con il piano gratuito di Gemini Google può usare i testi inviati per migliorare i suoi prodotti: va bene per menu pubblici, da valutare per materiali riservati.
 
 Licenze di terzi: `qrcode-generator` (MIT, anche in `control-room/cloudflare/functions/_lib/vendor/`) e `pdfjs-dist` (Apache 2.0), con i file di licenza accanto al codice.

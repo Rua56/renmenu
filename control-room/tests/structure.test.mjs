@@ -25,7 +25,8 @@ describe('Vini e bevande con più prezzi', () => {
   it('due prezzi senza etichetta: calice/bottiglia solo in una sezione vini, e da confermare', () => {
     const wine = read('Vini rossi\nMerlot 5/25\nRefosco 6,00 30,00');
     assert.deepEqual(wine.menu.sezioni[0].voci.map(prices), [['Calice 5,00', 'Bottiglia 25,00'], ['Calice 6,00', 'Bottiglia 30,00']]);
-    assert.equal(wine.confirm.length, 2);
+    // Una sola nota per sezione (non una per vino).
+    assert.equal(wine.confirm.length, 1);
     assert.match(wine.confirm[0].hint, /Conferma/);
     // Fuori da una sezione vini o con prezzi al contrario: nessuna etichetta inventata.
     const food = read('Primi\nGnocchi 10/12\nTagliatelle 9');
@@ -270,4 +271,30 @@ describe('Revisione: vini calice/bottiglia e portate del percorso non sono «pre
     const emptyVariant = structuredClone(r.menu); emptyVariant.sezioni.at(-1).voci[0].prezzi[1].prezzo = '';
     assert.equal(criticalFields(emptyVariant).pricesMissing.length, 1);
   });
+});
+
+it('allergeni scritti come «Allergeni: 1, 4, 7 *» o davanti alla descrizione: proposti, e tolti dal testo quando li accetti (menu La Chincaglieria)', async () => {
+  const { proposeMenuAllergens, applyExtras } = await import('../cloudflare/functions/_lib/extras.js');
+  const voce = (nome, descrizione) => ({ nome: { it: nome, en: nome }, prezzo: '10,00', ...(descrizione ? { descrizione: { it: descrizione, en: descrizione.replace('Allergeni', 'Allergens') } } : {}) });
+  const menu = { id: 'x', nome: 'X', lingue: ['it', 'en'], sezioni: [{ nome: { it: 'Piatti' }, voci: [
+    voce('Zucca in saor', 'Zucca al forno, cipolla rossa, pinoli e uvetta Allergeni: 12 contiene prodotti naturalmente privi di glutine'),
+    voce('Millefoglie', 'Allergeni: 1, 4, 7 *'),
+    voce('Uovo', 'uovo morbido, crema di funghi Allergeni: 7 *@'),
+    voce('Vellutata', 'Allergeni:1, 4, 7, 9 @'),
+    voce('Patate', 'Allergeni: --'),
+    voce('La mela', '(3-7-8) mela cotta al forno'),
+    voce('Strano', 'Allergeni: 7, 40')
+  ] }] };
+  const proposals = proposeMenuAllergens(menu);
+  assert.deepEqual(proposals.map((p) => [p.name, p.codes.join(',')]), [['Zucca in saor', '12'], ['Millefoglie', '1,4,7'], ['Uovo', '7'], ['Vellutata', '1,4,7,9'], ['La mela', '3,7,8']]);
+  const out = applyExtras(menu, proposals, () => 'foto').menu.sezioni[0].voci;
+  assert.deepEqual(out[0].allergeni, ['12']);
+  assert.equal(out[0].descrizione.it, 'Zucca al forno, cipolla rossa, pinoli e uvetta contiene prodotti naturalmente privi di glutine');
+  assert.equal(out[1].descrizione, undefined, 'solo numeri e simboli: nessuna descrizione');
+  assert.equal(out[2].descrizione.it, 'uovo morbido, crema di funghi');
+  assert.equal(out[2].descrizione.en, 'uovo morbido, crema di funghi');
+  assert.equal(out[3].descrizione, undefined);
+  assert.equal(out[4].descrizione.it, 'Allergeni: --', 'senza numeri non si tocca nulla');
+  assert.equal(out[5].descrizione.it, 'Mela cotta al forno');
+  assert.equal(out[6].descrizione.it, 'Allergeni: 7, 40', 'numeri fuori da 1–14: non si propone nulla');
 });

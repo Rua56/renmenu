@@ -5,11 +5,14 @@
 // deve essere stato detto davvero (anche a parole) e ogni parola di un nome nuovo deve venire dalla
 // frase o dal nome precedente. Se una sola operazione non regge, non si applica nulla.
 import { CLOUDFLARE_FREE_MODEL } from './ai-live.js';
+import { normalizeHours } from './hours.js';
+import { coverIn } from './venue-info.js';
 import { DIREZIONI } from './premium.js';
 
-export const OP_TYPES = ['prezzo', 'varianti', 'aggiungi', 'rimuovi', 'rinomina', 'descrizione', 'sposta', 'rinomina_sezione', 'motto', 'aspetto', 'locale', 'storia'];
+export const OP_TYPES = ['prezzo', 'varianti', 'aggiungi', 'rimuovi', 'rinomina', 'descrizione', 'sposta', 'rinomina_sezione', 'rimuovi_sezione', 'unisci_sezioni', 'motto', 'aspetto', 'locale', 'storia'];
 
 const plain = (value) => String(value || '').toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '');
+const capFirst = (text) => String(text || '').replace(/^([^A-Za-zÀ-ÿ]*)([a-zà-ÿ])/, (_, lead, first) => lead + first.toLocaleUpperCase('it-IT'));
 const words = (value) => plain(value).replace(/[^a-z0-9]+/g, ' ').trim().split(/\s+/).filter(Boolean);
 const itText = (value) => (typeof value === 'string' ? value : value?.it || '');
 
@@ -86,7 +89,7 @@ const OP_SCHEMA = {
       si: { type: 'integer' }, vi: { type: 'integer' }, nome: { type: 'string' }, prezzo: { type: 'string' },
       varianti: { type: 'array', items: { type: 'object', properties: { etichetta: { type: 'string' }, prezzo: { type: 'string' } }, required: ['etichetta', 'prezzo'] } },
       campo: { type: 'string' }, direzione: { type: 'string' }, colori: { type: 'object', properties: { fondo: { type: 'string' }, testo: { type: 'string' }, accento: { type: 'string' }, secondario: { type: 'string' } } },
-      descrizione: { type: 'string' }, sezione: { type: 'string' }, a_si: { type: 'integer' }, dopo_vi: { type: 'integer' }
+      descrizione: { type: 'string' }, sezione: { type: 'string' }, a_si: { type: 'integer' }, dopo_vi: { type: 'integer' }, sezioni: { type: 'array', items: { type: 'integer' } }
     }, required: ['tipo'] } },
     dubbio: { type: 'string' }
   },
@@ -95,9 +98,9 @@ const OP_SCHEMA = {
 const SYSTEM = [
   'Sei Jarvis, assistente di Riccardo per RenMenu. Riccardo ti detta (anche a voce, con errori di trascrizione) una correzione alla BOZZA di un menu.',
   'Trasformala in operazioni, usando SOLO gli indici dell’elenco: [S2] è la sezione 2, [2.5] è la voce 5 della sezione 2 (si=2, vi=5).',
-  'Tipi consentiti: prezzo (si, vi, prezzo); varianti (si, vi, varianti[{etichetta, prezzo}]: più prezzi per la stessa voce, per esempio calice e bottiglia, piccola e grande, oppure vitello e maiale se il nome elenca le alternative); aggiungi (si, nome, prezzo oppure varianti, descrizione facoltativa, dopo_vi facoltativo; se la sezione è nuova scrivi il suo nome in sezione e ometti si); rimuovi (si, vi); rinomina (si, vi, nome); descrizione (si, vi, descrizione; stringa vuota per toglierla); sposta (si, vi, a_si; se la sezione di destinazione non esiste ancora scrivi il suo nome in sezione e ometti a_si); rinomina_sezione (si, nome); motto (nome: la frase che compare sotto il logo nell’apertura del menu Premium, per esempio uno slogan del locale; nessun indice); locale (campo: indirizzo, telefono, instagram, maps, orari o sottotitolo; nome: il valore scritto da Riccardo); storia (nome: il testo della storia del locale, solo menu Premium, paragrafi separati da una riga a capo; nessun indice); aspetto (direzione: editoriale, bistrot o moderno; colori: {fondo, testo, accento, secondario} in formato #rrggbb, solo quelli che Riccardo ha scritto; nessun indice).',
+  'Tipi consentiti: prezzo (si, vi, prezzo); varianti (si, vi, varianti[{etichetta, prezzo}]: più prezzi per la stessa voce, per esempio calice e bottiglia, piccola e grande, oppure vitello e maiale se il nome elenca le alternative); aggiungi (si, nome, prezzo oppure varianti, descrizione facoltativa, dopo_vi facoltativo; se la sezione è nuova scrivi il suo nome in sezione e ometti si); rimuovi (si, vi); rinomina (si, vi, nome); descrizione (si, vi, descrizione; stringa vuota per toglierla); sposta (si, vi, a_si; se la sezione di destinazione non esiste ancora scrivi il suo nome in sezione e ometti a_si); rinomina_sezione (si, nome); rimuovi_sezione (si: toglie l’intera sezione con tutte le sue voci, solo se Riccardo chiede di togliere la sezione); unisci_sezioni (sezioni: [indici delle sezioni da unire, per esempio [5,6,7]]: le voci finiscono tutte nella prima, le altre spariscono; usalo quando Riccardo vuole una sola sezione al posto di più sezioni con lo stesso nome); motto (nome: la frase che compare sotto il logo nell’apertura del menu Premium, per esempio uno slogan del locale; nessun indice); locale (campo: indirizzo, telefono, instagram, maps, orari, sottotitolo o coperto; nome: il valore scritto da Riccardo; per orari scrivi le sue parole, Jarvis le riordina; per coperto nome è solo l’importo, per esempio 3,00: il coperto NON è mai una sezione né una voce, va sempre in locale con campo coperto); storia (nome: il testo della storia del locale, solo menu Premium, paragrafi separati da una riga a capo; nessun indice); aspetto (direzione: editoriale, bistrot o moderno; colori: {fondo, testo, accento, secondario} in formato #rrggbb, solo quelli che Riccardo ha scritto; nessun indice).',
   'Regole ferree: non inventare nulla. Nomi, prezzi e descrizioni devono essere quelli detti da Riccardo (i prezzi in formato 12,00). Non toccare le voci che Riccardo non nomina. Non scrivere allergeni, ingredienti o traduzioni. Se la richiesta è incomprensibile o ambigua, restituisci operazioni vuote e spiega in «dubbio», in italiano, cosa ti serve sapere.',
-  'Per dividere una voce in due piatti distinti: rimuovi la voce e aggiungi i due piatti nella stessa sezione. Se Riccardo dice di tenere una voce con due prezzi, usa varianti. Rispondi solo con JSON, in questa forma: {"operazioni":[{"tipo":"sposta","si":10,"vi":0,"sezione":"Bevande"},{"tipo":"prezzo","si":2,"vi":1,"prezzo":"9,00"}],"dubbio":""}. Ogni operazione ha sempre il campo «tipo».'
+  'Una sezione nuova si crea una volta sola: se aggiungi più voci alla stessa sezione nuova, scrivi lo stesso nome in sezione e Jarvis le mette tutte insieme. Per dividere una voce in due piatti distinti: rimuovi la voce e aggiungi i due piatti nella stessa sezione. Se Riccardo dice di tenere una voce con due prezzi, usa varianti. Rispondi solo con JSON, in questa forma: {"operazioni":[{"tipo":"sposta","si":10,"vi":0,"sezione":"Bevande"},{"tipo":"prezzo","si":2,"vi":1,"prezzo":"9,00"}],"dubbio":""}. Ogni operazione ha sempre il campo «tipo».'
 ].join('\n');
 
 function parseJson(text) {
@@ -197,6 +200,13 @@ export function validateOps(rawOps, menu, utterance) {
     const type = OP_TYPES.includes(written) ? written : OP_TYPES.slice().sort((x, y) => y.length - x.length).find((t) => written.startsWith(t)) || written;
     if (!OP_TYPES.includes(type)) { problems.push(`Operazione non riconosciuta (tipo «${clip(raw?.tipo, 30) || 'vuoto'}», ricevuto ${clip(JSON.stringify(raw ?? null), 110)}).`); continue; }
     const si = Number.isInteger(raw.si) ? raw.si : null, vi = Number.isInteger(raw.vi) ? raw.vi : null;
+    if (type === 'aggiungi' && plain(clip(raw.nome, 80)).replace(/[^a-z]/g, '') === 'coperto') {
+      // Il coperto non è una voce di menu: va nelle informazioni in fondo, sopra i contatti.
+      const p = normalizePrice(raw.prezzo);
+      if (!p || !prices.has(p)) { problems.push('Coperto: non ho sentito l’importo.'); continue; }
+      if (!ops.some((o) => o.tipo === 'locale' && o.campo === 'coperto')) ops.push({ tipo: 'locale', campo: 'coperto', nome: p });
+      continue;
+    }
     if (type === 'aggiungi') {
       const name = clip(raw.nome, 80);
       const label = `Nuova voce «${name || '?'}»`;
@@ -239,9 +249,26 @@ export function validateOps(rawOps, menu, utterance) {
       ops.push(entry); continue;
     }
     if (type === 'locale') {
-      const field = plain(raw.campo);
-      const FIELDS = ['indirizzo', 'telefono', 'instagram', 'maps', 'orari', 'sottotitolo'];
-      if (!FIELDS.includes(field)) { problems.push('Dati del locale: il campo deve essere indirizzo, telefono, instagram, maps, orari o sottotitolo.'); continue; }
+      const written = plain(raw.campo).replace(/[^a-z]+/g, ' ').trim();
+      const field = ['indirizzo', 'telefono', 'instagram', 'maps', 'orari', 'sottotitolo', 'coperto'].find((f) => written === f || written.split(' ').includes(f)) || written;
+      const FIELDS = ['indirizzo', 'telefono', 'instagram', 'maps', 'orari', 'sottotitolo', 'coperto'];
+      if (!FIELDS.includes(field)) { problems.push('Dati del locale: il campo deve essere indirizzo, telefono, instagram, maps, orari, sottotitolo o coperto.'); continue; }
+      if (field === 'coperto') {
+        const p = normalizePrice(String(raw.nome ?? raw.testo ?? raw.prezzo ?? '').replace(/[^\d,.]/g, ''));
+        if (!p || !prices.has(p)) { problems.push('Coperto: non ho sentito l’importo.'); continue; }
+        if (ops.some((o) => o.tipo === 'locale' && o.campo === 'coperto')) { problems.push('Coperto: uno solo per volta.'); continue; }
+        ops.push({ tipo: 'locale', campo: 'coperto', nome: p }); continue;
+      }
+      if (field === 'orari') {
+        // Orari: si leggono giorni e fasce e si scrivono in modo ordinato (italiano e inglese), partendo da quelli già nel menu.
+        const current = typeof menu?.orari === 'object' ? menu.orari?.it : menu?.orari;
+        const tidy = [raw.nome, raw.testo, utterance].map((text) => (text ? normalizeHours({ existing: current, text: String(text), utterance }) : null)).find(Boolean);
+        if (tidy) {
+          if (ops.some((o) => o.tipo === 'locale' && o.campo === 'orari')) { problems.push('Dati del locale (orari): uno solo per volta.'); continue; }
+          ops.push({ tipo: type, campo: 'orari', nome: tidy.it, en: tidy.en }); continue;
+        }
+        if (String(raw.nome ?? raw.testo ?? '').replace(/\s+/g, ' ').trim().length > 200) { problems.push('Dati del locale (orari): testo troppo lungo. Dimmi giorni e fasce, per esempio «mercoledì chiuso, gli altri giorni 12-15 e 19-22».'); continue; }
+      }
       let value = clip(raw.nome ?? raw.testo, field === 'orari' ? 200 : field === 'maps' ? 300 : 120);
       if (field === 'instagram') value = value.replace(/^https?:\/\/(?:www\.)?instagram\.com\//i, '').replace(/^@/, '').replace(/\/$/, '');
       const okShape = { telefono: /^\+?[0-9][0-9 ().-]{5,23}$/, instagram: /^[a-z0-9._]{1,30}$/i, maps: /^https:\/\/\S+$/ }[field];
@@ -273,6 +300,22 @@ export function validateOps(rawOps, menu, utterance) {
       if (!name || !textGrounded(name, said, itText(section(si).nome))) { problems.push(`Sezione «${itText(section(si).nome)}»: il nuovo nome non corrisponde a quello che hai detto.`); continue; }
       ops.push({ tipo: type, si, nome: name });
       continue;
+    }
+    if (type === 'rimuovi_sezione') {
+      const sec = section(si);
+      if (!sec) { problems.push('Togli sezione: sezione inesistente.'); continue; }
+      if (!itemNamed(sec, said)) { problems.push(`Sezione «${itText(sec.nome)}»: non l’hai nominata, non la tolgo.`); continue; }
+      if (touched.has(`s${si}`)) { problems.push(`Sezione «${itText(sec.nome)}»: troppe operazioni sulla stessa sezione.`); continue; }
+      touched.add(`s${si}`); ops.push({ tipo: type, si }); continue;
+    }
+    if (type === 'unisci_sezioni') {
+      const wanted = [...new Set((Array.isArray(raw.sezioni) ? raw.sezioni : []).filter((n) => Number.isInteger(n)))].sort((a, b) => a - b);
+      if (wanted.length < 2 || wanted.length > 8 || wanted.some((n) => !section(n))) { problems.push('Unisci sezioni: non ho capito quali sezioni unire.'); continue; }
+      const unnamed = wanted.find((n) => !itemNamed(section(n), said));
+      if (unnamed !== undefined) { problems.push(`Sezione «${itText(section(unnamed).nome)}»: non l’hai nominata, non la unisco.`); continue; }
+      if (wanted.some((n) => touched.has(`s${n}`))) { problems.push('Unisci sezioni: troppe operazioni sulle stesse sezioni.'); continue; }
+      wanted.forEach((n) => touched.add(`s${n}`));
+      ops.push({ tipo: type, si: wanted[0], altre: wanted.slice(1) }); continue;
     }
     const target = item(si, vi);
     if (!target) { problems.push(`Una modifica indica la voce [${si}.${vi}] che non esiste nell’elenco.`); continue; }
@@ -311,6 +354,21 @@ export function validateOps(rawOps, menu, utterance) {
       ops.push({ tipo: type, si, vi, descrizione: text }); continue;
     }
   }
+  // Il coperto detto con un solo importo chiaro, se il modello non ha prodotto l'operazione, lo ricavo io.
+  if (!ops.some((o) => o.tipo === 'locale' && o.campo === 'coperto') && !problems.some((p) => /^Coperto/.test(p)) && /\bcoperto\b/i.test(utterance) && !ops.some((o) => o.tipo === 'rimuovi' || o.tipo === 'rimuovi_sezione')) {
+    const cover = coverIn(utterance);
+    if (cover?.value && !cover.doubt) {
+      ops.push({ tipo: 'locale', campo: 'coperto', nome: cover.value });
+      // Il modello aveva sbagliato il campo: l'operazione giusta l'ho ricavata dalle parole dette.
+      for (let i = problems.length - 1; i >= 0; i -= 1) if (/^Dati del locale: il campo/.test(problems[i])) problems.splice(i, 1);
+    }
+  }
+  // Se la frase parla chiaramente di orari ma il modello non ha prodotto l'operazione, la ricavo io dalle parole dette.
+  if (!ops.some((o) => o.tipo === 'locale' && o.campo === 'orari') && !problems.some((p) => /orari/i.test(p)) && /\b(?:orari|orario|aperti|apriamo|apertura|chiusi|chiuso|chiusura|chiudiamo)\b/i.test(utterance)) {
+    const current = typeof menu?.orari === 'object' ? menu.orari?.it : menu?.orari;
+    const tidy = normalizeHours({ existing: current, text: utterance });
+    if (tidy) ops.push({ tipo: 'locale', campo: 'orari', nome: tidy.it, en: tidy.en });
+  }
   return { ops, problems };
 }
 
@@ -325,16 +383,20 @@ export function applyOps(menuIn, provenanceIn, ops, source) {
   const menu = structuredClone(menuIn);
   const summary = [];
   let needsEnglish = false;
+  const coverRows = [];
+  const hoursRows = []; // provenienza di orari.it / orari.en quando Jarvis li riscrive
   // Identità stabile delle voci e delle sezioni, per ricostruire la provenienza dopo spostamenti e rimozioni.
   menu.sezioni.forEach((section, si) => { section.__s = si; section.voci.forEach((item, vi) => { item.__k = `${si}.${vi}`; }); });
   const byKey = (key) => { for (const section of menu.sezioni) for (const item of section.voci) if (item.__k === key) return { section, item }; return null; };
   const changedFields = new Map(); // key → Set di prefissi di campo da non conservare
   const mark = (key, field) => { if (!changedFields.has(key)) changedFields.set(key, new Set()); changedFields.get(key).add(field); };
   const fresh = []; // voci nuove: { item, fields }
+  const emptied = new Set(); // sezioni rimaste senza voci dopo una rimozione o uno spostamento
   for (const op of ops) {
     if (op.tipo === 'aggiungi') {
       let section = op.si !== undefined ? menu.sezioni.find((s) => s.__s === op.si) : null;
-      if (!section && op.sezione) { section = { nome: { it: op.sezione }, voci: [], __s: `n${menu.sezioni.length}` }; menu.sezioni.push(section); summary.push(`Nuova sezione «${op.sezione}».`); }
+      if (!section && op.sezione) section = menu.sezioni.find((s) => plain(itText(s.nome)) === plain(op.sezione)) || null;
+      if (!section && op.sezione) { section = { nome: { it: capFirst(op.sezione) }, voci: [], __s: `n${menu.sezioni.length}` }; menu.sezioni.push(section); summary.push(`Nuova sezione «${capFirst(op.sezione)}».`); }
       const item = { nome: { it: op.nome } };
       if (op.varianti) item.prezzi = op.varianti.map((v) => ({ etichetta: { it: v.etichetta }, prezzo: v.prezzo }));
       else if (op.prezzo) item.prezzo = op.prezzo;
@@ -357,8 +419,20 @@ export function applyOps(menuIn, provenanceIn, ops, source) {
     }
     if (op.tipo === 'locale') {
       const localized = op.campo === 'orari' || op.campo === 'sottotitolo';
-      menu[op.campo] = localized ? { it: op.nome } : op.nome;
-      if (localized) needsEnglish = true;
+      menu[op.campo] = localized ? { it: op.nome, ...(op.en ? { en: op.en } : {}) } : op.nome;
+      if (op.campo === 'coperto') {
+        coverRows.push({ path: 'coperto', source, value: op.nome, status: 'confermato' });
+        // Un vecchio «Coperto» scritto come sezione con la sola voce coperto passa nelle informazioni in fondo.
+        const legacy = menu.sezioni.filter((s) => plain(itText(s.nome)) === 'coperto' && s.voci.every((v) => plain(itText(v.nome)) === 'coperto'));
+        for (const old of legacy) menu.sezioni.splice(menu.sezioni.indexOf(old), 1);
+        summary.push(`Coperto: ${op.nome} € (in fondo al menu, nelle informazioni${legacy.length ? '; tolta la sezione «Coperto»' : ''}).`);
+        continue;
+      }
+      if (localized && !op.en) needsEnglish = true;
+      if (op.campo === 'orari') {
+        hoursRows.push({ path: 'orari.it', source, value: op.nome, status: 'confermato' });
+        if (op.en) hoursRows.push({ path: 'orari.en', source: 'Orari italiani riscritti in inglese da Jarvis (nessuna traduzione automatica)', value: op.en, status: 'confermato' });
+      }
       summary.push(`${{ indirizzo: 'Indirizzo', telefono: 'Telefono', instagram: 'Instagram', maps: 'Link Google Maps', orari: 'Orari', sottotitolo: 'Sottotitolo' }[op.campo]}: «${op.nome}».`);
       continue;
     }
@@ -379,6 +453,30 @@ export function applyOps(menuIn, provenanceIn, ops, source) {
       summary.push(`Sezione «${itText(section.nome)}» → «${op.nome}».`);
       section.nome = { it: op.nome };
       needsEnglish = true;
+      continue;
+    }
+    if (op.tipo === 'rimuovi_sezione') {
+      const target = menu.sezioni.find((s) => s.__s === op.si);
+      if (!target) continue;
+      menu.sezioni.splice(menu.sezioni.indexOf(target), 1);
+      summary.push(`Sezione «${itText(target.nome)}» tolta${target.voci.length ? ` con le sue ${target.voci.length} voci` : ''}.`);
+      continue;
+    }
+    if (op.tipo === 'unisci_sezioni') {
+      const dest = menu.sezioni.find((s) => s.__s === op.si);
+      if (!dest) continue;
+      let moved = 0, dropped = 0;
+      for (const other of op.altre) {
+        const from = menu.sezioni.find((s) => s.__s === other);
+        if (!from || from === dest) continue;
+        for (const item of from.voci) {
+          const twin = dest.voci.some((v) => plain(itText(v.nome)) === plain(itText(item.nome)) && priceText(v) === priceText(item));
+          if (twin) { dropped += 1; continue; }
+          dest.voci.push(item); moved += 1;
+        }
+        menu.sezioni.splice(menu.sezioni.indexOf(from), 1);
+      }
+      summary.push(`Sezioni «${itText(dest.nome)}» unite in una sola${moved ? `: ${moved} voci spostate` : ''}${dropped ? `, ${dropped} doppioni tolti` : ''}.`);
       continue;
     }
     const found = byKey(`${op.si}.${op.vi}`);
@@ -404,14 +502,16 @@ export function applyOps(menuIn, provenanceIn, ops, source) {
       section.voci.splice(section.voci.indexOf(item), 1);
       mark(item.__k, '*');
       summary.push(`Tolto «${name}».`);
-      if (!section.voci.length) summary.push(`Attenzione: la sezione «${itText(section.nome)}» è rimasta senza piatti.`);
+      emptied.add(section);
     } else if (op.tipo === 'sposta') {
-      let dest = op.a_si !== undefined ? menu.sezioni.find((s) => s.__s === op.a_si) : menu.sezioni.find((s) => s.__new && plain(itText(s.nome)) === plain(op.sezione));
-      if (!dest && op.sezione) { dest = { nome: { it: op.sezione }, voci: [], __new: true, __s: `n${menu.sezioni.length}` }; menu.sezioni.push(dest); needsEnglish = true; summary.push(`Nuova sezione «${op.sezione}».`); }
-      section.voci.splice(section.voci.indexOf(item), 1); dest.voci.push(item); mark(item.__k, '*');
+      let dest = op.a_si !== undefined ? menu.sezioni.find((s) => s.__s === op.a_si) : menu.sezioni.find((s) => plain(itText(s.nome)) === plain(op.sezione));
+      if (!dest && op.sezione) { dest = { nome: { it: capFirst(op.sezione) }, voci: [], __new: true, __s: `n${menu.sezioni.length}` }; menu.sezioni.push(dest); needsEnglish = true; summary.push(`Nuova sezione «${capFirst(op.sezione)}».`); }
+      section.voci.splice(section.voci.indexOf(item), 1); dest.voci.push(item); mark(item.__k, '*'); emptied.add(section);
       summary.push(`«${name}» spostato in «${itText(dest.nome)}».`);
     }
   }
+  // Una sezione rimasta senza piatti per queste modifiche sparisce: un menu con sezioni vuote non è valido.
+  for (const section of emptied) if (!section.voci.length && menu.sezioni.includes(section)) { menu.sezioni.splice(menu.sezioni.indexOf(section), 1); summary.push(`Sezione «${itText(section.nome)}» tolta: non aveva più piatti.`); }
   // Provenienza: righe di voci rimosse/spostate/modificate cadono, le altre seguono la voce.
   const location = new Map();
   menu.sezioni.forEach((section, si) => section.voci.forEach((item, vi) => { if (item.__k) location.set(item.__k, `${si}.${vi}`); }));
@@ -434,8 +534,11 @@ export function applyOps(menuIn, provenanceIn, ops, source) {
       provenance.push({ ...row, path: `sezioni.${at}.${sectionMatch[2]}` });
       continue;
     }
+    if (hoursRows.length && /^orari(\.|$)/.test(path)) continue;
+    if (coverRows.length && path === 'coperto') continue;
     provenance.push(row);
   }
+  provenance.push(...hoursRows, ...coverRows);
   // Fonte delle voci nuove o cambiate: Riccardo, via Telegram.
   menu.sezioni.forEach((section, si) => section.voci.forEach((item, vi) => {
     const isNew = fresh.includes(item), fields = changedFields.get(item.__k);

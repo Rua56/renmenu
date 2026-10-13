@@ -28,7 +28,7 @@ const cut = (s) => s.length > 160 ? `${s.slice(0, 157)}…` : s;
 
 const STYLE = [
   ['editoriale', /\belegant\w*|raffinat\w*|\bclassic\w*|\bstoric\w*|gourmet|stellat\w*|sobri\w*|\bchic\b|lusso|lussuos\w*|esclusiv\w*|ricercat\w*|signoril\w*/],
-  ['bistrot', /rustic\w*|\bcald[oaie]\b|familiar\w*|tradizional\w*|accoglient\w*|\blegno\b|vintage|\bretro\b|\bosteria\b|\btrattoria\b|\benoteca\b|artigianal\w*|casereccio|genuin\w*/],
+  ['bistrot', /\bbistrot\b|rustic\w*|\bcald[oaie]\b|familiar\w*|tradizional\w*|accoglient\w*|\blegno\b|vintage|\bretro\b|\bosteria\b|\btrattoria\b|\benoteca\b|artigianal\w*|casereccio|genuin\w*/],
   ['moderno', /modern\w*|giovan\w*|minimal\w*|contemporane\w*|\burban\w*|\bpop\b|audac\w*|colorat\w*|dinamic\w*|\bfresc[oa]\b|street|\bgrintos\w*|essenzial\w*/]
 ];
 // Parole colore → tinta curata (leggibile su carta chiara). Prima le espressioni composte.
@@ -69,7 +69,7 @@ const OUT_OF_SCOPE = [
 export function creativeBrief(text, { attachments = 0 } = {}) {
   const rows = sentences(text);
   const brief = { stile: [], colori: [], sfondoScuro: false, lingue: [], lingueFuori: [], sezioni: [], riferimenti: [], logo: null, foto: null, permessoFoto: false,
-    scadenza: null, fuori: [], preventivo: null, mancanti: [], direzione: null };
+    scadenza: null, fuori: [], preventivo: null, mancanti: [], direzione: null, storia: null, galleria: null, schedeVini: null, diciture: [] };
   const seen = new Set();
   const push = (list, key, item) => { if (!seen.has(`${list}:${key}`)) { seen.add(`${list}:${key}`); brief[list].push(item); } };
   for (const row of rows) {
@@ -88,7 +88,7 @@ export function creativeBrief(text, { attachments = 0 } = {}) {
       }
     for (const [code, rx, label] of SPECIALS) if (rx.test(t)) push('sezioni', code, { codice: code, label, fonte: cut(row) });
     for (const m of row.matchAll(/\bhttps?:\/\/[^\s<>"')]+|\bwww\.[^\s<>"')]+/gi)) push('riferimenti', m[0], { tipo: 'link', valore: m[0].replace(/[.,;]$/, ''), fonte: cut(row) });
-    if (/\b(?:come|simile|ispirat\w*|stile del|tipo il|riferimento)\b/.test(t) && /\b(sito|instagram|pagina|locale|menu)\b/.test(t) && !brief.riferimenti.some((r) => r.fonte === cut(row)))
+    if (/\b(?:come|simile|ispirat\w*|stile del|tipo il|riferimento)\b/.test(t) && /\b(sito|instagram|pagina|locale|menu)\b/.test(t) && !/\b(?:storia|galleria|schede)\b/.test(t) && !brief.riferimenti.some((r) => r.fonte === cut(row)))
       push('riferimenti', row, { tipo: 'esempio', valore: cut(row), fonte: cut(row) });
     if (/\blogo\b/.test(t)) {
       const attached = /allegat\w*|in allegato|vi mando|vi invio|ti mando|ti invio|trovate/.test(t);
@@ -100,9 +100,27 @@ export function creativeBrief(text, { attachments = 0 } = {}) {
       if (/(?:potete|puoi|potete pure|liberi di|autorizz\w*|permesso)\b[^.]{0,40}\b(?:usa|utilizz|pubblic|mett)\w*|(?:usate|usa pure|utilizzate)\b[^.]{0,30}\bfoto/.test(t)) brief.permessoFoto = true;
     }
     const due = t.match(/\bentro (?:il |la |fine |meta )?[^,.;]{2,30}|\b(?:apertura|inaugurazion\w*|apriamo)\b[^,.;]{0,40}|\bper (?:il|la) (?:\d{1,2}|prossim\w*|fine)[^,.;]{0,25}/);
-    if (due && !brief.scadenza) brief.scadenza = { testo: due[0].trim(), fonte: cut(row) };
+    if (due && !brief.scadenza && !/prenot|percorso|degustazion|sera stessa|tavol/.test(t)) brief.scadenza = { testo: due[0].trim(), fonte: cut(row) };
     for (const [rx, label] of OUT_OF_SCOPE) if (rx.test(t)) push('fuori', label, { label, fonte: cut(row) });
-    if (!brief.preventivo && /preventivo|quanto (?:costa|verrebbe|spendiamo)|budget|prezzo del servizio|costo totale/.test(t)) brief.preventivo = { fonte: cut(row) };
+    if (!brief.preventivo && /preventivo|quanto (?:costa|verrebbe|spendiamo|costerebbe|tempo)|budget|prezzo del servizio|costo totale|\bacconto\b|tempi e prezzi|prezzi e tempi|che tempi|quali tempi|\bcosti\b/.test(t)) {
+      brief.preventivo = { fonte: cut(row) };
+    }
+    // «Possiamo partire da un acconto già questa settimana»: può stare in una frase dopo la domanda sui prezzi.
+    if (brief.preventivo && /\bacconto\b/.test(t)) {
+      const when = t.match(/\b(?:gia\s+)?(questa settimana|oggi|domani|subito|entro [a-z0-9 ]{2,20})\b/);
+      Object.assign(brief.preventivo, { acconto: true, quando: when ? when[1] : null });
+    }
+    // Pagina «storia del locale»: Jarvis non scrive la storia, annota i fatti scritti dal cliente e chiede il testo.
+    if (/\b(?:pagina|sezione|racconti\w*|raccontare)\b[^.]{0,60}\bstoria\b|\bstoria\b[^.]{0,40}\b(?:locale|osteria|ristorante|famiglia)\b/.test(t) && !brief.storia) {
+      const facts = [...row.matchAll(/\b(?:è nato|e nato|nato|nata|fondat[oa]|aperto|aperta)\s+(?:nel|nel\s+lontano|dal|il|in)\s+[^),.;]{3,60}/gi)].map((m) => m[0].trim());
+      brief.storia = { fatti: facts, fonte: cut(row) };
+    }
+    const gal = t.match(/galleria[^.]{0,40}?\b(\d{1,2}(?:\s*[-–]\s*\d{1,2})?)\s*foto/) || t.match(/\b(\d{1,2}(?:\s*[-–]\s*\d{1,2})?)\s*foto\b[^.]{0,40}galleria/);
+    if ((gal || /\bgalleria\b/.test(t)) && !brief.galleria) brief.galleria = { numero: gal ? gal[1].replace(/\s+/g, '') : null, fonte: cut(row) };
+    if (brief.galleria && !brief.galleria.arrivo && /\b(?:foto|immagini)\b[^.]{0,60}\b(?:whatsapp|domani|mail|email|telegram|dopo)\b|\b(?:whatsapp|domani)\b[^.]{0,40}\b(?:foto|immagini)\b/.test(t)) brief.galleria.arrivo = cut(row);
+    if (/\bschede?\b[^.]{0,30}\bvin[io]\b/.test(t) && !brief.schedeVini) brief.schedeVini = { fonte: cut(row) };
+    const claim = row.match(/\b(?:scritta|dicitura|slogan|claim|vogliamo scrivere|vorremmo scrivere)\s*[:“"«]?\s*[“"«]([^”"»]{4,80})[”"»]/i);
+    if (claim) brief.diciture.push({ testo: claim[1].trim(), dubbio: /non (?:sono |siamo )?(?:sicur\w*|certa|certo|certi)|dubbi\w*|si possa dire|si può dire|non so se/.test(t), fonte: cut(row) });
   }
   if (attachments > 0 && brief.logo?.stato === 'citato') brief.logo.stato = 'allegato';
   const score = { editoriale: 0, bistrot: 0, moderno: 0 };
@@ -117,6 +135,9 @@ export function creativeBrief(text, { attachments = 0 } = {}) {
   if (!brief.logo) brief.mancanti.push('Logo in buona qualità (PNG trasparente o SVG), se esiste');
   else if (brief.logo.stato === 'citato') brief.mancanti.push('Il file del logo: è citato ma non allegato');
   if (brief.foto && !brief.permessoFoto) brief.mancanti.push('Permesso scritto di usare le foto nel menu pubblico');
+  if (brief.storia) brief.mancanti.push('Testo della storia del locale scritto o confermato dal cliente (Jarvis non lo inventa)');
+  if (brief.galleria && !brief.permessoFoto) brief.mancanti.push(`Le foto della galleria${brief.galleria.numero ? ` (${brief.galleria.numero})` : ''} e il permesso scritto di pubblicarle`);
+  if (brief.schedeVini) brief.mancanti.push('Dati per le schede dei vini (cantina, vitigno, annata, descrizione): Jarvis non li inventa');
   if (brief.lingue.length + 1 > 4) brief.mancanti.push(`Lingue: il Premium ne prevede fino a 4, ne sono state chieste ${brief.lingue.length + 1}`);
   return brief;
 }
@@ -189,7 +210,11 @@ export function briefLines(brief) {
   if (brief.scadenza) out.push(`Scadenza: ${brief.scadenza.testo}`);
   if (brief.fuori.length) out.push(`Lavoro su misura (fuori dal template, da quotare): ${brief.fuori.map((f) => f.label).join(', ')}`);
   if (brief.lingueFuori.length) out.push(`Lingue non ancora nel template: ${brief.lingueFuori.map((l) => l.lingua).join(', ')} (lavoro su misura)`);
-  if (brief.preventivo) out.push('Chiede il preventivo: acconto 490 € + 39 €/mese, il totale lo decidi tu');
+  if (brief.storia) out.push(`Pagina storia del locale richiesta${brief.storia.fatti.length ? ` (dal cliente: ${brief.storia.fatti.join('; ')})` : ''}`);
+  if (brief.galleria) out.push(`Galleria foto${brief.galleria.numero ? `: ${brief.galleria.numero} foto` : ''}${brief.galleria.arrivo ? ', il cliente le manda a parte' : ''}`);
+  if (brief.schedeVini) out.push('Schede dei vini principali richieste');
+  for (const d of brief.diciture) out.push(`Dicitura richiesta: «${d.testo}»${d.dubbio ? ' (il cliente stesso ha un dubbio)' : ''}`);
+  if (brief.preventivo) out.push(`Chiede ${brief.preventivo.acconto ? 'tempi, prezzi e può versare un acconto' : 'il preventivo'}${brief.preventivo.quando ? ` (${brief.preventivo.quando})` : ''}: acconto 490 € + 39 €/mese, il totale lo decidi tu`);
   if (brief.mancanti.length) out.push(`Da chiedere al cliente: ${brief.mancanti.join('; ')}`);
   return out;
 }
@@ -201,8 +226,14 @@ export function briefNotes(brief) {
   for (const f of brief.fuori) notes.push({ kind: 'premium', text: f.fonte, hint: `Lavoro su misura: ${f.label}. Non è nel template Premium: valuta e quota tu.` });
   for (const l of brief.lingueFuori) notes.push({ kind: 'premium', text: l.fonte, hint: `Lingua «${l.lingua}» non ancora nel template: lavoro su misura.` });
   if (brief.logo?.stato === 'da_creare') notes.push({ kind: 'premium', text: brief.logo.fonte, hint: 'Logo da creare: lavoro su misura, da quotare.' });
-  for (const m of brief.mancanti) notes.push({ kind: 'premium', text: m, hint: 'Da chiedere al cliente prima di chiudere la grafica.' });
-  if (brief.preventivo) notes.push({ kind: 'premium', text: brief.preventivo.fonte, hint: 'Preventivo: acconto 490 € + 39 €/mese; il totale lo decidi tu, Jarvis non lo scrive.' });
+  for (const m of brief.mancanti.filter((x) => !/^(?:Testo della storia|Le foto della galleria|Dati per le schede)/.test(x))) notes.push({ kind: 'premium', text: m, hint: 'Da chiedere al cliente prima di chiudere la grafica.' });
+  const extraLangs = brief.lingue.filter((code) => code !== 'en');
+  if (extraLangs.length) notes.push({ kind: 'premium', text: `Lingue richieste: italiano + ${LABEL_LANG(brief.lingue)}`, hint: `Jarvis prepara in automatico solo l’inglese: ${LABEL_LANG(extraLangs)} ${extraLangs.length > 1 ? 'sono da preparare' : 'è da preparare'} e da verificare prima di aggiungerle al menu.` });
+  if (brief.storia) notes.push({ kind: 'premium', text: brief.storia.fonte, hint: `Pagina storia richiesta${brief.storia.fatti.length ? `: il cliente scrive solo «${brief.storia.fatti.join('; ')}»` : ''}. Non scrivo la storia da solo: chiedi al cliente il testo e approvalo tu.` });
+  if (brief.galleria) notes.push({ kind: 'premium', text: brief.galleria.fonte, hint: `Galleria${brief.galleria.numero ? ` di ${brief.galleria.numero} foto` : ''}: le foto arrivano a parte${brief.galleria.arrivo ? ' (il cliente le manda)' : ''}. Non entra nulla nel menu senza la tua approvazione.` });
+  if (brief.schedeVini) notes.push({ kind: 'premium', text: brief.schedeVini.fonte, hint: 'Schede dei vini: servono cantina, vitigno, annata e descrizione dal cliente. Jarvis non li inventa.' });
+  for (const d of brief.diciture) notes.push({ kind: 'premium', text: d.fonte, hint: `Dicitura «${d.testo}»: non l’ho inserita.${d.dubbio ? ' Il cliente stesso non è sicuro che si possa dire: verifica con lui prima di pubblicarla.' : ''}` });
+  if (brief.preventivo) notes.push({ kind: 'premium', text: brief.preventivo.fonte, hint: `${brief.preventivo.acconto ? 'Il cliente chiede tempi e prezzi e può versare un acconto' : 'Preventivo richiesto'}${brief.preventivo.quando ? ` (${brief.preventivo.quando})` : ''}: rispondi tu. Acconto 490 € + 39 €/mese; il totale lo decidi tu e i tempi li comunichi tu, Jarvis non li scrive.` });
   return notes;
 }
 

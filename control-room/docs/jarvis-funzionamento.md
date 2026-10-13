@@ -59,19 +59,74 @@ Ingressi e uscite:
 
 Interfaccia mobile-first in HTML e JavaScript senza framework. Protetta da Cloudflare Access (solo `renmenu1569@gmail.com`) e, in più, da una verifica della firma del token lato server su ogni pagina e ogni API. Le scritture accettano solo richieste dello stesso sito.
 
+### Orari di apertura
+
+Gli orari, detti a Telegram o scritti in un'email, vengono letti per giorni e fasce e riscritti in una riga ordinata, uguale in italiano e in inglese, senza traduzione automatica. Esempio: «mercoledì chiuso, da giovedì a martedì dalle 12 alle 15 e dalle 19 alle 22» diventa «12:00–15:00 e 19:00–22:00 · Chiuso il mercoledì». Se dici solo le fasce («12-15 e 19-22») restano i giorni già scritti; se dici un solo giorno cambia solo quello. Ogni orario deve essere stato detto davvero: se la frase è ambigua (giorni senza orario, cifre che non sono orari) Jarvis non scrive nulla e chiede. Il codice è in `_lib/hours.js`. Anche i titoli di sezione scritti tutti in minuscolo («antipasti») prendono l'iniziale maiuscola.
+
+### Foto con formati diversi tra le due letture
+
+Prima del confronto le due letture sono riportate allo stesso formato. Un piatto scritto come titolo con prezzo («# NOME — 10»), o con il nome come titolo e la descrizione sulla riga col prezzo, diventa «Nome — prezzo» con la descrizione sotto. Restano titoli i percorsi degustazione, il coperto e le sezioni con più piatti. Entra in bozza solo ciò che le due letture confermano; il resto resta «da verificare».
+
+Se sul materiale i piatti sono un elenco unico, senza titoli di sezione, Jarvis li mette in una sola sezione «Piatti» e tiene solo i titoli scritti davvero, come «Dolci». Le foto si uniscono nell'ordine in cui sono state mandate e un file che comincia con piatti senza titolo apre la sezione «Piatti», senza finire nell'ultima sezione del file precedente. «Prepara la bozza» a Telegram vale per la pratica in primo piano o nominata, anche a metà nome.
+
+Controllo dopo la pubblicazione: dopo 6 ore, 2 e 7 giorni Jarvis rilegge il menu online e lo confronta con l'ultimo contenuto da lui pubblicato; una nuova pubblicazione dello stesso menu sostituisce la sorveglianza precedente. Avvisa solo se il contenuto cambia senza una pubblicazione sua.
+
+Allergeni scritti dal locale: Jarvis non li deduce mai dal nome del piatto. Riconosce i numeri UE 1–14 scritti tra parentesi o come «Allergeni: 1, 4, 7» (con o senza simboli * @) e li propone nella Revisione, non preselezionati; solo dopo il tuo tocco diventano icone allergeni e i numeri escono dal testo. Una riga letta una sola volta o tagliata resta da verificare.
+
+### Modifiche a un menu già online senza prezzi né piatti
+
+Se la frase non contiene prezzi o piatti da cambiare (per esempio titoli delle sezioni, unione di sezioni, descrizioni), Jarvis crea comunque la pratica di aggiornamento con una bozza identica al menu online (stesso Menu ID, stesso QR) e vi applica la correzione come per ogni bozza. La pratica diventa quella in primo piano per 60 minuti. Pubblicazione e SÌ restano invariati.
+
+### Cliente senza nome (arrivato via email)
+
+Se il cliente si chiama «Nuovo contatto email», Jarvis a voce usa il nome del locale scritto nella bozza (per esempio «Osteria Ponte Vecchio»). Mostrare la bozza su Telegram o provare ad affidarla la mette in primo piano per un'ora: le frasi senza nome del locale («cappesante 18,50») valgono per quella pratica. La scheda cliente non viene rinominata da Jarvis.
+
+### Quando Jarvis non capisce
+
+Ogni frase che Jarvis non riesce ad applicare alla bozza (modifica non valida, nessuna modifica precisa, errore) viene registrata con il motivo nel registro delle attività (azione «jarvis.not_understood»): contiene solo il testo del comando e la ragione, e serve a migliorare Jarvis. Le frasi vere che hanno causato errori diventano test fissi in `tests/jarvis-corpus.test.mjs`. I modelli Gemini che falliscono vengono saltati per 10 minuti.
+
+### Il coperto
+
+Il coperto non è mai una sezione né una voce: si scrive nel campo coperto del menu e compare in fondo, sopra le informazioni del locale. Jarvis lo inserisce solo con un importo che hai detto davvero; se esiste già una sezione «Coperto» fatta solo da quella voce, la toglie e usa il campo. Frasi come «niente coperto» o con più importi restano un dubbio e Jarvis chiede. Le frasi sui dati del locale con un valore («il coperto è 3 euro», «gli orari sono…», «il telefono è…») sono capite come correzione della bozza in primo piano.
+
+### Sezioni e pratica in primo piano
+
+Da Telegram Jarvis sa anche unire sezioni («unifica le tre sezioni bevande»: le voci finiscono in una sola, i doppioni con stesso nome e stesso prezzo vengono tolti) e togliere una sezione intera («togli la sezione bevande»), purché tu la nomini. Più voci aggiunte nella stessa sezione nuova finiscono in una sola sezione, con l'iniziale maiuscola. Se togli tutte le voci di una sezione, la sezione sparisce da sola. Una frase senza il nome del locale riguarda sempre la pratica su cui stai lavorando (si rinnova a ogni correzione e dura 60 minuti): non viene più dedotta dai nomi dei piatti, che in locali diversi si somigliano («caffè», «bibite»). Un nome di locale che compare solo nell'interpretazione del modello e non nella tua frase viene ignorato. Per un menu già online dì il nome del locale.
+
+### Email lunghe e poco chiare
+
+Le email arrivano con le righe spezzate ogni 75 caratteri circa dal programma di posta. Prima di leggerle Jarvis riunisce le righe spezzate (solo se il testo è davvero «a colonna»: un elenco scritto a mano, una voce per riga, non viene toccato) e conserva il numero di righe, così «riga N» nelle note è sempre la riga dell'email originale, che resta intatta nella pratica.
+
+Cosa legge, senza inventare nulla:
+
+- **Prezzi scritti in modo libero**: «10,-», «€6», «14 € (surgelato in inverno)», «18 € / con rucola». La nota dopo il prezzo diventa la descrizione, con le parole del cliente. Numeri che non sono importi («5 tempi», «6 anni», «2 persone», «4 calici») non sono mai prezzi.
+- **Prezzo da chiedere a Riccardo**: se il locale è indeciso, il piatto resta senza prezzo e Jarvis te lo chiede per nome (bozza su Telegram e blocco di «Affida a Jarvis»): rispondi con una frase come «cappesante 18,50». Un prezzo «al mercato, cambia ogni giorno» invece non si chiede: resta senza importo, con le parole del locale in descrizione.
+- **Prezzo da decidere o variabile**: «prezzo da decidere, circa 18-19» non diventa un prezzo (nessun numero dell'intervallo): il piatto entra senza prezzo e una nota chiede a Riccardo di sceglierlo. «Prezzo al mercato, cambia ogni giorno» o «chiedere al cameriere» entrano come descrizione, senza prezzo.
+- **Disponibilità e commenti nel nome**: «(solo in primavera)» passa nella descrizione; «(nome inventato)» e simili vengono tolti dal nome, con una nota.
+- **Percorso degustazione**: il titolo resta intero («Collio in 5 tempi»), ogni formula («5 portate: 65 € a persona (85 € con abbinamento di 4 calici)») è una voce con i suoi prezzi come scritti dal cliente, le regole (prenotazione, minimo persone, giorni non disponibili) vanno nella descrizione del percorso. Il percorso si chiude alla carta dei vini o alla categoria successiva: non assorbe più il resto dell'email. Se il cliente non elenca le portate, una nota lo dice. Gli importi di ogni formula sono scritti anche nella descrizione, perché il visualizzatore Premium non mostra i prezzi in variante (se cambi un prezzo, cambia anche la riga). Le formule con i loro importi contano come prezzi attestati nel controllo prima di «Affida a Jarvis»; le portate senza importo richiedono il prezzo del percorso.
+- **Carta dei vini**: «Carta dei vini (…)» è un titolo di pagina; Bollicine, Bianchi, Rossi, Vini dolci sono sezioni; «6 € / 26 €» è calice e bottiglia (una nota per sezione, da confermare); «solo bottiglia, 32 €» e «solo calice, 12 €» hanno un solo prezzo con la sua etichetta.
+- **Coperto, servizio, ferie, contatti**: l'importo del coperto viene letto anche con altri numeri nella frase («bambini sotto i 6 anni»); la precisazione del cliente e «servizio compreso» finiscono in una nota da confermare. «Il coperto non lo facciamo» non inserisce nulla. «Ad agosto chiudiamo due settimane, date da decidere» è una nota di conferma, non entra negli orari. L'indirizzo email del locale non ha un campo nel menu pubblico: resta nella pratica.
+- **Allergeni**: se l'email ha una legenda numerata e i numeri accanto ai piatti, Jarvis verifica che la legenda sia quella UE 1-14 e propone gli allergeni piatto per piatto (mai preselezionati: li confermi tu). Se la legenda è diversa, o i numeri mancano per alcuni piatti, resta una proposta manuale «da chiedere in cucina». Mai dedotti dagli ingredienti.
+- **Frasi e domande del cliente**: ogni frase di un paragrafo lungo ha la sua nota (storia del locale, galleria, schede dei vini, dicitura richiesta, domanda su prezzi e tempi, acconto). Jarvis non risponde alle domande su prezzi e tempi, non scrive la storia, non inserisce diciture che il cliente stesso mette in dubbio («piatti tutti fatti in casa», dubbio sul pane) e non sceglie foto.
+- **Premium**: la scheda creativa registra il riferimento («come Al Bakaro, più sobrio»), i colori del logo, le lingue chieste (oltre all'inglese, tedesco e sloveno restano da preparare: Jarvis traduce in automatico solo l'inglese), la galleria (numero di foto e come arrivano), le schede dei vini (servono i dati dal cliente) e l'acconto (acconto 490 € + 39 €/mese, totale deciso da Riccardo).
+
+Le righe che Jarvis non capisce non spariscono: restano nell'elenco «Da sistemare o confermare» con il numero di riga.
+
 ### Le schermate
 
-| Gruppo | Schermata | A cosa serve |
+Dal 6 ottobre 2026 la Control Room ha tre voci sempre visibili (telefono e computer): **Oggi**, **Locali**, **Sistema**, in una barra in basso con sopra «Scrivi o parla a Jarvis…». L'aspetto segue il modello approvato (colonna stretta, sfera di Jarvis che diventa ambra quando aspetta il tuo SÌ, schede piatte, tema scuro). Gli strumenti di prima restano tutti, dentro Sistema, con i nuovi colori. La barra «Scrivi o parla a Jarvis…» apre un foglio con il link a Telegram e le frasi utili da copiare: la conversazione vera resta su Telegram.
+
+| Voce | Schermata | A cosa serve |
 |---|---|---|
-| Ogni giorno | Jarvis | Riquadro con messaggi e notifiche di Jarvis, stato delle pratiche |
-| Ogni giorno | Revisione | Controllo della bozza: voci, prezzi, allergeni, lingue, foto, checklist, modifica avanzata, «Rifai la bozza» |
-| Ogni giorno | Richieste | Le pratiche (categoria, piano, fonte, prossimo passo) |
-| Ogni giorno | Clienti | Schede dei locali: piano, email, link del menu, prova e rinnovo |
-| Strumenti | Approvazioni | Anteprima mandata, risposta del locale, SÌ finale |
-| Strumenti | Builder | Estrazione del menu da testo |
-| Strumenti | Materiali | File ricevuti, letture, riletture |
-| Strumenti | Anteprima | Anteprima privata della bozza |
-| Sistema | Notifiche, Registro, Voce | Messaggi, registro di ogni azione, voce del browser |
+| Oggi | Oggi | Saluto di Jarvis, «Da decidere» (cosa aspetta un tuo gesto, in ordine di urgenza), «In corso» (cosa segue Jarvis) e il conteggio di tutte le pratiche. Messaggi e Telegram di Jarvis sotto. |
+| Oggi | Pratica | Una pratica sola (se è un nuovo menu con piano da definire, in cima c'è «Scegli il piano»: tre pulsanti Standard, Annuale, Premium; finché non scegli non compare «Prepara la bozza»): avanzamento (Richiesta, Bozza, Controllo, Il tuo SÌ, Online), «Cosa cambia» rispetto al menu online (lettura in sola lettura da GitHub, registrata nel registro), «Modifica a mano», anteprima e il passo successivo reale (affido a Jarvis o SÌ). Sotto «Dettagli e strumenti»: regole del piano, Revisione, Approvazioni, Materiali, richiesta originale, Registro. |
+| Oggi | Tutte le pratiche | Elenco unico con tre filtri: Da decidere, In corso, Chiuse (le archiviate restano in Sistema, Richieste). |
+| Oggi | Modifica a mano | Sezioni e voci della bozza leggibili: tocco su una voce per cambiare nome o prezzo, «Togli dal menu», «Aggiungi una voce», «Togli la sezione» in fondo a ogni sezione (con «Rimetti» finché non salvi), ricerca. Il salvataggio usa lo stesso comando della Revisione (blocco sulla revisione, validazione, nuova versione): la checklist si azzera e la bozza torna da controllare. Non pubblica nulla. |
+| Locali | Elenco e Locale | Elenco dei locali con ricerca; la pagina di un locale mostra piano, menu, prova, email, le sue pratiche e «Apri il menu» (link pubblico, in sola lettura) |
+| Sistema | Schede cliente complete | Le schede dei locali con piano, email, link del menu, prova e rinnovo |
+| Sistema | Elenco strumenti | Revisione (controllo completo e modifica avanzata JSON, «Rifai la bozza»), Richieste, Approvazioni (PR, pubblicazione, verifica), Builder avanzato, Materiali, Anteprima, Notifiche, Registro, Voce del browser, più «Tutti i numeri e i dettagli» (numeri, coda, email al proprietario, casella Gmail) |
+
+Aprendo uno strumento da una pratica compare «Torna alla pratica». Nessuna azione è cambiata: «Approva e affida a Jarvis» e il SÌ usano gli stessi comandi di prima.
 
 ### I dati (database D1, 12 migrazioni)
 
@@ -124,7 +179,15 @@ Stati della missione: affidata, attesa invio, attesa cliente, attesa SÌ, pubbli
 
 ## Menu in formato proprio (Trattoria Blanch)
 
-Trattoria Blanch è registrata come cliente (scheda, indirizzo del menu `/blanch/`, memoria con piatti e prezzi), ma il suo menu non è in `menus/<id>.json`: si compila da `blanch/data/food.json` e `blanch/data/wines.tsv` con `blanch/tools/build_menu.py`. Jarvis lo riconosce per nome e, se gli si chiede una modifica, risponde che non è ancora collegato e non apre nessuna pratica. Per renderlo modificabile serve un adattatore che aggiorni i tre file in modo coerente e mantenga invariato l'indirizzo del QR già stampato.
+Trattoria Blanch ha un formato proprio: il suo menu si compila da `blanch/data/food.json` e `blanch/data/wines.tsv` in `blanch/data/menu.json` (stesso risultato, byte per byte, di `blanch/tools/build_menu.py`). Jarvis lo legge e lo modifica con un adattatore (`_lib/blanch.js`), con identificativo `trattoria-blanch`.
+
+- **Lettura:** Jarvis legge i tre file da GitHub, controlla che `menu.json` coincida con la compilazione di cibo e vini e li presenta nella forma RenMenu (sezioni e voci). I due importi senza spiegazione («€ 10,00 / 13,00») restano due importi: «Primo prezzo» e «Secondo prezzo». Le varianti calice, quarto, mezzo litro e litro restano tali.
+- **Bozza e anteprima:** come per ogni locale. L'anteprima usa la grafica standard di RenMenu, non la pagina di Blanch.
+- **Pubblicazione (solo dopo il tuo SÌ):** una PR modifica soltanto le righe cambiate di `food.json` e `wines.tsv` e rigenera `menu.json`, mai altro. Un piatto o un vino nuovo ha l'inglese e il tedesco scritti da Jarvis oppure, se mancano, il testo italiano da rivedere. Le righe non toccate restano identiche, con le loro note interne e l'ordine originale.
+- **Cosa non può contenere:** allergeni per piatto, telefono, coperto, tag, foto, schede, tema. Se la bozza li contiene Jarvis si ferma prima di aprire la PR e lo dice. Gli avvisi su coperto e allergie non si cambiano da qui.
+- **Verifica dopo la pubblicazione:** Jarvis rilegge `https://renmenu.pages.dev/blanch/data/menu.json` e la pagina `/blanch/`, e confronta con il menu approvato; il controllo a 6 ore, 2 e 7 giorni e il briefing usano gli stessi indirizzi.
+- **QR:** non cambia mai. Quello stampato resta valido: su richiesta Jarvis manda il link e i file esistenti (`blanch/qr/`), senza generarne uno nuovo.
+- **Se qualcosa non torna** (menu compilato diverso dai sorgenti, formato inatteso): errore chiaro, nessuna scrittura.
 
 ## 6. Piani e regole di servizio
 

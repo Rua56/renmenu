@@ -7,6 +7,7 @@ import { applyVenueInfo, extractVenueInfo } from './venue-info.js';
 // messaggio al cliente, nessuna PR, nessuna pubblicazione.
 import { extractMenuFromText, venueFromSource } from './menu.js';
 import { proposeSourceExtras } from './extras.js';
+import { prepareEmailSource } from './email-text.js';
 import { categoryByCode } from './service-rules.js';
 import { briefLines, creativeBrief } from './premium.js';
 
@@ -89,7 +90,7 @@ export function autopilotPlan(request) {
 /** Anteprima pura di ciò che Jarvis troverà (usata anche dall'importatore per la notifica). */
 export function autopilotPreview(request) {
   const plan = autopilotPlan(request);
-  const text = request.source_text ?? request.sourceText ?? '';
+  const text = prepareEmailSource(request.source_text ?? request.sourceText ?? '');
   const extraction = extractMenuFromText(plan.proposal.venue || 'Locale', text, plan.proposal.venue || 'locale');
   const extras = proposeSourceExtras(text, extraction.menu);
   return {

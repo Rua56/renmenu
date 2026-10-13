@@ -1,3 +1,4 @@
+import { BLANCH_PATHS, BlanchError, blanchToMenu, canonicalBlanch, compileBlanch, exportBlanchFiles, isBlanchSlug } from './blanch.js';
 import { menuDiff, validateMenu } from './menu.js';
 
 // This module is deliberately not wired into the Phase A route.  It is a
@@ -175,7 +176,7 @@ function contentEndpoint(slug, ref) {
 function normalizeCurrent(currentMenu) {
   if (currentMenu === undefined) return undefined;
   if (currentMenu === null || currentMenu?.exists === false) return null;
-  if (currentMenu?.exists === true) return { menu: currentMenu.menu, sha: currentMenu.sha };
+  if (currentMenu?.exists === true) return { menu: currentMenu.menu, sha: currentMenu.sha, legacyFiles: currentMenu.legacyFiles };
   if (currentMenu?.menu && typeof currentMenu.menu === 'object') return { menu: currentMenu.menu, sha: currentMenu.sha };
   return { menu: currentMenu, sha: undefined };
 }
@@ -243,14 +244,14 @@ function prSummary(pr) {
   };
 }
 
-function prBody({ slug, filePath, changes }) {
+function prBody({ slug, filePath, changes, legacy = false }) {
   const added = changes.filter((change) => change.type === 'aggiunto').length;
   const prices = changes.filter((change) => change.type === 'prezzo').length;
   const removed = changes.filter((change) => change.type === 'rimosso').length;
   return [
     '## Proposta menu pubblica',
-    `- File: \`${filePath}\``,
-    `- QR pubblico: \`menu/?m=${slug}\``,
+    legacy ? '- File: `blanch/data/food.json`, `blanch/data/wines.tsv` e `blanch/data/menu.json` (menu compilato)' : `- File: \`${filePath}\``,
+    legacy ? '- Indirizzo pubblico: `blanch/` (invariato, il QR stampato resta valido)' : `- QR pubblico: \`menu/?m=${slug}\``,
     `- Voci aggiunte: ${added}; prezzi modificati: ${prices}; voci rimosse: ${removed}.`,
     '',
     'Verificare il diff, approvare e fare merge manualmente. Nessun merge automatico è configurato.'
@@ -319,6 +320,7 @@ async function createOrRecoverPr(env, prepared, branch, options) {
  */
 export async function readCurrentMenu(env, slug, options = {}) {
   slug = requireSlug(slug);
+  if (isBlanchSlug(slug)) return readBlanchMenu(env, slug, options);
   const ref = options.ref || BASE_BRANCH;
   const result = await githubRequest(env, contentEndpoint(slug, ref), { ...options, allowStatuses: [404] });
   if (result.status === 404) return { exists: false, status: 404, slug, filePath: contentPath(slug), menu: null, sha: null, ref };
@@ -334,6 +336,32 @@ export async function readCurrentMenu(env, slug, options = {}) {
   return { exists: true, status: 200, slug, filePath: contentPath(slug), menu, sha: document.sha, ref };
 }
 
+
+/** Trattoria Blanch: tre file propri invece di menus/<id>.json (vedi blanch.js). Lo «SHA» è la firma dei tre blob. */
+async function readBlanchMenu(env, slug, options) {
+  const ref = options.ref || BASE_BRANCH;
+  const files = {};
+  for (const [key, path] of Object.entries(BLANCH_PATHS)) {
+    const result = await githubRequest(env, `/contents/${path}?ref=${encodeURIComponent(ref)}`, { ...options, allowStatuses: [404] });
+    if (result.status === 404) return { exists: false, status: 404, slug, filePath: BLANCH_PATHS.food, menu: null, sha: null, ref };
+    const document = result.data;
+    if (document?.type !== 'file' || typeof document.sha !== 'string' || typeof document.content !== 'string') fail('GITHUB_BAD_RESPONSE', 'GitHub non ha restituito un file Blanch valido.');
+    files[key] = { path, sha: document.sha, text: fromBase64(document.content) };
+  }
+  let menu;
+  try {
+    const compiled = compileBlanch(files.food.text, files.wines.text);
+    if (files.menu.text !== `${JSON.stringify(compiled)}\n`) fail('GITHUB_INVALID_JSON', 'Il menu compilato di Blanch non coincide con food.json e wines.tsv: va rigenerato a mano prima di usare Jarvis.', { status: 409 });
+    menu = blanchToMenu(compiled);
+  } catch (error) {
+    if (error instanceof BlanchError) fail('GITHUB_INVALID_JSON', error.message, { status: 422 });
+    throw error;
+  }
+  const digest = await crypto.subtle.digest('SHA-1', new TextEncoder().encode(`${files.food.sha}:${files.wines.sha}:${files.menu.sha}`));
+  const sha = [...new Uint8Array(digest)].map((byte) => byte.toString(16).padStart(2, '0')).join('');
+  return { exists: true, status: 200, slug, filePath: BLANCH_PATHS.food, menu, sha, ref, legacyFiles: files };
+}
+
 /**
  * Validates the approved JSON, keeps its immutable menu id equal to the slug,
  * checks new-vs-existing semantics, and computes only a public menu diff.
@@ -341,9 +369,16 @@ export async function readCurrentMenu(env, slug, options = {}) {
 export function inspectApprovedMenu({ slug, menu, requestKind, kind, mode, isNew, currentMenu } = {}) {
   slug = requireSlug(slug);
   const requestedMode = operationMode({ requestKind, kind, mode, isNew });
-  const candidate = cloneJson(menu);
+  let candidate = cloneJson(menu);
   if (!candidate || typeof candidate !== 'object' || Array.isArray(candidate) || candidate.id !== slug) {
     fail('SLUG_MISMATCH', 'L’identificativo JSON deve coincidere con lo slug immutabile del menu.', { status: 422 });
+  }
+  const legacy = isBlanchSlug(slug);
+  if (legacy) {
+    try { candidate = canonicalBlanch(candidate); } catch (error) {
+      if (error instanceof BlanchError) fail('LEGACY_FORMAT', error.message, { status: 422 });
+      throw error;
+    }
   }
   const validation = validateMenu(candidate);
   if (validation.errors.length) fail('INVALID_MENU', 'Il JSON del menu non supera la validazione pubblica.', { status: 422, details: { errors: validation.errors } });
@@ -358,7 +393,20 @@ export function inspectApprovedMenu({ slug, menu, requestKind, kind, mode, isNew
   const previous = existing?.menu || null;
   const changes = menuDiff(previous, candidate);
   const json = `${JSON.stringify(candidate, null, 2)}\n`;
-  const filePath = contentPath(slug);
+  const filePath = legacy ? BLANCH_PATHS.food : contentPath(slug);
+  let legacyWrites = null;
+  if (legacy && existing?.legacyFiles) {
+    const current = existing.legacyFiles;
+    let exported;
+    try { exported = exportBlanchFiles(candidate, { food: current.food.text, wines: current.wines.text, menu: current.menu.text }); } catch (error) {
+      if (error instanceof BlanchError) fail('LEGACY_FORMAT', error.message, { status: 422 });
+      throw error;
+    }
+    legacyWrites = [['food', exported.food], ['wines', exported.wines], ['menu', exported.menu]]
+      .filter(([key, text]) => text !== current[key].text)
+      .map(([key, text]) => ({ path: current[key].path, sha: current[key].sha, content: asBase64(text) }));
+    if (!legacyWrites.length) fail('NO_CHANGES', 'Il menu approvato è identico a quello online: niente da pubblicare.', { status: 409 });
+  }
   return {
     slug,
     mode: requestedMode,
@@ -368,8 +416,9 @@ export function inspectApprovedMenu({ slug, menu, requestKind, kind, mode, isNew
     content: asBase64(json),
     validation,
     changes,
-    prBody: prBody({ slug, filePath, changes }),
-    currentSha: existing?.sha || null
+    prBody: prBody({ slug, filePath, changes, legacy }),
+    currentSha: existing?.sha || null,
+    legacyWrites
   };
 }
 
@@ -416,7 +465,17 @@ async function recoverOrWriteBranch(env, prepared, branch, baseSha, options) {
   return resumeExistingBranch(env, prepared, branch, baseSha, recovered, options);
 }
 
+async function writeLegacyFiles(env, prepared, branch, options) {
+  for (const file of prepared.legacyWrites) {
+    const result = await githubRequest(env, `/contents/${file.path}`, { ...options, method: 'PUT', body: { message: putMessage('update', prepared.slug), content: file.content, sha: file.sha, branch }, allowStatuses: [409, 422] });
+    if (result.status === 200 || result.status === 201) continue;
+    fail('FILE_WRITE_CONFLICT', `GitHub ha segnalato un conflitto nella scrittura di ${file.path}.`, { status: result.status });
+  }
+  return { wrote: true, reusedBranch: false };
+}
+
 async function writeMenuFile(env, prepared, branch, options) {
+  if (prepared.legacyWrites) return writeLegacyFiles(env, prepared, branch, options);
   const body = { message: putMessage(prepared.mode, prepared.slug), content: prepared.content, branch };
   if (prepared.mode === 'update') body.sha = prepared.currentSha;
   const result = await githubRequest(env, contentEndpoint(prepared.slug), { ...options, method: 'PUT', body, allowStatuses: [409, 422] });
