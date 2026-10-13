@@ -24,6 +24,7 @@ import { memoryContext, memoryFor, menuStatements, noteStatement } from './memor
 import { buildDigest, digestText, recordEvent } from './journal.js';
 import { acceptProposals, askForProposals, decideProposal, pastProposals, proposalButtons, proposalsList, proposalText, reflectionDue, saveProposals, weekOf } from './reflection.js';
 import { slugify } from './menu.js';
+import { claudeKey } from './claude.js';
 import { pickButton } from './short-reply.js';
 
 export const PARTIAL_MARK = '[Testo parziale: leggi l’email completa in Gmail prima di decidere]';
@@ -766,13 +767,20 @@ export function createMissions(deps) {
       return;
     }
     if (/^\/voce\b/i.test(text) || (/\b(avvis\w*|notific\w*)\b/i.test(text) && /\b(a\s+voce|vocal[ei])\b/i.test(text) && text.split(/\s+/).length <= 12)) { const menu = await voiceAlertsMenu(db); await sendTg(db, env, chat, menu.text, menu.buttons, deps.fetchImpl); return; }
+    if (/^\/claude\b/i.test(text)) {
+      const want = /(?:^|\s)(?:si|sì|on|acceso|accendi|attiva)(?:\s|$)/i.test(text) ? 'si' : /(?:^|\s)(?:no|off|spento|spegni|disattiva)(?:\s|$)/i.test(text) ? 'no' : null;
+      if (want) await putSetting(db, 'claude_enabled', want);
+      const on = (await setting(db, 'claude_enabled')) === 'si';
+      await sendTg(db, env, chat, `${on ? 'Claude è acceso: lo uso per capirti, rispondere e per le proposte del lunedì. Costa a ogni messaggio sul tuo account Anthropic.' : 'Claude è spento: rispondo e preparo le proposte solo con i modelli gratuiti (Gemini e Cloudflare).'}${on && !claudeKey(env) ? ' Però manca la chiave ANTHROPIC_API_KEY, quindi uso comunque i gratuiti.' : ''} Scrivi «/claude sì» o «/claude no» per cambiare.`, null, deps.fetchImpl);
+      return;
+    }
     if (/^\/settimana\b/i.test(text)) { await sendTg(db, env, chat, digestText(await buildDigest(db)), null, deps.fetchImpl); return; }
     if (/^\/stato\b/i.test(text) || STATUS_WORDS.test(text)) {
       await sendTg(db, env, chat, await statusText(db), null, deps.fetchImpl);
       return;
     }
     if (/^\/aiuto\b|^\/help\b/i.test(text) || text.startsWith('/')) {
-      await sendTg(db, env, chat, 'Puoi scrivermi o mandarmi un vocale: «com’è la situazione?», «al Bakaro il frico ora costa 14», «crea una nuova pratica per il locale … con piano Standard», «pubblica il menu di …». Capisco anche /stato, /briefing, /settimana, /voce, /provaemail, /proposte, /rifletti, le foto e i PDF dei menu. Pubblicare richiede sempre il tuo SÌ col pulsante.', null, deps.fetchImpl);
+      await sendTg(db, env, chat, 'Puoi scrivermi o mandarmi un vocale: «com’è la situazione?», «al Bakaro il frico ora costa 14», «crea una nuova pratica per il locale … con piano Standard», «pubblica il menu di …». Capisco anche /stato, /briefing, /settimana, /voce, /claude, /provaemail, /proposte, /rifletti, le foto e i PDF dei menu. Pubblicare richiede sempre il tuo SÌ col pulsante.', null, deps.fetchImpl);
       return;
     }
     await converse(db, env, chat, text, false);
@@ -872,7 +880,7 @@ export function createMissions(deps) {
     const clues = await readClues(db, utterance);
     const context = await voiceContext(db, env, clues, history.slice(-8).map((h) => `${h.who}: ${String(h.text).slice(0, 300)}`).join('\n'));
     const gem = await geminiFor(db, env);
-    const understood = await understand(env.AI, utterance, context, { gemini: gem, claude: { env, fetchImpl: deps.fetchImpl } });
+    const understood = await understand(env.AI, utterance, context, { gemini: gem, claude: await claudeFor(db, env) });
     if (understood.modelName) await putSetting(db, 'gemini_good', JSON.stringify([understood.modelName])).catch(() => {});
     // Se il modello non è sicuro (o risponde a parole a un ordine) ma le parole chiave indicano un compito chiaro, Jarvis procede.
     const fallbackUsed = (understood.intent === 'non_chiaro' || (understood.intent === 'risposta' && !fresh)) && !['non_chiaro', 'ambiguo', 'risposta'].includes(clues.guess.intent);
@@ -915,7 +923,7 @@ export function createMissions(deps) {
       if (target?.draft && draftMentions(target.draft, utterance)) { const edited = await voiceEditDraft(db, env, utterance, target.draft); await answer(edited.text, edited.buttons || null, { keep: edited.keep }); return; }
     }
     if (intent.intent === 'risposta' || (intent.intent === 'non_chiaro' && clues.guess.intent === 'non_chiaro')) {
-      const talk = await freeChat(env.AI, { utterance: said0, context, history: fresh ? [...history, { who: 'Riccardo', text: pending.text }] : history, spoken }, { claude: { env, fetchImpl: deps.fetchImpl } });
+      const talk = await freeChat(env.AI, { utterance: said0, context, history: fresh ? [...history, { who: 'Riccardo', text: pending.text }] : history, spoken }, { claude: await claudeFor(db, env) });
       await auditedBatch(jarvisDb(db), [], 'jarvis.chat', `Conversazione libera: ${talk.ok ? (talk.engine === 'claude' ? 'Claude' : talk.model === CHAT_MODEL ? 'GPT-OSS 120B' : 'modello di riserva') : 'nessuna risposta'}.`, null).catch(() => {});
       const text = talk.ok ? talk.text : intent.risposta;
       if (text) { await answer(text, null, { keep: !talk.ok }); return; }
@@ -945,6 +953,11 @@ export function createMissions(deps) {
     await answer(intent.risposta || 'Non ho afferrato, Riccardo: di quale locale parliamo e cosa devo fare?');
   }
   // ——— Correzioni alla BOZZA in Revisione, dettate o scritte su Telegram ———
+  // Claude costa: lo usa solo se Riccardo l'ha acceso (/claude) e la chiave c'è. Di base Jarvis usa i modelli gratuiti.
+  async function claudeFor(db, env) {
+    if (!claudeKey(env)) return null;
+    return (await setting(db, 'claude_enabled').catch(() => null)) === 'si' ? { env, fetchImpl: deps.fetchImpl } : null;
+  }
   async function geminiFor(db, env) {
     try {
       const key = await readSealedSetting(env, setting, putSetting, db, 'gemini_api_key');
@@ -1692,13 +1705,15 @@ export function createMissions(deps) {
     if (!force) {
       if (!reflectionDue(at) || (await setting(db, 'last_reflection_week')) === week) return null;
       await putSetting(db, 'last_reflection_week', week);
-      if (!String(env?.ANTHROPIC_API_KEY || '').trim()) return null;
     }
+    const useClaude = Boolean(await claudeFor(db, env));
+    const gemini = useClaude ? null : await geminiFor(db, env);
+    if (!force && !useClaude && !gemini) return null;
     const [current, previous, past] = await Promise.all([buildDigest(db, { now: at }), buildDigest(db, { now: new Date(at.getTime() - 7 * 86_400_000) }), pastProposals(db, at)]);
-    const answer = await askForProposals(env, { settimana: current, settimanaPrecedente: previous, propostePassate: past.map(({ kind, title, status, week: w }) => ({ tipo: kind, titolo: title, stato: status, settimana: w })) }, { fetchImpl: deps.fetchImpl });
+    const answer = await askForProposals(env, { settimana: current, settimanaPrecedente: previous, propostePassate: past.map(({ kind, title, status, week: w }) => ({ tipo: kind, titolo: title, stato: status, settimana: w })) }, { fetchImpl: deps.fetchImpl, gemini, useClaude });
     if (answer.error) {
       await recordEvent(db, 'errore.riflessione', { detail: { errore: answer.error } });
-      await sendTg(db, env, chat, `Non sono riuscito a preparare le proposte della settimana: ${answer.error}.${/ANTHROPIC_API_KEY/.test(answer.error) ? ' Va aggiunta tra i Secret dello staging su Cloudflare Pages.' : ''}`, null, deps.fetchImpl);
+      await sendTg(db, env, chat, `Non sono riuscito a preparare le proposte della settimana: ${answer.error}.`, null, deps.fetchImpl);
       return { error: answer.error };
     }
     const proposals = acceptProposals(answer.proposals, past, at);
@@ -1760,7 +1775,7 @@ export function createMissions(deps) {
       const started = Date.now();
       const clues = await readClues(db, phrase);
       const context = await voiceContext(db, env, clues, '');
-      const understood = await understand(env.AI, phrase, context, { gemini: gem, engine, claude: { env, fetchImpl: deps.fetchImpl } });
+      const understood = await understand(env.AI, phrase, context, { gemini: gem, engine, claude: await claudeFor(db, env) });
       const fallbackUsed = (understood.intent === 'non_chiaro' || understood.intent === 'risposta') && !['non_chiaro', 'ambiguo', 'risposta'].includes(clues.guess.intent);
       out.push({ phrase, intent: understood.intent, dettaglio: understood.dettaglio || '', locale: understood.locale || '', urgente: understood.urgente === true, engine: understood.engine || 'nessuno', model: understood.modelName || '', keyword: clues.guess.intent, final: fallbackUsed ? clues.guess.intent : understood.intent, ms: Date.now() - started, why: understood.why || '' });
     }

@@ -42,6 +42,7 @@ function fakeServices({ proposals = [good('Ricontatta i locali silenziosi')], cl
     }
     if (href === 'https://api.github.com/repos/Rua56/renmenu/issues') return Response.json({ html_url: 'https://github.com/Rua56/renmenu/issues/200' }, { status: issueStatus });
     if (href.startsWith('https://api.telegram.org/')) return Response.json({ ok: true, result: { message_id: 1 } });
+    if (href.startsWith('https://generativelanguage.googleapis.com/')) return Response.json({ candidates: [{ content: { parts: [{ text: JSON.stringify({ proposte: proposals }) }] } }] });
     return Response.json({}, { status: 404 });
   };
   return { calls, fetchImpl, telegram: () => calls.filter((c) => c.href.endsWith('/sendMessage')).map((c) => c.body) };
@@ -58,7 +59,7 @@ test('riflessione: parte solo il lunedì tra le 8:15 e le 8:29 e la settimana è
 
 test('riflessione: la richiesta a Claude usa il modello, lo schema e i fallback, senza dati di contatto', async () => {
   const { calls, fetchImpl } = fakeServices();
-  const out = await askForProposals({ ANTHROPIC_API_KEY: 'sk-test' }, { settimana: { richieste: { nuove: 2 } } }, { fetchImpl });
+  const out = await askForProposals({ ANTHROPIC_API_KEY: 'sk-test' }, { settimana: { richieste: { nuove: 2 } } }, { fetchImpl, useClaude: true });
   assert.equal(out.proposals.length, 1);
   const call = calls[0];
   assert.equal(call.headers['x-api-key'], 'sk-test');
@@ -67,9 +68,10 @@ test('riflessione: la richiesta a Claude usa il modello, lo schema e i fallback,
   assert.equal(call.body.fallbacks, 'default');
   assert.equal(call.body.output_config.format.type, 'json_schema');
   assert.match(call.body.messages[0].content, /"nuove":2/);
-  assert.deepEqual(await askForProposals({}, {}, { fetchImpl }), { error: 'manca la chiave ANTHROPIC_API_KEY' });
+  assert.deepEqual(await askForProposals({}, {}, { fetchImpl, useClaude: true }), { error: 'manca la chiave ANTHROPIC_API_KEY' });
+  assert.match((await askForProposals({}, {}, { fetchImpl })).error, /manca la chiave Gemini/);
   const refused = async () => Response.json({ stop_reason: 'refusal', content: [] });
-  assert.match((await askForProposals({ ANTHROPIC_API_KEY: 'k' }, {}, { fetchImpl: refused })).error, /rifiutato/);
+  assert.match((await askForProposals({ ANTHROPIC_API_KEY: 'k' }, {}, { fetchImpl: refused, useClaude: true })).error, /rifiutato/);
 });
 
 test('riflessione: scarta proposte senza numeri, doppie, già rifiutate o rimandate da poco', () => {
@@ -121,6 +123,7 @@ test('riflessione: il lunedì Jarvis manda le proposte con i pulsanti, una volta
   globalThis.fetch = services.fetchImpl;
   try {
     await missions.putSetting(db, 'telegram_chat_id', '42');
+    await missions.putSetting(db, 'claude_enabled', 'si');
     const env = { DB: db, TELEGRAM_BOT_TOKEN: TOKEN, ANTHROPIC_API_KEY: 'sk-test' };
     const out = await missions.reflect(db, env, { now: NOW });
     assert.equal(out.proposals.length, 1);
@@ -138,7 +141,7 @@ test('riflessione: il lunedì Jarvis manda le proposte con i pulsanti, una volta
   } finally { globalThis.fetch = previous; }
 });
 
-test('riflessione: senza chiave il lunedì tace; /rifletti spiega cosa manca', async () => {
+test('riflessione: senza chiavi il lunedì tace; /rifletti spiega cosa manca', async () => {
   const db = database();
   const services = fakeServices();
   const previous = globalThis.fetch;
@@ -149,7 +152,7 @@ test('riflessione: senza chiave il lunedì tace; /rifletti spiega cosa manca', a
     assert.equal(await missions.reflect(db, env, { now: NOW }), null);
     assert.equal(services.telegram().length, 0);
     await missions.telegramUpdate(db, env, { message: { chat: { id: 42, type: 'private' }, text: '/rifletti' } });
-    assert.match(services.telegram().at(-1).text, /manca la chiave ANTHROPIC_API_KEY\. Va aggiunta tra i Secret/);
+    assert.match(services.telegram().at(-1).text, /manca la chiave Gemini \(gratuita\)/);
     assert.equal(db.sqlite.prepare("SELECT kind FROM jarvis_events").get().kind, 'errore.riflessione');
     await missions.telegramUpdate(db, env, { message: { chat: { id: 42, type: 'private' }, text: '/proposte' } });
     assert.match(services.telegram().at(-1).text, /Nessuna proposta aperta/);
@@ -163,6 +166,7 @@ test('riflessione: alla proposta si può rispondere a parole («non ora», poi �
   globalThis.fetch = services.fetchImpl;
   try {
     await missions.putSetting(db, 'telegram_chat_id', '42');
+    await missions.putSetting(db, 'claude_enabled', 'si');
     const env = { DB: db, TELEGRAM_BOT_TOKEN: TOKEN, ANTHROPIC_API_KEY: 'sk-test' };
     const out = await missions.reflect(db, env, { now: NOW });
     const [first, second] = out.proposals;
@@ -175,5 +179,27 @@ test('riflessione: alla proposta si può rispondere a parole («non ora», poi �
     assert.match(db.sqlite.prepare("SELECT summary FROM audit_events WHERE action='jarvis.conversation' ORDER BY created_at DESC").get().summary, /Risposta breve «non ora» → pulsante «Non ora»/);
     // Scelta già usata: un altro «no» non tocca più niente e va alla conversazione normale.
     assert.equal(db.sqlite.prepare("SELECT value FROM jarvis_settings WHERE key='tg_buttons'").get().value, 'null');
+  } finally { globalThis.fetch = previous; }
+});
+
+test('riflessione: di base usa Gemini gratuito anche se la chiave Anthropic c’è; Claude solo se acceso con /claude', async () => {
+  const db = database();
+  const services = fakeServices();
+  const previous = globalThis.fetch;
+  globalThis.fetch = services.fetchImpl;
+  try {
+    await missions.putSetting(db, 'telegram_chat_id', '42');
+    await missions.putSetting(db, 'gemini_api_key', 'gem-test');
+    const env = { DB: db, TELEGRAM_BOT_TOKEN: TOKEN, ANTHROPIC_API_KEY: 'sk-test' };
+    const out = await missions.reflect(db, env, { now: NOW });
+    assert.equal(out.proposals.length, 1);
+    assert.equal(services.calls.filter((c) => c.href.includes('anthropic')).length, 0, 'nessuna spesa su Anthropic');
+    assert.ok(services.calls.some((c) => c.href.startsWith('https://generativelanguage.googleapis.com/')));
+    await missions.telegramUpdate(db, env, { message: { chat: { id: 42, type: 'private' }, text: '/claude' } });
+    assert.match(services.telegram().at(-1).text, /Claude è spento: rispondo e preparo le proposte solo con i modelli gratuiti/);
+    await missions.telegramUpdate(db, env, { message: { chat: { id: 42, type: 'private' }, text: '/claude sì' } });
+    assert.match(services.telegram().at(-1).text, /Claude è acceso/);
+    await missions.reflect(db, env, { force: true, now: NOW });
+    assert.equal(services.calls.filter((c) => c.href.includes('anthropic')).length, 1);
   } finally { globalThis.fetch = previous; }
 });
