@@ -3,3 +3,4 @@
 .dev.vars
 .dev.vars.*
 *.local
+cloudflare/pages-dist/
