@@ -5,6 +5,7 @@ import { DatabaseSync } from 'node:sqlite';
 import { onRequest as gmailHook } from '../cloudflare/functions/hooks/gmail.js';
 import { onRequest as whatsappHook } from '../cloudflare/functions/hooks/whatsapp.js';
 import { gmailRelaySigningInput } from '../cloudflare/functions/_lib/inbound.js';
+import { approveSender, blockSender, takeUnannouncedHeld } from '../cloudflare/functions/_lib/whatsapp-in.js';
 
 const encoder = new TextEncoder();
 const gmailSecret = 'gmail-relay-test-secret-at-least-16';
@@ -16,6 +17,7 @@ function database() {
   sqlite.exec(readFileSync(new URL('../cloudflare/migrations/0001_initial.sql', import.meta.url), 'utf8'));
   sqlite.exec(readFileSync(new URL('../cloudflare/migrations/0002_integrations.sql', import.meta.url), 'utf8'));
   sqlite.exec(readFileSync(new URL('../cloudflare/migrations/0003_ai_free_scope.sql', import.meta.url), 'utf8'));
+  sqlite.exec('CREATE TABLE IF NOT EXISTS jarvis_settings (key TEXT PRIMARY KEY, value TEXT NOT NULL, updated_at TEXT NOT NULL)');
   return {
     prepare(sql) {
       return { bind(...params) {
@@ -74,12 +76,13 @@ async function gmailRequest(payload, timestamp = Math.floor(Date.now() / 1000), 
   });
 }
 
-const whatsAppPayload = (message = { id: 'wamid.hook.001', from: '393331234567', timestamp: '1760000000', type: 'text', text: { body: 'Vorrei aggiornare il menu' } }) => ({
+const whatsAppPayload = (message = { id: 'wamid.hook.001', from: '393331234567', timestamp: '1760000000', type: 'text', text: { body: 'Vorrei aggiornare il menu' } }, entryId = 'business-001', name = 'Cliente prova') => ({
   object: 'whatsapp_business_account',
-  entry: [{ id: 'business-001', changes: [{ field: 'messages', value: {
-    contacts: [{ wa_id: '393331234567', profile: { name: 'Cliente prova' } }], messages: [message]
+  entry: [{ id: entryId, changes: [{ field: 'messages', value: {
+    contacts: [{ wa_id: message.from, profile: { name } }], messages: [message]
   } }]}]
 });
+const textFrom = (id, from, body) => ({ id, from, timestamp: '1760000000', type: 'text', text: { body } });
 
 async function whatsAppRequest(payload) {
   const raw = JSON.stringify(payload);
@@ -223,6 +226,68 @@ describe('Cloudflare Pages WhatsApp hook', () => {
       const reaction = { id: 'wamid.react.4', from: '393331234567', timestamp: '1760000004', type: 'reaction', reaction: { emoji: '👍' } };
       await whatsappHook({ request: await whatsAppRequest(whatsAppPayload(reaction)), env });
       assert.deepEqual(db.rows("SELECT status FROM external_events WHERE source_event_id='wamid.react.4'"), [{ status: 'ignored' }]);
+    } finally { globalThis.fetch = previous; db.close(); }
+  });
+
+  it('with the private filter, unknown numbers wait for Riccardo: «locale» opens one case, «privato» is ignored forever', async () => {
+    const db = database();
+    try {
+      const env = whatsAppEnv(db, { WHATSAPP_PRIVATE_FILTER: 'true' });
+      await whatsappHook({ request: await whatsAppRequest(whatsAppPayload(textFrom('wamid.p.1', '393330000001', 'Ciao, ci vediamo stasera?'), 'business-001', 'Amico')), env });
+      await whatsappHook({ request: await whatsAppRequest(whatsAppPayload(textFrom('wamid.l.1', '393330000002', 'Buongiorno, vi mando il menu'), 'business-001', 'Osteria Nuova')), env });
+      await whatsappHook({ request: await whatsAppRequest(whatsAppPayload(textFrom('wamid.l.2', '393330000002', 'Il coperto è 2 euro'), 'business-001', 'Osteria Nuova')), env });
+      const repeated = await whatsappHook({ request: await whatsAppRequest(whatsAppPayload(textFrom('wamid.l.2', '393330000002', 'Il coperto è 2 euro'), 'business-001', 'Osteria Nuova')), env });
+      assert.deepEqual(await repeated.json(), { ok: true, accepted: 0, deduplicated: 1 });
+      assert.equal(db.rows('SELECT * FROM requests').length, 0, 'nessuna pratica prima della scelta');
+      assert.equal(db.rows('SELECT * FROM external_events').length, 0, 'niente registrato dei messaggi in attesa');
+
+      const held = await takeUnannouncedHeld(db);
+      assert.deepEqual(held.map((h) => [h.waId, h.name, h.count]), [['393330000001', 'Amico', 1], ['393330000002', 'Osteria Nuova', 2]]);
+      assert.match(held[1].preview, /vi mando il menu · Il coperto/);
+      assert.deepEqual(await takeUnannouncedHeld(db), [], 'annunciato una volta sola');
+
+      const approved = await approveSender(db, env, '393330000002');
+      assert.equal(approved.imported, 2);
+      const [request] = db.rows('SELECT id,source_text FROM requests');
+      assert.equal(request.id, approved.requestId);
+      assert.match(request.source_text, /^WhatsApp da Osteria Nuova \(\+393330000002\)\n\nBuongiorno, vi mando il menu\n\nIl coperto è 2 euro$/);
+      await whatsappHook({ request: await whatsAppRequest(whatsAppPayload(textFrom('wamid.l.3', '393330000002', 'Grazie'), 'business-001', 'Osteria Nuova')), env });
+      assert.match(db.rows('SELECT source_text FROM requests')[0].source_text, /Grazie$/, 'i messaggi successivi del locale passano subito');
+
+      assert.equal((await blockSender(db, '393330000001')).name, 'Amico');
+      await whatsappHook({ request: await whatsAppRequest(whatsAppPayload(textFrom('wamid.p.2', '393330000001', 'Rispondi!'), 'business-001', 'Amico')), env });
+      assert.deepEqual(db.rows("SELECT status,reason FROM external_events WHERE source_event_id='wamid.p.2'"), [{ status: 'ignored', reason: 'private_contact' }]);
+      assert.equal(db.rows('SELECT * FROM requests').length, 1);
+      assert.equal(JSON.stringify(db.rows('SELECT * FROM jarvis_settings')).includes('ci vediamo stasera'), false, 'i messaggi privati in attesa vengono cancellati');
+      assert.deepEqual(await takeUnannouncedHeld(db), []);
+    } finally { db.close(); }
+  });
+
+  it('via Dualhook accepts only the secret address and our WhatsApp account, and downloads files from Dualhook', async () => {
+    const db = database();
+    const calls = [];
+    const png = new Uint8Array([0x89, 0x50, 0x4e, 0x47, 1, 2]);
+    const fetchImpl = async (url, options = {}) => {
+      calls.push({ url: String(url), auth: options.headers?.Authorization });
+      if (String(url) === 'https://api.dualhook.com/v25.0/dh-media') return Response.json({ url: 'https://evil.example.com/x', mime_type: 'image/png', file_size: png.length });
+      if (String(url) === 'https://api.dualhook.com/v25.0/dh-media/content') return new Response(png);
+      return new Response('no', { status: 404 });
+    };
+    const previous = globalThis.fetch;
+    globalThis.fetch = fetchImpl;
+    try {
+      const hookKey = 'dualhook-path-key-at-least-16';
+      const env = { DB: db, WHATSAPP_WEBHOOK_ENABLED: 'true', WHATSAPP_INBOUND_VIA: 'dualhook', WHATSAPP_HOOK_KEY: hookKey, WHATSAPP_WABA_ID: '1234567890', WHATSAPP_VERIFY_TOKEN: verifyToken, WHATSAPP_TOKEN: 'dh-live-key',
+        BUCKET: { put: async () => {} } };
+      const post = (payload, key = hookKey) => new Request(`https://hooks.example.test/hooks/whatsapp?k=${key}`, { method: 'POST', headers: { 'Content-Type': 'application/json', 'X-Hub-Signature-256': 'sha256=firmata-da-dualhook' }, body: JSON.stringify(payload) });
+      const photo = { id: 'wamid.dh.1', from: '393331234567', timestamp: '1760000001', type: 'image', image: { id: 'dh-media', mime_type: 'image/png' } };
+      assert.equal((await whatsappHook({ request: post(whatsAppPayload(photo, '1234567890'), 'chiave-sbagliata-ma-lunga'), env })).status, 403);
+      assert.equal((await whatsappHook({ request: post(whatsAppPayload(photo, '999')), env })).status, 403, 'conto WhatsApp diverso');
+      assert.equal((await whatsappHook({ request: post(whatsAppPayload(photo, '1234567890')), env })).status, 200);
+      assert.deepEqual(db.rows('SELECT source,mime,size FROM materials'), [{ source: 'whatsapp', mime: 'image/png', size: png.length }]);
+      assert.ok(calls.every((c) => c.auth === 'Bearer dh-live-key' && c.url.startsWith('https://api.dualhook.com/')), 'mai seguire l\'indirizzo restituito');
+      // Senza la chiave dell'indirizzo la configurazione non è completa.
+      assert.equal((await whatsappHook({ request: post(whatsAppPayload(photo, '1234567890')), env: { ...env, WHATSAPP_HOOK_KEY: '' } })).status, 403);
     } finally { globalThis.fetch = previous; db.close(); }
   });
 });
