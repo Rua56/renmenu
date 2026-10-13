@@ -16,18 +16,26 @@ export async function askClaude(env, { system, messages, schema = null, effort =
   if (!key) return { error: 'manca la chiave ANTHROPIC_API_KEY' };
   const controller = typeof AbortController === 'function' ? new AbortController() : null;
   const timer = controller ? setTimeout(() => controller.abort(), timeoutMs) : null;
+  const send = (withFallback) => fetchImpl(API, {
+    method: 'POST', signal: controller?.signal,
+    headers: { 'Content-Type': 'application/json', 'x-api-key': key, 'anthropic-version': '2023-06-01', ...(withFallback ? { 'anthropic-beta': 'server-side-fallback-2026-07-01' } : {}) },
+    body: JSON.stringify({
+      model, max_tokens: maxTokens, ...(withFallback ? { fallbacks: 'default' } : {}), system,
+      output_config: { effort, ...(schema ? { format: { type: 'json_schema', schema } } : {}) },
+      messages
+    })
+  });
   try {
-    const response = await fetchImpl(API, {
-      method: 'POST', signal: controller?.signal,
-      headers: { 'Content-Type': 'application/json', 'x-api-key': key, 'anthropic-version': '2023-06-01', 'anthropic-beta': 'server-side-fallback-2026-07-01' },
-      body: JSON.stringify({
-        model, max_tokens: maxTokens, fallbacks: 'default', system,
-        output_config: { effort, ...(schema ? { format: { type: 'json_schema', schema } } : {}) },
-        messages
-      })
-    });
-    const payload = await response.json().catch(() => null);
-    if (!response.ok) return { error: `Claude ha risposto ${response.status}${payload?.error?.type ? ` (${payload.error.type})` : ''}` };
+    let response = await send(true);
+    let payload = await response.json().catch(() => null);
+    // Il fallback lato server non è disponibile per ogni chiave o account: senza, la richiesta resta valida.
+    if (response.status === 400) {
+      const retry = await send(false);
+      const retryPayload = await retry.json().catch(() => null);
+      if (retry.ok || retry.status !== 400) { response = retry; payload = retryPayload; }
+    }
+    if (/credit balance/i.test(String(payload?.error?.message || ''))) return { error: 'l’account Anthropic non ha credito: va caricato in console.anthropic.com, sezione Billing (Plans & Billing)' };
+    if (!response.ok) return { error: `Claude ha risposto ${response.status}${payload?.error?.type ? ` (${payload.error.type}${payload.error.message ? `: ${String(payload.error.message).slice(0, 160)}` : ''})` : ''}` };
     if (payload?.stop_reason === 'refusal') return { error: 'Claude ha rifiutato la richiesta' };
     if (payload?.stop_reason === 'max_tokens') return { error: 'risposta di Claude troncata' };
     const text = (payload?.content || []).filter((block) => block.type === 'text').map((block) => block.text).join('').trim();

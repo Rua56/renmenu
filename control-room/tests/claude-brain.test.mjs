@@ -65,3 +65,21 @@ test('conversazione: se Claude fallisce risponde il modello gratuito', async () 
   assert.equal(out.text, 'Eccomi.');
   assert.notEqual(out.engine, 'claude');
 });
+
+test('claude: un 400 sul fallback riprova senza fallback; senza credito lo dice chiaramente', async () => {
+  const { askClaude } = await import('../cloudflare/functions/_lib/claude.js');
+  const seen = [];
+  const fallbackRejected = async (url, options) => {
+    const body = JSON.parse(options.body);
+    seen.push({ fallbacks: body.fallbacks, beta: options.headers['anthropic-beta'] });
+    if (body.fallbacks) return Response.json({ type: 'error', error: { type: 'invalid_request_error', message: 'fallbacks: not available' } }, { status: 400 });
+    return Response.json({ model: 'claude-opus-5-5', stop_reason: 'end_turn', content: [{ type: 'text', text: 'Ciao.' }] });
+  };
+  const out = await askClaude({ ANTHROPIC_API_KEY: 'k' }, { system: 's', messages: [{ role: 'user', content: 'ciao' }] }, { fetchImpl: fallbackRejected });
+  assert.equal(out.text, 'Ciao.');
+  assert.deepEqual(seen, [{ fallbacks: 'default', beta: 'server-side-fallback-2026-07-01' }, { fallbacks: undefined, beta: undefined }]);
+  const broke = async () => Response.json({ type: 'error', error: { type: 'invalid_request_error', message: 'Your credit balance is too low to access the Anthropic API. Please go to Plans & Billing to upgrade or purchase credits.' } }, { status: 400 });
+  assert.match((await askClaude({ ANTHROPIC_API_KEY: 'k' }, { system: 's', messages: [] }, { fetchImpl: broke })).error, /non ha credito: va caricato in console\.anthropic\.com/);
+  const other = async () => Response.json({ type: 'error', error: { type: 'invalid_request_error', message: 'messages: field required' } }, { status: 400 });
+  assert.equal((await askClaude({ ANTHROPIC_API_KEY: 'k' }, { system: 's', messages: [] }, { fetchImpl: other })).error, 'Claude ha risposto 400 (invalid_request_error: messages: field required)');
+});
