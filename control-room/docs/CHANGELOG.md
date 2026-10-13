@@ -2,6 +2,10 @@
 
 Si aggiunge una voce a ogni pull request che cambia un comportamento di Jarvis o della Control Room, insieme all'aggiornamento di README, policy e funzionamento quando serve. Le voci più recenti stanno in alto.
 
+## 13 ottobre 2026
+
+- **Copia di sicurezza del database:** ogni notte tra le 3:00 e le 3:59 l'orologio salva tutte le tabelle di D1 (schema e righe) in `backups/d1/AAAA-MM-GG.json.gz` nel bucket R2 privato e cancella le copie più vecchie di 30 giorni. Esito annotato in `jarvis_settings.last_backup`; dopo tre tentativi falliti nello stesso giorno avviso su Telegram. Nuovo script `control-room/staging/d1-restore.mjs` che trasforma una copia in SQL per un database nuovo; nuovi test con ripristino completo verificato.
+
 ## 6 ottobre 2026
 
 - **Allineamento a `main`** (ramo Jarvis): `main` è entrato nel ramo senza conflitti. La build del sito pubblico risulta identica byte per byte con o senza il codice di Jarvis, i 305 test passano e il pacchetto dello staging si costruisce. Documentazione di policy, privacy, voce e README riscritta sullo stato reale; aggiunti questo registro e il documento sul funzionamento.
