@@ -641,11 +641,14 @@ export function createMissions(deps) {
         await sendTelegram(env, chat, out.text, out.buttons || null, deps.fetchImpl, { stacked: true });
         return;
       }
-      if (verb === 'del' || verb === 'delc' || verb === 'delno') {
-        const outcome = verb === 'delno' ? { text: 'Va bene, non elimino niente.' } : await runDelete(db, env, verb === 'del' ? { requestId: missionId } : { clientId: missionId });
-        await answerCallback(env, query.id, verb === 'delno' ? 'Non elimino' : 'Fatto', deps.fetchImpl);
+      if (['del', 'delc', 'dela', 'delq', 'delno'].includes(verb)) {
+        // del: una pratica · delc: un cliente senza pratiche · dela: tutte le pratiche aperte di un cliente · delq: scegli fra le pratiche di un cliente
+        const outcome = verb === 'delno' ? { text: 'Va bene, non elimino niente.' } : verb === 'delq' ? await deleteOffer(db, missionId, '')
+          : verb === 'dela' ? await runDeleteAll(db, env, missionId) : await runDelete(db, env, verb === 'del' ? { requestId: missionId } : { clientId: missionId });
+        await answerCallback(env, query.id, verb === 'delno' ? 'Non elimino' : verb === 'delq' ? 'Ecco le pratiche' : 'Fatto', deps.fetchImpl);
         if (query.message?.message_id) await clearButtons(env, chat, query.message.message_id, deps.fetchImpl);
-        await sendTelegram(env, chat, outcome.text, null, deps.fetchImpl);
+        if (verb === 'delq') await putSetting(db, 'tg_pending', outcome.pending ? JSON.stringify({ text: 'elimina pratica', at: now(), ...outcome.pending }) : 'null').catch(() => {});
+        await sendTelegram(env, chat, outcome.text, outcome.buttons || null, deps.fetchImpl, { stacked: true });
         return;
       }
       const outcome = ['pub', 'no'].includes(verb) ? await decide(db, env, missionId, verb === 'pub')
@@ -706,7 +709,7 @@ export function createMissions(deps) {
     const audio = spoken ? await speak(await voiceSettings(db, env), String(text).replace(/^«[\s\S]*?»\n\n/, ''), deps.fetchImpl) : null;
     if (audio && !buttons) { const sent = await sendVoice(env, chat, audio, text, deps.fetchImpl); if (sent?.ok) return; }
     if (audio && buttons) await sendVoice(env, chat, audio, '', deps.fetchImpl);
-    await sendTelegram(env, chat, text, buttons, deps.fetchImpl);
+    await sendTelegram(env, chat, text, buttons, deps.fetchImpl, { stacked: (buttons?.length || 0) > 2 });
   }
   async function receiveVoice(db, env, chat, message) {
     const media = message.voice || message.audio;
@@ -795,14 +798,21 @@ export function createMissions(deps) {
       intent.risposta = `Vuoi che modifichi ${dish ? `«${dish}» nel` : 'il'} menu di «${venue}», o ti serve un’informazione?`;
     }
     await auditedBatch(jarvisDb(db), [], 'jarvis.conversation', `Comando ${spoken ? 'vocale' : 'scritto'}: ${intent.intent}${intent.dettaglio ? `/${intent.dettaglio}` : ''} [${understood.engine || 'nessun modello'}]${fallbackUsed ? ' (da parole chiave)' : ''}${fresh ? ' (con chiarimento)' : ''}${understood.why ? ` (${understood.why})` : ''}.`, null).catch(() => {});
-    const answer = async (text, buttons = null, { keep = true } = {}) => {
+    const answer = async (text, buttons = null, { keep = true, pending: open = null } = {}) => {
       const asks = keep && /\?\s*$/.test(String(text)) && !buttons;
-      await putSetting(db, 'tg_pending', asks ? JSON.stringify({ text: utterance.slice(-1200), at: now() }) : 'null').catch(() => {});
+      // open: Jarvis ha fatto una domanda con pulsanti, ma Riccardo può anche rispondere a parole («entrambe», «la prima»).
+      await putSetting(db, 'tg_pending', open ? JSON.stringify({ text: utterance.slice(-1200), at: now(), ...open }) : asks ? JSON.stringify({ text: utterance.slice(-1200), at: now() }) : 'null').catch(() => {});
       await putSetting(db, 'tg_history', JSON.stringify([...history, { who: 'Riccardo', text: said0.slice(0, 1200), at: now() }, { who: 'Jarvis', text: String(text).slice(0, 1200), at: now() }].slice(-16))).catch(() => {});
       await reply(db, env, chat, `${said}${text}`, spoken, buttons);
     };
     // Domande e conversazione libera: risponde il modello grande, con tutta la memoria della chat.
     // «Il piano è Standard» subito dopo aver aperto una pratica: vale per QUELLA pratica, non per un menu online.
+    // Risposta breve a «quale elimino?»: resta nell'eliminazione, senza passare dal modello che la scambia per altro.
+    if (fresh && pending.kind === 'delete' && said0.trim().split(/\s+/).length <= 6) {
+      if (/^\s*(no|niente|nessuna|lascia(?:\s+stare)?|annulla|stop|basta)\b/i.test(said0)) { await answer('Va bene, non elimino niente.', null, { keep: false }); return; }
+      const asked = pending.clientId ? await deleteOffer(db, pending.clientId, said0) : await voiceDelete(db, env, said0, await readClues(db, said0), said0);
+      await answer(asked.text, asked.buttons || null, { keep: false, pending: asked.pending || null }); return;
+    }
     const planned = intent.intent === 'crea_pratica' ? null : await planForFocus(db, utterance, intent.locale);
     if (planned) { await answer(planned); return; }
     if (REREAD.test(said0)) { await answer(await voiceReread(db, env, intent.locale, utterance)); return; }
@@ -819,7 +829,7 @@ export function createMissions(deps) {
       if (text) { await answer(text, null, { keep: !talk.ok }); return; }
     }
     if (intent.intent === 'affida_pratica') { const asked = await voiceEntrust(db, env, intent.locale, clues, utterance); await answer(asked.text, asked.buttons || null, { keep: asked.keep === true }); return; }
-    if (intent.intent === 'cancella_pratica') { const asked = await voiceDelete(db, env, intent.locale, clues, utterance); await answer(asked.text, asked.buttons || null, { keep: asked.keep === true }); return; }
+    if (intent.intent === 'cancella_pratica') { const asked = await voiceDelete(db, env, intent.locale, clues, utterance); await answer(asked.text, asked.buttons || null, { keep: asked.keep === true, pending: asked.pending || null }); return; }
     if (intent.intent === 'stato') { const report = await statusReport(db, env, intent.dettaglio || (/\b(dettagli\w*|complet\w*|report|resoconto|riepilogo|tutto)\b/i.test(said0) ? 'completo' : /buone\s+notizie|novit/i.test(said0) ? 'buone_notizie' : 'breve')); await answer(report.text, report.buttons || null, { keep: false }); return; }
     if (intent.intent === 'anteprima') { const shown = await voiceShowPreview(db, env, intent.locale, clues, utterance); await answer(shown.text, shown.buttons || null, { keep: shown.keep }); return; }
     if (intent.intent === 'pubblica') {
@@ -1248,13 +1258,48 @@ export function createMissions(deps) {
       const named = spokenVenue ? matchVenue(spokenVenue, clients) : { client: null, candidates: [] };
       ids = named.client ? [named.client.id] : named.candidates.length ? named.candidates.map((c) => c.id) : [...new Set(clues.locales.map((c) => c.id))];
       if (!ids.length) return { text: `Non trovo un cliente che si chiami «${spokenVenue}». Dimmi il nome esatto del locale.` };
-    } else if (open.length === 1) ids = [open[0].client_id];
-    else return { text: open.length ? `Quale pratica elimino? Ho aperte: ${open.slice(0, 8).map((r) => `«${r.name}»`).join(', ')}.` : 'Non ci sono pratiche aperte da eliminare, Riccardo.' };
+    } else {
+      // Nessun locale detto: se le pratiche aperte sono di un solo cliente è quello, altrimenti un pulsante per cliente.
+      const owners = [...new Map(open.map((r) => [r.client_id, { id: r.client_id, name: r.name, n: open.filter((o) => o.client_id === r.client_id).length }])).values()];
+      if (owners.length === 1) ids = [owners[0].id];
+      else if (!owners.length) return { text: 'Non ci sono pratiche aperte da eliminare, Riccardo.' };
+      else return { text: `Di quale cliente elimino le pratiche? Toccalo qui sotto o scrivimi il nome.`, pending: { kind: 'delete' },
+        buttons: [...owners.slice(0, 8).map((o) => [`${String(o.name).slice(0, 40)}${o.n > 1 ? ` (${o.n} pratiche)` : ''}`, `delq:${o.id}`]), ['Nessuna', 'delno:x']] };
+    }
     if (ids.length > 1) return { text: `Ci sono più clienti simili: ${ids.map((id) => `«${clients.find((c) => c.id === id)?.name}»`).join(', ')}. Quale elimino?` };
-    const client = clients.find((c) => c.id === ids[0]);
-    const requests = open.filter((r) => r.client_id === client.id);
-    if (requests.length > 1) return { text: `«${client.name}» ha ${requests.length} pratiche aperte: ${requests.map((r) => `«${r.subject}»`).join(', ')}. Dimmi quale elimino, per esempio con le parole del titolo.` };
-    const target = requests[0] ? { requestId: requests[0].id } : { clientId: client.id };
+    return deleteOffer(db, ids[0], utterance);
+  }
+  const ALL_WORDS = /\b(tutt[aei]|entramb[aeio]|ambedue|tutte\s+e\s+due|tutti\s+e\s+due|tutte\s+e\s+tre|tutti\s+e\s+tre)\b/i;
+  const ORDINALS = [/\b(prima|1)\b/i, /\b(seconda|2)\b/i, /\b(terza|3)\b/i, /\b(quarta|4)\b/i];
+  const TITLE_SKIP = new Set(['elimina', 'eliminala', 'eliminale', 'cancella', 'cancellala', 'cancellale', 'pratica', 'pratiche', 'quella', 'quelle', 'menu', 'nuovo', 'nuova', 'della', 'delle', 'per', 'con', 'jarvis']);
+  // Pratiche aperte di un cliente: una sola → conferma; più d'una → le distingue con le parole del titolo,
+  // «la prima/seconda», oppure «tutte/entrambe»; se resta il dubbio, un pulsante per pratica più «tutte».
+  async function deleteOffer(db, clientId, utterance) {
+    const client = await getOne(db, 'SELECT id,name,menu_id FROM clients WHERE id=?', clientId);
+    if (!client) return { text: 'Quel cliente non c’è più.' };
+    const requests = await rows(db, "SELECT id,subject,status,created_at FROM requests WHERE client_id=? AND status<>'completata' ORDER BY created_at ASC", client.id).catch(() => []);
+    const said = String(utterance || '').split('\n').at(-1);
+    let chosen = requests;
+    if (requests.length > 1 && !ALL_WORDS.test(said)) {
+      const ordinal = ORDINALS.findIndex((rx) => rx.test(said));
+      const words = plainText(said).split('-').filter((w) => w.length > 2 && !TITLE_SKIP.has(w) && !plainText(client.name).split('-').includes(w));
+      const byTitle = words.length ? requests.filter((r) => words.every((w) => plainText(r.subject).includes(w))) : [];
+      chosen = ordinal >= 0 && ordinal < requests.length ? [requests[ordinal]] : byTitle.length === 1 ? byTitle : null;
+    }
+    if (!chosen) {
+      const when = (iso) => new Intl.DateTimeFormat('it-IT', { timeZone: 'Europe/Rome', day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' }).format(new Date(iso));
+      return { text: `«${client.name}» ha ${requests.length} pratiche aperte:\n${requests.map((r, i) => `${i + 1}. «${r.subject}» del ${when(r.created_at)}`).join('\n')}\n\nQuale elimino? Tocca un pulsante, oppure scrivimi «tutte» o «la prima». Non si può annullare.`,
+        pending: { kind: 'delete', clientId: client.id },
+        buttons: [...requests.slice(0, 6).map((r, i) => [`Elimina la ${i + 1}: «${String(r.subject).slice(0, 28)}» del ${when(r.created_at)}`, `del:${r.id}`]), [`Elimina tutte e ${requests.length}`, `dela:${client.id}`], ['Nessuna', 'delno:x']] };
+    }
+    if (chosen.length > 1) {
+      const plans = await Promise.all(chosen.map((r) => deletionPlan(db, { getOne, rows }, { requestId: r.id })));
+      const blocked = plans.filter((p) => !p.ok);
+      const files = plans.reduce((t, p) => t + (p.ok ? p.materials.length : 0), 0);
+      return { text: `Vuoi che elimini tutte le ${chosen.length} pratiche aperte di «${client.name}» (${chosen.map((r) => `«${r.subject}»`).join(', ')})?${files ? ` Cancello anche ${files} ${files === 1 ? 'file caricato' : 'file caricati'}.` : ''}${blocked.length ? ` ${blocked.length === 1 ? 'Una resta' : `${blocked.length} restano`}: ${blocked[0].blockers[0]}` : ''}\n\nNon si può annullare. Il registro delle azioni resta.`,
+        buttons: [[`SÌ, elimina tutte e ${chosen.length}`, `dela:${client.id}`], ['No, tienile', 'delno:x']] };
+    }
+    const target = chosen[0] ? { requestId: chosen[0].id } : { clientId: client.id };
     const plan = await deletionPlan(db, { getOne, rows }, target);
     const label = plan.request?.subject || `cliente «${client.name}»`;
     if (!plan.ok) return { text: `Non elimino «${label}»: ${plan.blockers[0]}` };
@@ -1265,12 +1310,12 @@ export function createMissions(deps) {
     return { text: `Vuoi che elimini «${label}»?${parts.length ? ` Cancello ${parts.join(' e ')}.` : ''} ${clientLine}\n\nNon si può annullare. Il registro delle azioni resta.`.replace(/ \n/g, '\n'),
       buttons: [['SÌ, elimina', `${plan.request ? 'del' : 'delc'}:${plan.request?.id || client.id}`], ['No, tienila', 'delno:x']] };
   }
-  async function runDelete(db, env, target) {
+  async function deleteOne(db, env, target) {
     const plan = await deletionPlan(db, { getOne, rows }, target);
-    if (!plan.ok) return { text: `Non elimino: ${plan.blockers[0]}` };
     const label = plan.request?.subject || `cliente «${plan.client?.name}»`;
+    if (!plan.ok) return { ok: false, plan, label, why: plan.blockers[0] };
     try { await action(jarvisDb(db), 'deleteRequest', { ...target, confirmation: 'ELIMINA PRATICA' }, env); }
-    catch (error) { return { text: `Non sono riuscito a eliminare «${label}»: ${String(error?.message || 'errore').slice(0, 200)}` }; }
+    catch (error) { return { ok: false, plan, label, why: String(error?.message || 'errore').slice(0, 200), failed: true }; }
     // Ricordi di lavoro che puntavano alla pratica eliminata.
     const mine = (key, test) => setting(db, key).then((raw) => { try { const v = JSON.parse(raw || 'null'); return v && test(v) ? putSetting(db, key, 'null') : null; } catch { return null; } }).catch(() => null);
     const draftIds = new Set(plan.drafts.map((d) => d.id));
@@ -1278,7 +1323,26 @@ export function createMissions(deps) {
     await mine('tg_checks', (v) => v.requestId === plan.request?.id);
     await mine('draft_undo', (v) => draftIds.has(v.draftId));
     await mine('draft_translate', (v) => draftIds.has(v.draftId));
+    return { ok: true, plan, label };
+  }
+  async function runDelete(db, env, target) {
+    const done = await deleteOne(db, env, target);
+    if (!done.ok) return { text: done.failed ? `Non sono riuscito a eliminare «${done.label}»: ${done.why}` : `Non elimino: ${done.why}` };
+    const { plan, label } = done;
     return { text: `Fatto, Riccardo: ho eliminato «${label}»${plan.deleteClient && plan.request ? ` e il cliente «${plan.client.name}»` : ''}, con ${plan.materials.length} file${plan.drafts.length ? ' e la bozza' : ''}.\n\nProssimo passo: vuoi aprire una nuova pratica? Dimmi il nome del locale.` };
+  }
+  // «Elimina tutte»: una pratica alla volta, con gli stessi controlli; l'ultima porta via anche il cliente se non resta altro.
+  async function runDeleteAll(db, env, clientId) {
+    const client = await getOne(db, 'SELECT id,name FROM clients WHERE id=?', clientId);
+    if (!client) return { text: 'Quel cliente non c’è più: niente da eliminare.' };
+    const open = await rows(db, "SELECT id FROM requests WHERE client_id=? AND status<>'completata' ORDER BY created_at ASC", clientId).catch(() => []);
+    if (!open.length) return { text: `«${client.name}» non ha pratiche aperte.` };
+    const results = [];
+    for (const r of open) results.push(await deleteOne(db, env, { requestId: r.id }));
+    const ok = results.filter((r) => r.ok), kept = results.filter((r) => !r.ok);
+    const files = ok.reduce((t, r) => t + r.plan.materials.length, 0);
+    const gone = ok.some((r) => r.plan.deleteClient);
+    return { text: `${ok.length ? `Fatto, Riccardo: ho eliminato ${ok.length === 1 ? 'la pratica' : `le ${ok.length} pratiche`} di «${client.name}»${files ? `, con ${files} file` : ''}${gone ? ', e anche il cliente' : ''}.` : `Non ho eliminato niente di «${client.name}».`}${kept.length ? ` ${kept.length === 1 ? 'Una resta' : `${kept.length} restano`}: ${kept[0].why}` : ''}` };
   }
   // ——— Punto della situazione: scritto da dati certi del database, mai inventato dal modello ———
   const MISSION_LABEL = { affidata: 'la sto preparando io', attesa_cliente: 'anteprima inviata, aspetto la risposta del locale', attesa_invio: 'anteprima in coda per Gmail', attesa_si: 'aspetta il tuo SÌ per pubblicare', ferma: 'ferma, serve il tuo intervento', pubblicazione: 'in pubblicazione', verifica: 'in verifica dopo la pubblicazione' };
