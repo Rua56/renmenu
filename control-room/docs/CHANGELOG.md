@@ -5,6 +5,7 @@ Si aggiunge una voce a ogni pull request che cambia un comportamento di Jarvis o
 ## 13 ottobre 2026
 
 - **Copia di sicurezza del database:** ogni notte tra le 3:00 e le 3:59 l'orologio salva tutte le tabelle di D1 (schema e righe) in `backups/d1/AAAA-MM-GG.json.gz` nel bucket R2 privato e cancella le copie più vecchie di 30 giorni. Esito annotato in `jarvis_settings.last_backup`; dopo tre tentativi falliti nello stesso giorno avviso su Telegram. Nuovo script `control-room/staging/d1-restore.mjs` che trasforma una copia in SQL per un database nuovo; nuovi test con ripristino completo verificato.
+- **Diario di Jarvis:** primo passo del «Jarvis che propone». Nuovo modulo `_lib/journal.js` che riassume un periodo in numeri leggendo registro, pratiche e missioni: richieste nuove e chiuse (con giorni medi), bozze preparate e rifatte, correzioni di Riccardo e dei locali (e i locali più corretti), dubbi di lettura e file non letti, pratiche affidate, SÌ e pubblicazioni, errori, locali più attivi e locali online senza richieste da più di 45 giorni. Nuova tabella `jarvis_events` (migrazione `0013`) per ciò che il registro non conserva: per ora gli errori dell'orologio sulle pratiche affidate, che prima andavano persi. Nuovo comando Telegram `/settimana`. Solo letture e conteggi, nessun dato di contatto; nuovi test.
 
 ## 6 ottobre 2026
 
