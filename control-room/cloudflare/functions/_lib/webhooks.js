@@ -132,7 +132,9 @@ export function whatsappWebhookConfiguration(env = {}) {
   const hookKey = env.WHATSAPP_HOOK_KEY;
   const wabaId = typeof env.WHATSAPP_WABA_ID === 'string' && /^\d{5,30}$/.test(env.WHATSAPP_WABA_ID) ? env.WHATSAPP_WABA_ID : null;
   const keys = via === 'dualhook' ? isConfiguredSecret(hookKey) && Boolean(wabaId) : isConfiguredSecret(appSecret);
-  return { enabled, via, configured: enabled && keys && isConfiguredSecret(verifyToken), appSecret, verifyToken, hookKey, wabaId };
+  // Dualhook verifica l'indirizzo prima di farci conoscere il conto (WABA): la verifica GET basta il token.
+  const challengeReady = enabled && isConfiguredSecret(verifyToken) && (via === 'dualhook' ? isConfiguredSecret(hookKey) : keys);
+  return { enabled, via, configured: enabled && keys && isConfiguredSecret(verifyToken), challengeReady, appSecret, verifyToken, hookKey, wabaId };
 }
 
 export async function verifyWhatsAppWebhookRequest(request, config) {

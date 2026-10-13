@@ -20,7 +20,7 @@ export async function onRequest(context) {
 
   if (context.request.method === 'GET') {
     // A challenge is exposed only after every required secret has been configured.
-    if (!config.configured) return hidden();
+    if (!config.challengeReady) return hidden();
     const verified = verifyWhatsAppChallenge({ query: context.request, verifyToken: config.verifyToken });
     return verified.ok
       ? new Response(verified.challenge, { status: 200, headers: { 'Content-Type': 'text/plain; charset=utf-8', 'Cache-Control': 'no-store' } })

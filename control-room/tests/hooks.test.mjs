@@ -286,6 +286,11 @@ describe('Cloudflare Pages WhatsApp hook', () => {
       assert.equal((await whatsappHook({ request: post(whatsAppPayload(photo, '1234567890')), env })).status, 200);
       assert.deepEqual(db.rows('SELECT source,mime,size FROM materials'), [{ source: 'whatsapp', mime: 'image/png', size: png.length }]);
       assert.ok(calls.every((c) => c.auth === 'Bearer dh-live-key' && c.url.startsWith('https://api.dualhook.com/')), 'mai seguire l\'indirizzo restituito');
+      // La verifica dell'indirizzo funziona anche prima di conoscere il conto WhatsApp.
+      const query = new URLSearchParams({ k: hookKey, 'hub.mode': 'subscribe', 'hub.verify_token': verifyToken, 'hub.challenge': 'dh-challenge' });
+      const challenge = await whatsappHook({ request: new Request(`https://hooks.example.test/hooks/whatsapp?${query}`), env: { ...env, WHATSAPP_WABA_ID: '' } });
+      assert.equal(await challenge.text(), 'dh-challenge');
+      assert.equal((await whatsappHook({ request: post(whatsAppPayload(photo, '1234567890')), env: { ...env, WHATSAPP_WABA_ID: '' } })).status, 403, 'ma i messaggi no');
       // Senza la chiave dell'indirizzo la configurazione non è completa.
       assert.equal((await whatsappHook({ request: post(whatsAppPayload(photo, '1234567890')), env: { ...env, WHATSAPP_HOOK_KEY: '' } })).status, 403);
     } finally { globalThis.fetch = previous; db.close(); }
