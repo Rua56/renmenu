@@ -710,13 +710,21 @@ export function createMissions(deps) {
       await reflect(db, env, { force: true });
       return;
     }
+    // /provaemail: una email di prova dal mittente dei locali a Riccardo, per verificare dominio e chiave.
+    if (/^\/provaemail\b/i.test(text)) {
+      const config = clientMailConfig(env);
+      const to = env.OWNER_EMAIL || '';
+      const out = config.ok && to ? await sendClientMail({ env, to, subject: 'Prova di invio di Jarvis da renmenu.com', text: `Se leggi questa email, Jarvis può scrivere ai locali da ${config.sender}.\n\nLe risposte a questo indirizzo tornano a Jarvis.\n\nJarvis · RenMenu`, idempotencyKey: `renmenu-prova-${Date.now()}`, fetchImpl: deps.fetchImpl }) : { ok: false, reason: config.ok ? 'OWNER_EMAIL mancante' : config.reason };
+      await sendTelegram(env, chat, out.ok ? `Email di prova partita da ${config.sender} a ${to}. Controlla la casella (anche lo spam).` : `L’email di prova non è partita: ${out.reason}.`, null, deps.fetchImpl);
+      return;
+    }
     if (/^\/settimana\b/i.test(text)) { await sendTelegram(env, chat, digestText(await buildDigest(db)), null, deps.fetchImpl); return; }
     if (/^\/stato\b/i.test(text) || STATUS_WORDS.test(text)) {
       await sendTelegram(env, chat, await statusText(db), null, deps.fetchImpl);
       return;
     }
     if (/^\/aiuto\b|^\/help\b/i.test(text) || text.startsWith('/')) {
-      await sendTelegram(env, chat, 'Puoi scrivermi o mandarmi un vocale: «com’è la situazione?», «al Bakaro il frico ora costa 14», «crea una nuova pratica per il locale … con piano Standard», «pubblica il menu di …». Capisco anche /stato, /briefing, /settimana, /proposte, /rifletti, le foto e i PDF dei menu. Pubblicare richiede sempre il tuo SÌ col pulsante.', null, deps.fetchImpl);
+      await sendTelegram(env, chat, 'Puoi scrivermi o mandarmi un vocale: «com’è la situazione?», «al Bakaro il frico ora costa 14», «crea una nuova pratica per il locale … con piano Standard», «pubblica il menu di …». Capisco anche /stato, /briefing, /settimana, /provaemail, /proposte, /rifletti, le foto e i PDF dei menu. Pubblicare richiede sempre il tuo SÌ col pulsante.', null, deps.fetchImpl);
       return;
     }
     await converse(db, env, chat, text, false);
