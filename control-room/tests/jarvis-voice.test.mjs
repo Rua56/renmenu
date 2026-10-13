@@ -428,6 +428,55 @@ describe('Comandi vocali di Jarvis', () => {
       assert.ok((await db.prepare('SELECT COUNT(*) n FROM audit_events WHERE request_id IS NULL').bind().first()).n >= 2, 'il registro resta');
     } finally { globalThis.fetch = previous; db.close(); }
   });
+  it('più pratiche con lo stesso titolo: pulsanti per ognuna, «entrambe» a parole, poi le elimina tutte (caso del 13 ottobre)', async () => {
+    const db = database();
+    const previous = globalThis.fetch;
+    globalThis.fetch = previousFetch;
+    try {
+      const stamp = '2026-10-13T12:00:00.000Z';
+      for (const [id, name] of [['cm', 'Nuovo contatto email'], ['cb', 'Al Chiostro Bistrot']]) await db.prepare("INSERT INTO clients (id,name,email,plan,menu_id,internal_notes,revision,created_at,updated_at) VALUES (?,?,NULL,'standard','','',1,?,?)").bind(id, name, stamp, stamp).run();
+      const made = [];
+      for (const [clientId, subject] of [['cm', 'Menu'], ['cm', 'Menu'], ['cb', 'Nuovo menu Standard · Al Chiostro Bistrot']]) {
+        const out = await action(db, 'createRequest', { clientId, subject, sourceChannel: 'email', sourceText: 'Menu di prova', kind: 'altro', plan: 'standard' });
+        made.push(out.body.id || out.body.result?.id || out.body.data?.id);
+      }
+      globalThis.fetch = fakeFetch;
+      calls.length = 0;
+      await missions.putSetting(db, 'telegram_chat_id', '42');
+      const say = async (text, intent) => missions.telegramUpdate(db, testEnv(db, { TELEGRAM_BOT_TOKEN: TOKEN, AI: aiSaying('', intent) }), { message: { chat: { id: 42, type: 'private' }, text } });
+      // Senza locale: un pulsante per cliente, senza nomi ripetuti.
+      await say('Elimina le pratiche di prova', { intent: 'cancella_pratica', locale: '', risposta: '' });
+      let last = calls.at(-1).body;
+      assert.match(last.text, /Di quale cliente/);
+      const keys = JSON.stringify(last.reply_markup);
+      assert.equal(keys.split('Nuovo contatto email').length - 1, 1, 'il cliente compare una volta sola');
+      assert.ok(keys.includes('delq:cm'));
+      // Il pulsante del cliente mostra le sue pratiche, numerate e con un pulsante ciascuna.
+      await missions.telegramUpdate(db, testEnv(db, { TELEGRAM_BOT_TOKEN: TOKEN }), { callback_query: { id: 'q1', data: 'delq:cm', message: { chat: { id: 42 }, message_id: 3 } } });
+      last = calls.at(-1).body;
+      assert.match(last.text, /«Nuovo contatto email» ha 2 pratiche aperte:\n1\. «Menu»[\s\S]*2\. «Menu»/);
+      for (const id of made.slice(0, 2)) assert.ok(JSON.stringify(last.reply_markup).includes(`del:${id}`));
+      assert.ok(JSON.stringify(last.reply_markup).includes('dela:cm'));
+      // A parole, come Riccardo: «elimina nuovo contatto email» e poi «eliminale entrambe» (il modello capisce altro).
+      await say('Elimina nuovo contatto email', { intent: 'cancella_pratica', locale: 'Nuovo contatto email', risposta: '' });
+      assert.match(calls.at(-1).body.text, /ha 2 pratiche aperte/);
+      await say('Menu', { intent: 'risposta', locale: '', risposta: 'Vuoi eliminarle entrambe?' });
+      assert.match(calls.at(-1).body.text, /ha 2 pratiche aperte/, 'due titoli uguali: ripropone i pulsanti, non chiacchiera');
+      await say('la seconda', { intent: 'non_chiaro', locale: '', risposta: '' });
+      assert.match(calls.at(-1).body.text, /Vuoi che elimini «Menu»\?/);
+      assert.ok(JSON.stringify(calls.at(-1).body.reply_markup).includes(`del:${made[1]}`));
+      await say('Elimina nuovo contatto email', { intent: 'cancella_pratica', locale: 'Nuovo contatto email', risposta: '' });
+      await say('Eliminale entrambe', { intent: 'cancella_pratica', locale: '', risposta: '' });
+      last = calls.at(-1).body;
+      assert.match(last.text, /Vuoi che elimini tutte le 2 pratiche aperte di «Nuovo contatto email»/);
+      assert.ok(JSON.stringify(last.reply_markup).includes('dela:cm'));
+      assert.equal((await db.prepare('SELECT COUNT(*) n FROM requests').bind().first()).n, 3, 'niente è cancellato prima del pulsante');
+      await missions.telegramUpdate(db, testEnv(db, { TELEGRAM_BOT_TOKEN: TOKEN }), { callback_query: { id: 'q2', data: 'dela:cm', message: { chat: { id: 42 }, message_id: 4 } } });
+      assert.match(calls.at(-1).body.text, /Fatto, Riccardo: ho eliminato le 2 pratiche di «Nuovo contatto email», e anche il cliente\./);
+      assert.deepEqual((await db.prepare('SELECT id FROM requests').bind().all()).results.map((r) => r.id), [made[2]], 'l’altro cliente resta');
+      assert.equal((await db.prepare("SELECT COUNT(*) n FROM clients WHERE id='cm'").bind().first()).n, 0);
+    } finally { globalThis.fetch = previous; db.close(); }
+  });
   it('non elimina una pratica pubblicata né un cliente con menu online', async () => {
     const db = database();
     const previous = globalThis.fetch;
