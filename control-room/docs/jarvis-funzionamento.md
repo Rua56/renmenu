@@ -32,7 +32,7 @@ Dimensioni al 6 ottobre 2026: circa 11.250 righe di backend (45 moduli di logica
                       Cloudflare Pages Functions (Jarvis)
                       D1 (dati)  R2 (file privati)  Workers AI
                                          |
-              Gemini (lettura foto, traduzioni, intenzioni)  |  ElevenLabs (voce)
+              Claude (intenzioni, conversazione, riflessione) · Gemini (lettura foto, traduzioni)  |  ElevenLabs (voce)
                                          |
                     GitHub: branch + PR + merge su main  -->  Cloudflare Pages (sito)
                                          |
@@ -159,6 +159,7 @@ Stati della missione: affidata, attesa invio, attesa cliente, attesa SÌ, pubbli
 - **Telegram:** testo, vocali (trascritti con Whisper su Workers AI, risposte anche a voce con ElevenLabs), foto e documenti.
 - **Intenzioni capite:** stato, anteprima, crea pratica, affida pratica, aggiorna menu, pubblica, cancella pratica, ricorda una nota, chiacchiera. Un modello sceglie una sola intenzione tra poche consentite; i valori (prezzi, piatti) restano quelli detti da Riccardo e sono verificati dal codice.
 - **Modifiche alla bozza:** elenco chiuso di operazioni (prezzo, varianti, aggiungi, rimuovi, rinomina, descrizione, sposta, motto, aspetto, campi del locale, storia). Ogni operazione deve nominare la voce toccata e ogni prezzo deve comparire nella frase. Le decisioni già applicate (colori, motto, storia, contatti) sopravvivono a «Rifai la bozza».
+- **Risposte brevi:** a ogni messaggio con pulsanti si può rispondere anche a parole («sì», «no», «non ora», «la seconda», «entrambe»): vale come il tocco. Pubblicare resta un tocco; cancellare a parole chiede sempre conferma.
 - **Comandi utili:** `/stato`, `/briefing`, `/settimana` (diario degli ultimi 7 giorni: richieste, correzioni, dubbi, pubblicazioni, errori e locali silenziosi), `/proposte` e `/rifletti` (proposte di miglioramento: il lunedì alle 8:15 Jarvis rilegge il diario con Claude e ne manda al massimo 3 con Fallo, Non ora e Mai; «Fallo» su una miglioria al codice apre una issue su GitHub), «mandami il QR di …», «mostrami l'anteprima» (link privato valido 24 ore), «ricorda che …», «dimentica …».
 - **Briefing:** ogni mattina dal lunedì al sabato alle 8 e un giro di proposte con pulsanti (promemoria ai locali che non rispondono, bozze ferme, SÌ in attesa).
 

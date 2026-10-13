@@ -23,6 +23,7 @@ import { memoryContext, memoryFor, menuStatements, noteStatement } from './memor
 import { buildDigest, digestText, recordEvent } from './journal.js';
 import { acceptProposals, askForProposals, decideProposal, pastProposals, proposalButtons, proposalsList, proposalText, reflectionDue, saveProposals, weekOf } from './reflection.js';
 import { slugify } from './menu.js';
+import { pickButton } from './short-reply.js';
 
 export const PARTIAL_MARK = '[Testo parziale: leggi l’email completa in Gmail prima di decidere]';
 export const OWNER_REVIEW = 'telegram:riccardo';
@@ -73,7 +74,7 @@ export function createMissions(deps) {
     let check = null; try { check = JSON.parse(row?.provenance_json || '[]')[0]?.checks?.[item.idx]; } catch {}
     if (!check) return finishChecks(db, env, chat, state);
     const q = checkQuestion(check, state.k, state.queue.length);
-    await sendTelegram(env, chat, q.text, q.buttons, deps.fetchImpl, { stacked: true });
+    await sendTg(db, env, chat, q.text, q.buttons, deps.fetchImpl, { stacked: true });
     return null;
   }
   /** Dopo la lettura: se ci sono dubbi con prezzi, Jarvis li chiede uno alla volta (prima della bozza). */
@@ -102,7 +103,7 @@ export function createMissions(deps) {
       await putSetting(db, 'draft_after_checks', JSON.stringify({ requestId: request.id, at: now() }));
       text += ' Preparo la bozza adesso: ti scrivo appena è pronta (pochi minuti).';
     }
-    await sendTelegram(env, chat, text, null, deps.fetchImpl);
+    await sendTg(db, env, chat, text, null, deps.fetchImpl);
     return { text };
   }
   async function answerCheck(db, env, chat, k, choice) {
@@ -161,6 +162,12 @@ export function createMissions(deps) {
     await db.prepare('INSERT INTO jarvis_settings (key,value,updated_at) VALUES (?,?,?) ON CONFLICT(key) DO UPDATE SET value=excluded.value,updated_at=excluded.updated_at')
       .bind(key, String(value), now()).run();
   }
+  // Ogni messaggio con pulsanti viene ricordato: Riccardo può rispondere anche a parole («la seconda», «sì»).
+  async function sendTg(db, env, chat, text, buttons, fetchImpl, options) {
+    const sent = await sendTelegram(env, chat, text, buttons, fetchImpl, options);
+    if (Array.isArray(buttons) && buttons.length) await putSetting(db, 'tg_buttons', JSON.stringify({ at: now(), text: String(text).slice(0, 600), buttons: buttons.slice(0, 12), messageId: sent?.result?.message_id || null })).catch(() => {});
+    return sent;
+  }
 
   // Ogni messaggio va sia nella Control Room (riquadro JARVIS) sia su Telegram, se collegato.
   async function tell(db, env, mission, subject, text, buttons = null, priority = 'normale') {
@@ -168,7 +175,7 @@ export function createMissions(deps) {
     await db.prepare('INSERT INTO notifications (id,request_id,channel,subject,body,priority,due_at,status,created_at) VALUES (?,?,?,?,?,?,?,?,?)')
       .bind(id, mission?.request_id || null, 'in_app', `Jarvis · ${subject}`, String(text).slice(0, 5000), priority, null, 'mock', now()).run();
     const chat = await setting(db, 'telegram_chat_id');
-    if (chat && telegramReady(env)) await sendTelegram(env, chat, `${text}`, buttons, deps.fetchImpl);
+    if (chat && telegramReady(env)) await sendTg(db, env, chat, `${text}`, buttons, deps.fetchImpl);
   }
 
   async function move(db, mission, status, note, extra = {}) {
@@ -418,7 +425,7 @@ export function createMissions(deps) {
     if (!chat || !telegramReady(env)) return { ok: false, why: 'Telegram non collegato', qr };
     const kind = qr.withLogo ? 'con il logo del locale' : 'classico';
     const note = QR_WITH_LOGO.has(plan) && !qr.withLogo ? `\nIl logo non l’ho potuto inserire (${qr.logoProblem || 'nessun logo nel menu'}): questo è il QR classico, dimmi se vuoi che lo rifaccia con il logo.` : '';
-    await sendTelegram(env, chat, `QR del menu di «${name}» (${kind}).\nLink: ${qr.link}\nIl QR non cambia con gli aggiornamenti del menu: puoi stamparlo.${note}`, null, deps.fetchImpl);
+    await sendTg(db, env, chat, `QR del menu di «${name}» (${kind}).\nLink: ${qr.link}\nIl QR non cambia con gli aggiornamenti del menu: puoi stamparlo.${note}`, null, deps.fetchImpl);
     const slugName = String(slug).replace(/[^a-z0-9-]/gi, '').slice(0, 40) || 'menu';
     const photo = await sendPhoto(env, chat, qr.png, `QR ${name}`, deps.fetchImpl);
     await sendDocument(env, chat, qr.png, `qr-${slugName}.png`, 'image/png', 'Per stampare: file PNG a piena qualità.', deps.fetchImpl);
@@ -492,18 +499,18 @@ export function createMissions(deps) {
     const hits = clients.filter((c) => plain(c.name).split(' ').some((w) => w.length >= 3 && !generic.has(w) && said.includes(w)));
     if (hits.length !== 1) {
       const names = (hits.length ? hits : clients).slice(0, 8).map((c) => `«${c.name}»`).join(', ');
-      await sendTelegram(env, chat, hits.length ? `Quale locale? ${names}.` : (clients.length ? `Di quale locale vuoi il QR? Quelli già online: ${names}.` : 'Nessun menu è ancora online: il QR lo preparo dopo la pubblicazione.'), null, deps.fetchImpl);
+      await sendTg(db, env, chat, hits.length ? `Quale locale? ${names}.` : (clients.length ? `Di quale locale vuoi il QR? Quelli già online: ${names}.` : 'Nessun menu è ancora online: il QR lo preparo dopo la pubblicazione.'), null, deps.fetchImpl);
       return;
     }
     const client = hits[0];
     if (isBlanchSlug(client.menu_id)) {
       // Menu in formato Blanch: il QR è quello già stampato e non si rigenera mai.
-      await sendTelegram(env, chat, `Il QR di «${client.name}» è quello già stampato e non cambia mai.\nLink: ${publicMenuPageUrl('https://renmenu.pages.dev', client.menu_id)}\nFile del QR: https://renmenu.pages.dev/blanch/qr/trattoria-blanch-qr.png (PNG) e https://renmenu.pages.dev/blanch/qr/trattoria-blanch-qr.svg (SVG).`, null, deps.fetchImpl);
+      await sendTg(db, env, chat, `Il QR di «${client.name}» è quello già stampato e non cambia mai.\nLink: ${publicMenuPageUrl('https://renmenu.pages.dev', client.menu_id)}\nFile del QR: https://renmenu.pages.dev/blanch/qr/trattoria-blanch-qr.png (PNG) e https://renmenu.pages.dev/blanch/qr/trattoria-blanch-qr.svg (SVG).`, null, deps.fetchImpl);
       return;
     }
     let menu = null;
     try { const r = await (deps.fetchImpl || globalThis.fetch)(`https://renmenu.com/menus/${encodeURIComponent(client.menu_id)}.json`); if (r.ok) menu = await r.json(); } catch { menu = null; }
-    if (!menu) { await sendTelegram(env, chat, `Non riesco a leggere il menu online di «${client.name}»: riprova tra poco.`, null, deps.fetchImpl); return; }
+    if (!menu) { await sendTg(db, env, chat, `Non riesco a leggere il menu online di «${client.name}»: riprova tra poco.`, null, deps.fetchImpl); return; }
     await sendMenuQr(db, env, { slug: client.menu_id, name: client.name, plan: client.plan, logoUrl: menu.premium?.logo || '', baseUrl: menuLink(client.menu_id) });
   }
   async function stepVerifying(db, env, mission) {
@@ -591,71 +598,78 @@ export function createMissions(deps) {
     return { ok: true, text: after.status === 'verifica' ? 'Pubblicato. Verifico online tra un minuto e ti scrivo.' : 'Ricevuto: sto pubblicando, ti aggiorno.' };
   }
 
+  // Un pulsante premuto: con un tocco (query) o scelto da una risposta scritta o detta («la seconda», «sì»).
+  async function pressButton(db, env, chat, data, query = null) {
+    const [verb, missionId, extra, arg4] = String(data || '').split(':');
+    const ack = (text) => (query?.id ? answerCallback(env, query.id, text, deps.fetchImpl) : null);
+    const clear = () => (query?.message?.message_id ? clearButtons(env, chat, query.message.message_id, deps.fetchImpl) : null);
+    await putSetting(db, 'tg_buttons', 'null').catch(() => {});
+    if (verb === 'chk') {
+      await clear();
+      const outcome = missionId === 'end' ? await answerCheck(db, env, chat, -1, 'end') : await answerCheck(db, env, chat, Number(missionId), String(extra || ''));
+      await ack(outcome.text);
+      if (!outcome.silent) await sendTg(db, env, chat, outcome.text, null, deps.fetchImpl);
+      return;
+    }
+    if (verb === 'undo') {
+      const outcome = await undoDraftEdit(db, env, missionId);
+      await ack(outcome.text);
+      await clear();
+      await sendTg(db, env, chat, outcome.text, null, deps.fetchImpl);
+      return;
+    }
+    if (verb === 'peek') {
+      const found = (await openDrafts(db).catch(() => [])).find((d) => d.id === missionId);
+      const shown = found ? await showDraft(db, env, found) : { text: 'Quella bozza non è più aperta.' };
+      await ack('Ecco la bozza');
+      await sendTg(db, env, chat, shown.text, shown.buttons || null, deps.fetchImpl);
+      return;
+    }
+    if (verb === 'prop') {
+      const outcome = await decideProposal(db, env, missionId, String(extra || ''), { fetchImpl: deps.fetchImpl });
+      if (outcome.status) await auditedBatch(jarvisDb(db), [], 'jarvis.proposal', `Proposta «${String(outcome.title).slice(0, 80)}»: ${outcome.status} da Riccardo.`, null).catch(() => {});
+      await ack(outcome.status ? 'Ricevuto' : 'Già risposto');
+      await clear();
+      await sendTg(db, env, chat, outcome.text, null, deps.fetchImpl);
+      return;
+    }
+    if (verb === 'soll' || verb === 'sollno') {
+      await ack(verb === 'sollno' ? 'Aspetto ancora' : 'Lo metto in coda');
+      await clear();
+      const out = verb === 'sollno' ? { text: 'Va bene, aspetto ancora: te lo riproporrò fra qualche giorno.' } : await runReminder(db, env, missionId);
+      await sendTg(db, env, chat, out.text, null, deps.fetchImpl);
+      return;
+    }
+    if (verb === 'affq' || verb === 'aff' || verb === 'affno') {
+      await ack(verb === 'affno' ? 'Ok, non affido' : 'Un attimo');
+      if (verb !== 'affq') await clear();
+      const out = verb === 'affno' ? { text: 'Va bene, non affido niente: la pratica resta in Revisione.' }
+        : verb === 'affq' ? await entrustBrief(db, env, missionId) : await runEntrust(db, env, missionId, Number(extra), String(arg4 || 'n'));
+      await sendTg(db, env, chat, out.text, out.buttons || null, deps.fetchImpl, { stacked: true });
+      return;
+    }
+    if (['del', 'delc', 'dela', 'delq', 'delno'].includes(verb)) {
+      // del: una pratica · delc: un cliente senza pratiche · dela: tutte le pratiche aperte di un cliente · delq: scegli fra le pratiche di un cliente
+      const outcome = verb === 'delno' ? { text: 'Va bene, non elimino niente.' } : verb === 'delq' ? await deleteOffer(db, missionId, '')
+        : verb === 'dela' ? await runDeleteAll(db, env, missionId) : await runDelete(db, env, verb === 'del' ? { requestId: missionId } : { clientId: missionId });
+      await ack(verb === 'delno' ? 'Non elimino' : verb === 'delq' ? 'Ecco le pratiche' : 'Fatto');
+      await clear();
+      if (verb === 'delq') await putSetting(db, 'tg_pending', outcome.pending ? JSON.stringify({ text: 'elimina pratica', at: now(), ...outcome.pending }) : 'null').catch(() => {});
+      await sendTg(db, env, chat, outcome.text, outcome.buttons || null, deps.fetchImpl, { stacked: true });
+      return;
+    }
+    const outcome = ['pub', 'no'].includes(verb) ? await decide(db, env, missionId, verb === 'pub')
+      : verb === 'att' ? await attachTelegramFile(db, env, missionId) : verb === 'attno' ? (await putSetting(db, 'tg_pending_file', ''), { text: 'Va bene, la foto non viene usata.' }) : { text: 'Comando sconosciuto.' };
+    await ack(outcome.text);
+    await clear();
+    await sendTg(db, env, chat, outcome.text, null, deps.fetchImpl);
+  }
   async function telegramUpdate(db, env, update) {
     const chat = await setting(db, 'telegram_chat_id');
     if (update?.callback_query) {
       const query = update.callback_query, from = String(query.message?.chat?.id || '');
       if (!chat || from !== chat) return;
-      const [verb, missionId, extra, arg4] = String(query.data || '').split(':');
-      if (verb === 'chk') {
-        if (query.message?.message_id) await clearButtons(env, chat, query.message.message_id, deps.fetchImpl);
-        const outcome = missionId === 'end' ? await answerCheck(db, env, chat, -1, 'end') : await answerCheck(db, env, chat, Number(missionId), String(extra || ''));
-        await answerCallback(env, query.id, outcome.text, deps.fetchImpl);
-        if (!outcome.silent) await sendTelegram(env, chat, outcome.text, null, deps.fetchImpl);
-        return;
-      }
-      if (verb === 'undo') {
-        const outcome = await undoDraftEdit(db, env, missionId);
-        await answerCallback(env, query.id, outcome.text, deps.fetchImpl);
-        if (query.message?.message_id) await clearButtons(env, chat, query.message.message_id, deps.fetchImpl);
-        await sendTelegram(env, chat, outcome.text, null, deps.fetchImpl);
-        return;
-      }
-      if (verb === 'peek') {
-        const found = (await openDrafts(db).catch(() => [])).find((d) => d.id === missionId);
-        const shown = found ? await showDraft(db, env, found) : { text: 'Quella bozza non è più aperta.' };
-        await answerCallback(env, query.id, 'Ecco la bozza', deps.fetchImpl);
-        await sendTelegram(env, chat, shown.text, shown.buttons || null, deps.fetchImpl);
-        return;
-      }
-      if (verb === 'prop') {
-        const outcome = await decideProposal(db, env, missionId, String(extra || ''), { fetchImpl: deps.fetchImpl });
-        if (outcome.status) await auditedBatch(jarvisDb(db), [], 'jarvis.proposal', `Proposta «${String(outcome.title).slice(0, 80)}»: ${outcome.status} da Riccardo.`, null).catch(() => {});
-        await answerCallback(env, query.id, outcome.status ? 'Ricevuto' : 'Già risposto', deps.fetchImpl);
-        if (query.message?.message_id) await clearButtons(env, chat, query.message.message_id, deps.fetchImpl);
-        await sendTelegram(env, chat, outcome.text, null, deps.fetchImpl);
-        return;
-      }
-      if (verb === 'soll' || verb === 'sollno') {
-        await answerCallback(env, query.id, verb === 'sollno' ? 'Aspetto ancora' : 'Lo metto in coda', deps.fetchImpl);
-        if (query.message?.message_id) await clearButtons(env, chat, query.message.message_id, deps.fetchImpl);
-        const out = verb === 'sollno' ? { text: 'Va bene, aspetto ancora: te lo riproporrò fra qualche giorno.' } : await runReminder(db, env, missionId);
-        await sendTelegram(env, chat, out.text, null, deps.fetchImpl);
-        return;
-      }
-      if (verb === 'affq' || verb === 'aff' || verb === 'affno') {
-        await answerCallback(env, query.id, verb === 'affno' ? 'Ok, non affido' : 'Un attimo', deps.fetchImpl);
-        if (query.message?.message_id && verb !== 'affq') await clearButtons(env, chat, query.message.message_id, deps.fetchImpl);
-        const out = verb === 'affno' ? { text: 'Va bene, non affido niente: la pratica resta in Revisione.' }
-          : verb === 'affq' ? await entrustBrief(db, env, missionId) : await runEntrust(db, env, missionId, Number(extra), String(arg4 || 'n'));
-        await sendTelegram(env, chat, out.text, out.buttons || null, deps.fetchImpl, { stacked: true });
-        return;
-      }
-      if (['del', 'delc', 'dela', 'delq', 'delno'].includes(verb)) {
-        // del: una pratica · delc: un cliente senza pratiche · dela: tutte le pratiche aperte di un cliente · delq: scegli fra le pratiche di un cliente
-        const outcome = verb === 'delno' ? { text: 'Va bene, non elimino niente.' } : verb === 'delq' ? await deleteOffer(db, missionId, '')
-          : verb === 'dela' ? await runDeleteAll(db, env, missionId) : await runDelete(db, env, verb === 'del' ? { requestId: missionId } : { clientId: missionId });
-        await answerCallback(env, query.id, verb === 'delno' ? 'Non elimino' : verb === 'delq' ? 'Ecco le pratiche' : 'Fatto', deps.fetchImpl);
-        if (query.message?.message_id) await clearButtons(env, chat, query.message.message_id, deps.fetchImpl);
-        if (verb === 'delq') await putSetting(db, 'tg_pending', outcome.pending ? JSON.stringify({ text: 'elimina pratica', at: now(), ...outcome.pending }) : 'null').catch(() => {});
-        await sendTelegram(env, chat, outcome.text, outcome.buttons || null, deps.fetchImpl, { stacked: true });
-        return;
-      }
-      const outcome = ['pub', 'no'].includes(verb) ? await decide(db, env, missionId, verb === 'pub')
-        : verb === 'att' ? await attachTelegramFile(db, env, missionId) : verb === 'attno' ? (await putSetting(db, 'tg_pending_file', ''), { text: 'Va bene, la foto non viene usata.' }) : { text: 'Comando sconosciuto.' };
-      await answerCallback(env, query.id, outcome.text, deps.fetchImpl);
-      if (query.message?.message_id) await clearButtons(env, chat, query.message.message_id, deps.fetchImpl);
-      await sendTelegram(env, chat, outcome.text, null, deps.fetchImpl);
+      await pressButton(db, env, chat, String(query.data || ''), query);
       return;
     }
     const message = update?.message;
@@ -670,7 +684,7 @@ export function createMissions(deps) {
         await putSetting(db, 'telegram_chat_id', from);
         await putSetting(db, 'telegram_pair_code', '');
         await auditedBatch(jarvisDb(db), [], 'jarvis.telegram_linked', 'Telegram collegato alla Control Room.', null);
-        await sendTelegram(env, from, 'Ciao Riccardo, sono Jarvis. Da ora ti scrivo qui per le pratiche RenMenu e ti chiedo il SÌ prima di pubblicare. Scrivi /stato per il punto della situazione.', null, deps.fetchImpl);
+        await sendTg(db, env, from, 'Ciao Riccardo, sono Jarvis. Da ora ti scrivo qui per le pratiche RenMenu e ti chiedo il SÌ prima di pubblicare. Scrivi /stato per il punto della situazione.', null, deps.fetchImpl);
       }
       return;
     }
@@ -678,23 +692,23 @@ export function createMissions(deps) {
     // Dubbi aperti: un prezzo scritto («7,50») risponde al dubbio in corso.
     if (normalizePrice(text)) {
       let open = null; try { open = JSON.parse(await setting(db, 'tg_checks') || 'null'); } catch {}
-      if (open?.queue && open.k < open.queue.length) { const outcome = await answerCheck(db, env, chat, open.k, normalizePrice(text)); if (!outcome.silent) await sendTelegram(env, chat, outcome.text, null, deps.fetchImpl); return; }
+      if (open?.queue && open.k < open.queue.length) { const outcome = await answerCheck(db, env, chat, open.k, normalizePrice(text)); if (!outcome.silent) await sendTg(db, env, chat, outcome.text, null, deps.fetchImpl); return; }
     }
     if (/\bqr\b/i.test(text) && /\b(?:mand\w*|dammi|dai|gener\w*|invi\w*|rifai|prepar\w*|voglio|serve)\b/i.test(text) && !EDIT_WORDS_STRICT.test(text)) { await qrOnRequest(db, env, chat, text); return; }
     if (/^\/briefing\b/i.test(text)) { await briefing(db, env, { force: true }); return; }
-    if (/^\/proposte\b/i.test(text)) { await sendTelegram(env, chat, await proposalsList(db), null, deps.fetchImpl); return; }
+    if (/^\/proposte\b/i.test(text)) { await sendTg(db, env, chat, await proposalsList(db), null, deps.fetchImpl); return; }
     if (/^\/rifletti\b/i.test(text)) {
-      await sendTelegram(env, chat, 'Rileggo il diario della settimana e preparo le proposte: ci vuole qualche istante.', null, deps.fetchImpl);
+      await sendTg(db, env, chat, 'Rileggo il diario della settimana e preparo le proposte: ci vuole qualche istante.', null, deps.fetchImpl);
       await reflect(db, env, { force: true });
       return;
     }
-    if (/^\/settimana\b/i.test(text)) { await sendTelegram(env, chat, digestText(await buildDigest(db)), null, deps.fetchImpl); return; }
+    if (/^\/settimana\b/i.test(text)) { await sendTg(db, env, chat, digestText(await buildDigest(db)), null, deps.fetchImpl); return; }
     if (/^\/stato\b/i.test(text) || STATUS_WORDS.test(text)) {
-      await sendTelegram(env, chat, await statusText(db), null, deps.fetchImpl);
+      await sendTg(db, env, chat, await statusText(db), null, deps.fetchImpl);
       return;
     }
     if (/^\/aiuto\b|^\/help\b/i.test(text) || text.startsWith('/')) {
-      await sendTelegram(env, chat, 'Puoi scrivermi o mandarmi un vocale: «com’è la situazione?», «al Bakaro il frico ora costa 14», «crea una nuova pratica per il locale … con piano Standard», «pubblica il menu di …». Capisco anche /stato, /briefing, /settimana, /proposte, /rifletti, le foto e i PDF dei menu. Pubblicare richiede sempre il tuo SÌ col pulsante.', null, deps.fetchImpl);
+      await sendTg(db, env, chat, 'Puoi scrivermi o mandarmi un vocale: «com’è la situazione?», «al Bakaro il frico ora costa 14», «crea una nuova pratica per il locale … con piano Standard», «pubblica il menu di …». Capisco anche /stato, /briefing, /settimana, /proposte, /rifletti, le foto e i PDF dei menu. Pubblicare richiede sempre il tuo SÌ col pulsante.', null, deps.fetchImpl);
       return;
     }
     await converse(db, env, chat, text, false);
@@ -709,15 +723,15 @@ export function createMissions(deps) {
     const audio = spoken ? await speak(await voiceSettings(db, env), String(text).replace(/^«[\s\S]*?»\n\n/, ''), deps.fetchImpl) : null;
     if (audio && !buttons) { const sent = await sendVoice(env, chat, audio, text, deps.fetchImpl); if (sent?.ok) return; }
     if (audio && buttons) await sendVoice(env, chat, audio, '', deps.fetchImpl);
-    await sendTelegram(env, chat, text, buttons, deps.fetchImpl, { stacked: (buttons?.length || 0) > 2 });
+    await sendTg(db, env, chat, text, buttons, deps.fetchImpl, { stacked: (buttons?.length || 0) > 2 });
   }
   async function receiveVoice(db, env, chat, message) {
     const media = message.voice || message.audio;
-    if (Number(media.duration || 0) > 180) { await sendTelegram(env, chat, 'Il vocale è troppo lungo: tienilo sotto i 3 minuti.', null, deps.fetchImpl); return; }
+    if (Number(media.duration || 0) > 180) { await sendTg(db, env, chat, 'Il vocale è troppo lungo: tienilo sotto i 3 minuti.', null, deps.fetchImpl); return; }
     const file = await downloadTelegramFile(env, media.file_id, deps.fetchImpl);
-    if (!file?.bytes?.length) { await sendTelegram(env, chat, 'Non riesco a scaricare il vocale da Telegram: riprova.', null, deps.fetchImpl); return; }
+    if (!file?.bytes?.length) { await sendTg(db, env, chat, 'Non riesco a scaricare il vocale da Telegram: riprova.', null, deps.fetchImpl); return; }
     const heard = await transcribe(env.AI, file.bytes);
-    if (!heard.ok) { await sendTelegram(env, chat, `Perdona Riccardo, ${heard.reason}. Puoi ripetere?`, null, deps.fetchImpl); return; }
+    if (!heard.ok) { await sendTg(db, env, chat, `Perdona Riccardo, ${heard.reason}. Puoi ripetere?`, null, deps.fetchImpl); return; }
     if (STATUS_WORDS.test(heard.text.trim())) { await reply(db, env, chat, `«${heard.text.trim()}»\n\n${await statusText(db)}`, false); return; }
     await converse(db, env, chat, heard.text, true);
   }
@@ -765,6 +779,7 @@ export function createMissions(deps) {
   // Conversazione: ricorda gli ultimi scambi e, se Jarvis ha appena chiesto un chiarimento,
   // unisce la risposta di Riccardo al comando precedente (es. «cambia il frico a 12» → «quale locale?» → «Bakaro»).
   const PENDING_MINUTES = 10;
+  const BUTTONS_MINUTES = 30;
   const plainText = (text) => String(text || '').toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/[^a-z0-9]+/g, '-');
   const localeSaid = (venue, utterance) => {
     const said = `-${plainText(utterance)}-`;
@@ -776,11 +791,24 @@ export function createMissions(deps) {
     let pending = null; try { pending = JSON.parse(await setting(db, 'tg_pending') || 'null'); } catch {}
     const fresh = pending && Date.now() - Date.parse(pending.at) < PENDING_MINUTES * MINUTE;
     const utterance = fresh ? `${pending.text}\n${said0}` : said0;
+    let offered = null; try { offered = JSON.parse(await setting(db, 'tg_buttons') || 'null'); } catch {}
     let history = []; try { history = JSON.parse(await setting(db, 'tg_history') || '[]').filter((h) => Date.now() - Date.parse(h.at) < 180 * MINUTE); } catch {}
+    // Risposta breve all'ultima domanda con pulsanti («la seconda», «entrambe», «sì», «non ora»): vale come il tocco.
+    if (offered && Date.now() - Date.parse(offered.at) < BUTTONS_MINUTES * MINUTE) {
+      const picked = pickButton(said0, offered.buttons);
+      if (picked?.tapOnly) { await reply(db, env, chat, `${said}Per sicurezza «${picked.tapOnly}» lo confermi tu toccando il pulsante qui sopra.`, spoken); return; }
+      if (picked?.data) {
+        await putSetting(db, 'tg_history', JSON.stringify([...history, { who: 'Riccardo', text: said0.slice(0, 1200), at: now() }, { who: 'Jarvis', text: `(scelto «${picked.label}»)`, at: now() }].slice(-16))).catch(() => {});
+        await putSetting(db, 'tg_pending', 'null').catch(() => {});
+        await auditedBatch(jarvisDb(db), [], 'jarvis.conversation', `Risposta breve «${said0.slice(0, 40)}» → pulsante «${String(picked.label).slice(0, 60)}».`, null).catch(() => {});
+        await pressButton(db, env, chat, picked.data, offered.messageId ? { message: { message_id: offered.messageId } } : null);
+        return;
+      }
+    }
     const clues = await readClues(db, utterance);
     const context = await voiceContext(db, env, clues, history.slice(-8).map((h) => `${h.who}: ${String(h.text).slice(0, 300)}`).join('\n'));
     const gem = await geminiFor(db, env);
-    const understood = await understand(env.AI, utterance, context, { gemini: gem });
+    const understood = await understand(env.AI, utterance, context, { gemini: gem, claude: { env, fetchImpl: deps.fetchImpl } });
     if (understood.modelName) await putSetting(db, 'gemini_good', JSON.stringify([understood.modelName])).catch(() => {});
     // Se il modello non è sicuro (o risponde a parole a un ordine) ma le parole chiave indicano un compito chiaro, Jarvis procede.
     const fallbackUsed = (understood.intent === 'non_chiaro' || (understood.intent === 'risposta' && !fresh)) && !['non_chiaro', 'ambiguo', 'risposta'].includes(clues.guess.intent);
@@ -823,8 +851,8 @@ export function createMissions(deps) {
       if (target?.draft && draftMentions(target.draft, utterance)) { const edited = await voiceEditDraft(db, env, utterance, target.draft); await answer(edited.text, edited.buttons || null, { keep: edited.keep }); return; }
     }
     if (intent.intent === 'risposta' || (intent.intent === 'non_chiaro' && clues.guess.intent === 'non_chiaro')) {
-      const talk = await freeChat(env.AI, { utterance: said0, context, history: fresh ? [...history, { who: 'Riccardo', text: pending.text }] : history, spoken });
-      await auditedBatch(jarvisDb(db), [], 'jarvis.chat', `Conversazione libera: ${talk.ok ? (talk.model === CHAT_MODEL ? 'GPT-OSS 120B' : 'modello di riserva') : 'nessuna risposta'}.`, null).catch(() => {});
+      const talk = await freeChat(env.AI, { utterance: said0, context, history: fresh ? [...history, { who: 'Riccardo', text: pending.text }] : history, spoken }, { claude: { env, fetchImpl: deps.fetchImpl } });
+      await auditedBatch(jarvisDb(db), [], 'jarvis.chat', `Conversazione libera: ${talk.ok ? (talk.engine === 'claude' ? 'Claude' : talk.model === CHAT_MODEL ? 'GPT-OSS 120B' : 'modello di riserva') : 'nessuna risposta'}.`, null).catch(() => {});
       const text = talk.ok ? talk.text : intent.risposta;
       if (text) { await answer(text, null, { keep: !talk.ok }); return; }
     }
@@ -998,7 +1026,7 @@ export function createMissions(deps) {
       text = `Non sono riuscito a preparare l’inglese delle voci nuove (${String(error?.message || 'errore').slice(0, 120)}). Puoi farlo in Revisione con «Traduci».`;
     }
     const chat = await setting(db, 'telegram_chat_id');
-    if (chat && telegramReady(env)) await sendTelegram(env, chat, text, null, deps.fetchImpl);
+    if (chat && telegramReady(env)) await sendTg(db, env, chat, text, null, deps.fetchImpl);
     return { text };
   }
   // «Jarvis, rileggi le foto»: rimette in coda tutti i file della pratica e li legge con le regole attuali.
@@ -1176,7 +1204,7 @@ export function createMissions(deps) {
     const followed = new Set((await safe('SELECT request_id FROM jarvis_missions')).map((x) => x.request_id));
     for (const d of (await safe(OPEN_DRAFTS)).filter((x) => !followed.has(x.request_id))) items.push({ text: `«${d.client_name || d.subject}»: la bozza è pronta da guardare. Se ti va bene, affidamela.`, buttons: [['Mostrami la bozza', `peek:${d.id}`], ['Affida a Jarvis', `affq:${d.id}`]] });
     const sent = items.slice(0, 5);
-    for (const [i, item] of sent.entries()) await sendTelegram(env, chat, `${i === 0 ? `Da decidere stamattina (${sent.length}${items.length > sent.length ? ` di ${items.length}` : ''}):\n\n` : ''}${item.text}`, item.buttons, deps.fetchImpl, { stacked: true });
+    for (const [i, item] of sent.entries()) await sendTg(db, env, chat, `${i === 0 ? `Da decidere stamattina (${sent.length}${items.length > sent.length ? ` di ${items.length}` : ''}):\n\n` : ''}${item.text}`, item.buttons, deps.fetchImpl, { stacked: true });
     return sent;
   }
   async function runReminder(db, env, missionId) {
@@ -1537,7 +1565,7 @@ export function createMissions(deps) {
     const doc = message.document;
     const mime = photo ? 'image/jpeg' : String(doc?.mime_type || '');
     if (!photo && !FILE_TYPES.has(mime)) {
-      await sendTelegram(env, chat, /heic|heif/i.test(mime) ? 'Questa foto è in formato HEIC: mandamela come foto normale (non come file), così Telegram la converte in JPG.' : 'Posso leggere foto (JPG, PNG, WebP) e PDF dei menu.', null, deps.fetchImpl);
+      await sendTg(db, env, chat, /heic|heif/i.test(mime) ? 'Questa foto è in formato HEIC: mandamela come foto normale (non come file), così Telegram la converte in JPG.' : 'Posso leggere foto (JPG, PNG, WebP) e PDF dei menu.', null, deps.fetchImpl);
       return;
     }
     const fileId = photo ? photo.file_id : doc.file_id;
@@ -1547,12 +1575,12 @@ export function createMissions(deps) {
     try { focus = JSON.parse(await setting(db, 'tg_focus') || 'null'); } catch {}
     if (focus?.requestId && Date.now() - Date.parse(focus.at) < FOCUS_MINUTES * MINUTE) {
       const outcome = await attachTelegramFile(db, env, focus.requestId);
-      await sendTelegram(env, chat, outcome.text.startsWith('Collegato') ? `${outcome.text} (è la pratica che mi hai appena fatto aprire).` : outcome.text, null, deps.fetchImpl);
+      await sendTg(db, env, chat, outcome.text.startsWith('Collegato') ? `${outcome.text} (è la pratica che mi hai appena fatto aprire).` : outcome.text, null, deps.fetchImpl);
       return;
     }
     const open = await rows(db, "SELECT id,subject FROM requests WHERE status NOT IN ('completata','archiviata','chiusa') ORDER BY updated_at DESC LIMIT 5");
-    if (!open.length) { await sendTelegram(env, chat, 'Non ci sono pratiche aperte a cui collegare il file: crea prima la pratica nella Control Room.', null, deps.fetchImpl); return; }
-    await sendTelegram(env, chat, `Ricevuto «${name}». A quale pratica lo collego? Poi lo leggo e ti dico cosa ho trovato.`,
+    if (!open.length) { await sendTg(db, env, chat, 'Non ci sono pratiche aperte a cui collegare il file: crea prima la pratica nella Control Room.', null, deps.fetchImpl); return; }
+    await sendTg(db, env, chat, `Ricevuto «${name}». A quale pratica lo collego? Poi lo leggo e ti dico cosa ho trovato.`,
       [...open.map((r) => [String(r.subject || r.id).slice(0, 48), `att:${r.id}`]), ['Nessuna, lascia stare', 'attno:x']], deps.fetchImpl, { stacked: true });
   }
   async function attachTelegramFile(db, env, requestId) {
@@ -1606,7 +1634,7 @@ export function createMissions(deps) {
     const answer = await askForProposals(env, { settimana: current, settimanaPrecedente: previous, propostePassate: past.map(({ kind, title, status, week: w }) => ({ tipo: kind, titolo: title, stato: status, settimana: w })) }, { fetchImpl: deps.fetchImpl });
     if (answer.error) {
       await recordEvent(db, 'errore.riflessione', { detail: { errore: answer.error } });
-      await sendTelegram(env, chat, `Non sono riuscito a preparare le proposte della settimana: ${answer.error}.${/ANTHROPIC_API_KEY/.test(answer.error) ? ' Va aggiunta tra i Secret dello staging su Cloudflare Pages.' : ''}`, null, deps.fetchImpl);
+      await sendTg(db, env, chat, `Non sono riuscito a preparare le proposte della settimana: ${answer.error}.${/ANTHROPIC_API_KEY/.test(answer.error) ? ' Va aggiunta tra i Secret dello staging su Cloudflare Pages.' : ''}`, null, deps.fetchImpl);
       return { error: answer.error };
     }
     const proposals = acceptProposals(answer.proposals, past, at);
@@ -1614,9 +1642,9 @@ export function createMissions(deps) {
     try { saved = await saveProposals(db, week, proposals, { model: answer.model, digest: current, now: at }); }
     catch (error) { if (/no such table/i.test(String(error?.message))) return null; throw error; }
     await auditedBatch(jarvisDb(db), [], 'jarvis.reflection', `Riflessione della settimana del ${week}: ${saved.length} proposte (${answer.model}).`, null).catch(() => {});
-    if (!saved.length) { await sendTelegram(env, chat, 'Ho riletto il diario della settimana: nessuna miglioria con numeri abbastanza solidi da proporti. Scrivi /settimana per vedere i numeri.', null, deps.fetchImpl); return { proposals: [] }; }
-    await sendTelegram(env, chat, `Ho riletto il diario della settimana e ho ${saved.length === 1 ? 'una proposta' : `${saved.length} proposte`} per migliorare il servizio. Rispondi con un tocco: Fallo, Non ora o Mai.`, null, deps.fetchImpl);
-    for (const [i, p] of saved.entries()) await sendTelegram(env, chat, proposalText(p, i, saved.length), proposalButtons(p.id), deps.fetchImpl);
+    if (!saved.length) { await sendTg(db, env, chat, 'Ho riletto il diario della settimana: nessuna miglioria con numeri abbastanza solidi da proporti. Scrivi /settimana per vedere i numeri.', null, deps.fetchImpl); return { proposals: [] }; }
+    await sendTg(db, env, chat, `Ho riletto il diario della settimana e ho ${saved.length === 1 ? 'una proposta' : `${saved.length} proposte`} per migliorare il servizio. Rispondi con un tocco: Fallo, Non ora o Mai.`, null, deps.fetchImpl);
+    for (const [i, p] of saved.entries()) await sendTg(db, env, chat, proposalText(p, i, saved.length), proposalButtons(p.id), deps.fetchImpl);
     return { proposals: saved };
   }
 
@@ -1632,7 +1660,7 @@ export function createMissions(deps) {
     let text, buttons = null;
     try { await action(jarvisDb(db), 'generateDraft', { requestId: request.id }, env); text = `Bozza pronta per «${String(request.subject || 'la pratica').slice(0, 60)}»: guardala qui sotto e, se ti va bene, affidamela. Le voci che hai saltato restano da verificare.`; buttons = [['Mostrami la bozza', `peek:${(await getOne(db, 'SELECT id FROM drafts WHERE request_id=?', request.id))?.id}`], ['Affida a Jarvis', `affq:${(await getOne(db, 'SELECT id FROM drafts WHERE request_id=?', request.id))?.id}`]]; }
     catch (error) { text = `Non sono riuscito a preparare la bozza: ${String(error?.message || 'errore').slice(0, 160)}.`; }
-    if (chat && telegramReady(env)) await sendTelegram(env, chat, text, buttons, deps.fetchImpl, { stacked: true });
+    if (chat && telegramReady(env)) await sendTg(db, env, chat, text, buttons, deps.fetchImpl, { stacked: true });
     return { text };
   }
   // Prova di comprensione: classifica frasi senza eseguire nulla e senza scrivere sul database.
@@ -1643,7 +1671,7 @@ export function createMissions(deps) {
       const started = Date.now();
       const clues = await readClues(db, phrase);
       const context = await voiceContext(db, env, clues, '');
-      const understood = await understand(env.AI, phrase, context, { gemini: gem, engine });
+      const understood = await understand(env.AI, phrase, context, { gemini: gem, engine, claude: { env, fetchImpl: deps.fetchImpl } });
       const fallbackUsed = (understood.intent === 'non_chiaro' || understood.intent === 'risposta') && !['non_chiaro', 'ambiguo', 'risposta'].includes(clues.guess.intent);
       out.push({ phrase, intent: understood.intent, dettaglio: understood.dettaglio || '', locale: understood.locale || '', urgente: understood.urgente === true, engine: understood.engine || 'nessuno', model: understood.modelName || '', keyword: clues.guess.intent, final: fallbackUsed ? clues.guess.intent : understood.intent, ms: Date.now() - started, why: understood.why || '' });
     }

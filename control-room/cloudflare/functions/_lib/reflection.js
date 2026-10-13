@@ -4,12 +4,13 @@
 // soltanto: niente parte senza il tocco di Riccardo. Una proposta senza un numero nell'evidenza viene
 // scartata, un «Mai» non viene più riproposto, un «Non ora» torna dopo 30 giorni.
 // Con «Fallo» su una miglioria al codice Jarvis apre una issue su GitHub (etichetta jarvis-proposta).
-// Chiamata diretta all'API (fetch): il pacchetto delle Functions non porta dipendenze npm.
+// La chiamata a Claude è in claude.js (fetch diretto: il pacchetto delle Functions non porta dipendenze npm).
+import { askClaude, CLAUDE_MODEL } from './claude.js';
+
 const DAY = 86_400_000;
-export const REFLECTION_MODEL = 'claude-opus-5-5';
+export const REFLECTION_MODEL = CLAUDE_MODEL;
 export const MAX_PROPOSALS = 3;
 const SNOOZE_DAYS = 30;
-const API = 'https://api.anthropic.com/v1/messages';
 const ISSUES = 'https://api.github.com/repos/Rua56/renmenu/issues';
 const KINDS = ['operativa', 'commerciale', 'codice'];
 const LIMITS = { title: 90, problem: 400, evidence: 300, proposal: 500, risk: 200 };
@@ -49,31 +50,11 @@ const SCHEMA = {
 
 /** Chiede a Claude le proposte. Restituisce { proposals, model } oppure { error }. */
 export async function askForProposals(env, input, { fetchImpl = globalThis.fetch, timeoutMs = 120_000 } = {}) {
-  const key = String(env?.ANTHROPIC_API_KEY || '').trim();
-  if (!key) return { error: 'manca la chiave ANTHROPIC_API_KEY' };
-  const controller = typeof AbortController === 'function' ? new AbortController() : null;
-  const timer = controller ? setTimeout(() => controller.abort(), timeoutMs) : null;
-  try {
-    const response = await fetchImpl(API, {
-      method: 'POST', signal: controller?.signal,
-      headers: { 'Content-Type': 'application/json', 'x-api-key': key, 'anthropic-version': '2023-06-01', 'anthropic-beta': 'server-side-fallback-2026-07-01' },
-      body: JSON.stringify({
-        model: REFLECTION_MODEL, max_tokens: 16000, fallbacks: 'default', system: SYSTEM,
-        output_config: { effort: 'high', format: { type: 'json_schema', schema: SCHEMA } },
-        messages: [{ role: 'user', content: `<diario>\n${JSON.stringify(input)}\n</diario>` }]
-      })
-    });
-    const payload = await response.json().catch(() => null);
-    if (!response.ok) return { error: `Claude ha risposto ${response.status}${payload?.error?.type ? ` (${payload.error.type})` : ''}` };
-    if (payload?.stop_reason === 'refusal') return { error: 'Claude ha rifiutato la richiesta' };
-    if (payload?.stop_reason === 'max_tokens') return { error: 'risposta di Claude troncata' };
-    const text = (payload?.content || []).filter((block) => block.type === 'text').map((block) => block.text).join('');
-    let parsed; try { parsed = JSON.parse(text); } catch { return { error: 'risposta di Claude non leggibile' }; }
-    if (!Array.isArray(parsed?.proposte)) return { error: 'risposta di Claude senza proposte' };
-    return { proposals: parsed.proposte, model: payload.model || REFLECTION_MODEL };
-  } catch (error) {
-    return { error: error?.name === 'AbortError' ? 'Claude non ha risposto in tempo' : 'Claude non raggiungibile' };
-  } finally { if (timer) clearTimeout(timer); }
+  const out = await askClaude(env, { model: REFLECTION_MODEL, system: SYSTEM, schema: SCHEMA, effort: 'high', maxTokens: 16000,
+    messages: [{ role: 'user', content: `<diario>\n${JSON.stringify(input)}\n</diario>` }] }, { fetchImpl, timeoutMs });
+  if (out.error) return { error: out.error };
+  if (!Array.isArray(out.json?.proposte)) return { error: 'risposta di Claude senza proposte' };
+  return { proposals: out.json.proposte, model: out.model };
 }
 
 const norm = (value) => String(value || '').toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g, '').replace(/[^a-z0-9]+/g, ' ').trim();

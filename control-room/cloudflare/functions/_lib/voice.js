@@ -7,6 +7,7 @@
 import { CLOUDFLARE_FREE_MODEL } from './ai-live.js';
 import { slugify } from './menu.js';
 import { geminiJson } from './gemini-json.js';
+import { askClaude, claudeKey } from './claude.js';
 
 export const STT_MODEL = '@cf/openai/whisper-large-v3-turbo';
 export const INTENTS = new Set(['risposta', 'stato', 'anteprima', 'cancella_pratica', 'affida_pratica', 'aggiorna_menu', 'crea_pratica', 'pubblica', 'ricorda', 'non_chiaro']);
@@ -49,11 +50,13 @@ function parseJson(text) {
 }
 
 const SCHEMA = { type: 'object', properties: { intent: { type: 'string', enum: [...INTENTS] }, locale: { type: 'string' }, risposta: { type: 'string' }, dettaglio: { type: 'string', enum: ['', ...STATUS_CUTS] }, urgente: { type: 'boolean' } }, required: ['intent', 'locale', 'risposta'] };
+const CLAUDE_SCHEMA = { ...SCHEMA, required: ['intent', 'locale', 'risposta', 'dettaglio', 'urgente'], additionalProperties: false };
 
 /** Capisce il comando. `context` = testo del briefing + elenco dei locali (fonte unica per le risposte). */
-export async function understand(ai, utterance, context, { timeoutMs = 25_000, gemini = null, engine = 'auto' } = {}) {
+export async function understand(ai, utterance, context, { timeoutMs = 25_000, gemini = null, engine = 'auto', claude = null } = {}) {
   const fallback = { intent: 'non_chiaro', locale: '', risposta: '' };
-  if (typeof ai?.run !== 'function' && !(gemini && engine !== 'cloudflare')) return fallback;
+  const withClaude = Boolean(claude && claudeKey(claude.env) && engine === 'auto');
+  if (typeof ai?.run !== 'function' && !(gemini && engine !== 'cloudflare') && !withClaude) return fallback;
   const system = [
     'Sei Jarvis, l’assistente personale di Riccardo per RenMenu (menu digitali QR per locali). Tono calmo, caldo, cortese, conciso.',
     'Ricevi un comando di Riccardo e i DATI attuali della Control Room. Riccardo parla liberamente, in modo colloquiale, anche a frasi spezzate; il testo viene da un vocale e può contenere errori di trascrizione (nomi di locali o piatti storpiati). Capisci l’intenzione, non le parole esatte.',
@@ -79,7 +82,16 @@ export async function understand(ai, utterance, context, { timeoutMs = 25_000, g
   const userText = `DATI:\n${String(context || '').slice(0, 9000)}\n\nCOMANDO DI RICCARDO:\n${String(utterance).slice(0, 1500)}`;
   const shape = (parsed, engineName) => ({ intent: parsed.intent, locale: String(parsed.locale || '').slice(0, 120), risposta: String(parsed.risposta || '').replace(/[*#•]/g, '').slice(0, 700),
     dettaglio: STATUS_CUTS.has(parsed.dettaglio) ? parsed.dettaglio : '', urgente: parsed.urgente === true, engine: engineName, modelName: parsed.modelName });
-  // Gemini per primo (capisce meglio le frasi naturali); se non risponde in tempo, il modello gratuito di Cloudflare.
+  // Claude per primo se c'è la chiave (capisce meglio di tutti le frasi naturali e spezzate), poi Gemini,
+  // poi il modello gratuito di Cloudflare.
+  let claudeWhy = '';
+  if (withClaude) {
+    const out = await askClaude(claude.env, { system, schema: CLAUDE_SCHEMA, effort: 'low', maxTokens: 2000, messages: [{ role: 'user', content: userText }] },
+      { fetchImpl: claude.fetchImpl, timeoutMs: claude.timeoutMs || 15_000 });
+    if (out.json && INTENTS.has(out.json.intent)) return shape({ ...out.json, modelName: undefined }, 'claude');
+    claudeWhy = `Claude: ${out.error || `intenzione «${String(out.json?.intent).slice(0, 30)}»`}`;
+  }
+  // Gemini (capisce bene le frasi naturali); se non risponde in tempo, il modello gratuito di Cloudflare.
   let geminiWhy = '';
   if (gemini && engine !== 'cloudflare') {
     const tries = [];
@@ -88,6 +100,8 @@ export async function understand(ai, utterance, context, { timeoutMs = 25_000, g
     geminiWhy = tries.length ? `Gemini: ${tries.map((t) => `${t.model} ${t.status}`).join(', ').slice(0, 160)}` : '';
     if (engine === 'gemini') return { ...fallback, why: geminiWhy || 'Gemini non risponde', tries };
   }
+  geminiWhy = [claudeWhy, geminiWhy].filter(Boolean).join('; ');
+  if (typeof ai?.run !== 'function') return { ...fallback, why: geminiWhy || 'nessun modello' };
   try {
     const out = await withTimeout(Promise.resolve().then(() => ai.run(CLOUDFLARE_FREE_MODEL, { messages: [
       { role: 'system', content: system },
@@ -177,8 +191,9 @@ export function chatText(out) {
 }
 const tidy = (text) => String(text || '').replace(/<think>[\s\S]*?<\/think>/g, '').replace(/\*\*|__|^#+\s*|^[-*•]\s+/gm, '').replace(/[\u{1F300}-\u{1FAFF}\u{2600}-\u{27BF}]/gu, '').replace(/\n{3,}/g, '\n\n').trim();
 
-export async function chat(ai, { utterance, context, history = [], spoken = false }, { timeoutMs = 30_000 } = {}) {
-  if (typeof ai?.run !== 'function') return { ok: false, text: '' };
+export async function chat(ai, { utterance, context, history = [], spoken = false }, { timeoutMs = 30_000, claude = null } = {}) {
+  const withClaude = Boolean(claude && claudeKey(claude.env));
+  if (typeof ai?.run !== 'function' && !withClaude) return { ok: false, text: '' };
   const system = [
     'Sei J.A.R.V.I.S., l’assistente personale di Riccardo Iuran, creatore di RenMenu (menu digitali QR per ristoranti e bar, base a Gorizia). Riccardo non gestisce un locale: i ristoranti e i bar sono i suoi clienti. Ispirato al Jarvis di Iron Man: calmo, caldo, elegante, con un filo di ironia garbata. Dai del tu a Riccardo e ogni tanto lo chiami per nome.',
     'Parli in italiano naturale, come in una conversazione vera: niente elenchi puntati, niente titoli, niente emoji, niente markdown.',
@@ -193,6 +208,19 @@ export async function chat(ai, { utterance, context, history = [], spoken = fals
   const messages = [{ role: 'system', content: `${system}\n\nDATI DELLA CONTROL ROOM:\n${String(context || '').slice(0, 12_000)}` },
     ...history.slice(-12).map((h) => ({ role: h.who === 'Jarvis' ? 'assistant' : 'user', content: String(h.text).slice(0, 1200) })),
     { role: 'user', content: String(utterance).slice(0, 2000) }];
+  if (withClaude) {
+    // Claude vuole i turni alternati e il primo di Riccardo: unisce i messaggi vicini dello stesso autore.
+    const turns = [];
+    for (const m of messages.slice(1)) {
+      if (turns.length && turns.at(-1).role === m.role) turns.at(-1).content += `\n${m.content}`;
+      else if (turns.length || m.role === 'user') turns.push({ ...m });
+    }
+    const out = await askClaude(claude.env, { system: messages[0].content, messages: turns, effort: 'medium', maxTokens: 4000 },
+      { fetchImpl: claude.fetchImpl, timeoutMs: claude.timeoutMs || timeoutMs });
+    const text = tidy(out.text);
+    if (text) return { ok: true, text: text.slice(0, spoken ? 900 : 3000), model: out.model, engine: 'claude' };
+    if (typeof ai?.run !== 'function') return { ok: false, text: '' };
+  }
   for (const [model, options] of [[CHAT_MODEL, { max_tokens: 2500 }], [CLOUDFLARE_FREE_MODEL, { max_tokens: 700, temperature: 0.6 }]]) {
     try {
       const out = await withTimeout(Promise.resolve().then(() => ai.run(model, { messages, ...options })), timeoutMs);
