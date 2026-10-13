@@ -69,3 +69,17 @@ export async function callOwner(fetchImpl, key, { agentId, phoneNumberId, to, si
   if (out && out.success === false) throw new Error(`ElevenLabs: ${String(out.message || 'chiamata non partita').slice(0, 160)}`);
   return { conversationId: out?.conversation_id || null, callSid: out?.callSid || null };
 }
+
+/** Com'è andata una telefonata (registro delle conversazioni di ElevenLabs), in poche parole per Riccardo. */
+export async function callOutcome(fetchImpl, key, conversationId) {
+  const data = await call(fetchImpl, key, `/conversations/${encodeURIComponent(conversationId)}`);
+  const meta = data?.metadata || {};
+  const turns = Array.isArray(data?.transcript) ? data.transcript.length : 0;
+  const parts = [`stato «${data?.status || 'sconosciuto'}»`, `${turns} battute`];
+  if (meta.call_duration_secs !== undefined) parts.push(`${meta.call_duration_secs} secondi`);
+  if (meta.termination_reason) parts.push(`chiusura: ${String(meta.termination_reason).slice(0, 200)}`);
+  const error = meta.error?.reason || meta.error?.message || (typeof meta.error === 'string' ? meta.error : '');
+  if (error) parts.push(`errore: ${String(error).slice(0, 200)}`);
+  if (data?.analysis?.call_successful) parts.push(`esito: ${data.analysis.call_successful}`);
+  return parts.join(', ');
+}

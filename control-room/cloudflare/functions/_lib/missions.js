@@ -26,7 +26,7 @@ import { acceptProposals, askForProposals, decideProposal, pastProposals, propos
 import { slugify } from './menu.js';
 import { claudeKey } from './claude.js';
 import { pickButton } from './short-reply.js';
-import { callOwner, ensureAgent, phoneNumber, twilioNumber } from './phone.js';
+import { callOutcome, callOwner, ensureAgent, phoneNumber, twilioNumber } from './phone.js';
 import { approveSender, blockSender, takeUnannouncedHeld } from './whatsapp-in.js';
 
 export const PARTIAL_MARK = '[Testo parziale: leggi l’email completa in Gmail prima di decidere]';
@@ -807,6 +807,14 @@ export function createMissions(deps) {
 
   // ——— Telefonata vera (ElevenLabs + numero Twilio importato) ———
   async function phoneCall(db, env, text) {
+    // «/chiamami esito»: com'è andata l'ultima telefonata (serve quando la linea cade).
+    if (/\b(esito|com.e andata|perch\w*)\b/i.test(text)) {
+      const last = await setting(db, 'phone_last_call');
+      if (!last) return 'Non ho ancora fatto telefonate da controllare.';
+      const voice = await voiceSettings(db, env);
+      try { return `Ultima telefonata: ${await callOutcome(deps.fetchImpl, voice.apiKey, last)}.`; }
+      catch (error) { return `Non riesco a leggere l’esito della telefonata: ${String(error?.message || 'errore').slice(0, 200)}`; }
+    }
     const written = String(text).match(/(?:\+|00)?\d[\d\s.-]{7,18}\d/)?.[0];
     if (written) {
       const number = phoneNumber(written);
@@ -824,6 +832,7 @@ export function createMissions(deps) {
       await putSetting(db, 'phone_agent_id', agentId);
       const situation = await statusText(db).catch(() => '');
       const out = await callOwner(deps.fetchImpl, voice.apiKey, { agentId, phoneNumberId: line.id, to, situation, reason: 'Mi hai chiesto di chiamarti: dimmi pure, ti racconto come vanno le cose.' });
+      if (out.conversationId) await putSetting(db, 'phone_last_call', out.conversationId);
       await auditedBatch(jarvisDb(db), [], 'jarvis.phone_call', `Telefonata a Riccardo partita dal numero ${line.number || 'Twilio'}${out.callSid ? ` (Twilio ${out.callSid})` : ''}.`, null).catch(() => {});
       return `Ti sto chiamando dal ${line.number || 'numero Twilio'}. Se non squilla entro un minuto, dimmelo.`;
     } catch (error) {

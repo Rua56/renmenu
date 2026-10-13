@@ -33,6 +33,7 @@ async function withServices({ numbers = [{ phone_number_id: 'pn_1', phone_number
     calls.push({ href, method: options.method || 'GET', body: typeof options.body === 'string' ? JSON.parse(options.body) : options.body });
     if (href.endsWith('/v1/convai/phone-numbers')) return Response.json(numbers);
     if (href.endsWith('/v1/convai/agents/create')) return Response.json({ agent_id: 'agent_jarvis' });
+    if (href.endsWith('/v1/convai/conversations/conv_1')) return Response.json({ status: 'failed', transcript: [], metadata: { call_duration_secs: 2, termination_reason: 'Missing required dynamic variables' } });
     if (href.endsWith('/v1/convai/twilio/outbound-call')) return Response.json({ success: true, message: 'ok', conversation_id: 'conv_1', callSid: 'CA123' });
     return Response.json({ ok: true, result: { message_id: calls.length } });
   };
@@ -74,6 +75,8 @@ test('/chiamami: chiede il numero, poi crea l’agente una volta e telefona con 
     await send(db, env, 'chiamami');
     assert.equal(calls.filter((c) => c.href.endsWith('/agents/create')).length, 1, 'l’agente si crea una volta sola');
     assert.equal(calls.filter((c) => c.href.endsWith('/twilio/outbound-call')).length, 2, 'il numero resta ricordato');
+    await send(db, env, '/chiamami esito');
+    assert.match(said(calls).at(-1), /stato «failed», 0 battute, 2 secondi, chiusura: Missing required dynamic variables/);
   });
 });
 
