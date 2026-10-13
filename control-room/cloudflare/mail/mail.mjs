@@ -10,7 +10,7 @@ const HOOK = 'https://renmenu-jarvis-stage.pages.dev/jarvis-hook/mail-in';
 export default {
   async email(message, env) {
     const raw = await new Response(message.raw).arrayBuffer();
-    let delivered = false;
+    let delivered = false, info = '';
     try {
       const response = await fetch(HOOK, {
         method: 'POST',
@@ -18,12 +18,14 @@ export default {
         body: raw
       });
       delivered = response.ok;
-    } catch { delivered = false; }
+      info = `${response.status} ${(await response.text()).slice(0, 300)}`;
+    } catch (error) { info = `fetch: ${String(error)}`; }
+    console.log('mail-in', raw.byteLength, info); // solo esito e dimensione, mai il contenuto
     if (env.MAIL_COPY_TO) {
       await message.forward(env.MAIL_COPY_TO);
       return;
     }
-    if (!delivered) throw new Error('Jarvis non raggiungibile: riprovare più tardi');
+    if (!delivered) throw new Error(`Jarvis non raggiungibile (${info}): riprovare più tardi`);
   },
   async fetch() { return new Response('Not found', { status: 404 }); }
 };

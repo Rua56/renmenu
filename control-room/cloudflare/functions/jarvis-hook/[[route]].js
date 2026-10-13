@@ -75,8 +75,17 @@ export async function onRequest(context) {
       if (Number(request.headers.get('content-length') || 0) > MAX_RAW_BYTES) return reply({ ok: false, error: 'TOO_LARGE' }, 413);
       const raw = new Uint8Array(await request.arrayBuffer());
       if (!raw.length || raw.length > MAX_RAW_BYTES) return reply({ ok: false, error: 'TOO_LARGE' }, 413);
-      const outcome = await importIncomingMail(env.DB, raw, { envelopeFrom: request.headers.get('X-Mail-From'), envelopeTo: request.headers.get('X-Mail-To') },
-        { receiveFiles: (payload) => receivePendingMail(env.DB, env, payload) });
+      // Esito dell'ultima email (senza contenuto) in jarvis_settings.last_mail_in: serve a capire un rifiuto.
+      const remember = (value) => missions.putSetting(env.DB, 'last_mail_in', JSON.stringify({ at: new Date().toISOString(), bytes: raw.length, ...value })).catch(() => null);
+      let outcome;
+      try {
+        outcome = await importIncomingMail(env.DB, raw, { envelopeFrom: request.headers.get('X-Mail-From'), envelopeTo: request.headers.get('X-Mail-To') },
+          { receiveFiles: (payload) => receivePendingMail(env.DB, env, payload) });
+      } catch (error) {
+        await remember({ ok: false, error: String(error?.message || error).slice(0, 300) });
+        return reply({ ok: false, error: 'IMPORT_FAILED' }, 500);
+      }
+      await remember({ ok: outcome.ok, kind: outcome.kind, error: outcome.error, attachments: outcome.attachments });
       if (outcome.note) await missions.notify(env.DB, env, outcome.requestId || null, 'email ricevuta', outcome.note).catch(() => null);
       return reply({ ok: outcome.ok, kind: outcome.kind, error: outcome.error }, outcome.ok ? 200 : 422);
     }
