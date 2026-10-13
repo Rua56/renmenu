@@ -25,7 +25,7 @@ Il dettaglio è in [`control-room/docs/jarvis-funzionamento.md`](control-room/do
 - **Bozza e revisione:** voci, prezzi (anche calice/bottiglia), percorsi degustazione, coperto, contatti, inglese tradotto come bozza; ogni dato porta la sua fonte.
 - **Missione:** dopo l'affido, Jarvis manda l'anteprima al locale, applica le modifiche chiare, chiede il SÌ a Riccardo, pubblica, verifica online, manda link e QR a Riccardo e, se il locale ha un'email, anche al locale, poi sorveglia il menu a 6 ore, 2 giorni e 7 giorni.
 - **Aggiornamenti:** per un menu già online la bozza parte dal file pubblicato, con lo stesso identificativo e lo stesso QR.
-- **Assistente:** briefing alle 8 (lunedì-sabato), stato, diario della settimana (`/settimana`), memoria per locale, risposte a voce.
+- **Assistente:** briefing alle 8 (lunedì-sabato), stato, diario della settimana (`/settimana`), riflessione del lunedì con al massimo 3 proposte di miglioramento (Fallo, Non ora, Mai; `/proposte`, `/rifletti`), memoria per locale, risposte a voce.
 
 ## Avvio locale e prove
 
@@ -50,7 +50,7 @@ Prove opzionali nel browser: `python3 control-room/tests/browser_smoke.py`, `dem
 | `control-room/cloudflare/functions/jarvis-hook/` | Ingressi pubblici protetti da segreto: Telegram, orologio, allegati email, foto Premium |
 | `control-room/cloudflare/functions/_lib/` | Logica: `missions.js` (missioni, Telegram, QR, email), `vision.js` (foto), `menu-structure.js`, `draft-edit.js`, `translate.js`, `premium.js`, `media.js`, `qr.js`, `github-live.js`, `voice.js` e altri |
 | `control-room/cloudflare/clock/` | Worker con cron: chiama ogni minuto `/jarvis-hook/tick` |
-| `control-room/cloudflare/migrations/` | Schema D1 (0001-0013, additive) |
+| `control-room/cloudflare/migrations/` | Schema D1 (0001-0014, additive) |
 | `control-room/staging/` | Costruzione e pacchetto dello staging, script di import Gmail e coda di invio email |
 | `control-room/tests/` | Test automatici (oltre 300) |
 | `control-room/docs/` | Funzionamento di Jarvis, regole di servizio, relay Gmail, registro aggiornamenti |
@@ -75,6 +75,7 @@ Lo script compila le Functions, controlla che nel pacchetto ci siano `_worker.js
 | Apps Script Google | Foto e PDF allegati alle email dei clienti | Segreto dedicato; fino a sei allegati per email |
 | Telegram | Unico canale con Riccardo (una chat collegata con codice monouso) | Pulsanti per SÌ, dubbi, affido, eliminazioni |
 | Gemini (piano gratuito) | Lettura foto, traduzioni, correzioni, intenzioni | Chiave cifrata nel database; ripiego automatico su Workers AI |
+| Claude (Anthropic API, `claude-opus-5-5`) | Riflessione settimanale: il lunedì alle 8:15 legge il diario e propone al massimo 3 migliorie | Una chiamata a settimana (più `/rifletti`); riceve solo numeri e nomi dei locali; secret `ANTHROPIC_API_KEY` |
 | Workers AI (piano gratuito, 10.000 Neurons al giorno) | Ripiego dei modelli, trascrizione vocali (Whisper), conversazione | Se la quota finisce Jarvis lo segnala |
 | ElevenLabs | Voce di Jarvis nelle risposte vocali | Chiave cifrata nel database |
 | GitHub (`Rua56/renmenu`) | Lettura del menu online, branch e pull request, unione su `main` dopo il SÌ, verifica | Token ristretto; Jarvis non tocca altro |
@@ -85,7 +86,7 @@ Lo script compila le Functions, controlla che nel pacchetto ci siano `_worker.js
 
 ## Variabili e binding
 
-I valori reali stanno solo nei Secret e nelle variabili di Cloudflare Pages, mai nell'HTML, in Git, nei log o in chat. L'elenco dei nomi è in [`control-room/.env.example`](control-room/.env.example). Binding: `DB` (D1), `BUCKET` (R2 privato), `AI` (Workers AI). Secret principali: `TELEGRAM_BOT_TOKEN`, `GITHUB_TOKEN`, `JARVIS_CLOCK_SECRET`, `RESEND_API_KEY`, `SETTINGS_SECRET`, `AI_API_KEY`. Le chiavi Gemini e voce sono nel database, cifrate con `SETTINGS_SECRET`.
+I valori reali stanno solo nei Secret e nelle variabili di Cloudflare Pages, mai nell'HTML, in Git, nei log o in chat. L'elenco dei nomi è in [`control-room/.env.example`](control-room/.env.example). Binding: `DB` (D1), `BUCKET` (R2 privato), `AI` (Workers AI). Secret principali: `TELEGRAM_BOT_TOKEN`, `GITHUB_TOKEN`, `JARVIS_CLOCK_SECRET`, `RESEND_API_KEY`, `SETTINGS_SECRET`, `AI_API_KEY`, `ANTHROPIC_API_KEY`. Le chiavi Gemini e voce sono nel database, cifrate con `SETTINGS_SECRET`.
 
 ## Limiti noti e da fare
 
