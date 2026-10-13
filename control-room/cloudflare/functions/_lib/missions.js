@@ -20,6 +20,7 @@ import { GEMINI_PREFERRED } from './vision.js';
 import { findDishes, findLocales, guessIntent, hintsText } from './understanding.js';
 import { memoryContext, memoryFor, menuStatements, noteStatement } from './memory.js';
 import { buildDigest, digestText, recordEvent } from './journal.js';
+import { acceptProposals, askForProposals, decideProposal, pastProposals, proposalButtons, proposalsList, proposalText, reflectionDue, saveProposals, weekOf } from './reflection.js';
 
 export const PARTIAL_MARK = '[Testo parziale: leggi l’email completa in Gmail prima di decidere]';
 export const OWNER_REVIEW = 'telegram:riccardo';
@@ -610,6 +611,14 @@ export function createMissions(deps) {
         await sendTelegram(env, chat, shown.text, shown.buttons || null, deps.fetchImpl);
         return;
       }
+      if (verb === 'prop') {
+        const outcome = await decideProposal(db, env, missionId, String(extra || ''), { fetchImpl: deps.fetchImpl });
+        if (outcome.status) await auditedBatch(jarvisDb(db), [], 'jarvis.proposal', `Proposta «${String(outcome.title).slice(0, 80)}»: ${outcome.status} da Riccardo.`, null).catch(() => {});
+        await answerCallback(env, query.id, outcome.status ? 'Ricevuto' : 'Già risposto', deps.fetchImpl);
+        if (query.message?.message_id) await clearButtons(env, chat, query.message.message_id, deps.fetchImpl);
+        await sendTelegram(env, chat, outcome.text, null, deps.fetchImpl);
+        return;
+      }
       if (verb === 'soll' || verb === 'sollno') {
         await answerCallback(env, query.id, verb === 'sollno' ? 'Aspetto ancora' : 'Lo metto in coda', deps.fetchImpl);
         if (query.message?.message_id) await clearButtons(env, chat, query.message.message_id, deps.fetchImpl);
@@ -663,13 +672,19 @@ export function createMissions(deps) {
     }
     if (/\bqr\b/i.test(text) && /\b(?:mand\w*|dammi|dai|gener\w*|invi\w*|rifai|prepar\w*|voglio|serve)\b/i.test(text) && !EDIT_WORDS_STRICT.test(text)) { await qrOnRequest(db, env, chat, text); return; }
     if (/^\/briefing\b/i.test(text)) { await briefing(db, env, { force: true }); return; }
+    if (/^\/proposte\b/i.test(text)) { await sendTelegram(env, chat, await proposalsList(db), null, deps.fetchImpl); return; }
+    if (/^\/rifletti\b/i.test(text)) {
+      await sendTelegram(env, chat, 'Rileggo il diario della settimana e preparo le proposte: ci vuole qualche istante.', null, deps.fetchImpl);
+      await reflect(db, env, { force: true });
+      return;
+    }
     if (/^\/settimana\b/i.test(text)) { await sendTelegram(env, chat, digestText(await buildDigest(db)), null, deps.fetchImpl); return; }
     if (/^\/stato\b/i.test(text) || STATUS_WORDS.test(text)) {
       await sendTelegram(env, chat, await statusText(db), null, deps.fetchImpl);
       return;
     }
     if (/^\/aiuto\b|^\/help\b/i.test(text) || text.startsWith('/')) {
-      await sendTelegram(env, chat, 'Puoi scrivermi o mandarmi un vocale: «com’è la situazione?», «al Bakaro il frico ora costa 14», «crea una nuova pratica per il locale … con piano Standard», «pubblica il menu di …». Capisco anche /stato, /briefing, /settimana, le foto e i PDF dei menu. Pubblicare richiede sempre il tuo SÌ col pulsante.', null, deps.fetchImpl);
+      await sendTelegram(env, chat, 'Puoi scrivermi o mandarmi un vocale: «com’è la situazione?», «al Bakaro il frico ora costa 14», «crea una nuova pratica per il locale … con piano Standard», «pubblica il menu di …». Capisco anche /stato, /briefing, /settimana, /proposte, /rifletti, le foto e i PDF dei menu. Pubblicare richiede sempre il tuo SÌ col pulsante.', null, deps.fetchImpl);
       return;
     }
     await converse(db, env, chat, text, false);
@@ -1390,6 +1405,8 @@ export function createMissions(deps) {
   // Briefing del mattino: una volta al giorno, lun–sab alle 8 (ora italiana).
   async function briefing(db, env, { force = false, now: at = new Date() } = {}) {
     const day = romeDay(at);
+    // L'orologio passa di qui ogni minuto: il lunedì alle 8:15 parte anche la riflessione settimanale.
+    if (!force) await reflect(db, env, { now: at }).catch(() => null);
     if (!force) {
       if (!briefingDue(at) || (await setting(db, 'last_briefing_day')) === day) return null;
       await putSetting(db, 'last_briefing_day', day);
@@ -1398,6 +1415,34 @@ export function createMissions(deps) {
     await tell(db, env, null, 'briefing', text);
     await morningProposals(db, env).catch(() => null);
     return text;
+  }
+
+  // Riflessione settimanale: Jarvis rilegge il diario e propone al massimo 3 migliorie (Fallo, Non ora, Mai).
+  async function reflect(db, env, { force = false, now: at = new Date() } = {}) {
+    const chat = await setting(db, 'telegram_chat_id');
+    if (!chat || !telegramReady(env)) return null;
+    const week = weekOf(at);
+    if (!force) {
+      if (!reflectionDue(at) || (await setting(db, 'last_reflection_week')) === week) return null;
+      await putSetting(db, 'last_reflection_week', week);
+      if (!String(env?.ANTHROPIC_API_KEY || '').trim()) return null;
+    }
+    const [current, previous, past] = await Promise.all([buildDigest(db, { now: at }), buildDigest(db, { now: new Date(at.getTime() - 7 * 86_400_000) }), pastProposals(db, at)]);
+    const answer = await askForProposals(env, { settimana: current, settimanaPrecedente: previous, propostePassate: past.map(({ kind, title, status, week: w }) => ({ tipo: kind, titolo: title, stato: status, settimana: w })) }, { fetchImpl: deps.fetchImpl });
+    if (answer.error) {
+      await recordEvent(db, 'errore.riflessione', { detail: { errore: answer.error } });
+      await sendTelegram(env, chat, `Non sono riuscito a preparare le proposte della settimana: ${answer.error}.${/ANTHROPIC_API_KEY/.test(answer.error) ? ' Va aggiunta tra i Secret dello staging su Cloudflare Pages.' : ''}`, null, deps.fetchImpl);
+      return { error: answer.error };
+    }
+    const proposals = acceptProposals(answer.proposals, past, at);
+    let saved = [];
+    try { saved = await saveProposals(db, week, proposals, { model: answer.model, digest: current, now: at }); }
+    catch (error) { if (/no such table/i.test(String(error?.message))) return null; throw error; }
+    await auditedBatch(jarvisDb(db), [], 'jarvis.reflection', `Riflessione della settimana del ${week}: ${saved.length} proposte (${answer.model}).`, null).catch(() => {});
+    if (!saved.length) { await sendTelegram(env, chat, 'Ho riletto il diario della settimana: nessuna miglioria con numeri abbastanza solidi da proporti. Scrivi /settimana per vedere i numeri.', null, deps.fetchImpl); return { proposals: [] }; }
+    await sendTelegram(env, chat, `Ho riletto il diario della settimana e ho ${saved.length === 1 ? 'una proposta' : `${saved.length} proposte`} per migliorare il servizio. Rispondi con un tocco: Fallo, Non ora o Mai.`, null, deps.fetchImpl);
+    for (const [i, p] of saved.entries()) await sendTelegram(env, chat, proposalText(p, i, saved.length), proposalButtons(p.id), deps.fetchImpl);
+    return { proposals: saved };
   }
 
   const notify = (db, env, requestId, subject, text) => tell(db, env, { request_id: requestId }, subject, text);
@@ -1429,5 +1474,5 @@ export function createMissions(deps) {
     }
     return out;
   }
-  return { entrust, tick, watchTick, queueOnlineEmail, checkOnlineMails, makeMenuQr, decide, telegramUpdate, probeIntents, setting, putSetting, briefing, notify, startChecks, answerCheck, draftAfterChecks, translateAfterEdit, undoDraftEdit, draftTarget, voiceEditDraft };
+  return { entrust, tick, watchTick, reflect, queueOnlineEmail, checkOnlineMails, makeMenuQr, decide, telegramUpdate, probeIntents, setting, putSetting, briefing, notify, startChecks, answerCheck, draftAfterChecks, translateAfterEdit, undoDraftEdit, draftTarget, voiceEditDraft };
 }
