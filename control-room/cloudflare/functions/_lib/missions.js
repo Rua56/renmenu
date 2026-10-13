@@ -26,6 +26,7 @@ import { acceptProposals, askForProposals, decideProposal, pastProposals, propos
 import { slugify } from './menu.js';
 import { claudeKey } from './claude.js';
 import { pickButton } from './short-reply.js';
+import { approveSender, blockSender, takeUnannouncedHeld } from './whatsapp-in.js';
 
 export const PARTIAL_MARK = '[Testo parziale: leggi l’email completa in Gmail prima di decidere]';
 export const OWNER_REVIEW = 'telegram:riccardo';
@@ -702,6 +703,18 @@ export function createMissions(deps) {
       const out = verb === 'affno' ? { text: 'Va bene, non affido niente: la pratica resta in Revisione.' }
         : verb === 'affq' ? await entrustBrief(db, env, missionId) : await runEntrust(db, env, missionId, Number(extra), String(arg4 || 'n'));
       await sendTg(db, env, chat, out.text, out.buttons || null, deps.fetchImpl, { stacked: true });
+      return;
+    }
+    if (verb === 'wak' || verb === 'wap') {
+      // wak: il numero WhatsApp è un locale (pratica dai messaggi in attesa) · wap: è privato, sempre ignorato
+      const out = verb === 'wak' ? await approveSender(db, env, missionId, { fetchImpl: deps.fetchImpl }) : await blockSender(db, missionId);
+      await ack(verb === 'wak' ? 'È un locale' : 'Privato');
+      await clear();
+      const who = out.name || `+${missionId}`;
+      const text = !out.ok ? 'Numero non valido.' : verb === 'wap' ? `Va bene, ${who} è privato: i suoi messaggi restano solo sul tuo telefono e non te lo chiedo più.`
+        : `Fatto: ${who} è un locale. ${out.imported ? `Ho aperto la pratica con ${out.imported === 1 ? 'il suo messaggio' : `i suoi ${out.imported} messaggi`}.` : 'I suoi prossimi messaggi diventano pratiche.'}`;
+      if (out.ok) await auditedBatch(jarvisDb(db), [], 'jarvis.whatsapp_contact', `Numero WhatsApp segnato come ${verb === 'wak' ? 'locale' : 'privato'} da Riccardo.`, out.requestId || null).catch(() => {});
+      await sendTg(db, env, chat, text, null, deps.fetchImpl);
       return;
     }
     if (['del', 'delc', 'dela', 'delq', 'delno'].includes(verb)) {
@@ -1753,7 +1766,16 @@ export function createMissions(deps) {
       await notify(db, env, event.request_id || null, `messaggio ${from}`, `Nuovo messaggio ${from} da ${event.name || 'un contatto nuovo'}${said ? `: «${said.slice(0, 300)}${said.length > 300 ? '…' : ''}»` : ' (non è un testo: guardalo nella Control Room)'}. L'ho messo tra le pratiche da verificare.`, 'importante').catch(() => null);
     }
     if (fresh.length) await putSetting(db, 'external_seen_at', fresh.at(-1).received_at);
-    return fresh.length;
+    // Numeri WhatsApp sconosciuti (coesistenza col numero personale): Riccardo dice se è un locale.
+    const held = await takeUnannouncedHeld(db).catch(() => []);
+    const chat = held.length ? await setting(db, 'telegram_chat_id') : null;
+    for (const h of held) {
+      if (!chat || !telegramReady(env)) break;
+      const who = `${h.name ? `${h.name} ` : ''}(+${h.waId})`;
+      await sendTg(db, env, chat, `WhatsApp da un numero che non conosco: ${who}${h.preview ? `, «${h.preview}»` : ''}. È un locale? Se è una chat privata non apro niente e non te lo chiedo più.`,
+        [['Sì, è un locale: apri la pratica', `wak:${h.waId}`], ['No, è privato: ignoralo', `wap:${h.waId}`]], deps.fetchImpl, { stacked: true }).catch(() => null);
+    }
+    return fresh.length + held.length;
   }
   // Un guasto che si ripete (orologio, email in arrivo) avvisa una volta ogni `minutes`, non a ogni minuto.
   async function alertOnce(db, env, key, subject, text, { minutes = 60, priority = 'importante' } = {}) {

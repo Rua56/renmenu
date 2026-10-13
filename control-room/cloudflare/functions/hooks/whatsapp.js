@@ -9,8 +9,9 @@ import {
 import { importWhatsAppMessage } from '../_lib/whatsapp-in.js';
 
 /**
- * Cloudflare Pages Function for GET/POST /hooks/whatsapp. The only outbound calls are to Meta,
- * to download photos and PDFs the venue sent (with WHATSAPP_TOKEN). Jarvis announces new
+ * Cloudflare Pages Function for GET/POST /hooks/whatsapp. The only outbound calls are to Meta
+ * (or Dualhook, with WHATSAPP_INBOUND_VIA=dualhook), to download photos and PDFs the venue sent
+ * (with WHATSAPP_TOKEN). Unknown numbers wait for Riccardo when WHATSAPP_PRIVATE_FILTER=true. Jarvis announces new
  * messages on Telegram from its clock tick (announceExternal).
  */
 export async function onRequest(context) {
@@ -19,7 +20,7 @@ export async function onRequest(context) {
 
   if (context.request.method === 'GET') {
     // A challenge is exposed only after every required secret has been configured.
-    if (!config.configured) return hidden();
+    if (!config.challengeReady) return hidden();
     const verified = verifyWhatsAppChallenge({ query: context.request, verifyToken: config.verifyToken });
     return verified.ok
       ? new Response(verified.challenge, { status: 200, headers: { 'Content-Type': 'text/plain; charset=utf-8', 'Cache-Control': 'no-store' } })
@@ -28,7 +29,7 @@ export async function onRequest(context) {
 
   if (context.request.method !== 'POST') return hidden();
   if (!config.configured) return forbidden();
-  const parsed = await verifyWhatsAppWebhookRequest(context.request, config.appSecret);
+  const parsed = await verifyWhatsAppWebhookRequest(context.request, config);
   if (!parsed.ok) return forbidden();
 
   try {

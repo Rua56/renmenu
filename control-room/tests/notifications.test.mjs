@@ -118,3 +118,21 @@ test('avvisi: i messaggi WhatsApp arrivati dal webhook vengono annunciati una vo
     assert.doesNotMatch(JSON.stringify(sent(calls)), /Vecchio messaggio/);
   });
 });
+
+test('avvisi: un numero WhatsApp sconosciuto chiede «è un locale?» e il tocco apre la pratica', async () => {
+  const { importWhatsAppMessage } = await import('../cloudflare/functions/_lib/whatsapp-in.js');
+  await withServices(async (calls) => {
+    const db = database(), env = { ...(await linked(db, { voice: false })), WHATSAPP_PRIVATE_FILTER: 'true' };
+    await missions.announceExternal(db, env); // punto di partenza
+    const message = { id: 'wamid.x1', waId: '393330000009', profileName: 'Trattoria Sole', messageType: 'text', content: { text: 'Vi mando il menu nuovo', raw: { type: 'text', text: { body: 'Vi mando il menu nuovo' } } } };
+    assert.equal((await importWhatsAppMessage(db, env, message)).kind, 'held');
+    assert.equal(await missions.announceExternal(db, env), 1);
+    const ask = sent(calls).at(-1);
+    assert.match(ask.text, /numero che non conosco: Trattoria Sole \(\+393330000009\), «Vi mando il menu nuovo»\. È un locale\?/);
+    assert.deepEqual(ask.reply_markup.inline_keyboard.flat().map((b) => b.callback_data), ['wak:393330000009', 'wap:393330000009']);
+    assert.equal(await missions.announceExternal(db, env), 0, 'una domanda sola per numero');
+    await missions.telegramUpdate(db, env, { callback_query: { id: 'q1', data: 'wak:393330000009', message: { chat: { id: 42 }, message_id: 7 } } });
+    assert.match(sent(calls).at(-1).text, /^Fatto: Trattoria Sole è un locale\. Ho aperto la pratica con il suo messaggio\./);
+    assert.equal(db.sqlite.prepare("SELECT COUNT(*) n FROM requests WHERE source_channel='whatsapp'").get().n, 1);
+  });
+});

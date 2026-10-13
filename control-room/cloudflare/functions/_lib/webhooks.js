@@ -2,6 +2,7 @@ import {
   DEFAULT_MAX_CANONICAL_BYTES,
   DEFAULT_MAX_WEBHOOK_BYTES,
   gmailRelaySigningInput,
+  parseWhatsAppCustomerMessages,
   readBoundedRawBody,
   timingSafeEqual,
   verifyAndParseWhatsAppWebhook,
@@ -117,17 +118,36 @@ export function gmailWebhookConfiguration(env = {}) {
   return { enabled, configured: enabled && isConfiguredSecret(secret), secret };
 }
 
+// Due strade per ricevere WhatsApp:
+// · Meta diretto: il corpo è firmato con WHATSAPP_APP_SECRET (X-Hub-Signature-256).
+// · Dualhook (coesistenza col numero dell'app WhatsApp Business): Meta firma con la chiave dell'app
+//   di Dualhook, che non si può avere. Si controllano allora un parametro segreto nell'indirizzo
+//   (?k=WHATSAPP_HOOK_KEY) e che il conto WhatsApp sia il nostro (WHATSAPP_WABA_ID), come
+//   raccomanda la documentazione di Dualhook.
 export function whatsappWebhookConfiguration(env = {}) {
   const enabled = env.WHATSAPP_WEBHOOK_ENABLED === 'true';
+  const via = env.WHATSAPP_INBOUND_VIA === 'dualhook' ? 'dualhook' : 'meta';
   const appSecret = env.WHATSAPP_APP_SECRET;
   const verifyToken = env.WHATSAPP_VERIFY_TOKEN;
-  return { enabled, configured: enabled && isConfiguredSecret(appSecret) && isConfiguredSecret(verifyToken), appSecret, verifyToken };
+  const hookKey = env.WHATSAPP_HOOK_KEY;
+  const wabaId = typeof env.WHATSAPP_WABA_ID === 'string' && /^\d{5,30}$/.test(env.WHATSAPP_WABA_ID) ? env.WHATSAPP_WABA_ID : null;
+  const keys = via === 'dualhook' ? isConfiguredSecret(hookKey) && Boolean(wabaId) : isConfiguredSecret(appSecret);
+  // Dualhook verifica l'indirizzo prima di farci conoscere il conto (WABA): la verifica GET basta il token.
+  const challengeReady = enabled && isConfiguredSecret(verifyToken) && (via === 'dualhook' ? isConfiguredSecret(hookKey) : keys);
+  return { enabled, via, configured: enabled && keys && isConfiguredSecret(verifyToken), challengeReady, appSecret, verifyToken, hookKey, wabaId };
 }
 
-export async function verifyWhatsAppWebhookRequest(request, appSecret) {
+export async function verifyWhatsAppWebhookRequest(request, config) {
+  const settings = typeof config === 'string' ? { via: 'meta', appSecret: config } : config;
   const read = await readBoundedRawBody(request, { maxBytes: DEFAULT_MAX_WEBHOOK_BYTES });
   if (!read.ok) return read;
-  return verifyAndParseWhatsAppWebhook({ headers: request.headers, rawBody: read.rawBody, appSecret });
+  if (settings.via !== 'dualhook') return verifyAndParseWhatsAppWebhook({ headers: request.headers, rawBody: read.rawBody, appSecret: settings.appSecret });
+  const supplied = new URL(request.url).searchParams.get('k') || '';
+  if (!isConfiguredSecret(settings.hookKey) || !timingSafeEqual(encoder.encode(settings.hookKey), encoder.encode(supplied))) return { ok: false, reason: 'INVALID_HOOK_KEY' };
+  let payload;
+  try { payload = JSON.parse(decoder.decode(read.rawBody)); } catch { return { ok: false, reason: 'MALFORMED_WHATSAPP_PAYLOAD' }; }
+  if (!Array.isArray(payload?.entry) || payload.entry.some((entry) => String(entry?.id) !== settings.wabaId)) return { ok: false, reason: 'UNEXPECTED_WABA' };
+  return parseWhatsAppCustomerMessages(payload);
 }
 
 export { verifyWhatsAppChallenge };
