@@ -1,6 +1,7 @@
 // Ingressi pubblici di Jarvis, fuori da Cloudflare Access ma protetti da segreti:
 // - /jarvis-hook/telegram: aggiornamenti del bot (header segreto impostato con setWebhook);
-// - /jarvis-hook/tick: l'orologio (Worker con cron) con il segreto JARVIS_CLOCK_SECRET.
+// - /jarvis-hook/tick: l'orologio (Worker con cron) con il segreto JARVIS_CLOCK_SECRET;
+// - /jarvis-hook/mail-in: le email di menu@renmenu.com dal Worker email, con il segreto degli allegati.
 // Nessun dato viene restituito: solo esiti sintetici.
 import { linkPendingMailFiles, missions, readPendingMaterials, receivePendingMail, runAutopilot } from '../control-room/api/[[route]].js';
 import { sameSecret, sendTelegram, telegramReady } from '../_lib/telegram.js';
@@ -8,6 +9,7 @@ import { chat } from '../_lib/voice.js';
 import { serveMedia } from '../_lib/public-media.js';
 import { previewUrl } from '../_lib/approvals.js';
 import { dailyBackup } from '../_lib/backup.js';
+import { MAX_RAW_BYTES, importIncomingMail } from '../_lib/mail-in.js';
 
 const reply = (body, status = 200) => new Response(JSON.stringify(body), { status, headers: { 'Content-Type': 'application/json', 'Cache-Control': 'no-store' } });
 
@@ -65,6 +67,18 @@ export async function onRequest(context) {
       const payload = await request.json().catch(() => null);
       const outcome = await receivePendingMail(env.DB, env, payload);
       return reply(outcome, outcome.ok ? 200 : 400);
+    }
+    if (path === '/jarvis-hook/mail-in') {
+      // Worker email di menu@renmenu.com: l'email grezza (MIME), con lo stesso segreto degli allegati.
+      const expected = await missions.setting(env.DB, 'mail_files_secret');
+      if (!expected || !sameSecret(request.headers.get('X-Jarvis-Mail'), expected)) return reply({ ok: false }, 403);
+      if (Number(request.headers.get('content-length') || 0) > MAX_RAW_BYTES) return reply({ ok: false, error: 'TOO_LARGE' }, 413);
+      const raw = new Uint8Array(await request.arrayBuffer());
+      if (!raw.length || raw.length > MAX_RAW_BYTES) return reply({ ok: false, error: 'TOO_LARGE' }, 413);
+      const outcome = await importIncomingMail(env.DB, raw, { envelopeFrom: request.headers.get('X-Mail-From'), envelopeTo: request.headers.get('X-Mail-To') },
+        { receiveFiles: (payload) => receivePendingMail(env.DB, env, payload) });
+      if (outcome.note) await missions.notify(env.DB, env, outcome.requestId || null, 'email ricevuta', outcome.note).catch(() => null);
+      return reply({ ok: outcome.ok, kind: outcome.kind, error: outcome.error }, outcome.ok ? 200 : 422);
     }
     if (path === '/jarvis-hook/probe-ai') {
       // Collaudo del modello di conversazione: domanda fissa, nessun dato della Control Room.

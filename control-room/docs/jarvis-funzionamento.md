@@ -41,7 +41,7 @@ Dimensioni al 6 ottobre 2026: circa 11.250 righe di backend (45 moduli di logica
 
 Ingressi e uscite:
 
-- **Email in ingresso.** Un'automazione scatta a ogni nuova email su `renmenu1569@gmail.com`, la legge come dato non attendibile e la registra come pratica nel database di Jarvis. Un Apps Script dello stesso account manda a parte foto e PDF allegati, con un segreto.
+- **Email in ingresso.** L'indirizzo dei locali è `menu@renmenu.com`: Email Routing di Cloudflare consegna ogni email al Worker `renmenu-jarvis-mail`, che la passa a `/jarvis-hook/mail-in`. Jarvis legge testo e allegati in un colpo solo, crea la pratica (o collega la risposta a un'anteprima), mette da parte foto e PDF per l'orologio e avvisa su Telegram. Newsletter e risposte automatiche restano fuori. Ponte storico, attivo finché non si spegne: un'automazione scatta a ogni nuova email su `renmenu1569@gmail.com`, la legge come dato non attendibile e la registra come pratica nel database di Jarvis. Un Apps Script dello stesso account manda a parte foto e PDF allegati, con un segreto.
 - **Telegram.** Una sola chat autorizzata (Riccardo), collegata con un codice monouso. Testo, vocali e foto.
 - **Email in uscita.** Jarvis non spedisce direttamente: mette il messaggio in una coda e fa partire un comando interno; l'automazione Gmail lo spedisce da renmenu1569 (anteprime, promemoria, email con link e QR).
 - **Orologio.** Un Worker con cron chiama ogni minuto `/jarvis-hook/tick`: legge le foto in coda, genera bozze, fa avanzare le missioni, controlla i menu pubblicati, manda il briefing e, alle 3 di notte, salva la copia di sicurezza del database nel bucket R2 (30 giorni di storico; dopo tre tentativi falliti avvisa su Telegram).

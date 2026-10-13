@@ -14,7 +14,7 @@
 
 L'accesso alla Control Room è protetto due volte: Cloudflare Access davanti all'host e verifica lato server della firma del token (RS256/JWKS, emittente, audience, scadenza, tipo ed email del proprietario) su ogni pagina e ogni API. Le scritture accettano solo richieste dello stesso sito. Se la configurazione manca, l'accesso è negato.
 
-Gli ingressi pubblici di Jarvis stanno fuori da Access ma sono protetti da segreti: `/jarvis-hook/telegram` (segreto del bot), `/jarvis-hook/tick` (segreto dell'orologio), `/jarvis-hook/mail-files` (segreto dello script Gmail), `/jarvis-hook/media/<hash>` (solo le foto Premium confermate da Riccardo, indispensabili per l'anteprima).
+Gli ingressi pubblici di Jarvis stanno fuori da Access ma sono protetti da segreti: `/jarvis-hook/telegram` (segreto del bot), `/jarvis-hook/tick` (segreto dell'orologio), `/jarvis-hook/mail-files` (segreto dello script Gmail), `/jarvis-hook/mail-in` (le email di `menu@renmenu.com` dal Worker email, stesso segreto), `/jarvis-hook/media/<hash>` (solo le foto Premium confermate da Riccardo, indispensabili per l'anteprima).
 
 ## Cosa fa Jarvis
 
@@ -72,6 +72,7 @@ Lo script compila le Functions, controlla che nel pacchetto ci siano `_worker.js
 | Servizio | Uso | Note |
 | --- | --- | --- |
 | Gmail (`renmenu1569@gmail.com`) | Import delle richieste; invio di anteprime, promemoria ed email con link e QR | L'import e l'invio sono fatti da un'automazione Perplexity; Jarvis mette i messaggi in coda e fa partire un comando interno. Mai da `iuran56@gmail.com` |
+| Email Routing Cloudflare (`menu@renmenu.com`) | Email dei locali con testo, foto e PDF in un solo passaggio | Worker `renmenu-jarvis-mail` → `/jarvis-hook/mail-in`; secret `JARVIS_MAIL_SECRET`, copia facoltativa in `MAIL_COPY_TO` |
 | Apps Script Google | Foto e PDF allegati alle email dei clienti | Segreto dedicato; fino a sei allegati per email |
 | Telegram | Unico canale con Riccardo (una chat collegata con codice monouso) | Pulsanti per SÌ, dubbi, affido, eliminazioni |
 | Gemini (piano gratuito) | Lettura foto, traduzioni, correzioni, intenzioni | Chiave cifrata nel database; ripiego automatico su Workers AI |
