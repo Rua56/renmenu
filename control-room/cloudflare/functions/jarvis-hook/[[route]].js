@@ -124,7 +124,7 @@ export async function onRequest(context) {
       await missions.draftAfterChecks(env.DB, env).catch(() => null);
       await missions.translateAfterEdit(env.DB, env).catch(() => null);
       const drafted = await runAutopilot(env.DB, env);
-      for (const entry of drafted) await missions.ping(env.DB, env, entry.message, null, entry.outcome === 'bozza' ? 'importante' : 'normale').catch(() => null);
+      for (const entry of drafted) await missions.ping(env.DB, env, entry.message, entry.buttons || null, entry.outcome === 'bozza' ? 'importante' : 'normale').catch(() => null);
       const done = await missions.tick(env.DB, env);
       await missions.watchTick(env.DB, env).catch(() => null);
       const briefed = await missions.briefing(env.DB, env).catch(() => null);

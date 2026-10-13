@@ -21,6 +21,7 @@ import { translateMenu, translationEntries, translationSummary } from '../../_li
 import { allExtras, applyExtras, proposeSourceExtras } from '../../_lib/extras.js';
 import { prepareEmailSource } from '../../_lib/email-text.js';
 import { autopilotMessage, autopilotPreview, classifyRequest } from '../../_lib/autopilot.js';
+import { understandClientRequest } from '../../_lib/request-ai.js';
 import { createMissions } from '../../_lib/missions.js';
 import { noteStatement } from '../../_lib/memory.js';
 import { THEMES, proposeTheme, themeFromText } from '../../_lib/themes.js';
@@ -154,15 +155,20 @@ async function draftRows(db) {
   }
 }
 const parseList = (json) => { try { const value = JSON.parse(json || '[]'); return Array.isArray(value) ? value : []; } catch { return []; } };
-// Autopilota: richieste email nuove, mai toccate da Riccardo né da Jarvis. Le azioni passano
+// Autopilota: richieste nuove (email e WhatsApp), mai toccate da Riccardo né da Jarvis. Le azioni passano
 // dalle stesse operazioni dell'interfaccia (stessi controlli), con «jarvis» come autore nel registro.
-const AUTOPILOT_SQL = `SELECT r.*, c.menu_id AS client_menu_id FROM requests r JOIN clients c ON c.id=r.client_id WHERE r.source_channel='email' AND r.status='nuova' AND r.kind='altro'
-  AND r.category IS NULL AND r.revision=1 AND NOT EXISTS (SELECT 1 FROM drafts d WHERE d.request_id=r.id)
+// WhatsApp arriva a pezzi (un messaggio dopo l'altro sulla stessa pratica): Jarvis aspetta 3 minuti di calma.
+// Solo le pratiche WhatsApp arrivate da oggi: quelle di prova già in archivio non diventano avvisi.
+const WHATSAPP_CALM_MS = 3 * 60_000;
+const AUTOPILOT_SQL = `SELECT r.*, c.menu_id AS client_menu_id, c.name AS client_name FROM requests r JOIN clients c ON c.id=r.client_id
+  WHERE r.status='nuova' AND r.kind='altro' AND r.category IS NULL
+  AND ((r.source_channel='email' AND r.revision=1) OR (r.source_channel='whatsapp' AND r.updated_at<? AND r.created_at>'2026-10-13T16:30'))
+  AND NOT EXISTS (SELECT 1 FROM drafts d WHERE d.request_id=r.id)
   AND NOT EXISTS (SELECT 1 FROM audit_events a WHERE a.request_id=r.id AND a.action LIKE 'autopilot.%')
   AND NOT EXISTS (SELECT 1 FROM materials m WHERE m.request_id=r.id AND m.processing_status='da_trascrivere' AND m.archived_at IS NULL AND (m.mime='application/pdf' OR m.mime IN ('image/jpeg','image/png','image/webp')))
   ORDER BY r.created_at ASC LIMIT 2`;
 async function autopilotPending(db) {
-  try { return await rows(db, AUTOPILOT_SQL); } catch (error) { if (/no such column/i.test(String(error?.message))) return []; throw error; }
+  try { return await rows(db, AUTOPILOT_SQL, new Date(Date.now() - WHATSAPP_CALM_MS).toISOString()); } catch (error) { if (/no such column/i.test(String(error?.message))) return []; throw error; }
 }
 const asJarvis = (db) => ({ prepare: (sql) => db.prepare(sql), batch: (statements) => db.batch(statements), actor: 'jarvis' });
 // Foto e PDF arrivati (email, Telegram o caricati da Riccardo): Jarvis li legge da solo, uno per
@@ -265,29 +271,68 @@ async function readPendingInner(db, env, calm) {
   }
   return done;
 }
+// Testo scritto dal cliente, senza l'intestazione con nome e numero di WhatsApp (non serve al modello).
+const clientWords = (request) => String(request.source_text || '').replace(/^WhatsApp da [^\n]*\n+/, '');
+// Le parole chiave non bastano (richiesta non riconosciuta, o menu nuovo senza piano): la legge il modello gratuito.
+async function understandForAutopilot(db, env, request, regex) {
+  if (regex.category && (regex.kind !== 'nuovo' || regex.explicitPlan)) return null;
+  let understood = null;
+  try { understood = await understandClientRequest({ gemini: await geminiConfig(db, env), ai: env.AI }, { subject: request.subject, text: clientWords(request), clientName: request.client_name }); }
+  catch { return null; }
+  if (!understood) return null;
+  // Il modello non aggiunge niente a ciò che le parole chiave avevano già capito: resta la proposta delle regole.
+  if (regex.kind === 'nuovo' && !understood.explicitPlan) return null;
+  if (!understood.category && understood.kind !== 'nuovo') return null;
+  if (!understood.venue && regex.venue) understood.venue = regex.venue;
+  if (!understood.reasons.length) understood.reasons = regex.reasons;
+  return understood;
+}
 export async function runAutopilot(db, env = {}) {
   const done = [];
   for (const request of await autopilotPending(db)) {
-    const preview = autopilotPreview(request);
+    const regex = classifyRequest(request.subject, request.source_text);
+    const understood = await understandForAutopilot(db, env, request, regex);
+    const preview = autopilotPreview(request, understood);
+    // Menu nuovo: il nome del locale per la bozza viene solo da una riga «Locale: …» (o dalla scheda cliente).
+    if (understood && preview.action === 'bozza' && preview.kind === 'nuovo' && !regex.venue) {
+      preview.action = 'proponi';
+      preview.why = understood.venue ? `Il locale sembra «${understood.venue}»: confermalo nella pratica (Menu ID) e genera tu la bozza.` : 'Manca il nome del locale: indicalo nella pratica (Menu ID) e genera tu la bozza.';
+    }
     const jarvis = asJarvis(db);
-    let outcome = preview.action, blocked = '';
+    let outcome = preview.action, blocked = '', edited = null;
     try {
       if (preview.category) {
         const next = preview.action === 'bozza' ? 'Bozza preparata da Jarvis: controllala in Revisione.' : `Proposta di Jarvis: ${preview.categoryLabel}. Conferma o cambia la categoria.`;
         await action(jarvis, 'updateRequest', { id: request.id, revision: request.revision, patch: { category: preview.category, nextStep: next.slice(0, 240) } }, env);
       }
-      if (preview.action === 'bozza') { await action(jarvis, 'generateDraft', { requestId: request.id }, env); preview.notes = await draftNotes(db, request.id); }
+      if (preview.action === 'bozza') {
+        try { await action(jarvis, 'generateDraft', { requestId: request.id }, env); }
+        catch (error) {
+          // Modifica scritta a parole («da domani la carbonara la facciamo a 13»): le regole fisse non la leggono.
+          // La bozza parte dal menu online e la modifica la traduce il modello gratuito, con i soliti controlli.
+          if (!preview.menuId || !/modifica precisa|Nessun piatto/i.test(String(error?.message || ''))) throw error;
+          await action(jarvis, 'generateDraft', { requestId: request.id, baseOnly: true }, env);
+          edited = await missions.editDraftFromClient(db, env, request.id, clientWords(request), request.source_channel);
+          // Nessuna modifica applicata: niente bozza identica al menu online, decide Riccardo.
+          if (!edited.applied) {
+            await discardUntouchedJarvisDraft(db, request.id);
+            throw new Error(`${String(error?.message || '')} ${/modelli non rispondono/.test(edited.text) ? 'Anche il modello gratuito non ha risposto.' : `Il modello gratuito: ${String(edited.text).replace(/\s+/g, ' ').slice(0, 200)}`}`.trim());
+          }
+        }
+        preview.notes = await draftNotes(db, request.id);
+      }
     } catch (error) {
       outcome = 'proponi';
       blocked = String(error?.message || 'Operazione non completata.').slice(0, 300);
     }
-    const message = blocked ? `${autopilotMessage(request.subject, { ...preview, why: '' }, 'proponi')} Bozza non generata: ${blocked}` : autopilotMessage(request.subject, preview, outcome);
+    let message = blocked ? autopilotMessage(request.subject, { ...preview, why: `Bozza non generata: ${blocked}` }, 'proponi') : autopilotMessage(request.subject, preview, outcome);
+    if (edited?.applied && !blocked) message += `\n\nModifiche applicate:\n${String(edited.text).split('\n').filter((line) => line.startsWith('•')).join('\n')}`;
     const id = uid(), stamp = now();
     const why = preview.reasons ? ` Fonte: ${preview.reasons}.` : '';
     await auditedBatch(jarvis, [db.prepare('INSERT INTO notifications (id,request_id,channel,subject,body,priority,due_at,status,created_at) VALUES (?,?,?,?,?,?,?,?,?)')
       .bind(id, request.id, 'in_app', outcome === 'bozza' ? 'Jarvis · bozza pronta' : 'Jarvis · serve una tua decisione', `${message}${why}`.slice(0, 5000), outcome === 'bozza' ? 'importante' : 'normale', null, 'mock', stamp)],
     outcome === 'bozza' ? 'autopilot.draft' : 'autopilot.proposal', message, request.id, { sql: 'SELECT 1 FROM notifications WHERE id=?', args: [id] });
-    done.push({ requestId: request.id, outcome, message });
+    done.push({ requestId: request.id, outcome, message, buttons: edited?.applied && !blocked ? edited.buttons : null });
   }
   return done;
 }

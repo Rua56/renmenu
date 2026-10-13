@@ -1023,10 +1023,11 @@ export function createMissions(deps) {
   async function noteMiss(db, utterance, reason, requestId = null) {
     try { await auditedBatch(jarvisDb(db), [], 'jarvis.not_understood', `«${String(utterance).replace(/\s+/g, ' ').slice(0, 220)}» → ${String(reason).replace(/\s+/g, ' ').slice(0, 260)}`, requestId); } catch { /* solo diagnostica */ }
   }
-  async function voiceEditDraft(db, env, utterance, draft) {
+  // from: { source, who } quando la modifica arriva dal locale (email o WhatsApp) e non da Riccardo.
+  async function voiceEditDraft(db, env, utterance, draft, from = null) {
     let menu; try { menu = JSON.parse(draft.menu_json); } catch { return { text: 'La bozza non si legge: aprila in Revisione.' }; }
     const name = draft.client_name || menu.nome || draft.subject || 'la bozza';
-    const plan = await proposeOps({ ai: env.AI, gemini: await geminiFor(db, env), utterance, menu });
+    const plan = await proposeOps({ ai: env.AI, gemini: await geminiFor(db, env), utterance, menu, ...(from?.who ? { who: from.who } : {}) });
     // Quali modelli Gemini hanno risposto o no: gli assenti (404) non si riprovano, i guasti restano in /stato.
     if (plan.tries?.length) {
       try {
@@ -1052,7 +1053,7 @@ export function createMissions(deps) {
     if (!checked.ops.length) return { text: plan.dubbio ? plan.dubbio : `Non trovo una modifica precisa per la bozza di «${name}». Dimmi per esempio «le braciole costano 9» o «aggiungi il tiramisù a 5 euro nei dolci».`, keep: true };
     const snapshot = { draftId: draft.id, menu_json: draft.menu_json, provenance_json: draft.provenance_json, at: now() };
     let saved;
-    try { saved = (await action(jarvisDb(db), 'editDraftOps', { id: draft.id, revision: draft.revision, ops: checked.ops, source: 'Riccardo (Telegram)' }, env)).result; }
+    try { saved = (await action(jarvisDb(db), 'editDraftOps', { id: draft.id, revision: draft.revision, ops: checked.ops, source: from?.source || 'Riccardo (Telegram)' }, env)).result; }
     catch (error) { await noteMiss(db, utterance, String(error?.message || 'errore'), draft.request_id); return { text: `Non sono riuscito a modificare la bozza di «${name}»: ${String(error?.message || 'errore').slice(0, 200)}` }; }
     await putSetting(db, 'draft_undo', JSON.stringify({ ...snapshot, revision: saved.revision })).catch(() => {});
     // Chi lavora su una bozza continua a lavorarci: ogni correzione rinnova la pratica «in primo piano».
@@ -1080,6 +1081,16 @@ export function createMissions(deps) {
       text: `Fatto, bozza di «${name}» aggiornata:\n${checked.ops.length ? saved.summary.split(/(?<=\.)\s+/).map((line) => `• ${line}`).join('\n') : ''}\n\nLa trovi in Revisione. La checklist si è azzerata: va riconfermata prima dell’anteprima.${paused ? ' L’anteprima che avevo già preparato non vale più: ho fermato quella pratica, e dopo la revisione me la riaffidi da «Approva e affida a Jarvis».' : ''}${english ? ' L’inglese delle voci nuove lo preparo tra un minuto.' : ''}${paused ? '' : '\n\nProssimo passo: guarda la bozza e, se ti va bene, affidami la pratica: ti faccio il riepilogo da confermare qui.'}`,
       buttons: [['Annulla', `undo:${draft.id}`], ['Mostrami la bozza', `peek:${draft.id}`], ['Affida a Jarvis', `affq:${draft.id}`]]
     };
+  }
+  // Modifiche scritte a parole dal locale (email o WhatsApp) che le regole fisse non sanno leggere:
+  // la bozza parte dal menu online e il modello gratuito le traduce in operazioni, con gli stessi controlli
+  // delle correzioni di Riccardo (nomi e prezzi presi solo dal testo). Restituisce { applied, text }.
+  async function editDraftFromClient(db, env, requestId, text, channel = 'email') {
+    const draft = (await openDrafts(db)).find((d) => d.request_id === requestId);
+    if (!draft) return { applied: false, text: 'bozza non trovata' };
+    const who = channel === 'whatsapp' ? 'RICHIESTA DEL LOCALE PER WHATSAPP' : 'RICHIESTA DEL LOCALE PER EMAIL';
+    const out = await voiceEditDraft(db, env, text, draft, { who, source: channel === 'whatsapp' ? 'Locale (WhatsApp)' : 'Locale (email)' });
+    return { applied: Array.isArray(out.buttons), text: out.text, buttons: out.buttons || null };
   }
   async function undoDraftEdit(db, env, draftId) {
     let saved = null; try { saved = JSON.parse(await setting(db, 'draft_undo') || 'null'); } catch {}
@@ -1803,5 +1814,5 @@ export function createMissions(deps) {
     }
     return out;
   }
-  return { alertOnce, announceExternal, ping, entrust, tick, watchTick, watchRegister, reflect, queueOnlineEmail, checkOnlineMails, makeMenuQr, decide, telegramUpdate, probeIntents, setting, putSetting, briefing, notify, startChecks, answerCheck, draftAfterChecks, translateAfterEdit, undoDraftEdit, draftTarget, voiceEditDraft };
+  return { alertOnce, announceExternal, ping, entrust, tick, watchTick, watchRegister, reflect, queueOnlineEmail, checkOnlineMails, makeMenuQr, decide, telegramUpdate, probeIntents, setting, putSetting, briefing, notify, startChecks, answerCheck, draftAfterChecks, translateAfterEdit, undoDraftEdit, draftTarget, voiceEditDraft, editDraftFromClient };
 }
