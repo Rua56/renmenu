@@ -168,6 +168,18 @@ describe('Comandi vocali di Jarvis', () => {
       assert.match(calls.at(-1).body.text, /nessun menu aspetta il tuo SÌ/);
     } finally { globalThis.fetch = previous; db.close(); }
   });
+  it('/settimana: il diario della settimana arriva su Telegram', async () => {
+    const db = database();
+    const previous = globalThis.fetch;
+    globalThis.fetch = fakeFetch;
+    try {
+      calls.length = 0;
+      await missions.putSetting(db, 'telegram_chat_id', '42');
+      await missions.telegramUpdate(db, testEnv(db, { TELEGRAM_BOT_TOKEN: TOKEN }), { message: { chat: { id: 42, type: 'private' }, text: '/settimana' } });
+      assert.match(calls.at(-1).body.text, /^Diario di Jarvis · dal /);
+      assert.match(calls.at(-1).body.text, /Errori: nessuno\./);
+    } finally { globalThis.fetch = previous; db.close(); }
+  });
   it('«crea una nuova pratica per Antoine I love You con piano standard» → cliente + pratica, poi la foto si collega da sola', async () => {
     const db = database();
     const previous = globalThis.fetch;
@@ -473,6 +485,24 @@ describe('Comandi vocali di Jarvis', () => {
     } finally { publicState = 'ok'; globalThis.fetch = previous; db.close(); }
   });
 
+  it('orologio: un errore su una pratica affidata finisce nel diario di Jarvis', async () => {
+    const db = database();
+    const previous = globalThis.fetch;
+    globalThis.fetch = fakeFetch;
+    try {
+      for (const sql of readFileSync(new URL('../cloudflare/migrations/0013_jarvis_events.sql', import.meta.url), 'utf8').replace(/^--.*$/gm, '').split(';').filter((x) => x.trim())) await db.prepare(sql).bind().run();
+      await pratica(db, 'Pizzeria Luna', 'luna@example.com');
+      const env = testEnv(db, { TELEGRAM_BOT_TOKEN: TOKEN });
+      const draft = await db.prepare('SELECT id,revision FROM drafts').bind().first();
+      await missions.entrust(db, env, { draftId: draft.id, revision: draft.revision, confirmation: 'AFFIDO A JARVIS' });
+      await db.prepare('DROP TABLE jarvis_outbox').bind().run();
+      const out = await missions.tick(db, env);
+      assert.ok(out[0].error, 'il passo della missione fallisce');
+      const event = await db.prepare('SELECT kind,request_id,detail_json FROM jarvis_events').bind().first();
+      assert.equal(event.kind, 'errore.missione');
+      assert.equal(JSON.parse(event.detail_json).stato, 'attesa_invio');
+    } finally { globalThis.fetch = previous; db.close(); }
+  });
   it('giro mattutino: propone il promemoria con il testo, lo manda in coda solo al tocco e lo segnala quando è inviato', async () => {
     const db = database();
     const previous = globalThis.fetch;

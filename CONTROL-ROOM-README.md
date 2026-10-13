@@ -25,7 +25,7 @@ Il dettaglio è in [`control-room/docs/jarvis-funzionamento.md`](control-room/do
 - **Bozza e revisione:** voci, prezzi (anche calice/bottiglia), percorsi degustazione, coperto, contatti, inglese tradotto come bozza; ogni dato porta la sua fonte.
 - **Missione:** dopo l'affido, Jarvis manda l'anteprima al locale, applica le modifiche chiare, chiede il SÌ a Riccardo, pubblica, verifica online, manda link e QR a Riccardo e, se il locale ha un'email, anche al locale, poi sorveglia il menu a 6 ore, 2 giorni e 7 giorni.
 - **Aggiornamenti:** per un menu già online la bozza parte dal file pubblicato, con lo stesso identificativo e lo stesso QR.
-- **Assistente:** briefing alle 8 (lunedì-sabato), stato, memoria per locale, risposte a voce.
+- **Assistente:** briefing alle 8 (lunedì-sabato), stato, diario della settimana (`/settimana`), memoria per locale, risposte a voce.
 
 ## Avvio locale e prove
 
@@ -50,7 +50,7 @@ Prove opzionali nel browser: `python3 control-room/tests/browser_smoke.py`, `dem
 | `control-room/cloudflare/functions/jarvis-hook/` | Ingressi pubblici protetti da segreto: Telegram, orologio, allegati email, foto Premium |
 | `control-room/cloudflare/functions/_lib/` | Logica: `missions.js` (missioni, Telegram, QR, email), `vision.js` (foto), `menu-structure.js`, `draft-edit.js`, `translate.js`, `premium.js`, `media.js`, `qr.js`, `github-live.js`, `voice.js` e altri |
 | `control-room/cloudflare/clock/` | Worker con cron: chiama ogni minuto `/jarvis-hook/tick` |
-| `control-room/cloudflare/migrations/` | Schema D1 (0001-0012, additive) |
+| `control-room/cloudflare/migrations/` | Schema D1 (0001-0013, additive) |
 | `control-room/staging/` | Costruzione e pacchetto dello staging, script di import Gmail e coda di invio email |
 | `control-room/tests/` | Test automatici (oltre 300) |
 | `control-room/docs/` | Funzionamento di Jarvis, regole di servizio, relay Gmail, registro aggiornamenti |
