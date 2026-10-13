@@ -1,7 +1,7 @@
-// Allegati delle email dei clienti: lo script Google di renmenu1569 manda a Jarvis le foto e i PDF
-// (mai altro) con l'id del messaggio Gmail. Jarvis li tiene da parte finché l'importer crea la
-// pratica della stessa email (id gmail-request-<messageId>) e li collega solo se il mittente è
-// lo stesso cliente. Poi la lettura delle foto e l'autopilota fanno il resto.
+// Allegati delle email dei clienti: arrivano dall'ingresso diretto menu@renmenu.com (_lib/mail-in.js)
+// o dallo script Google di renmenu1569, solo foto e PDF, con l'id del messaggio. Jarvis li tiene da
+// parte finché l'importer crea la pratica della stessa email (id gmail-request-<messageId>) e li
+// collega solo se il mittente è lo stesso cliente. Poi la lettura delle foto e l'autopilota fanno il resto.
 const TYPES = { 'image/jpeg': 'jpg', 'image/png': 'png', 'image/webp': 'webp', 'application/pdf': 'pdf' };
 const MAX_FILE = 10_000_000, MAX_FILES = 6, ORPHAN_DAYS = 3;
 const signatureOk = (mime, b) => mime === 'image/jpeg' ? b[0] === 0xff && b[1] === 0xd8 && b[2] === 0xff
@@ -17,7 +17,7 @@ function fromBase64(value) {
 }
 const cleanName = (name, part, mime) => String(name || '').replace(/[\u0000-\u001f\u007f/\\]+/g, ' ').trim().slice(0, 120) || `allegato-${part + 1}.${TYPES[mime]}`;
 
-/** Riceve {messageId, from, subject, files:[{name,mime,data}], skipped:[nomi]}. */
+/** Riceve {messageId, from, subject, files:[{name,mime,data base64 | bytes}], skipped:[nomi]}. */
 export async function receiveMailFiles(db, env, payload, { now, uid }) {
   const messageId = String(payload?.messageId || '');
   const sender = String(payload?.from || '').trim().toLowerCase();
@@ -31,7 +31,7 @@ export async function receiveMailFiles(db, env, payload, { now, uid }) {
     const name = cleanName(file?.name, part, mime);
     if (!TYPES[mime]) { skipped.push(name); continue; }
     let bytes;
-    try { bytes = fromBase64(file.data); } catch { skipped.push(name); continue; }
+    try { bytes = file.bytes instanceof Uint8Array ? file.bytes : fromBase64(file.data); } catch { skipped.push(name); continue; }
     if (!bytes.length || bytes.length > MAX_FILE || !signatureOk(mime, bytes)) { skipped.push(name); continue; }
     const existing = await db.prepare('SELECT id FROM mail_files WHERE message_id=? AND part=?').bind(messageId, part).first();
     if (existing) { stored.push(existing.id); continue; } // lo script ha riprovato: niente doppioni
