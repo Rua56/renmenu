@@ -26,6 +26,7 @@ import { acceptProposals, askForProposals, decideProposal, pastProposals, propos
 import { slugify } from './menu.js';
 import { claudeKey } from './claude.js';
 import { pickButton } from './short-reply.js';
+import { callOwner, ensureAgent, phoneNumber, twilioNumber } from './phone.js';
 import { approveSender, blockSender, takeUnannouncedHeld } from './whatsapp-in.js';
 
 export const PARTIAL_MARK = '[Testo parziale: leggi l’email completa in Gmail prima di decidere]';
@@ -779,6 +780,11 @@ export function createMissions(deps) {
       await sendTg(db, env, chat, out.ok ? `Email di prova partita da ${config.sender} a ${to}. Controlla la casella (anche lo spam).` : `L’email di prova non è partita: ${out.reason}.`, null, deps.fetchImpl);
       return;
     }
+    // /chiamami (o «chiamami», «telefonami»): Jarvis telefona a Riccardo con la sua voce. A pagamento: solo su richiesta.
+    if (/^\/chiamami\b/i.test(text) || /^(?:jarvis[,\s]+)?(?:chiamami|telefonami|fammi una (?:chiamata|telefonata))\b/i.test(text.trim())) {
+      await sendTg(db, env, chat, await phoneCall(db, env, text), null, deps.fetchImpl);
+      return;
+    }
     if (/^\/voce\b/i.test(text) || (/\b(avvis\w*|notific\w*)\b/i.test(text) && /\b(a\s+voce|vocal[ei])\b/i.test(text) && text.split(/\s+/).length <= 12)) { const menu = await voiceAlertsMenu(db); await sendTg(db, env, chat, menu.text, menu.buttons, deps.fetchImpl); return; }
     if (/^\/claude\b/i.test(text)) {
       const want = /(?:^|\s)(?:si|sì|on|acceso|accendi|attiva)(?:\s|$)/i.test(text) ? 'si' : /(?:^|\s)(?:no|off|spento|spegni|disattiva)(?:\s|$)/i.test(text) ? 'no' : null;
@@ -793,10 +799,37 @@ export function createMissions(deps) {
       return;
     }
     if (/^\/aiuto\b|^\/help\b/i.test(text) || text.startsWith('/')) {
-      await sendTg(db, env, chat, 'Puoi scrivermi o mandarmi un vocale: «com’è la situazione?», «al Bakaro il frico ora costa 14», «crea una nuova pratica per il locale … con piano Standard», «pubblica il menu di …». Capisco anche /stato, /briefing, /settimana, /voce, /claude, /provaemail, /proposte, /rifletti, le foto e i PDF dei menu. Pubblicare richiede sempre il tuo SÌ col pulsante.', null, deps.fetchImpl);
+      await sendTg(db, env, chat, 'Puoi scrivermi o mandarmi un vocale: «com’è la situazione?», «al Bakaro il frico ora costa 14», «crea una nuova pratica per il locale … con piano Standard», «pubblica il menu di …». Capisco anche /stato, /briefing, /settimana, /voce, /chiamami, /claude, /provaemail, /proposte, /rifletti, le foto e i PDF dei menu. Pubblicare richiede sempre il tuo SÌ col pulsante.', null, deps.fetchImpl);
       return;
     }
     await converse(db, env, chat, text, false);
+  }
+
+  // ——— Telefonata vera (ElevenLabs + numero Twilio importato) ———
+  async function phoneCall(db, env, text) {
+    const written = String(text).match(/(?:\+|00)?\d[\d\s.-]{7,18}\d/)?.[0];
+    if (written) {
+      const number = phoneNumber(written);
+      if (!number) return 'Quel numero non lo capisco: scrivilo così, «/chiamami +39 333 1234567».';
+      await putSetting(db, 'owner_phone', number);
+    }
+    const to = await setting(db, 'owner_phone');
+    if (!to) return 'A quale numero ti chiamo? Scrivimi «/chiamami +39 …» con il cellulare che hai verificato su Twilio: lo ricordo per le prossime volte.';
+    const voice = await voiceSettings(db, env);
+    if (voice.provider !== 'elevenlabs' || !voice.apiKey) return 'Per telefonarti mi serve la voce di ElevenLabs: impostala nella Control Room, sezione Jarvis.';
+    try {
+      const line = await twilioNumber(deps.fetchImpl, voice.apiKey);
+      if (!line) return 'Su ElevenLabs non trovo ancora il numero Twilio: Agents → Phone Numbers → Import → Twilio, con numero, Account SID e Auth Token. Poi riscrivimi «chiamami».';
+      const agentId = await ensureAgent(deps.fetchImpl, voice.apiKey, { agentId: await setting(db, 'phone_agent_id'), voiceId: voice.voiceId });
+      await putSetting(db, 'phone_agent_id', agentId);
+      const situation = await statusText(db).catch(() => '');
+      const out = await callOwner(deps.fetchImpl, voice.apiKey, { agentId, phoneNumberId: line.id, to, situation, reason: 'Mi hai chiesto di chiamarti: dimmi pure, ti racconto come vanno le cose.' });
+      await auditedBatch(jarvisDb(db), [], 'jarvis.phone_call', `Telefonata a Riccardo partita dal numero ${line.number || 'Twilio'}${out.callSid ? ` (Twilio ${out.callSid})` : ''}.`, null).catch(() => {});
+      return `Ti sto chiamando dal ${line.number || 'numero Twilio'}. Se non squilla entro un minuto, dimmelo.`;
+    } catch (error) {
+      if (error?.status === 401) return 'ElevenLabs rifiuta la chiave della voce per le telefonate: serve una chiave con il permesso «Conversational AI» (Agents). Creane una nuova su ElevenLabs e salvala nella Control Room, sezione Jarvis.';
+      return `La telefonata non è partita: ${String(error?.message || 'errore').slice(0, 220)}`;
+    }
   }
 
   // ——— Conversazione (testo o voce) ———
