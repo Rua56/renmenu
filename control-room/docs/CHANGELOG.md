@@ -2,6 +2,10 @@
 
 Si aggiunge una voce a ogni pull request che cambia un comportamento di Jarvis o della Control Room, insieme all'aggiornamento di README, policy e funzionamento quando serve. Le voci più recenti stanno in alto.
 
+## 13 ottobre 2026
+
+- **Diario di Jarvis:** primo passo del «Jarvis che propone». Nuovo modulo `_lib/journal.js` che riassume un periodo in numeri leggendo registro, pratiche e missioni: richieste nuove e chiuse (con giorni medi), bozze preparate e rifatte, correzioni di Riccardo e dei locali (e i locali più corretti), dubbi di lettura e file non letti, pratiche affidate, SÌ e pubblicazioni, errori, locali più attivi e locali online senza richieste da più di 45 giorni. Nuova tabella `jarvis_events` (migrazione `0013`) per ciò che il registro non conserva: per ora gli errori dell'orologio sulle pratiche affidate, che prima andavano persi. Nuovo comando Telegram `/settimana`. Solo letture e conteggi, nessun dato di contatto; nuovi test.
+
 ## 6 ottobre 2026
 
 - **Allineamento a `main`** (ramo Jarvis): `main` è entrato nel ramo senza conflitti. La build del sito pubblico risulta identica byte per byte con o senza il codice di Jarvis, i 305 test passano e il pacchetto dello staging si costruisce. Documentazione di policy, privacy, voce e README riscritta sullo stato reale; aggiunti questo registro e il documento sul funzionamento.

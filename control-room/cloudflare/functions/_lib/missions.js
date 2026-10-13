@@ -19,6 +19,7 @@ import { editFingerprints, editLogKey, proposeOps, validateOps } from './draft-e
 import { GEMINI_PREFERRED } from './vision.js';
 import { findDishes, findLocales, guessIntent, hintsText } from './understanding.js';
 import { memoryContext, memoryFor, menuStatements, noteStatement } from './memory.js';
+import { buildDigest, digestText, recordEvent } from './journal.js';
 
 export const PARTIAL_MARK = '[Testo parziale: leggi l’email completa in Gmail prima di decidere]';
 export const OWNER_REVIEW = 'telegram:riccardo';
@@ -540,7 +541,11 @@ export function createMissions(deps) {
     const out = [];
     for (const mission of missions) {
       try { const after = await step(db, env, mission); out.push({ id: mission.id, from: mission.status, to: after?.status }); }
-      catch (error) { out.push({ id: mission.id, from: mission.status, error: error?.quiet ? 'concorrente' : String(error?.message || 'errore').slice(0, 160) }); }
+      catch (error) {
+        const reason = error?.quiet ? 'concorrente' : String(error?.message || 'errore').slice(0, 160);
+        if (!error?.quiet) await recordEvent(db, 'errore.missione', { requestId: mission.request_id, detail: { stato: mission.status, errore: reason } });
+        out.push({ id: mission.id, from: mission.status, error: reason });
+      }
     }
     return out;
   }
@@ -658,12 +663,13 @@ export function createMissions(deps) {
     }
     if (/\bqr\b/i.test(text) && /\b(?:mand\w*|dammi|dai|gener\w*|invi\w*|rifai|prepar\w*|voglio|serve)\b/i.test(text) && !EDIT_WORDS_STRICT.test(text)) { await qrOnRequest(db, env, chat, text); return; }
     if (/^\/briefing\b/i.test(text)) { await briefing(db, env, { force: true }); return; }
+    if (/^\/settimana\b/i.test(text)) { await sendTelegram(env, chat, digestText(await buildDigest(db)), null, deps.fetchImpl); return; }
     if (/^\/stato\b/i.test(text) || STATUS_WORDS.test(text)) {
       await sendTelegram(env, chat, await statusText(db), null, deps.fetchImpl);
       return;
     }
     if (/^\/aiuto\b|^\/help\b/i.test(text) || text.startsWith('/')) {
-      await sendTelegram(env, chat, 'Puoi scrivermi o mandarmi un vocale: «com’è la situazione?», «al Bakaro il frico ora costa 14», «crea una nuova pratica per il locale … con piano Standard», «pubblica il menu di …». Capisco anche /stato, /briefing, le foto e i PDF dei menu. Pubblicare richiede sempre il tuo SÌ col pulsante.', null, deps.fetchImpl);
+      await sendTelegram(env, chat, 'Puoi scrivermi o mandarmi un vocale: «com’è la situazione?», «al Bakaro il frico ora costa 14», «crea una nuova pratica per il locale … con piano Standard», «pubblica il menu di …». Capisco anche /stato, /briefing, /settimana, le foto e i PDF dei menu. Pubblicare richiede sempre il tuo SÌ col pulsante.', null, deps.fetchImpl);
       return;
     }
     await converse(db, env, chat, text, false);

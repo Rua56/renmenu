@@ -104,7 +104,7 @@ Stati della missione: affidata, attesa invio, attesa cliente, attesa SÌ, pubbli
 - **Telegram:** testo, vocali (trascritti con Whisper su Workers AI, risposte anche a voce con ElevenLabs), foto e documenti.
 - **Intenzioni capite:** stato, anteprima, crea pratica, affida pratica, aggiorna menu, pubblica, cancella pratica, ricorda una nota, chiacchiera. Un modello sceglie una sola intenzione tra poche consentite; i valori (prezzi, piatti) restano quelli detti da Riccardo e sono verificati dal codice.
 - **Modifiche alla bozza:** elenco chiuso di operazioni (prezzo, varianti, aggiungi, rimuovi, rinomina, descrizione, sposta, motto, aspetto, campi del locale, storia). Ogni operazione deve nominare la voce toccata e ogni prezzo deve comparire nella frase. Le decisioni già applicate (colori, motto, storia, contatti) sopravvivono a «Rifai la bozza».
-- **Comandi utili:** `/stato`, `/briefing`, «mandami il QR di …», «mostrami l'anteprima» (link privato valido 24 ore), «ricorda che …», «dimentica …».
+- **Comandi utili:** `/stato`, `/briefing`, `/settimana` (diario degli ultimi 7 giorni: richieste, correzioni, dubbi, pubblicazioni, errori e locali silenziosi), «mandami il QR di …», «mostrami l'anteprima» (link privato valido 24 ore), «ricorda che …», «dimentica …».
 - **Briefing:** ogni mattina dal lunedì al sabato alle 8 e un giro di proposte con pulsanti (promemoria ai locali che non rispondono, bozze ferme, SÌ in attesa).
 
 ### 5.3 La memoria
