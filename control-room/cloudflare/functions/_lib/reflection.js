@@ -6,6 +6,7 @@
 // Con «Fallo» su una miglioria al codice Jarvis apre una issue su GitHub (etichetta jarvis-proposta).
 // La chiamata a Claude è in claude.js (fetch diretto: il pacchetto delle Functions non porta dipendenze npm).
 import { askClaude, CLAUDE_MODEL } from './claude.js';
+import { geminiJson } from './gemini-json.js';
 
 const DAY = 86_400_000;
 export const REFLECTION_MODEL = CLAUDE_MODEL;
@@ -48,13 +49,25 @@ const SCHEMA = {
     properties: { tipo: { type: 'string', enum: KINDS }, titolo: { type: 'string' }, problema: { type: 'string' }, evidenza: { type: 'string' }, proposta: { type: 'string' }, rischio: { type: 'string' } } } } }
 };
 
-/** Chiede a Claude le proposte. Restituisce { proposals, model } oppure { error }. */
-export async function askForProposals(env, input, { fetchImpl = globalThis.fetch, timeoutMs = 120_000 } = {}) {
-  const out = await askClaude(env, { model: REFLECTION_MODEL, system: SYSTEM, schema: SCHEMA, effort: 'high', maxTokens: 16000,
-    messages: [{ role: 'user', content: `<diario>\n${JSON.stringify(input)}\n</diario>` }] }, { fetchImpl, timeoutMs });
-  if (out.error) return { error: out.error };
-  if (!Array.isArray(out.json?.proposte)) return { error: 'risposta di Claude senza proposte' };
-  return { proposals: out.json.proposte, model: out.model };
+/**
+ * Chiede le proposte a un modello. Di base Gemini (piano gratuito); Claude solo se Riccardo l'ha acceso
+ * (useClaude), perché costa. Restituisce { proposals, model } oppure { error }.
+ */
+export async function askForProposals(env, input, { fetchImpl = globalThis.fetch, timeoutMs = 120_000, gemini = null, useClaude = false } = {}) {
+  const user = `<diario>\n${JSON.stringify(input)}\n</diario>`;
+  if (useClaude) {
+    const out = await askClaude(env, { model: REFLECTION_MODEL, system: SYSTEM, schema: SCHEMA, effort: 'high', maxTokens: 16000,
+      messages: [{ role: 'user', content: user }] }, { fetchImpl, timeoutMs });
+    if (out.error) return { error: out.error };
+    if (!Array.isArray(out.json?.proposte)) return { error: 'risposta di Claude senza proposte' };
+    return { proposals: out.json.proposte, model: out.model };
+  }
+  if (!gemini?.key) return { error: 'manca la chiave Gemini (gratuita): impostala nella Control Room, sezione Jarvis' };
+  const tries = [];
+  const out = await geminiJson(gemini, { system: `${SYSTEM}\nRispondi SOLO con un oggetto JSON {"proposte": [...]}, ogni proposta con i campi tipo, titolo, problema, evidenza, proposta, rischio.`,
+    user, validate: (p) => Array.isArray(p?.proposte), deadlineMs: 60_000, perModelMs: 30_000, maxOutputTokens: 4000 }, tries);
+  if (!out) return { error: `Gemini non ha risposto${tries.length ? ` (${tries.map((t) => `${t.model} ${t.status}`).join(', ').slice(0, 120)})` : ''}` };
+  return { proposals: out.proposte, model: out.modelName || 'gemini' };
 }
 
 const norm = (value) => String(value || '').toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g, '').replace(/[^a-z0-9]+/g, ' ').trim();

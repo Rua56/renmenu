@@ -32,7 +32,7 @@ Dimensioni al 6 ottobre 2026: circa 11.250 righe di backend (45 moduli di logica
                       Cloudflare Pages Functions (Jarvis)
                       D1 (dati)  R2 (file privati)  Workers AI
                                          |
-              Claude (intenzioni, conversazione, riflessione) · Gemini (lettura foto, traduzioni)  |  ElevenLabs (voce)
+              Gemini (gratuito: foto, traduzioni, intenzioni, riflessione) · Claude solo con /claude sì  |  ElevenLabs (voce)
                                          |
                     GitHub: branch + PR + merge su main  -->  Cloudflare Pages (sito)
                                          |
@@ -161,6 +161,7 @@ Stati della missione: affidata, attesa invio, attesa cliente, attesa SÌ, pubbli
 - **Intenzioni capite:** stato, anteprima, crea pratica, affida pratica, aggiorna menu, pubblica, cancella pratica, ricorda una nota, chiacchiera. Un modello sceglie una sola intenzione tra poche consentite; i valori (prezzi, piatti) restano quelli detti da Riccardo e sono verificati dal codice.
 - **Modifiche alla bozza:** elenco chiuso di operazioni (prezzo, varianti, aggiungi, rimuovi, rinomina, descrizione, sposta, motto, aspetto, campi del locale, storia). Ogni operazione deve nominare la voce toccata e ogni prezzo deve comparire nella frase. Le decisioni già applicate (colori, motto, storia, contatti) sopravvivono a «Rifai la bozza».
 - **Risposte brevi:** a ogni messaggio con pulsanti si può rispondere anche a parole («sì», «no», «non ora», «la seconda», «entrambe»): vale come il tocco. Pubblicare resta un tocco; cancellare a parole chiede sempre conferma.
+- **Modelli:** di base Jarvis usa solo modelli gratuiti (Gemini e Workers AI). `/claude sì` accende Claude (a pagamento, chiave `ANTHROPIC_API_KEY`) per capire, rispondere e preparare le proposte; `/claude no` lo spegne.
 - **Avvisi:** ogni avviso va nella Control Room e su Telegram. Dalle 22 alle 7 quelli normali arrivano senza suono; quelli importanti suonano sempre e Jarvis li dice anche a voce. `/voce` sceglie: solo importanti (predefinito), tutti (di giorno) o nessuno. Messaggi WhatsApp e Gmail dai webhook, email non registrate, orologio inceppato e copia di sicurezza fallita hanno un avviso proprio.
 - **Comandi utili:** `/stato`, `/briefing`, `/settimana` (diario degli ultimi 7 giorni: richieste, correzioni, dubbi, pubblicazioni, errori e locali silenziosi), `/proposte` e `/rifletti` (proposte di miglioramento: il lunedì alle 8:15 Jarvis rilegge il diario con Claude e ne manda al massimo 3 con Fallo, Non ora e Mai; «Fallo» su una miglioria al codice apre una issue su GitHub), «mandami il QR di …», «mostrami l'anteprima» (link privato valido 24 ore), «ricorda che …», «dimentica …».
 - **Briefing:** ogni mattina dal lunedì al sabato alle 8 e un giro di proposte con pulsanti (promemoria ai locali che non rispondono, bozze ferme, SÌ in attesa).
