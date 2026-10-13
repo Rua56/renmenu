@@ -242,6 +242,7 @@ export function parseWhatsAppCustomerMessages(payload, { seenIds } = {}) {
             provider: 'whatsapp-cloud',
             id: message.id,
             waId: message.from,
+            profileName: typeof contacts.get(message.from)?.profile?.name === 'string' ? contacts.get(message.from).profile.name.slice(0, 80) : undefined,
             messageType: typeof message.type === 'string' && message.type.length <= 64 ? message.type : 'unknown',
             timestamp: typeof message.timestamp === 'string' && /^\d{10}$/.test(message.timestamp) ? Number(message.timestamp) : undefined,
             content: {

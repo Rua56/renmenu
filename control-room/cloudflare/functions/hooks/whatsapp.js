@@ -2,14 +2,17 @@ import {
   forbidden,
   hidden,
   hookJson,
-  persistIncomingExternalEvent,
   verifyWhatsAppChallenge,
   verifyWhatsAppWebhookRequest,
-  whatsappRecordFromMessage,
   whatsappWebhookConfiguration
 } from '../_lib/webhooks.js';
+import { importWhatsAppMessage } from '../_lib/whatsapp-in.js';
 
-/** Cloudflare Pages Function for GET/POST /hooks/whatsapp.  It makes no outbound calls. */
+/**
+ * Cloudflare Pages Function for GET/POST /hooks/whatsapp. The only outbound calls are to Meta,
+ * to download photos and PDFs the venue sent (with WHATSAPP_TOKEN). Jarvis announces new
+ * messages on Telegram from its clock tick (announceExternal).
+ */
 export async function onRequest(context) {
   const config = whatsappWebhookConfiguration(context.env);
   if (!config.enabled) return hidden();
@@ -32,8 +35,8 @@ export async function onRequest(context) {
     let accepted = 0;
     let deduplicated = 0;
     for (const message of parsed.messages) {
-      const outcome = await persistIncomingExternalEvent(context.env.DB, whatsappRecordFromMessage(message));
-      if (outcome.deduplicated) deduplicated += 1;
+      const outcome = await importWhatsAppMessage(context.env.DB, context.env, message);
+      if (outcome.kind === 'duplicate') deduplicated += 1;
       else accepted += 1;
     }
     return hookJson({ ok: true, accepted, deduplicated });

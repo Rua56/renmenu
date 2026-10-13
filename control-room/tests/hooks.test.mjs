@@ -160,7 +160,7 @@ describe('Cloudflare Pages WhatsApp hook', () => {
     } finally { db.close(); }
   });
 
-  it('uses the exact raw Meta body, persistently deduplicates customer messages, and sends non-text messages to review without downloading them', async () => {
+  it('uses the exact raw Meta body, persistently deduplicates customer messages, and groups a photo that cannot be downloaded into the same case for review', async () => {
     const db = database();
     try {
       const payload = whatsAppPayload();
@@ -179,8 +179,50 @@ describe('Cloudflare Pages WhatsApp hook', () => {
 
       const image = { id: 'wamid.hook.image', from: '393331234567', timestamp: '1760000001', type: 'image', image: { id: 'meta-media-id' } };
       assert.equal((await whatsappHook({ request: await whatsAppRequest(whatsAppPayload(image)), env: whatsAppEnv(db) })).status, 200);
-      assert.deepEqual(db.rows("SELECT source_event_id,status,reason FROM external_events WHERE source_event_id='wamid.hook.image'"), [{ source_event_id: 'wamid.hook.image', status: 'needs_review', reason: 'unsupported_message_type' }]);
+      // Senza token né bucket la foto non si scarica: stessa pratica del testo, da rivedere.
+      assert.deepEqual(db.rows("SELECT source_event_id,status,reason FROM external_events WHERE source_event_id='wamid.hook.image'"), [{ source_event_id: 'wamid.hook.image', status: 'imported', reason: 'grouped' }]);
+      assert.equal(db.rows('SELECT * FROM requests').length, 1);
+      assert.match(db.rows('SELECT next_step FROM requests')[0].next_step, /non è stato scaricato/);
+      assert.equal(db.rows('SELECT status FROM requests')[0].status, 'dati_da_confermare');
       assert.equal(db.rows('SELECT * FROM materials').length, 0);
     } finally { db.close(); }
+  });
+
+  it('downloads photos and PDFs from Meta into the private bucket and keeps one case per number', async () => {
+    const db = database();
+    const stored = [];
+    const calls = [];
+    const jpeg = new Uint8Array([0xff, 0xd8, 0xff, 0xe0, 1, 2, 3]);
+    const previous = globalThis.fetch;
+    globalThis.fetch = async (url, options = {}) => {
+      calls.push({ url: String(url), auth: options.headers?.Authorization });
+      if (String(url) === 'https://graph.facebook.com/v21.0/media-photo') return Response.json({ url: 'https://lookaside.fbsbx.whatsapp.net/media?id=1', mime_type: 'image/jpeg', file_size: jpeg.length });
+      if (String(url) === 'https://graph.facebook.com/v21.0/media-evil') return Response.json({ url: 'https://evil.example.com/x', mime_type: 'image/jpeg' });
+      if (String(url).startsWith('https://lookaside.fbsbx.whatsapp.net/')) return new Response(jpeg);
+      return new Response('no', { status: 404 });
+    };
+    try {
+      const env = whatsAppEnv(db, { WHATSAPP_TOKEN: 'meta-token', BUCKET: { put: async (key, bytes, opts) => { stored.push({ key, size: bytes.length, type: opts.httpMetadata.contentType }); } } });
+      const photo = { id: 'wamid.photo.1', from: '393331234567', timestamp: '1760000001', type: 'image', image: { id: 'media-photo', mime_type: 'image/jpeg', caption: 'Menu del pranzo' } };
+      assert.equal((await whatsappHook({ request: await whatsAppRequest(whatsAppPayload(photo)), env })).status, 200);
+      const text = { id: 'wamid.text.2', from: '393331234567', timestamp: '1760000002', type: 'text', text: { body: 'Il coperto è 2 euro' } };
+      await whatsappHook({ request: await whatsAppRequest(whatsAppPayload(text)), env });
+      const evil = { id: 'wamid.photo.3', from: '393331234567', timestamp: '1760000003', type: 'image', image: { id: 'media-evil' } };
+      await whatsappHook({ request: await whatsAppRequest(whatsAppPayload(evil)), env });
+      const [request] = db.rows('SELECT id,subject,status,source_text,next_step FROM requests');
+      assert.equal(db.rows('SELECT * FROM requests').length, 1, 'una pratica per numero');
+      assert.equal(request.subject, 'Richiesta WhatsApp');
+      assert.match(request.source_text, /^WhatsApp da Cliente prova \(\+393331234567\)\n\nMenu del pranzo\n\nIl coperto è 2 euro\n\n\[foto allegata\]$/);
+      assert.match(request.next_step, /UNEXPECTED_MEDIA_HOST/);
+      assert.deepEqual(db.rows('SELECT source,processing_status,mime,size FROM materials'), [{ source: 'whatsapp', processing_status: 'da_trascrivere', mime: 'image/jpeg', size: jpeg.length }]);
+      assert.deepEqual(stored.map((s) => s.type), ['image/jpeg']);
+      assert.ok(stored[0].key.startsWith(`private/requests/${request.id}/`));
+      assert.ok(calls.every((c) => c.auth === 'Bearer meta-token'));
+      assert.ok(!calls.some((c) => c.url.includes('evil.example.com')), 'mai scaricare da indirizzi non di Meta');
+      // Un messaggio di sistema (reazione) non crea pratiche.
+      const reaction = { id: 'wamid.react.4', from: '393331234567', timestamp: '1760000004', type: 'reaction', reaction: { emoji: '👍' } };
+      await whatsappHook({ request: await whatsAppRequest(whatsAppPayload(reaction)), env });
+      assert.deepEqual(db.rows("SELECT status FROM external_events WHERE source_event_id='wamid.react.4'"), [{ status: 'ignored' }]);
+    } finally { globalThis.fetch = previous; db.close(); }
   });
 });
