@@ -28,15 +28,15 @@ EOF
 cat > dist/robots.txt <<'EOF'
 User-agent: *
 Allow: /
-Sitemap: https://renmenu.pages.dev/sitemap.xml
+Sitemap: https://renmenu.com/sitemap.xml
 EOF
 
 cat > dist/sitemap.xml <<'EOF'
 <?xml version="1.0" encoding="UTF-8"?>
 <urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">
-  <url><loc>https://renmenu.pages.dev/</loc></url>
-  <url><loc>https://renmenu.pages.dev/anteprima/</loc></url>
-  <url><loc>https://renmenu.pages.dev/casi-studio/trattoria-blanch/</loc></url>
+  <url><loc>https://renmenu.com/</loc></url>
+  <url><loc>https://renmenu.com/anteprima/</loc></url>
+  <url><loc>https://renmenu.com/casi-studio/trattoria-blanch/</loc></url>
 </urlset>
 EOF
 
