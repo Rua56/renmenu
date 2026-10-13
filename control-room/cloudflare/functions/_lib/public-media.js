@@ -2,7 +2,7 @@
 // Cloudflare Access, come gli altri ingressi pubblici di Jarvis).
 // Si serve SOLO una foto confermata da Riccardo in Revisione (media_items.status='confermata'):
 // l'originale del cliente resta privato in R2; qui c'è solo la copia ridotta che ha scelto lui.
-// Serve all'anteprima del menu su renmenu.pages.dev prima della pubblicazione.
+// Serve all'anteprima del menu su renmenu.com prima della pubblicazione.
 import { PUBLIC_FILE } from './media.js';
 
 const TYPES = { jpg: 'image/jpeg', webp: 'image/webp', png: 'image/png' };

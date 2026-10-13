@@ -174,7 +174,7 @@ describe('Jarvis autonomo: dalla bozza affidata alla pubblicazione', () => {
       const opened = await hook({ request: new Request(link), env: { DB: db } });
       assert.equal(opened.status, 302);
       const full = opened.headers.get('Location');
-      assert.match(full, /^https:\/\/renmenu\.pages\.dev\/menu\/\?lang=it#data=/);
+      assert.match(full, /^https:\/\/renmenu\.com\/menu\/\?lang=it#data=/);
       assert.equal(JSON.parse(Buffer.from(full.split('#data=')[1].replace(/-/g, '+').replace(/_/g, '/'), 'base64').toString()).id, draft.slug || JSON.parse(Buffer.from(full.split('#data=')[1].replace(/-/g, '+').replace(/_/g, '/'), 'base64').toString()).id);
       assert.equal((await hook({ request: new Request(link.replace(/RM-\w+/, 'RM-ZZZZZZ')), env: { DB: db } })).status, 404);
       assert.match(JSON.stringify(message.body.reply_markup), /pub:/);
@@ -460,7 +460,7 @@ describe('Email al locale con link e QR dopo la pubblicazione', () => {
       assert.equal(queued.to, 'locale@example.com');
       const out = await db.prepare(ONLINE_GET_SQL).bind(queued.code).first();
       assert.match(out.subject, /^Il tuo menu RenMenu è online · /);
-      assert.match(out.body, new RegExp(`https://renmenu.pages.dev/menu/\\?m=${dr.slug}`));
+      assert.match(out.body, new RegExp(`https://renmenu.com/menu/\\?m=${dr.slug}`));
       assert.match(out.body, /qr-.*\.png/);
       assert.doesNotMatch(out.body, /€|prezzo di/i, 'niente prezzi o pagamenti nell’email');
       const stored = JSON.parse((await db.prepare('SELECT value FROM jarvis_settings WHERE key=?').bind(`outbox_qr_${queued.code}`).first()).value);

@@ -101,7 +101,7 @@ describe('published Gmail email retention (fake fetch only)', () => {
       await seed(db);
       const remote = publicFetch(new Response(null, { status: 404 }));
       await expectBlocked(db, remote.fetch, () => remote.calls.length === 1 &&
-        remote.calls[0].url === 'https://renmenu.pages.dev/menus/osteria-di-prova.json');
+        remote.calls[0].url === 'https://renmenu.com/menus/osteria-di-prova.json');
     } finally { db.close(); }
   });
 

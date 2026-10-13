@@ -1,6 +1,6 @@
 import { validateMenu } from './menu.js';
 
-const PUBLIC_ORIGIN = 'https://renmenu.pages.dev';
+const PUBLIC_ORIGIN = 'https://renmenu.com';
 const SLUG = /^[a-z0-9]+(?:-[a-z0-9]+)*$/;
 const PURGE_ACTION = 'email.retention.purged';
 export const PURGE_PUBLISHED_EMAIL_CONFIRMATION = 'CONFERMO ELIMINAZIONE EMAIL PUBBLICATA';
@@ -29,7 +29,7 @@ function publicMenuUrl(slug) {
   const url = new URL(`/menus/${slug}.json`, PUBLIC_ORIGIN);
   // Keep this explicit even though the URL is constructed locally: no caller
   // can turn this verification request into an arbitrary outbound fetch.
-  assert(url.protocol === 'https:' && url.hostname === 'renmenu.pages.dev' && url.port === '' &&
+  assert(url.protocol === 'https:' && url.hostname === 'renmenu.com' && url.port === '' &&
     url.pathname === `/menus/${slug}.json` && !url.search && !url.hash, 'Destinazione pubblica non autorizzata.', 409);
   return url;
 }

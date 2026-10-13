@@ -446,7 +446,7 @@ function notesPanel(draft) {
 // Tema grafico del menu Standard: scelta rapida, salvata come una normale revisione della bozza.
 const THEMES = [['bordeaux', 'Bordeaux classico', '#7a1f2b', '#3f0f17'], ['trattoria', 'Verde trattoria', '#3d6b3a', '#1f3a1d'], ['mare', 'Blu mare', '#1d5a7a', '#0d2c40'], ['terracotta', 'Terracotta', '#b0522b', '#6b2c12'], ['notte', 'Nero elegante', '#2a2420', '#0f0d0b'], ['sole', 'Ocra caffè', '#c9891f', '#7a4a0c']];
 // Premium su misura: anteprima privata di ogni direzione (il menu viaggia nel frammento #data=, non arriva a nessun server).
-const PUBLIC_VIEWER = 'https://renmenu.pages.dev/menu/';
+const PUBLIC_VIEWER = 'https://renmenu.com/menu/';
 function viewerUrl(menu) {
   const bytes = new TextEncoder().encode(JSON.stringify(menu));
   let binary = '';
@@ -721,7 +721,7 @@ function approvalPathPanel(draft) {
   const liveVerified = livePr?.status === 'merged';
   const published = live ? liveVerified : draft.status === 'pubblicazione_simulata';
   const finalDone = live ? Boolean(livePr && ['pr_open', 'merged'].includes(livePr.status)) : ['pr_simulata', 'pubblicazione_simulata'].includes(draft.status);
-  const customerUrl = `https://renmenu.pages.dev/menu/?m=${encodeURIComponent(draft.slug)}`;
+  const customerUrl = `https://renmenu.com/menu/?m=${encodeURIComponent(draft.slug)}`;
   let action = '';
   const mission = missionFor(draft);
   if (mission && !['completata', 'ferma', 'annullata'].includes(mission.status)) action = jarvisMissionPanel(draft);
@@ -1217,7 +1217,7 @@ async function handleClick(event) {
       return;
     }
     if (action === 'live-merge') {
-      openConfirmation({ title: 'Pubblica il menu', copy: `Il menu ${draft.slug} approvato dal locale va online su renmenu.pages.dev. Jarvis controlla prima che la PR contenga solo questo file e la versione approvata.`, phrase: 'CONFERMO MERGE MENU APPROVATO', button: 'Pubblica', type: 'githubMergePr',
+      openConfirmation({ title: 'Pubblica il menu', copy: `Il menu ${draft.slug} approvato dal locale va online su renmenu.com. Jarvis controlla prima che la PR contenga solo questo file e la versione approvata.`, phrase: 'CONFERMO MERGE MENU APPROVATO', button: 'Pubblica', type: 'githubMergePr',
         payload: { draftId: draft.id, revision: draft.revision, requestRevision: request.revision, confirmation: 'CONFERMO MERGE MENU APPROVATO' },
         success: 'Pubblicazione avviata: tra 1–2 minuti tocca «Verifica online».' });
       return;

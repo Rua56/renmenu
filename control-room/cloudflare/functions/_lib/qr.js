@@ -4,7 +4,7 @@
 // Nessun servizio esterno: il codice QR si calcola qui e il PNG si scrive a mano.
 import qrcode from './vendor/qrcode.mjs';
 
-export const PUBLIC_ORIGIN = 'https://renmenu.pages.dev';
+export const PUBLIC_ORIGIN = 'https://renmenu.com';
 export const menuLink = (slug) => `${PUBLIC_ORIGIN}/menu/?m=${encodeURIComponent(slug)}`;
 
 export function qrModules(text) {

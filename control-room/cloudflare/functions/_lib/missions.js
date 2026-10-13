@@ -495,7 +495,7 @@ export function createMissions(deps) {
     }
     const client = hits[0];
     let menu = null;
-    try { const r = await (deps.fetchImpl || globalThis.fetch)(`https://renmenu.pages.dev/menus/${encodeURIComponent(client.menu_id)}.json`); if (r.ok) menu = await r.json(); } catch { menu = null; }
+    try { const r = await (deps.fetchImpl || globalThis.fetch)(`https://renmenu.com/menus/${encodeURIComponent(client.menu_id)}.json`); if (r.ok) menu = await r.json(); } catch { menu = null; }
     if (!menu) { await sendTelegram(env, chat, `Non riesco a leggere il menu online di «${client.name}»: riprova tra poco.`, null, deps.fetchImpl); return; }
     await sendMenuQr(db, env, { slug: client.menu_id, name: client.name, plan: client.plan, logoUrl: menu.premium?.logo || '', baseUrl: menuLink(client.menu_id) });
   }
@@ -987,7 +987,7 @@ export function createMissions(deps) {
   const FOCUS_MINUTES = 60;
   // ——— Controllo dopo la pubblicazione: dopo 6 ore, 2 giorni e 7 giorni Jarvis rilegge il menu online. Tace se va tutto bene ———
   const WATCH_AFTER_HOURS = [6, 48, 168];
-  const PUBLIC_ORIGIN = 'https://renmenu.pages.dev';
+  const PUBLIC_ORIGIN = 'https://renmenu.com';
   async function readPublic(slug) {
     const get = async (url, json) => {
       let response;
@@ -1286,7 +1286,7 @@ export function createMissions(deps) {
     if (!draft) {
       const clients = await rows(db, "SELECT id,name,menu_id FROM clients WHERE menu_id IS NOT NULL AND menu_id<>''").catch(() => []);
       const { client } = pickLocale(spokenVenue, clues, clients);
-      if (client) return { text: `«${client.name}» non ha bozze aperte, ma ha il menu online: https://renmenu.pages.dev/menu/?m=${encodeURIComponent(client.menu_id)}` };
+      if (client) return { text: `«${client.name}» non ha bozze aperte, ma ha il menu online: https://renmenu.com/menu/?m=${encodeURIComponent(client.menu_id)}` };
       return { text: `Non trovo una bozza né un menu online per «${spokenVenue || 'quel locale'}». Dimmi il nome esatto del locale.` };
     }
     return showDraft(db, env, draft);

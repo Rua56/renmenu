@@ -496,7 +496,7 @@ describe('private AI + GitHub operations (fakes only)', () => {
       const fixture = await insertPublication(db);
       const github = githubFetch({ status: prStatus({ headRef: fixture.branchName }) });
       const pages = publicFetch((url, init) => {
-        assert.equal(url.href, 'https://renmenu.pages.dev/menus/osteria-di-prova.json');
+        assert.equal(url.href, 'https://renmenu.com/menus/osteria-di-prova.json');
         assert.equal(init.method, 'GET');
         assert.equal(init.redirect, 'manual', 'i Worker non supportano redirect:error');
         return response(reorderedMenu());
@@ -506,7 +506,7 @@ describe('private AI + GitHub operations (fakes only)', () => {
       };
       const verified = await runPrivateIntegrationAction(context(db, env), 'githubVerifyPublication', fixture.payload);
       assert.equal(verified.status, 'merged');
-      assert.equal(verified.publicUrl, 'https://renmenu.pages.dev/menu/?m=osteria-di-prova', 'la pagina dei clienti, non il file JSON');
+      assert.equal(verified.publicUrl, 'https://renmenu.com/menu/?m=osteria-di-prova', 'la pagina dei clienti, non il file JSON');
       assert.equal(getOne(db, 'SELECT status,pr_number FROM live_pr_operations WHERE id=?', fixture.operationId).status, 'merged');
       const completed = getOne(db, 'SELECT status,public_url,revision FROM requests WHERE id=?', fixture.requestId);
       assert.equal(completed.status, 'completata');

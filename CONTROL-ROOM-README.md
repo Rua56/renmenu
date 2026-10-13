@@ -1,6 +1,6 @@
 # RenMenu Control Room · Jarvis
 
-**Stato (6 ottobre 2026):** la Control Room con Jarvis lavora sullo staging privato `renmenu-jarvis-stage.pages.dev`, separato dal sito pubblico `renmenu.pages.dev`. Jarvis legge richieste e materiali, prepara bozze, chiede conferme a Riccardo su Telegram e, solo dopo il suo SÌ, pubblica il menu sul sito tramite pull request. La Control Room non è un portale per i clienti: è il cruscotto privato del Team RenMenu.
+**Stato (6 ottobre 2026):** la Control Room con Jarvis lavora sullo staging privato `renmenu-jarvis-stage.pages.dev`, separato dal sito pubblico `renmenu.com` (prima `renmenu.pages.dev`, ancora attivo). Jarvis legge richieste e materiali, prepara bozze, chiede conferme a Riccardo su Telegram e, solo dopo il suo SÌ, pubblica il menu sul sito tramite pull request. La Control Room non è un portale per i clienti: è il cruscotto privato del Team RenMenu.
 
 > **Regola di manutenzione.** Ogni modifica a Jarvis o alla Control Room aggiorna, nella stessa pull request, questo README, le policy in `docs/` quando cambia un comportamento e il registro in [`control-room/docs/CHANGELOG.md`](control-room/docs/CHANGELOG.md). Il funzionamento passo per passo è in [`control-room/docs/jarvis-funzionamento.md`](control-room/docs/jarvis-funzionamento.md).
 
@@ -10,7 +10,7 @@
 | --- | --- | --- |
 | Demo locale | `http://127.0.0.1:8765/control-room/site/?demo=1` | Dati sintetici nel solo `localStorage`; nessuna chiamata esterna |
 | Staging privato (Jarvis) | `https://renmenu-jarvis-stage.pages.dev/control-room/` | D1 e R2 dedicati, Cloudflare Access solo per `renmenu1569@gmail.com`; dati reali dei clienti, Telegram, email, pubblicazione dei menu dopo il SÌ |
-| Sito pubblico | `https://renmenu.pages.dev/` (e GitHub Pages per i QR storici) | Sito statico, menu e QR; ramo `main` |
+| Sito pubblico | `https://renmenu.com/` (e `renmenu.pages.dev` e GitHub Pages per i QR storici) | Sito statico, menu e QR; ramo `main` |
 
 L'accesso alla Control Room è protetto due volte: Cloudflare Access davanti all'host e verifica lato server della firma del token (RS256/JWKS, emittente, audience, scadenza, tipo ed email del proprietario) su ogni pagina e ogni API. Le scritture accettano solo richieste dello stesso sito. Se la configurazione manca, l'accesso è negato.
 

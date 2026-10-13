@@ -9,7 +9,7 @@ const rgbaLogo = async (w, h) => {
 const asFetch = (bytes) => async () => ({ ok: true, arrayBuffer: async () => bytes.buffer.slice(bytes.byteOffset, bytes.byteOffset + bytes.length) });
 
 test('il link del menu è quello stabile della pagina pubblica', () => {
-  assert.equal(menuLink('osteria-codelli-23'), 'https://renmenu.pages.dev/menu/?m=osteria-codelli-23');
+  assert.equal(menuLink('osteria-codelli-23'), 'https://renmenu.com/menu/?m=osteria-codelli-23');
 });
 
 test('PNG scritto e riletto: stessi pixel', async () => {

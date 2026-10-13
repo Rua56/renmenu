@@ -37,8 +37,8 @@ const RETRYABLE_WITHOUT_WRITE = new Set([
 ]);
 const PUBLIC_LANGUAGES = new Set(['it', 'en', 'de', 'fr', 'es']);
 // This is deliberately a constant rather than configuration or client input:
-// the verification receipt may only attest the canonical public Pages origin.
-const PUBLIC_MENU_ORIGIN = 'https://renmenu.pages.dev';
+// the verification receipt may only attest the canonical public origin (renmenu.com, served by the Pages project).
+const PUBLIC_MENU_ORIGIN = 'https://renmenu.com';
 const COMPLETED_REQUEST_STATUS = 'completata';
 
 function fail(message, status = 422) {

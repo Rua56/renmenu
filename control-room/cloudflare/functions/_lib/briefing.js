@@ -4,7 +4,7 @@
 import { validateMenu } from './menu.js';
 
 const DAY = 86_400_000;
-const PUBLIC = 'https://renmenu.pages.dev';
+const PUBLIC = 'https://renmenu.com';
 const REPO_MENUS = 'https://api.github.com/repos/Rua56/renmenu/contents/menus?ref=main';
 const MISSION_LABEL = { affidata: 'preparo l’anteprima', attesa_invio: 'invio dell’anteprima', attesa_cliente: 'attendo il locale', attesa_si: 'aspetta il tuo SÌ', pubblicazione: 'in pubblicazione', verifica: 'verifica online', ferma: 'ferma: serve te' };
 
