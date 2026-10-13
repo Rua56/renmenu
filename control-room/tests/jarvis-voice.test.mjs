@@ -180,6 +180,26 @@ describe('Comandi vocali di Jarvis', () => {
       assert.match(calls.at(-1).body.text, /Errori: nessuno\./);
     } finally { globalThis.fetch = previous; db.close(); }
   });
+  it('/provaemail: email di prova dal mittente dei locali, oppure il motivo per cui non parte', async () => {
+    const db = database();
+    const previous = globalThis.fetch;
+    const sent = [];
+    globalThis.fetch = async (url, options) => {
+      if (String(url) === 'https://api.resend.com/emails') { sent.push(JSON.parse(options.body)); return Response.json({ id: 'p1' }); }
+      return fakeFetch(url, options);
+    };
+    try {
+      calls.length = 0;
+      await missions.putSetting(db, 'telegram_chat_id', '42');
+      const ask = (extra) => missions.telegramUpdate(db, testEnv(db, { TELEGRAM_BOT_TOKEN: TOKEN, ...extra }), { message: { chat: { id: 42, type: 'private' }, text: '/provaemail' } });
+      await ask({});
+      assert.match(calls.at(-1).body.text, /non è partita: CLIENT_MAIL_OFF/);
+      await ask({ CLIENT_MAIL_FROM: 'RenMenu <menu@renmenu.com>', EMAIL_LIVE_ENABLED: 'true', RESEND_API_KEY: 're_test_123456' });
+      assert.match(calls.at(-1).body.text, /partita da menu@renmenu\.com a renmenu1569@gmail\.com/);
+      assert.deepEqual(sent[0].to, ['renmenu1569@gmail.com']);
+      assert.equal(sent[0].from, 'RenMenu <menu@renmenu.com>');
+    } finally { globalThis.fetch = previous; db.close(); }
+  });
   it('«crea una nuova pratica per Antoine I love You con piano standard» → cliente + pratica, poi la foto si collega da sola', async () => {
     const db = database();
     const previous = globalThis.fetch;
