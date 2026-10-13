@@ -88,8 +88,8 @@ const calls = [];
 let publicState = 'ok';
 const fakeFetch = async (url, options = {}) => {
   const href = String(url);
-  if (href.startsWith('https://renmenu.pages.dev/menus/prova.json')) return publicState === 'ok' ? Response.json({ id: 'prova', nome: 'Prova' }) : new Response('x', { status: 404 });
-  if (href.startsWith('https://renmenu.pages.dev/menu/?m=prova')) return new Response('<html></html>', { status: publicState === 'pagina' ? 500 : 200 });
+  if (href.startsWith('https://renmenu.com/menus/prova.json')) return publicState === 'ok' ? Response.json({ id: 'prova', nome: 'Prova' }) : new Response('x', { status: 404 });
+  if (href.startsWith('https://renmenu.com/menu/?m=prova')) return new Response('<html></html>', { status: publicState === 'pagina' ? 500 : 200 });
   if (href.includes('/contents/menus/osteria-viva.json')) return Response.json({ type: 'file', sha: 'abc1234def', content: Buffer.from(JSON.stringify(LIVE)).toString('base64') });
   if (href.includes('/contents/menus/')) return Response.json({ message: 'Not Found' }, { status: 404 });
   if (href.startsWith('https://api.elevenlabs.io/')) { calls.push({ method: 'tts', url: href, body: JSON.parse(options.body), headers: options.headers }); return new Response(new Uint8Array(2000), { status: 200 }); }
@@ -312,7 +312,7 @@ describe('Comandi vocali di Jarvis', () => {
       assert.match(text, /non è pubblicata e non è stata inviata a nessuno/);
       const open = await hook(new Request(`https://jarvis.test/jarvis-hook/bozza/${code}`), env);
       assert.equal(open.status, 302);
-      assert.match(open.headers.get('Location'), /^https:\/\/renmenu\.pages\.dev\/menu\/\?lang=it#data=/);
+      assert.match(open.headers.get('Location'), /^https:\/\/renmenu\.com\/menu\/\?lang=it#data=/);
       const wrong = await hook(new Request('https://jarvis.test/jarvis-hook/bozza/BZ-AAAAAAAAAA'), env);
       assert.equal(wrong.status, 404);
       for (const [cut, pattern] of [['breve', /Hai 1 pratica aperta: «Trattoria Nuova» \(bozza in revisione/], ['completo', /Pratiche aperte \(1\):\n- Trattoria Nuova: bozza in revisione[\s\S]*Aspettano te: «Trattoria Nuova»/]]) {
@@ -457,7 +457,7 @@ describe('Comandi vocali di Jarvis', () => {
       calls.length = 0;
       await missions.putSetting(db, 'telegram_chat_id', '42');
       const env = testEnv(db, { TELEGRAM_BOT_TOKEN: TOKEN });
-      const set = (patch = {}) => missions.putSetting(db, 'watch_m1', JSON.stringify({ requestId: null, slug: 'prova', name: 'Prova', url: 'https://renmenu.pages.dev/menu/?m=prova', sha: null, step: 0, fails: 0, next: '2026-01-01T00:00:00.000Z', ...patch }));
+      const set = (patch = {}) => missions.putSetting(db, 'watch_m1', JSON.stringify({ requestId: null, slug: 'prova', name: 'Prova', url: 'https://renmenu.com/menu/?m=prova', sha: null, step: 0, fails: 0, next: '2026-01-01T00:00:00.000Z', ...patch }));
       const read = async () => JSON.parse((await db.prepare("SELECT value FROM jarvis_settings WHERE key='watch_m1'").bind().first())?.value || 'null');
       await set();
       publicState = 'ok';

@@ -59,7 +59,7 @@ const optionalMenuUrl = (value) => {
   if (!value) return null;
   let url;
   try { url = new URL(value); } catch { assert(false, 'URL menù non valido.'); }
-  assert(url.protocol === 'https:' && ['renmenu.pages.dev', 'rua56.github.io'].includes(url.hostname), 'URL menù non autorizzato.');
+  assert(url.protocol === 'https:' && ['renmenu.com', 'renmenu.pages.dev', 'rua56.github.io'].includes(url.hostname), 'URL menù non autorizzato.');
   return url.href;
 };
 const assert = (condition, message, status = 422) => {

@@ -8,7 +8,7 @@ RenMenu vende menu digitali con QR ai locali. Il progetto ha tre parti distinte:
 
 | Parte | Cos'è | Dove vive | Chi la usa |
 |---|---|---|---|
-| Sito pubblico | Vetrina, pagamenti e visualizzatore dei menu (`menu/?m=<id>`) | `renmenu.pages.dev`, ramo `main` | Clienti e clienti dei locali |
+| Sito pubblico | Vetrina, pagamenti e visualizzatore dei menu (`menu/?m=<id>`) | `renmenu.com` (anche `renmenu.pages.dev`), ramo `main` | Clienti e clienti dei locali |
 | Control Room | Cruscotto privato: clienti, richieste, materiali, bozze, approvazioni, registro | `renmenu-jarvis-stage.pages.dev/control-room`, dietro Cloudflare Access | Solo Riccardo |
 | Jarvis | L'assistente che lavora dentro la Control Room e su Telegram: legge, prepara, chiede, pubblica dopo il SÌ | Stesso staging, con orologio e Telegram | Riccardo (unico interlocutore) |
 
@@ -53,7 +53,7 @@ Ingressi e uscite:
 - **Menu online:** `bakaro`, `buffet-alla-valletta`, `caffe-bon-bon`, `pub-underground`, `demo`, `demo-premium`.
 - **Vendita e pagamenti:** `crea/`, `paga/`, link Stripe e bonifico. Jarvis non li tocca mai.
 - **Controllo:** `scripts/validate-menus.py` è l'autorità di pubblicazione; Jarvis ne applica le stesse regole in `_lib/menu.js`.
-- **Indirizzo stabile:** il QR di un locale punta sempre a `https://renmenu.pages.dev/menu/?m=<id>`. Si aggiornano i dati, il QR non cambia.
+- **Indirizzo stabile:** dal 13 ottobre 2026 i link e i QR che Jarvis manda puntano a `https://renmenu.com/menu/?m=<id>`. I QR già stampati con `renmenu.pages.dev` o `rua56.github.io` continuano a funzionare: stesso sito, stesso file. Si aggiornano i dati, il QR non cambia.
 
 ## 4. La Control Room
 

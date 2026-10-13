@@ -87,7 +87,7 @@ describe('Percorso di approvazione: funzioni pure', () => {
   it('il link di anteprima contiene il menu esatto nel frammento, senza pubblicare nulla', () => {
     const menu = { id: 'x', nome: { it: 'Caffè Ò' }, lingue: ['it', 'en'], sezioni: [{ nome: { it: 'Dolci', en: 'Desserts' }, voci: [{ nome: { it: 'Strudel' }, prezzo: '5,00' }] }] };
     const url = previewUrl(menu);
-    assert.match(url, /^https:\/\/renmenu\.pages\.dev\/menu\/\?lang=it#data=/);
+    assert.match(url, /^https:\/\/renmenu\.com\/menu\/\?lang=it#data=/);
     assert.deepEqual(decode(url), menu);
     const email = previewEmail({ menu, code: 'RM-ABCDEF', url });
     assert.match(email.subject, /rif\. RM-ABCDEF/);

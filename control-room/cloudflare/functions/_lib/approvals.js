@@ -5,7 +5,7 @@
 // 5-6. conferma finale e pubblicazione. Ogni approvazione vale solo per il contenuto esatto
 // (SHA del JSON): qualsiasi modifica alla bozza la rende scaduta.
 
-export const PUBLIC_VIEWER = 'https://renmenu.pages.dev/menu/';
+export const PUBLIC_VIEWER = 'https://renmenu.com/menu/';
 export const APPROVAL_STATUSES = Object.freeze(['anteprima_pronta', 'anteprima_inviata', 'risposta_ricevuta', 'approvata_cliente', 'modifiche_richieste']);
 export const ACTIVATIONS = Object.freeze({
   prova_30_giorni: 'Standard: prova gratuita di 30 giorni avviata',
