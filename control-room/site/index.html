@@ -11,6 +11,7 @@
   <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,500;9..144,600&family=Instrument+Sans:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600&family=Manrope:wght@400;500;600;700;800&display=swap">
   <link rel="stylesheet" href="./styles.css">
   <link rel="stylesheet" href="./jarvis-ui.css">
+  <link rel="stylesheet" href="./jarvis-hud.css">
 </head>
 <body>
   <a class="skip-link" href="#main-content">Vai al contenuto</a>
@@ -25,6 +26,7 @@
         <button class="icon-button" id="theme-toggle" type="button" aria-label="Attiva tema chiaro" title="Cambia tema">◐</button>
       </div>
     </header>
+    <div class="hud-telemetry" id="hud-telemetry" aria-hidden="true"><span class="hud-live">Online</span><time id="hud-clock">--:--:--</time><span class="hud-bar"></span><span>Gorizia · 45.94N 13.62E</span></div>
     <aside class="sidebar" aria-label="Navigazione principale"><nav id="primary-nav"></nav></aside>
     <main id="main-content" class="main-content" tabindex="-1">
       <section id="view" aria-label="Area di lavoro"><p class="loading">Apertura Control Room…</p></section>
@@ -53,5 +55,6 @@
   </dialog>
   <noscript><p class="noscript">Per usare RenMenu Control Room occorre abilitare JavaScript.</p></noscript>
   <script type="module" src="./app.js"></script>
+  <script type="module" src="./hud.js"></script>
 </body>
 </html>

@@ -4,6 +4,7 @@ Si aggiunge una voce a ogni pull request che cambia un comportamento di Jarvis o
 
 ## 14 ottobre 2026
 
+- **Control Room in stile HUD di J.A.R.V.I.S.:** con il tema scuro la Control Room ha ora sfondo a griglia con una linea di scansione lenta, barra di telemetria sotto l'intestazione (stato, orologio di Roma che scorre, posizione), reattore con anello graduato e mirino, etichette tecniche «▸ DA DECIDERE ───», angoli HUD su schede e riquadri (ambra su quelle urgenti), barra «Scrivi o parla a Jarvis» da console e un breve avvio «sistemi online» alla prima apertura della sessione. Le schermate e i comandi restano gli stessi; il tema chiaro non cambia e con «riduci movimento» non si muove nulla. Nuovi file `site/jarvis-hud.css` e `site/hud.js` (senza script o stili in linea, compatibili con la CSP).
 - **Jarvis chiama per gli avvisi importanti (se lo accendi):** «/chiamami avvisi» mostra il pulsante Accendi/Spegni; «/chiamami avvisi sì|no» fa lo stesso a parole. Con la chiamata accesa, a ogni avviso importante (bozza pronta, nuovo messaggio WhatsApp, guasti…) Jarvis oltre al messaggio telefona e dice il motivo, solo dalle 8 alle 22 e al massimo una volta ogni 30 minuti. È spenta di base perché ogni chiamata costa minuti Twilio ed ElevenLabs. Se la chiamata non parte, lo scrive su Telegram. Nuovo test.
 
 ## 13 ottobre 2026

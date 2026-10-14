@@ -1,0 +1,126 @@
+/* RenMenu Control Room · strato HUD di J.A.R.V.I.S. (solo tema scuro).
+   Si appoggia a jarvis-ui.css senza cambiare la struttura delle schermate: sfondo a griglia con
+   scansione, reattore con anello graduato, angoli HUD su schede e riquadri, etichette tecniche,
+   barra di telemetria sotto l'intestazione e avvio «sistemi online». Con «riduci movimento» resta
+   tutto fermo. */
+html[data-theme="dark"] {
+  --hud: #46d6ff; --hud-dim: rgba(70, 214, 255, .16); --hud-line: rgba(70, 214, 255, .28); --hud-glow: rgba(70, 214, 255, .45);
+}
+
+/* ——— sfondo: griglia fine, vignetta e una linea di scansione lenta ——— */
+html[data-theme="dark"] body {
+  background:
+    radial-gradient(120% 70% at 50% 0%, rgba(18, 48, 74, .55) 0%, transparent 60%),
+    linear-gradient(rgba(70, 214, 255, .045) 1px, transparent 1px) 0 0 / 28px 28px,
+    linear-gradient(90deg, rgba(70, 214, 255, .045) 1px, transparent 1px) 0 0 / 28px 28px,
+    var(--bg);
+  background-attachment: fixed;
+}
+html[data-theme="dark"] .app-shell { position: relative; background: transparent; }
+html[data-theme="dark"] .app-shell::before {
+  position: fixed; z-index: 0; inset: 0; pointer-events: none; content: "";
+  background: radial-gradient(140% 90% at 50% 40%, transparent 55%, rgba(0, 0, 0, .55) 100%);
+}
+html[data-theme="dark"] .app-shell::after {
+  position: fixed; z-index: 1; left: 0; right: 0; top: -20vh; height: 18vh; pointer-events: none; content: "";
+  background: linear-gradient(180deg, transparent, rgba(70, 214, 255, .05) 70%, rgba(70, 214, 255, .1) 98%, transparent);
+  animation: hud-scan 9s linear infinite;
+}
+html[data-theme="dark"] .app-shell > * { position: relative; z-index: 2; }
+html[data-theme="dark"] .bottom-nav { position: fixed; z-index: 40; }
+@keyframes hud-scan { to { transform: translateY(140vh); } }
+
+/* ——— intestazione e telemetria ——— */
+html[data-theme="dark"] .brand-mark { border-color: var(--hud-line); box-shadow: 0 0 14px var(--hud-dim), inset 0 0 10px var(--hud-dim); }
+html[data-theme="dark"] .brand-copy strong { color: var(--hud); text-shadow: 0 0 10px var(--hud-glow); letter-spacing: .22em; }
+html[data-theme="dark"] .mode-badge { border-color: var(--hud-line); color: var(--teal-soft); }
+.hud-telemetry { display: none; }
+html[data-theme="dark"] .hud-telemetry {
+  display: flex; align-items: center; gap: 10px; max-width: 480px; margin: 2px auto 0; padding: 0 16px;
+  color: var(--muted); font: 500 10px/1 var(--mono); letter-spacing: .14em; text-transform: uppercase; white-space: nowrap; overflow: hidden;
+}
+.hud-telemetry .hud-live { color: var(--gr); }
+.hud-telemetry .hud-live::before { display: inline-block; width: 6px; height: 6px; margin-right: 6px; border-radius: 50%; background: var(--gr); box-shadow: 0 0 8px var(--gr); content: ""; vertical-align: 1px; animation: hud-pulse 2s ease-in-out infinite; }
+.hud-telemetry time { color: var(--teal-soft); font-variant-numeric: tabular-nums; }
+.hud-telemetry .hud-bar { position: relative; flex: 1; height: 1px; min-width: 24px; background: var(--hud-line); overflow: hidden; }
+.hud-telemetry .hud-bar::after { position: absolute; top: 0; left: -30%; width: 30%; height: 1px; background: linear-gradient(90deg, transparent, var(--hud), transparent); content: ""; animation: hud-sweep 3.2s ease-in-out infinite; }
+@keyframes hud-sweep { to { left: 100%; } }
+
+/* ——— reattore: anello graduato esterno e mirino ——— */
+html[data-theme="dark"] .jarvis-hero { position: relative; }
+html[data-theme="dark"] .jarvis-hero .reactor { position: relative; width: 168px; height: 168px; }
+html[data-theme="dark"] .jarvis-hero .reactor::before {
+  position: absolute; inset: -16px; border-radius: 50%; content: "";
+  background: repeating-conic-gradient(from 0deg, var(--hud-line) 0deg 1.2deg, transparent 1.2deg 6deg);
+  -webkit-mask: radial-gradient(circle, transparent 66%, #000 67%, #000 71%, transparent 72%);
+  mask: radial-gradient(circle, transparent 66%, #000 67%, #000 71%, transparent 72%);
+  animation: hud-spin 40s linear infinite reverse;
+}
+html[data-theme="dark"] .jarvis-hero .reactor::after {
+  position: absolute; inset: -30px; border-radius: 50%; content: "";
+  background:
+    linear-gradient(var(--hud-line), var(--hud-line)) 50% 0 / 1px 14px no-repeat,
+    linear-gradient(var(--hud-line), var(--hud-line)) 50% 100% / 1px 14px no-repeat,
+    linear-gradient(var(--hud-line), var(--hud-line)) 0 50% / 14px 1px no-repeat,
+    linear-gradient(var(--hud-line), var(--hud-line)) 100% 50% / 14px 1px no-repeat;
+}
+html[data-theme="dark"] .reactor .core { animation: hud-breathe 3.4s ease-in-out infinite; }
+@keyframes hud-breathe { 0%, 100% { filter: brightness(1); transform: scale(1); } 50% { filter: brightness(1.25); transform: scale(1.04); } }
+html[data-theme="dark"] .jarvis-hero h1 { text-shadow: 0 0 22px rgba(70, 214, 255, .25); }
+html[data-theme="dark"] .jarvis-hero .eyebrow { color: var(--teal-soft); letter-spacing: .24em; }
+html[data-theme="dark"] .jarvis-hero .eyebrow::before, html[data-theme="dark"] .jarvis-hero .eyebrow::after { color: var(--hud-line); content: " ── "; }
+
+/* ——— etichette di sezione: stile tecnico con linea ——— */
+html[data-theme="dark"] .lab, html[data-theme="dark"] .oggi-block > .eyebrow { display: flex; align-items: center; gap: 8px; color: var(--teal-soft); }
+html[data-theme="dark"] .lab::before, html[data-theme="dark"] .oggi-block > .eyebrow::before { color: var(--hud); content: "▸"; }
+html[data-theme="dark"] .lab::after, html[data-theme="dark"] .oggi-block > .eyebrow::after { flex: 1; height: 1px; background: linear-gradient(90deg, var(--hud-line), transparent); content: ""; }
+
+/* ——— angoli HUD su schede e riquadri ——— */
+html[data-theme="dark"] :is(.oggi-card, .panel, .sys-list, .locale, .fact, .oggi-calm, .notice) { position: relative; }
+html[data-theme="dark"] :is(.oggi-card, .panel, .sys-list, .locale, .oggi-calm)::after {
+  position: absolute; inset: -1px; z-index: 1; display: block; width: auto; height: auto; border: 0; border-radius: inherit; pointer-events: none; content: "";
+  --c: var(--hud); --l: 14px;
+  background:
+    linear-gradient(var(--c), var(--c)) 0 0 / var(--l) 1.5px no-repeat, linear-gradient(var(--c), var(--c)) 0 0 / 1.5px var(--l) no-repeat,
+    linear-gradient(var(--c), var(--c)) 100% 100% / var(--l) 1.5px no-repeat, linear-gradient(var(--c), var(--c)) 100% 100% / 1.5px var(--l) no-repeat;
+  opacity: .75;
+}
+html[data-theme="dark"] :is(.oggi-card.hot, .oggi-card.alert)::after { --c: var(--am); }
+html[data-theme="dark"] :is(.oggi-card, .locale) { border-color: rgba(70, 214, 255, .14); background: linear-gradient(180deg, rgba(20, 32, 51, .92), rgba(15, 24, 38, .92)); backdrop-filter: blur(2px); }
+html[data-theme="dark"] :is(.oggi-card, .locale):hover { border-color: var(--hud-line); box-shadow: 0 0 24px var(--hud-dim); }
+html[data-theme="dark"] .oggi-card.hot { border-color: rgba(255, 179, 71, .3); }
+html[data-theme="dark"] .oggi-card strong { letter-spacing: .005em; }
+html[data-theme="dark"] .oggi-tag { color: var(--teal-soft); }
+html[data-theme="dark"] .sys-list { border-color: rgba(70, 214, 255, .14); background: rgba(15, 24, 38, .92); }
+html[data-theme="dark"] .sys-row { position: relative; }
+html[data-theme="dark"] .sys-row::before { position: absolute; top: 14px; bottom: 14px; left: 0; width: 2px; background: var(--hud); box-shadow: 0 0 8px var(--hud); content: ""; opacity: 0; transition: opacity .15s; }
+html[data-theme="dark"] .sys-row:hover::before, html[data-theme="dark"] .sys-row:focus-visible::before { opacity: 1; }
+html[data-theme="dark"] .av { border: 1px solid var(--hud-line); background: rgba(18, 48, 74, .6); box-shadow: inset 0 0 12px var(--hud-dim); font-family: var(--mono); }
+html[data-theme="dark"] .view-header h1, html[data-theme="dark"] h1.page-title { text-shadow: 0 0 18px rgba(70, 214, 255, .2); }
+html[data-theme="dark"] .steps li.done::before { background: var(--hud); box-shadow: 0 0 8px var(--hud-glow); }
+
+/* ——— «Scrivi o parla a Jarvis» come una console ——— */
+html[data-theme="dark"] .ask { border-color: var(--hud-line); background: rgba(11, 20, 34, .94); box-shadow: 0 0 0 1px rgba(70, 214, 255, .06), 0 8px 30px rgba(0, 0, 0, .55), 0 0 26px var(--hud-dim); font-family: var(--mono); font-size: 13.5px; letter-spacing: .02em; }
+html[data-theme="dark"] .ask b { position: relative; box-shadow: 0 0 18px var(--hud-glow); }
+html[data-theme="dark"] .ask b::after { position: absolute; inset: -5px; border: 1px solid var(--hud-line); border-radius: 50%; content: ""; animation: hud-ping 2.6s ease-out infinite; }
+@keyframes hud-ping { from { opacity: .9; transform: scale(.9); } to { opacity: 0; transform: scale(1.35); } }
+html[data-theme="dark"] .bottom-nav .tabs > .nav-link[aria-current="page"] { text-shadow: 0 0 10px var(--hud-glow); }
+html[data-theme="dark"] .bottom-nav .tabs > .nav-link[aria-current="page"]::after { position: absolute; bottom: 0; left: 30%; right: 30%; height: 2px; border-radius: 2px; background: var(--hud); box-shadow: 0 0 10px var(--hud); content: ""; }
+
+/* ——— conversazione ——— */
+html[data-theme="dark"] .msg.j { border-color: var(--hud-line); background: rgba(20, 32, 51, .95); box-shadow: 0 0 16px var(--hud-dim); }
+
+/* ——— avvio «sistemi online» (una volta per sessione, da hud.js) ——— */
+.hud-boot { position: fixed; z-index: 100; inset: 0; display: grid; place-items: center; background: var(--bg-deep, #03060b); color: var(--hud, #46d6ff); font: 500 12px/1.9 var(--mono, monospace); letter-spacing: .3em; text-transform: uppercase; pointer-events: none; animation: hud-boot-out .5s ease-in 1.5s forwards; }
+.hud-boot div { text-align: center; }
+.hud-boot strong { display: block; margin-bottom: 10px; font-size: 20px; letter-spacing: .45em; text-shadow: 0 0 18px var(--hud-glow, rgba(70, 214, 255, .45)); }
+.hud-boot span { display: block; opacity: 0; animation: hud-line-in .3s ease-out forwards; }
+.hud-boot span:nth-child(2) { animation-delay: .25s; } .hud-boot span:nth-child(3) { animation-delay: .55s; } .hud-boot span:nth-child(4) { animation-delay: .85s; }
+@keyframes hud-line-in { to { opacity: .85; } }
+@keyframes hud-boot-out { to { opacity: 0; visibility: hidden; } }
+
+@media (prefers-reduced-motion: reduce) {
+  html[data-theme="dark"] .app-shell::after, .hud-telemetry .hud-bar::after, .hud-telemetry .hud-live::before,
+  html[data-theme="dark"] .jarvis-hero .reactor::before, html[data-theme="dark"] .reactor .core, html[data-theme="dark"] .ask b::after { animation: none !important; }
+  .hud-boot { display: none; }
+}
