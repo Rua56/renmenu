@@ -28,6 +28,7 @@ import { claudeKey } from './claude.js';
 import { pickButton } from './short-reply.js';
 import { callOutcome, callOwner, ensureAgent, phoneNumber, twilioNumber } from './phone.js';
 import { approveSender, blockSender, takeUnannouncedHeld } from './whatsapp-in.js';
+import { lastReadingTest, startReadingTest } from './reading-test.js';
 
 export const PARTIAL_MARK = '[Testo parziale: leggi l’email completa in Gmail prima di decidere]';
 export const OWNER_REVIEW = 'telegram:riccardo';
@@ -802,13 +803,19 @@ export function createMissions(deps) {
       await sendTg(db, env, chat, `${on ? 'Claude è acceso: lo uso per capirti, rispondere e per le proposte del lunedì. Costa a ogni messaggio sul tuo account Anthropic.' : 'Claude è spento: rispondo e preparo le proposte solo con i modelli gratuiti (Gemini e Cloudflare).'}${on && !claudeKey(env) ? ' Però manca la chiave ANTHROPIC_API_KEY, quindi uso comunque i gratuiti.' : ''} Scrivi «/claude sì» o «/claude no» per cambiare.`, null, deps.fetchImpl);
       return;
     }
+    // /prova lettura: Jarvis rilegge i menu di prova e misura gli errori (piatti persi, prezzi sbagliati).
+    if (/^\/prova\s*lettur/i.test(text) || /^\/provalettura\b/i.test(text)) {
+      const answer = /\b(esito|risultat\w*|com.e andata)\b/i.test(text) ? await lastReadingTest(db) : await startReadingTest(db, env, { fetchImpl: deps.fetchImpl });
+      await sendTg(db, env, chat, answer, null, deps.fetchImpl);
+      return;
+    }
     if (/^\/settimana\b/i.test(text)) { await sendTg(db, env, chat, digestText(await buildDigest(db)), null, deps.fetchImpl); return; }
     if (/^\/stato\b/i.test(text) || STATUS_WORDS.test(text)) {
       await sendTg(db, env, chat, await statusText(db), null, deps.fetchImpl);
       return;
     }
     if (/^\/aiuto\b|^\/help\b/i.test(text) || text.startsWith('/')) {
-      await sendTg(db, env, chat, 'Puoi scrivermi o mandarmi un vocale: «com’è la situazione?», «al Bakaro il frico ora costa 14», «crea una nuova pratica per il locale … con piano Standard», «pubblica il menu di …». Capisco anche /stato, /briefing, /settimana, /voce, /chiamami, /claude, /provaemail, /proposte, /rifletti, le foto e i PDF dei menu. Pubblicare richiede sempre il tuo SÌ col pulsante.', null, deps.fetchImpl);
+      await sendTg(db, env, chat, 'Puoi scrivermi o mandarmi un vocale: «com’è la situazione?», «al Bakaro il frico ora costa 14», «crea una nuova pratica per il locale … con piano Standard», «pubblica il menu di …». Capisco anche /stato, /briefing, /settimana, /voce, /chiamami, /claude, /provaemail, /prova lettura, /proposte, /rifletti, le foto e i PDF dei menu. Pubblicare richiede sempre il tuo SÌ col pulsante.', null, deps.fetchImpl);
       return;
     }
     await converse(db, env, chat, text, false);

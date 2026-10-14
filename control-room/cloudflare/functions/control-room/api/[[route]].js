@@ -213,7 +213,7 @@ export async function readPendingMaterials(db, env = {}, { calmMs = 40_000 } = {
   finally { try { await db.prepare("UPDATE jarvis_settings SET value='',updated_at=? WHERE key='read_lock'").bind(new Date().toISOString()).run(); } catch { /* il blocco scade da solo dopo 6 minuti */ } }
 }
 // Chiave Gemini salvata cifrata da Riccardo (Control Room → Lettura dei menu): lettura foto e traduzioni.
-async function geminiConfig(db, env) {
+export async function geminiConfig(db, env) {
   try {
     const key = await readSealedSetting(env, missions.setting, missions.putSetting, db, 'gemini_api_key');
     const models = JSON.parse(await missions.setting(db, 'gemini_models') || '[]');

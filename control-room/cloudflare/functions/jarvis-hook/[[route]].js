@@ -3,12 +3,13 @@
 // - /jarvis-hook/tick: l'orologio (Worker con cron) con il segreto JARVIS_CLOCK_SECRET;
 // - /jarvis-hook/mail-in: le email di menu@renmenu.com dal Worker email, con il segreto degli allegati.
 // Nessun dato viene restituito: solo esiti sintetici.
-import { linkPendingMailFiles, missions, readPendingMaterials, receivePendingMail, runAutopilot } from '../control-room/api/[[route]].js';
+import { geminiConfig, linkPendingMailFiles, missions, readPendingMaterials, receivePendingMail, runAutopilot } from '../control-room/api/[[route]].js';
 import { sameSecret } from '../_lib/telegram.js';
 import { chat } from '../_lib/voice.js';
 import { serveMedia } from '../_lib/public-media.js';
 import { previewUrl } from '../_lib/approvals.js';
 import { dailyBackup } from '../_lib/backup.js';
+import { readingTestStep } from '../_lib/reading-test.js';
 import { MAX_RAW_BYTES, importIncomingMail } from '../_lib/mail-in.js';
 
 const reply = (body, status = 200) => new Response(JSON.stringify(body), { status, headers: { 'Content-Type': 'application/json', 'Cache-Control': 'no-store' } });
@@ -131,6 +132,11 @@ export async function onRequest(context) {
       const backup = await dailyBackup(env.DB, env.BUCKET).catch(() => null);
       if (backup && !backup.ok && backup.attempts >= 3) {
         await missions.alertOnce(env.DB, env, 'backup', 'copia di sicurezza', `Copia di sicurezza del database non riuscita oggi (${backup.error}). Ritento domattina alle 3: se si ripete, controlla il bucket R2 dello staging.`, { minutes: 20 * 60 }).catch(() => null);
+      }
+      // Prova di lettura (/prova lettura): una foto per giro, a fine giro, solo quando non ci sono materiali veri da leggere.
+      if (!read.length) {
+        const step = await readingTestStep(env.DB, env, { gemini: await geminiConfig(env.DB, env) }).catch(() => null);
+        if (step?.done) await missions.ping(env.DB, env, step.text).catch(() => null);
       }
       return reply({ ok: true, autopilot: drafted.length, briefing: Boolean(briefed), backup: backup ? Boolean(backup.ok) : undefined, missions: done.map(({ from, to, error }) => ({ from, to, error: error ? 'errore' : undefined })) });
     }
