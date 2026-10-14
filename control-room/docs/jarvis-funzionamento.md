@@ -50,7 +50,7 @@ Ingressi e uscite:
 ## 3. Il sito pubblico
 
 - **Visualizzatore** `menu/index.html`: legge `menus/<id>.json`, supporta temi Standard (sei palette), lingue, allergeni UE 1-14, prezzi doppi calice/bottiglia e percorsi degustazione.
-- **Premium** `menu/premium.js` e `premium.css`: stesso JSON, ma il blocco `premium` decide l'aspetto (direzioni grafiche, logo in apertura, storia, galleria, firma, schede apribili di piatti e vini).
+- **Premium** `menu/premium.js` e `premium.css`: stesso JSON, ma il blocco `premium` decide l'aspetto (direzioni grafiche, logo in apertura, storia, galleria, firma, schede apribili di piatti e vini, bottiglie scontornate, abbinamenti vino-piatto ricavati dalle schede, «La tua selezione» del cliente, animazioni che rispettano «riduci movimento»).
 - **Menu online:** `bakaro`, `buffet-alla-valletta`, `caffe-bon-bon`, `pub-underground`, `demo`, `demo-premium`.
 - **Vendita e pagamenti:** `crea/`, `paga/`, link Stripe e bonifico. Jarvis non li tocca mai.
 - **Controllo:** `scripts/validate-menus.py` è l'autorità di pubblicazione; Jarvis ne applica le stesse regole in `_lib/menu.js`.
