@@ -6,6 +6,7 @@ import { provisionalQrSvg, provisionalTarget } from './provisional-qr.js';
 import { mountPdfPreview } from './pdf-preview.js';
 import { extractPdfText } from './material-extract.js';
 import { announce, closeChat, openChat } from './jarvis-chat.js';
+import { logLines, markFresh } from './jarvis-log.js';
 import { greetOnce, greetingFor, lastVisit, markVisit } from './jarvis-greet.js';
 import { pauseWake, startWake, wakeAvailable, wakeEnabled, wakeState, setWakeEnabled } from './jarvis-wake.js';
 import { showFor } from './jarvis-show.js';
@@ -1045,9 +1046,16 @@ function proposeBlock() {
   };
   return `<section class="hud-display hud-propose" aria-label="Jarvis propone"><div class="hud-display-head"><p class="eyebrow">JARVIS PROPONE · ${state.initiatives.length}</p></div><div class="hud-rows">${list.map(row).join('')}</div></section>`;
 }
+// «Registro dal vivo»: cosa stanno facendo Jarvis e Riccardo, come un terminale (jarvis-log.js).
+function logBlock() {
+  const lines = markFresh(logLines(state.audit || [], { limit: 6 }));
+  if (!lines.length) return '';
+  const line = (l) => `<li class="log-line ${escapeHtml(l.kind)}${l.fresh ? ' fresh' : ''}"><time>${escapeHtml(l.time)}</time><b>${escapeHtml(l.who)}</b><span>${escapeHtml(l.text)}</span></li>`;
+  return `<section class="hud-log" aria-label="Registro dal vivo"><div class="hud-log-head"><p class="eyebrow">REGISTRO · DAL VIVO</p><button class="hud-more" type="button" data-route="registro">Tutto →</button></div><ol class="hud-log-lines" aria-live="polite">${lines.map(line).join('')}</ol><p class="hud-log-cursor" aria-hidden="true">&gt; in ascolto<i>▌</i></p></section>`;
+}
 function renderCommand() {
   const all = allPratiche();
-  return `<div class="view-wrap jarvis-home">${jarvisHero()}${demoNotice()}${adessoBlock(all)}${proposeBlock()}${hudReadouts(all)}${display === 'numeri della settimana' ? '' : '<button class="hud-more" type="button" data-action="show" data-show="numeri della settimana">Grafici della settimana →</button>'}${hudDisplay()}${jarvisPanel()}</div>`;
+  return `<div class="view-wrap jarvis-home">${jarvisHero()}${demoNotice()}${adessoBlock(all)}${proposeBlock()}${hudReadouts(all)}${display === 'numeri della settimana' ? '' : '<button class="hud-more" type="button" data-action="show" data-show="numeri della settimana">Grafici della settimana →</button>'}${hudDisplay()}${logBlock()}${jarvisPanel()}</div>`;
 }
 function renderPratiche() {
   const all = allPratiche();
@@ -1343,9 +1351,34 @@ function navigate(target) {
 
 let autopilotRunning = false;
 let telegramLinkUrl = '';
+// La home si aggiorna da sola mentre è aperta e in primo piano: ridisegna solo se qualcosa è cambiato,
+// e mai mentre stai scrivendo o mentre è aperta un'altra schermata (lì i moduli hanno le loro revisioni).
+const LIVE_MS = 20_000;
+let liveTimer = 0;
+let lastSnapshot = '';
+function scheduleLive() {
+  clearTimeout(liveTimer);
+  liveTimer = setTimeout(liveTick, LIVE_MS);
+}
+async function liveTick() {
+  scheduleLive();
+  if (document.hidden || !['command', 'pratiche'].includes(activeView) || autopilotRunning) return;
+  if (document.activeElement?.matches?.('input, textarea, select')) return;
+  try {
+    const next = await loadState();
+    if (!next || !Array.isArray(next.requests)) return;
+    const snapshot = JSON.stringify(next);
+    if (snapshot === lastSnapshot) return;
+    lastSnapshot = snapshot;
+    state = next;
+    if (['command', 'pratiche'].includes(activeView) && !document.activeElement?.matches?.('input, textarea, select')) render();
+  } catch { /* rete assente: si riprova al giro dopo */ }
+}
+document.addEventListener('visibilitychange', () => { if (!document.hidden && state) liveTick(); });
 async function refresh() {
   state = await loadState();
   if (!state || !Array.isArray(state.requests)) throw new Error('Stato API non conforme al contratto.');
+  lastSnapshot = JSON.stringify(state);
   if (!requestById()) selectedRequestId = state.requests[0]?.id || null;
   render();
   // Autopilota: appena la Control Room si apre, Jarvis lavora sulle richieste nuove.
@@ -1954,5 +1987,6 @@ async function init() {
   try { await refresh(); } catch (error) { renderAccessError(error); return; }
   prepareGreeting();
   listenForWake();
+  scheduleLive();
 }
 init();
