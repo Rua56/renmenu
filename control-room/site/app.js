@@ -966,7 +966,24 @@ function hudDisplay() {
     if (r.kind === 'client') return `<button class="hud-row" type="button" data-select-client="${escapeHtml(r.id)}" data-route="locale">${body}</button>`;
     return `<div class="hud-row">${body}</div>`;
   };
+  if (shown.chart) return `<section class="hud-display hud-numbers" id="hud-display" aria-label="${escapeHtml(shown.title)}"><div class="hud-display-head"><p class="eyebrow">${escapeHtml(shown.title)}</p><button type="button" data-action="show-close" aria-label="Chiudi i grafici">✕</button></div>${hudCharts(shown.chart)}</section>`;
   return `<section class="hud-display" id="hud-display" aria-label="${escapeHtml(shown.title)}"><div class="hud-display-head"><p class="eyebrow">${escapeHtml(shown.title)} · ${shown.rows.length}</p><button type="button" data-action="show-close" aria-label="Chiudi l’elenco">✕</button></div>${shown.rows.length ? `<div class="hud-rows">${shown.rows.map(row).join('')}</div>` : `<p class="oggi-calm">${escapeHtml(shown.say)}</p>`}</section>`;
+}
+// Grafici olografici («mostrami i numeri»): una barra per giorno, oggi acceso, solo dati già nella pagina.
+function hudCharts(chart) {
+  const n = chart.days.length;
+  const step = 10, bar = n > 10 ? 7 : 6, height = 44;
+  const card = (series) => {
+    const top = Math.max(1, ...series.values);
+    const bars = series.values.map((value, i) => {
+      const h = value ? Math.max(3, Math.round((value / top) * height)) : 1;
+      const day = chart.days[i];
+      return `<rect class="hud-bar${value ? '' : ' zero'}${day.today ? ' today' : ''}" x="${i * step + (step - bar) / 2}" y="${height - h}" width="${bar}" height="${h}" rx="1.5"><title>${escapeHtml(`${day.label}: ${value}`)}</title></rect>`;
+    }).join('');
+    const grid = [0.5, 1].map((f) => `<line class="hud-grid" x1="0" x2="${n * step}" y1="${height - f * height}" y2="${height - f * height}"/>`).join('');
+    return `<div class="hud-chart ${escapeHtml(series.tone)}"><div class="hud-chart-head"><span>${escapeHtml(series.label)}</span><strong>${series.total}</strong></div><svg viewBox="0 0 ${n * step} ${height}" preserveAspectRatio="none" role="img" aria-label="${escapeHtml(`${series.label}: ${series.values.join(', ')}`)}">${grid}${bars}<line class="hud-base" x1="0" x2="${n * step}" y1="${height}" y2="${height}"/></svg><div class="hud-chart-axis"><span>${escapeHtml(chart.days[0].label)}</span><span>oggi</span></div></div>`;
+  };
+  return `<div class="hud-charts">${chart.series.map(card).join('')}</div><p class="hud-chart-foot">Menu online adesso <strong>${chart.online}</strong></p>`;
 }
 function showOnHome(phrase) {
   const shown = showFor(phrase, showData());
@@ -990,7 +1007,7 @@ function proposeBlock() {
 }
 function renderCommand() {
   const all = allPratiche();
-  return `<div class="view-wrap jarvis-home">${jarvisHero()}${demoNotice()}${adessoBlock(all)}${proposeBlock()}${hudReadouts(all)}${hudDisplay()}${jarvisPanel()}</div>`;
+  return `<div class="view-wrap jarvis-home">${jarvisHero()}${demoNotice()}${adessoBlock(all)}${proposeBlock()}${hudReadouts(all)}${display === 'numeri della settimana' ? '' : '<button class="hud-more" type="button" data-action="show" data-show="numeri della settimana">Grafici della settimana →</button>'}${hudDisplay()}${jarvisPanel()}</div>`;
 }
 function renderPratiche() {
   const all = allPratiche();
