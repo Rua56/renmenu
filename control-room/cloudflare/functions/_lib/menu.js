@@ -363,7 +363,14 @@ export function extractMenuFromText(venue, source, requestedSlug) {
     const nextRow = lines.slice(index + 1).find((line) => line.trim()) || '';
     const nextClean = nextRow.trim().replace(/^[-•*]\s*/, '');
     // Percorso degustazione: titolo (con o senza prezzo) seguito da portate senza prezzo.
-    const degu = row.startsWith('[da verificare]') ? null : degustazioneHeading(row);
+    let degu = row.startsWith('[da verificare]') ? null : degustazioneHeading(row);
+    // «Percorso … — 90» con sotto una frase sola e poi voci col loro prezzo («in caso di indisponibilità…», poi
+    // «Abbinamento 5 vini — 50»): non elenca portate, è una voce col suo prezzo (Cardamomo, quarta prova).
+    if (degu?.amount && !/^\s*#/.test(lines[index])) {
+      const after = lines.slice(index + 1).map((l) => l.trim()).filter(Boolean);
+      const bare = after.findIndex((l) => /^#/.test(l) || (priceRow(l) && !tastingTier(l)));
+      if (bare === 1) degu = null;
+    }
     if (degu && nextClean && (!priceRow(nextClean) || tastingTier(nextClean)) && !degustazioneHeading(nextClean)) {
       openSection(sectionTitleCase(degu.name), lineNumber, { tipo: 'degustazione' });
       if (degu.amount) section.prezzo = fmt(degu.amount);

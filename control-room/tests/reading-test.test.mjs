@@ -150,6 +150,15 @@ describe('prova di lettura: terza prova', () => {
     assert.deepEqual(items, ['Tiramisù = 800', 'Percorso Degustazione con 5 Portate dalla Cucina & Dolce = 9000', 'Abbinamento 5 Vini = 5000', 'Acqua = 350']);
   });
 
+  it('una frase sola sotto il percorso non lo trasforma in un titolo (Cardamomo, quarta prova)', async () => {
+    const { combineReadings } = await import('../cloudflare/functions/_lib/vision.js');
+    const text = '# Dolci\nTiramisù — 8,00\n# Percorso Degustazione\ncon 5 Portate dalla Cucina & Dolce — 90\nin caso di indisponibilità del prodotto fresco, utilizziamo prodotti abbattuti da noi\nAbbinamento 5 Vini — 50\nAcqua — 3,50';
+    // La seconda lettura salta la frase: nella lettura combinata resta un dubbio, e il percorso non deve restare un titolo.
+    const other = text.replace(/\nin caso[^\n]*/, '');
+    const items = menuItems(draftFromReadings('X', [combineReadings(text, other).text]).menu).map((i) => `${i.name} = ${i.prices.join('/')}`);
+    assert.deepEqual(items.filter((i) => !/indisponibilit/.test(i)), ['Tiramisù = 800', 'Percorso Degustazione con 5 Portate dalla Cucina & Dolce = 9000', 'Abbinamento 5 Vini = 5000', 'Acqua = 350']);
+  });
+
   it('una descrizione che finisce con i numeri degli allergeni non diventa un prezzo (Da Marcello)', async () => {
     const { fixLayout } = await import('../cloudflare/functions/_lib/vision.js');
     const text = ['Penne con scampi 1 2 3 4 — 9,00', 'Gnocchi al pesto 1 3 7 8 — 9,00', 'Totani fritti 1 2 4 5 — 13,00', 'Orate o Branzini (circa 800g) — 25,00', '> olio e limone 4'].join('\n');

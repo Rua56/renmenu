@@ -170,8 +170,11 @@ export function fixLayout(text) {
       // «# Percorso Degustazione» + «con 5 Portate dalla Cucina & Dolce — 90»: è il titolo del percorso con il suo prezzo.
       if (!m && DEGU_TITLE.test(title) && /^\s*con\s/i.test(lines[i + 1] || '') && priced(lines[i + 1])) {
         const p = lines[i + 1].match(PRICE_END);
-        // Senza portate elencate sotto è una voce con il suo prezzo, non un titolo.
-        const courses = lines[i + 2] && !heading(lines[i + 2]) && !priced(lines[i + 2]) && !note(lines[i + 2]) && lines[i + 2].trim();
+        // Senza portate elencate sotto (almeno due righe senza prezzo prima della voce o del titolo successivo) è una voce
+        // con il suo prezzo, non un titolo: una frase sola sotto («in caso di indisponibilità del prodotto fresco…») non è un percorso.
+        let courses = 0;
+        for (let k = i + 2; k < lines.length && !heading(lines[k]) && !priced(lines[k]); k += 1) if (lines[k].trim() && !note(lines[k])) courses += 1;
+        courses = courses >= 2;
         out.push(`${courses ? line.trim() : title.trim()} ${lines[i + 1].slice(0, p.index).trim()} — ${p[1]}${courses ? ' €' : ''}`); i += 1; continue;
       }
       if (m) {
