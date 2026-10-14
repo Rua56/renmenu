@@ -46,19 +46,23 @@ export function samples(bytes, format) {
 /**
  * Apre il dialogo. Va chiamata dentro il tocco (iPhone sblocca l'audio solo così).
  * session(): Promise<{ url, situation }> dal server. Callback: onState('connecting'|'listening'|'speaking'|'ended', note),
- * onUser(text), onAgent(text), onLevel(0..1), onTool(name, params) → Promise<string>.
+ * onUser(text), onAgent(text), onLevel(0..1) la tua voce, onOutLevel(0..1) quella di Jarvis (per il reattore),
+ * onTool(name, params) → Promise<string>.
  * Restituisce { stop(), context(text) }.
  */
-export function startLive({ session, onState = () => {}, onUser = () => {}, onAgent = () => {}, onLevel = () => {}, onTool = async () => '' }) {
+export function startLive({ session, onState = () => {}, onUser = () => {}, onAgent = () => {}, onLevel = () => {}, onOutLevel = () => {}, onTool = async () => '' }) {
   const ctx = new Context();
   ctx.resume?.().catch(() => {});
   let ws = null, stream = null, source = null, processor = null, mute = null;
   let ready = false, ended = false, inputRate = 16000, outputFormat = 'pcm_16000', playHead = 0, speaking = false;
   const playing = new Set();
+  const outTimers = new Set();
 
   const send = (message) => { if (ws?.readyState === 1) ws.send(JSON.stringify(message)); };
   const setSpeaking = (on) => { if (on !== speaking && !ended) { speaking = on; onState(on ? 'speaking' : 'listening'); } };
   function silence() {
+    for (const t of outTimers) clearTimeout(t);
+    outTimers.clear(); onOutLevel(0);
     for (const node of playing) { try { node.onended = null; node.stop(); } catch { /* già ferma */ } }
     playing.clear(); playHead = 0; setSpeaking(false);
   }
@@ -71,6 +75,15 @@ export function startLive({ session, onState = () => {}, onUser = () => {}, onAg
     node.buffer = buffer; node.connect(ctx.destination);
     const at = Math.max(ctx.currentTime + 0.03, playHead);
     node.start(at); playHead = at + buffer.duration;
+    // Il reattore segue la voce di Jarvis: un livello ogni 80 ms, al momento in cui suona.
+    const step = Math.max(1, Math.floor(buffer.sampleRate * 0.08));
+    for (let from = 0; from < data.length; from += step) {
+      let sum = 0; const to = Math.min(data.length, from + step);
+      for (let i = from; i < to; i += 1) sum += data[i] * data[i];
+      const level = Math.min(1, Math.sqrt(sum / (to - from)) * 5);
+      const timer = setTimeout(() => { outTimers.delete(timer); if (!ended) onOutLevel(level); }, Math.max(0, (at - ctx.currentTime + from / buffer.sampleRate) * 1000));
+      outTimers.add(timer);
+    }
     playing.add(node);
     node.onended = () => { playing.delete(node); if (!playing.size) setSpeaking(false); };
     setSpeaking(true);
