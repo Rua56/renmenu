@@ -294,9 +294,19 @@ export function createMissions(deps) {
   }
 
   // ——— passi della missione ———
+  // Il locale ha già approvato proprio questo menu (es. pubblicazione interrotta e pratica riaffidata):
+  // niente nuova anteprima, serve solo il SÌ di Riccardo.
+  const clientApproved = async (approval, draft) => approval?.status === 'approvata_cliente' && approval.snapshot_sha === await sha256Hex(draft.menu_json);
+  async function askPublishApproved(db, env, mission, menu) {
+    const next = await move(db, mission, 'attesa_si', 'Il locale aveva già approvato questa versione: attendo solo il SÌ di Riccardo.');
+    await tell(db, env, next, 'posso pubblicare?', `«${menu.nome || 'menu'}» è già approvato dal locale, nella versione attuale: non serve un’altra anteprima.\nPubblico il menu? Al tuo SÌ pubblico e verifico online.`,
+      [['SÌ, pubblica', `pub:${mission.id}`], ['Non ancora', `no:${mission.id}`]], 'importante');
+    return next;
+  }
   async function stepEntrusted(db, env, mission) {
     const jarvis = jarvisDb(db);
-    const { draft, request, menu } = await load(db, mission);
+    const { draft, request, menu, approval: before } = await load(db, mission);
+    if (await clientApproved(before, draft)) return askPublishApproved(db, env, mission, menu);
     // Pratica senza email del locale (es. aperta da Riccardo su Telegram): l'anteprima la approva lui, su Telegram.
     if (!request.client_email) return stepOwnerPreview(db, env, mission, draft, menu);
     let prepared;
@@ -454,8 +464,15 @@ export function createMissions(deps) {
           operationKey: `${draft.id}.r${draft.revision}`, expectedBaseSha: read.baseSha, expectedFileSha: read.exists ? read.sha : null,
           confirmation: 'CONFERMO APERTURA PR LIVE' }, env);
         ({ draft, request } = await load(db, mission));
-      } else if (operation.status !== 'pr_open') {
-        return stop(db, env, mission, `la PR è in uno stato da controllare (${operation.status})`);
+      } else if (operation.status !== 'pr_open' || Number(operation.revision) !== Number(draft.revision)) {
+        // Esito incerto (risposta di GitHub persa, due aperture insieme) o bozza solo rinumerata:
+        // Jarvis ritrova da solo la PR del branch esatto della riserva. Se non c'è, si ferma e lo dice.
+        try {
+          await action(jarvis, 'githubReconcilePr', { draftId: draft.id, confirmation: 'CONFERMO RICONCILIAZIONE PR LIVE' }, env);
+        } catch (error) {
+          return stop(db, env, mission, `la PR è in uno stato da controllare (${operation.status}: ${String(error?.message || 'errore').slice(0, 160)})`);
+        }
+        ({ draft, request } = await load(db, mission));
       }
       await action(jarvis, 'githubMergePr', { draftId: draft.id, revision: draft.revision, requestRevision: request.revision, confirmation: 'CONFERMO MERGE MENU APPROVATO' }, env);
     } catch (error) {
@@ -630,7 +647,10 @@ export function createMissions(deps) {
 
   async function tick(db, env) {
     let missions;
-    try { missions = await rows(db, "SELECT * FROM jarvis_missions WHERE status IN ('affidata','attesa_invio','attesa_cliente','pubblicazione','verifica') ORDER BY updated_at ASC LIMIT 5"); }
+    // Una pubblicazione appena partita dal SÌ su Telegram la porta avanti quel passaggio: l'orologio
+    // la riprende solo dopo un tentativo fallito o dopo 2 minuti (mai due aperture della stessa PR insieme).
+    const fresh = new Date(Date.parse(now()) - 120_000).toISOString();
+    try { missions = await rows(db, "SELECT * FROM jarvis_missions WHERE status IN ('affidata','attesa_invio','attesa_cliente','pubblicazione','verifica') AND NOT (status='pubblicazione' AND attempts=0 AND updated_at>?) ORDER BY updated_at ASC LIMIT 5", fresh); }
     catch (error) { if (/no such table/i.test(String(error?.message))) return []; throw error; }
     const out = [];
     for (const mission of missions) {
@@ -660,12 +680,15 @@ export function createMissions(deps) {
         .bind(stamp, stamp, approval.id).run();
       ({ approval, draft, request } = await load(db, mission));
     }
-    if (approval?.status !== 'risposta_ricevuta' || approval.snapshot_sha !== await sha256Hex(draft.menu_json))
+    // Approvazione del locale già registrata (pubblicazione ripresa): si va dritti alla pubblicazione.
+    const already = await clientApproved(approval, draft);
+    if (!already && (approval?.status !== 'risposta_ricevuta' || approval.snapshot_sha !== await sha256Hex(draft.menu_json)))
       return { ok: false, text: 'La bozza o la risposta sono cambiate: controlla in Approvazioni.' };
     const jarvis = jarvisDb(db);
     try {
-      await action(jarvis, 'decideClientReply', { id: approval.id, revision: approval.revision, decision: 'approva' }, env);
-      if (request.kind === 'nuovo') {
+      if (!already) await action(jarvis, 'decideClientReply', { id: approval.id, revision: approval.revision, decision: 'approva' }, env);
+      const fresh0 = await getOne(db, 'SELECT activation FROM publication_approvals WHERE id=?', approval.id);
+      if (request.kind === 'nuovo' && !fresh0?.activation) {
         const fresh = await getOne(db, 'SELECT * FROM publication_approvals WHERE id=?', approval.id);
         await action(jarvis, 'setActivation', { id: fresh.id, revision: fresh.revision, activation: ACTIVATION_BY_PLAN[request.plan], date: romeDate(),
           note: 'Confermata da Riccardo con il SÌ su Telegram.' }, env);
@@ -673,7 +696,9 @@ export function createMissions(deps) {
     } catch (error) { await stop(db, env, mission, `non riesco a registrare l’approvazione (${String(error?.message || 'errore').slice(0, 200)})`); return { ok: false, text: 'Mi sono fermato: dettagli nel prossimo messaggio.' }; }
     const next = await move(db, mission, 'pubblicazione', 'SÌ di Riccardo ricevuto: apro la PR e pubblico.');
     await auditedBatch(jarvis, [], 'jarvis.publish_ok', 'Riccardo ha confermato la pubblicazione (SÌ su Telegram).', mission.request_id);
-    const after = await stepPublishing(db, env, next);
+    let after = next;
+    try { after = await stepPublishing(db, env, next); }
+    catch (error) { if (!error?.quiet) throw error; } // l'orologio ha già preso il passaggio: va avanti lui
     return { ok: true, text: after.status === 'verifica' ? 'Pubblicato. Verifico online tra un minuto e ti scrivo.' : 'Ricevuto: sto pubblicando, ti aggiorno.' };
   }
 
@@ -1176,11 +1201,19 @@ export function createMissions(deps) {
     if (intent.intent === 'stato') { const report = await statusReport(db, env, intent.dettaglio || (/\b(dettagli\w*|complet\w*|report|resoconto|riepilogo|tutto)\b/i.test(said0) ? 'completo' : /buone\s+notizie|novit/i.test(said0) ? 'buone_notizie' : 'breve')); await answer(report.text, report.buttons || null, { keep: false }); return; }
     if (intent.intent === 'anteprima') { const shown = await voiceShowPreview(db, env, intent.locale, clues, utterance); await answer(shown.text, shown.buttons || null, { keep: shown.keep }); return; }
     if (intent.intent === 'pubblica') {
-      const waiting = await rows(db, "SELECT m.id,d.menu_json,d.slug FROM jarvis_missions m JOIN drafts d ON d.id=m.draft_id WHERE m.status='attesa_si' ORDER BY m.updated_at DESC LIMIT 10");
+      // Anche le pratiche ferme con l'approvazione del locale valida (pubblicazione interrotta) si possono riprendere.
+      const listed = await rows(db, `SELECT m.id,m.status,d.menu_json,d.slug,a.status AS approval_status,a.snapshot_sha FROM jarvis_missions m JOIN drafts d ON d.id=m.draft_id
+        LEFT JOIN publication_approvals a ON a.draft_id=d.id WHERE m.status='attesa_si' OR (m.status='ferma' AND a.status='approvata_cliente') ORDER BY m.updated_at DESC LIMIT 10`);
+      const waiting = [];
+      for (const m of listed) if (m.status === 'attesa_si' || (m.approval_status === 'approvata_cliente' && m.snapshot_sha === await sha256Hex(m.menu_json))) waiting.push(m);
       const named = waiting.map((m) => { let name = m.slug; try { name = JSON.parse(m.menu_json).nome || name; } catch {} return { ...m, name, menu_id: m.slug }; });
       const pick = intent.locale ? matchVenue(intent.locale, named).client : named.length === 1 ? named[0] : null;
       if (!named.length) { await answer('Al momento nessun menu aspetta il tuo SÌ, Riccardo.'); return; }
       if (!pick) { await answer(`Aspettano il tuo SÌ: ${named.map((m) => m.name).join(', ')}. Quale pubblico?`); return; }
+      if (pick.status === 'ferma') {
+        const stopped = await getOne(db, 'SELECT * FROM jarvis_missions WHERE id=?', pick.id);
+        await move(db, stopped, 'attesa_si', 'Riccardo ha chiesto di riprendere la pubblicazione: il locale aveva già approvato, attendo il SÌ.');
+      }
       await answer(`«${pick.name}» è pronto. Per sicurezza la pubblicazione la confermi tu col pulsante.`, [['SÌ, pubblica', `pub:${pick.id}`], ['Non ancora', `no:${pick.id}`]]);
       return;
     }

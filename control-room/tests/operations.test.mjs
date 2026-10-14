@@ -452,6 +452,43 @@ describe('private AI + GitHub operations (fakes only)', () => {
       const blocked = await runPrivateIntegrationAction(context(db, { GITHUB_PROVIDER: 'live', GITHUB_TOKEN: 'test-token', GITHUB_FETCH: uncertain.fetch }), 'githubOpenPr', uncertainPayload);
       assert.equal(blocked.needsReconciliation, true);
       assert.equal(uncertain.calls.length, callsBeforeRetry, 'uncertain write is never blindly retried');
+
+      // Jarvis riconcilia da solo: trova la PR sul branch esatto della riserva e segue la revisione
+      // della bozza solo rinumerata (stesso menu).
+      db.sqlite.prepare('UPDATE drafts SET revision=3 WHERE id=?').run('draft-uncertain');
+      const branch = getOne(db, 'SELECT branch_name FROM live_pr_operations WHERE draft_id=?', 'draft-uncertain').branch_name;
+      const found = prStatus({ merged: false, headRef: branch });
+      const lookup = githubFetch({ status: found });
+      const finder = async (input, init = {}) => {
+        const url = new URL(String(input));
+        if (url.pathname.endsWith('/pulls') && init.method === 'GET') { assert.equal(url.searchParams.get('head'), `Rua56:${branch}`); return response([found]); }
+        return lookup.fetch(input, init);
+      };
+      await assert.rejects(runPrivateIntegrationAction(context(db, { GITHUB_PROVIDER: 'live', GITHUB_TOKEN: 'test-token', GITHUB_FETCH: lookup.fetch }), 'githubReconcilePr',
+        { draftId: 'draft-uncertain', confirmation: 'CONFERMO RICONCILIAZIONE PR LIVE' }), (error) => error.status === 404, 'nessuna PR sul branch: si ferma');
+      const reconciled = await runPrivateIntegrationAction(context(db, { GITHUB_PROVIDER: 'live', GITHUB_TOKEN: 'test-token', GITHUB_FETCH: finder }), 'githubReconcilePr',
+        { draftId: 'draft-uncertain', confirmation: 'CONFERMO RICONCILIAZIONE PR LIVE' });
+      assert.equal(reconciled.status, 'pr_open');
+      const row = getOne(db, 'SELECT status,pr_number,revision FROM live_pr_operations WHERE draft_id=?', 'draft-uncertain');
+      assert.deepEqual({ ...row }, { status: 'pr_open', pr_number: 18, revision: 3 });
+
+      // Due aperture insieme (SÌ su Telegram e orologio): la seconda aspetta, non segna la riconciliazione.
+      const requestId3 = insertRequest(db, { id: 'request-race', clientId: 'client-3', kind: 'aggiornamento', status: 'approvata', revision: 3 });
+      db.sqlite.prepare('INSERT INTO drafts (id,request_id,slug,menu_json,status,checks_json,revision,created_at,updated_at) VALUES (?,?,?,?,?,?,?,?,?)')
+        .run('draft-race', requestId3, 'osteria-di-prova', JSON.stringify(menu()), 'pronta_pr', JSON.stringify(checks()), 2, now(), now());
+      await approveSeeded(db, 'draft-race', requestId3);
+      const racePayload = { ...payload, draftId: 'draft-race', revision: 2, requestRevision: 3, operationKey: 'operation-live-race' };
+      const race = githubFetch();
+      let release; const gate = new Promise((resolve) => { release = resolve; });
+      const slow = async (input, init) => { await gate; return race.fetch(input, init); };
+      const first = runPrivateIntegrationAction(context(db, { GITHUB_PROVIDER: 'live', GITHUB_TOKEN: 'test-token', GITHUB_FETCH: slow }), 'githubOpenPr', racePayload);
+      for (let i = 0; i < 20 && !getOne(db, 'SELECT id FROM live_pr_operations WHERE draft_id=?', 'draft-race'); i += 1) await new Promise((r) => setTimeout(r, 5));
+      await assert.rejects(runPrivateIntegrationAction(context(db, { GITHUB_PROVIDER: 'live', GITHUB_TOKEN: 'test-token', GITHUB_FETCH: race.fetch }), 'githubOpenPr', racePayload),
+        (error) => error.status === 409 && /già in corso/.test(error.message));
+      assert.equal(getOne(db, 'SELECT status FROM live_pr_operations WHERE draft_id=?', 'draft-race').status, 'reserved');
+      assert.equal(race.calls.length, 0, 'la seconda apertura non scrive su GitHub');
+      release();
+      assert.equal((await first).status, 'pr_open', 'la prima apertura finisce normalmente');
     } finally { db.close(); }
   });
 
