@@ -8,7 +8,7 @@ import { notesSummary } from './notes.js';
 import { deletionPlan } from './delete-request.js';
 import { missingPriceNames, reviewIssues } from './editorial.js';
 import { allExtras } from './extras.js';
-import { assessReply, proposeReplyChanges, referenceCode, sha256Hex } from './approvals.js';
+import { assessReply, proposeReplyChanges, referenceCode, sha256Hex, stripQuoted } from './approvals.js';
 import { sendOwnerNotification } from './owner-notifications.js';
 import { clientMailConfig, sendClientMail } from './client-mail.js';
 import { briefingDue, buildBriefing, romeDay } from './briefing.js';
@@ -398,7 +398,7 @@ export function createMissions(deps) {
     // Restano innocue solo le conferme di cortesia ("perfetto così", "va benissimo").
     const doubts = proposals.filter((entry) => entry.type === 'manuale' && !HARMLESS.test(entry.source || ''));
     const quote = reply.trim().replace(/\s+/g, ' ').slice(0, 300);
-    if (doubts.length) return stop(db, env, mission, `nella risposta del locale c’è qualcosa che non so applicare da solo: «${String(doubts[0].source).slice(0, 200)}»${doubts[0].note ? ` (${doubts[0].note})` : ''}`);
+    if (doubts.length) return clientEditsByAi(db, env, mission, approval, reply, venue, `nella risposta del locale c’è qualcosa che non so applicare da solo: «${String(doubts[0].source).slice(0, 200)}»${doubts[0].note ? ` (${doubts[0].note})` : ''}`);
     if (assessment.suggestion === 'approvazione' && !changes.length) {
       const request = await getOne(db, 'SELECT kind,plan FROM requests WHERE id=?', mission.request_id);
       const activation = request.kind === 'nuovo' ? `\nAttivo: ${PLAN_LABEL[request.plan]} da oggi (${romeDate()}).` : '';
@@ -408,7 +408,7 @@ export function createMissions(deps) {
       return next;
     }
     const unclear = !changes.length || changes.some((entry) => !AUTO_CHANGES.has(entry.type));
-    if (unclear) return stop(db, env, mission, `risposta del locale da valutare: «${quote}»`);
+    if (unclear) return clientEditsByAi(db, env, mission, approval, reply, venue, `risposta del locale da valutare: «${quote}»`);
     if (mission.rounds >= MAX_ROUNDS) return stop(db, env, mission, `già ${MAX_ROUNDS} giri di modifiche: meglio che lo senta tu`);
     const jarvis = jarvisDb(db);
     try {
@@ -420,6 +420,23 @@ export function createMissions(deps) {
     const next = await move(db, mission, 'affidata', 'Modifiche applicate; preparo la nuova anteprima.', { rounds: mission.rounds + 1 });
     await tell(db, env, next, 'modifiche applicate', `«${venue}» ha chiesto modifiche e le ho applicate:\n- ${changes.map(describeChange).join('\n- ')}\nInvio la nuova anteprima al locale.`);
     return stepEntrusted(db, env, next);
+  }
+  // Correzioni scritte a parole che le regole fisse non leggono («mancano le lasagne a 11 €…»): il modello
+  // gratuito le traduce in modifiche della bozza, con i soliti controlli (nomi e prezzi solo dal testo).
+  // Jarvis NON rimanda l'anteprima: Riccardo guarda la bozza, sistema il resto (foto, schede…) e la riaffida.
+  async function clientEditsByAi(db, env, mission, approval, reply, venue, why) {
+    let out;
+    try { out = await editDraftFromClient(db, env, mission.request_id, stripQuoted(reply), 'email'); }
+    catch (error) { out = { applied: false, text: String(error?.message || 'errore') }; }
+    const current = await getOne(db, 'SELECT * FROM jarvis_missions WHERE id=?', mission.id);
+    // Nessuna modifica applicata: la risposta resta da decidere a Riccardo, come prima.
+    if (!out.applied) return ACTIVE.includes(current.status) ? stop(db, env, current, `${why}. Ho provato a leggerla io, senza riuscirci: ${String(out.text).slice(0, 200)}`) : current;
+    // Le modifiche sono in bozza: la risposta del locale è gestita, la pratica si riaffida dopo la revisione.
+    try { const fresh = await getOne(db, 'SELECT id,revision FROM publication_approvals WHERE id=?', approval.id); await action(jarvisDb(db), 'decideClientReply', { id: fresh.id, revision: fresh.revision, decision: 'modifiche' }, env); }
+    catch { /* resta in Approvazioni: Riccardo la chiude lui */ }
+    const quote = stripQuoted(reply).replace(/\s+/g, ' ').slice(0, 400);
+    await tell(db, env, current, 'modifiche del locale in bozza', `«${venue}» ha chiesto modifiche all’anteprima (rif. ${approval.reference_code}): «${quote}»\n\n${out.text}\n\nQuello che non è una modifica precisa (foto, schede, richieste generiche) non l’ho toccato: rileggi la risposta, sistema il resto in Revisione e riaffidamela.`, out.buttons, 'importante');
+    return current;
   }
   async function stepPublishing(db, env, mission) {
     const jarvis = jarvisDb(db);

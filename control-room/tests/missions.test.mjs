@@ -65,6 +65,7 @@ const action = (db, type, payload) => call(db, 'actions', { type, payload });
 import { buildImportBatch, buildReplyBatch } from '../staging/gmail-import.mjs';
 import { ONLINE_GET_SQL, OUTBOX_GET_SQL, outboxSent } from '../staging/jarvis-outbox.mjs';
 import { missions } from '../cloudflare/functions/control-room/api/[[route]].js';
+import { proposeReplyChanges } from '../cloudflare/functions/_lib/approvals.js';
 
 const TOKEN = '123456789:AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA';
 const telegramCalls = [];
@@ -211,6 +212,32 @@ describe('Jarvis autonomo: dalla bozza affidata alla pubblicazione', () => {
       assert.ok(state.notifications.some((n) => n.subject === 'Jarvis · serve una tua decisione'));
       const again = await action(db, 'entrustToJarvis', { draftId: state.drafts[0].id, revision: state.drafts[0].revision, confirmation: 'AFFIDO A JARVIS' });
       assert.equal(again.status, 422, 'la risposta è ancora da decidere: Riccardo la valuta prima');
+    } finally { db.close(); }
+  });
+
+  it('correzioni scritte a parole: il modello le mette in bozza, la firma non conta, l’anteprima non riparte da sola', async () => {
+    const db = database();
+    try {
+      await run(db, buildImportBatch(event('m4', 'Nuovo menu', SOURCE.replace('Missione', 'Parole'))));
+      await action(db, 'runAutopilot', {});
+      const draft = (await call(db, 'state')).body.drafts[0];
+      await action(db, 'entrustToJarvis', { draftId: draft.id, revision: draft.revision, confirmation: 'AFFIDO A JARVIS' });
+      const queued = await outbox(db);
+      const sent = outboxSent(queued.reference_code, 'g');
+      await db.prepare(sent.sql).bind(...sent.params).run();
+      await tick(db);
+      await clientReply(db, queued.reference_code, 'r5', 'Buongiorno,\n\ndal menu mancano le Lasagne della casa (11,00 €)\ne non vediamo le foto.\n\nMarta Zorzut\nOsteria Parole');
+      const ai = { run: async (model, input) => input?.response_format?.json_schema?.properties?.operazioni
+        ? { response: { operazioni: [{ tipo: 'aggiungi', si: 0, nome: 'Lasagne della casa', prezzo: '11,00' }], dubbio: '' } } : { response: 'ok' } };
+      await missions.tick(db, { ...env, DB: db, ...accessEnv, AI: ai });
+      const state = (await call(db, 'state')).body;
+      const menu = JSON.parse((await db.prepare('SELECT menu_json FROM drafts').bind().first()).menu_json);
+      assert.ok(menu.sezioni[0].voci.some((v) => /lasagne/i.test(v.nome.it) && v.prezzo === '11,00'), 'piatto aggiunto in bozza');
+      assert.equal((await db.prepare('SELECT status FROM publication_approvals').bind().first()).status, 'modifiche_richieste');
+      assert.notEqual(state.missions[0].status, 'attesa_invio', 'nessuna nuova anteprima senza Riccardo');
+      assert.ok(state.notifications.some((n) => n.subject === 'Jarvis · modifiche del locale in bozza'));
+      // «Approvo» con la firma sotto: è un'approvazione, non una modifica da gestire a mano.
+      assert.deepEqual(proposeReplyChanges('Approvo.\n\nLuca\nEnoteca Il Calice Storto', menu), []);
     } finally { db.close(); }
   });
 
