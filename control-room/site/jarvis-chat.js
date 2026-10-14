@@ -45,8 +45,20 @@ let phase = 'idle'; // idle | listening | thinking | speaking
 let live = null; // dialogo dal vivo in corso (jarvis-live.js)
 
 let lastNote = '';
+// Il reattore (home e foglio della chat) segue Jarvis: html[data-jarvis] e i livelli di voce --jv-lvl / --jv-out.
+const root = globalThis.document?.documentElement;
+function setLevel(value) { root?.style.setProperty('--jv-lvl', Number(value || 0).toFixed(2)); }
+function setOutLevel(value) {
+  if (!root) return;
+  if (value === null) { delete root.dataset.jarvisOut; root.style.setProperty('--jv-out', '0'); return; }
+  root.dataset.jarvisOut = '1';
+  root.style.setProperty('--jv-out', Number(value).toFixed(2));
+}
 function setPhase(next, note = '') {
   phase = next;
+  if (root) { if (next === 'idle') delete root.dataset.jarvis; else root.dataset.jarvis = next; }
+  if (next !== 'listening') setLevel(0);
+  if (next !== 'speaking') setOutLevel(null);
   if (!sheet) return;
   sheet.dataset.phase = next;
   const status = sheet.querySelector('#chat-status');
@@ -78,7 +90,7 @@ function renderLog() {
 
 function render() {
   sheet.innerHTML = `<div class="sheet-head"><strong>Parla con Jarvis</strong><button type="button" data-action="ask-close">Chiudi</button></div>
-    <div class="chat-core" aria-hidden="true"><span></span></div>
+    <div class="chat-core reactor" aria-hidden="true"><span class="r1"></span><span class="r2"></span><span class="r3"></span><span class="core"></span></div>
     <p class="chat-status" id="chat-status" role="status"></p>
     <div class="log" id="chat-log" aria-live="polite"></div>
     <div class="quick chat-quick">${SUGGESTIONS.map((s) => `<button type="button" data-chat-suggest="${escapeHtml(s)}">${escapeHtml(s)}</button>`).join('')}</div>
@@ -159,7 +171,7 @@ function stopListening() {
   listenTurn += 1;
   stopHearing(false);
   if (recognition) { const old = recognition; recognition = null; old.onend = null; old.onerror = null; old.onresult = null; old.abort(); }
-  if (sheet) sheet.style.setProperty('--lvl', '0');
+  setLevel(0);
 }
 function quiet(note) {
   // In «mani libere» riprova un paio di volte prima di smettere: magari stavi pensando.
@@ -178,7 +190,7 @@ async function listenWithEar() {
   setPhase('listening');
   let blob = null;
   try {
-    blob = await hear({ onLevel: (level) => sheet?.style.setProperty('--lvl', level.toFixed(2)) });
+    blob = await hear({ onLevel: setLevel });
   } catch (error) {
     if (turn !== listenTurn) return;
     // Il telefono ha messo in pausa il microfono dopo aver parlato: basta un tocco per ripartire,
@@ -247,7 +259,8 @@ function startLiveDialog() {
   const LIVE_NOTES = { connecting: 'Collego Jarvis dal vivo…', listening: 'Dal vivo: parla pure', speaking: 'Jarvis parla… interrompilo quando vuoi' };
   live = startLive({
     session: jarvisLiveSession,
-    onLevel: (level) => sheet?.style.setProperty('--lvl', level.toFixed(2)),
+    onLevel: setLevel,
+    onOutLevel: setOutLevel,
     onUser: (text) => push({ role: 'user', text }),
     onAgent: (text) => push({ role: 'jarvis', kind: 'text', text }),
     onState: (state, note) => {
@@ -401,6 +414,6 @@ export function closeChat() {
   stopLiveDialog();
   handsFree = false;
   stopListening(); stopSpeaking();
-  phase = 'idle';
+  setPhase('idle');
   if (sheet) sheet.hidden = true;
 }
