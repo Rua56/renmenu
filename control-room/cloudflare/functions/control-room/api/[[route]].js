@@ -27,6 +27,8 @@ import { MAX_ROUNDS, MAX_TRIES, PREP_KEY, PREP_STEPS, enrollPrep, nextStep, pars
 import { understandClientRequest } from '../../_lib/request-ai.js';
 import { createMissions } from '../../_lib/missions.js';
 import { spokenText, telegramCapture } from '../../_lib/cr-chat.js';
+import { previewCard } from '../../_lib/menu-diff.js';
+import { pickButton } from '../../_lib/short-reply.js';
 import { noteStatement } from '../../_lib/memory.js';
 import { THEMES, proposeTheme, themeFromText } from '../../_lib/themes.js';
 import { dropRepeatedPages, notesSummary, reviewNotes, structureNotes } from '../../_lib/notes.js';
@@ -375,6 +377,26 @@ export async function enrollAutoPrep(db, requestId) {
   if (!draft) return false;
   return enrollPrep({ get: missions.setting, put: missions.putSetting }, db, { draftId: draft.id, requestId, plan: draft.plan });
 }
+// Jarvis prepara da solo anche le bozze rimaste ferme in Revisione (fatte a mano o prima della preparazione
+// automatica): dopo 3 ore senza modifiche completa lingue, schede e foto e poi chiede solo «la mando al locale?».
+// Una volta per bozza, una per giro, solo pratiche nuove con il piano già deciso. Nulla parte senza il SÌ di Riccardo.
+export const IDLE_PREP_MS = 3 * 3600_000;
+export async function enrollIdleDrafts(db, at = Date.now()) {
+  const seenKey = 'prep_seen';
+  let seen = []; try { seen = JSON.parse(await missions.setting(db, seenKey) || '[]'); } catch { seen = []; }
+  if (!Array.isArray(seen)) seen = [];
+  const queued = parsePrep(await missions.setting(db, PREP_KEY));
+  const list = await rows(db, `SELECT d.id,d.request_id,r.plan FROM drafts d JOIN requests r ON r.id=d.request_id
+    WHERE d.status IN ('bozza','revisione') AND r.kind='nuovo' AND r.plan IN ('standard','annuale','premium') AND r.status NOT IN ('completata','archiviata','chiusa')
+    AND COALESCE(r.is_ai_test_fixture,0)=0 AND d.updated_at<=? AND d.updated_at>=? AND NOT EXISTS (SELECT 1 FROM jarvis_missions m WHERE m.request_id=d.request_id)
+    ORDER BY d.updated_at DESC LIMIT 20`, new Date(at - IDLE_PREP_MS).toISOString(), new Date(at - 14 * 86_400_000).toISOString()).catch(() => []);
+  const next = list.find((d) => !seen.includes(d.id) && !queued[d.id]);
+  if (!next) return null;
+  await missions.putSetting(db, seenKey, JSON.stringify([...seen, next.id].slice(-200)));
+  const ok = await enrollPrep({ get: missions.setting, put: missions.putSetting }, db, { draftId: next.id, requestId: next.request_id, plan: next.plan }, new Date(at - 10 * 60_000).toISOString());
+  if (ok) await auditedBatch({ prepare: (sql) => db.prepare(sql), batch: (s) => db.batch(s), actor: 'jarvis' }, [], 'jarvis.prep_idle', 'Bozza ferma in Revisione da più di 3 ore: Jarvis completa da solo lingue, schede e foto, poi chiede se mandare l’anteprima.', next.request_id).catch(() => {});
+  return ok ? next.id : null;
+}
 // Foto del cliente e delle cantine al posto proposto (stessa scelta che Riccardo vede in Revisione).
 // Solo quelle già leggere (fino a 900 KB): le più grandi le riduce il telefono di Riccardo in Revisione.
 async function autoPlaceMedia(db, env, draft) {
@@ -602,13 +624,23 @@ const FAKE_TG_TOKEN = `1000000:${'x'.repeat(35)}`;
 export async function jarvisAsk(env, input = {}) {
   const db = env.DB;
   const text = String(input.text || '').replace(/\s+/g, ' ').trim().slice(0, 1000);
-  const press = String(input.press || '').trim().slice(0, 64);
+  let press = String(input.press || '').trim().slice(0, 64);
   assert(text || press, 'Scrivi o di’ qualcosa a Jarvis.');
   const chat = await missions.setting(db, 'telegram_chat_id');
-  assert(chat, 'Jarvis non ha ancora un proprietario: collega prima Telegram da Sistema → Notifiche.', 409);
+  assert(chat, 'Jarvis non ha ancora un proprietario: collega prima Telegram da Strumenti → Collegamenti e voce di Jarvis.', 409);
   let offered = [];
   try { offered = JSON.parse(await missions.setting(db, 'cr_buttons') || '[]'); } catch { offered = []; }
-  if (press) assert(Array.isArray(offered) && offered.includes(press), 'Questo pulsante non è più valido: chiedi di nuovo a Jarvis.', 409);
+  if (!Array.isArray(offered)) offered = [];
+  if (press) assert(offered.includes(press), 'Questo pulsante non è più valido: chiedi di nuovo a Jarvis.', 409);
+  // Risposta a voce a una domanda precisa (briefing, «Pronto per te»): «sì», «no», «la seconda» valgono come il
+  // tocco su quei pulsanti. Pubblicare resta un tocco: «sì» non pubblica mai (vedi short-reply.js).
+  const choose = !press && Array.isArray(input.choose) ? input.choose.filter((b) => Array.isArray(b) && typeof b[0] === 'string' && offered.includes(String(b[1]))).map(([label, data]) => [label.slice(0, 80), String(data)]).slice(0, 8) : [];
+  if (choose.length) {
+    const picked = pickButton(text, choose);
+    if (picked?.tapOnly) return { messages: [{ kind: 'text', text: `Per sicurezza «${picked.tapOnly}» lo confermi tu toccando il pulsante.`, buttons: choose, say: `Per sicurezza ${picked.tapOnly} lo confermi tu toccando il pulsante.`, picked: 'tap' }] };
+    if (picked?.data) press = picked.data;
+  }
+  const started = now();
   const capture = telegramCapture((...args) => globalThis.fetch(...args));
   const talk = createMissions({ ...missionDeps, fetchImpl: capture.fetchImpl, captured: true });
   // Senza token Telegram Jarvis non «manda» nulla: un token finto basta, tanto le chiamate restano qui.
@@ -617,10 +649,47 @@ export async function jarvisAsk(env, input = {}) {
     ? { callback_query: { id: `cr-${uid()}`, data: press, message: { chat: { id: chat } } } }
     : { message: { chat: { id: chat, type: 'private' }, text } });
   const fresh = capture.messages.flatMap((m) => (m.buttons || []).map(([, data]) => data));
-  if (fresh.length || press) await missions.putSetting(db, 'cr_buttons', JSON.stringify([...new Set([...fresh, ...offered.filter((d) => d !== press)])].slice(0, 40)));
+  if (fresh.length || press) await missions.putSetting(db, 'cr_buttons', JSON.stringify([...new Set([...fresh, ...offered.filter((d) => d !== press)])].slice(0, 60)));
   const messages = capture.messages.map((m) => ({ ...m, say: m.kind === 'text' || m.kind === 'note' ? spokenText(m.text) : '' }));
   if (!messages.length) messages.push({ kind: 'text', text: 'Fatto.', buttons: [], say: 'Fatto.' });
-  return { messages };
+  // Anteprima dal vivo: il menu come lo vedrà il cliente, con la modifica appena fatta segnata.
+  const card = await liveCard(db, env, { started, press }).catch(() => null);
+  if (card) {
+    const owner = messages.find((m) => (m.buttons || []).some(([, data]) => /^(?:undo|peek|affq):/.test(data) && data.endsWith(card.draftId))) || messages.findLast((m) => m.kind === 'text') || messages[messages.length - 1];
+    owner.card = card;
+  }
+  return { messages, ...(press && input.choose ? { pressed: press } : {}) };
+}
+// «Pronto per te» e briefing a voce: le decisioni che Jarvis ha già preparato, ognuna con i suoi pulsanti.
+// I pulsanti valgono come quelli offerti nella conversazione (stesso elenco cr_buttons).
+export async function jarvisReady(env) {
+  const db = env.DB;
+  const items = (await missions.readyItems(db, env)).map((item) => ({ kind: item.kind, requestId: item.requestId || null, text: item.text, say: spokenText(item.text), buttons: (item.buttons || []).map(([label, data]) => [String(label), String(data)]) }));
+  const fresh = items.flatMap((item) => item.buttons.map(([, data]) => data));
+  if (fresh.length) {
+    let offered = []; try { offered = JSON.parse(await missions.setting(db, 'cr_buttons') || '[]'); } catch { offered = []; }
+    await missions.putSetting(db, 'cr_buttons', JSON.stringify([...new Set([...fresh, ...(Array.isArray(offered) ? offered : [])])].slice(0, 60)));
+  }
+  return { items };
+}
+/** La bozza toccata da questa richiesta, confrontata con com'era prima (o con il menu online). */
+async function liveCard(db, env, { started, press }) {
+  const DRAFT = 'SELECT d.id,d.request_id,d.slug,d.menu_json,d.updated_at,r.kind,r.created_at AS request_at,c.name AS client_name FROM drafts d JOIN requests r ON r.id=d.request_id LEFT JOIN clients c ON c.id=r.client_id';
+  if (press && !press.startsWith('peek:')) return null;
+  const draft = press ? await getOne(db, `${DRAFT} WHERE d.id=?`, press.slice(5)) : await getOne(db, `${DRAFT} WHERE d.updated_at>=? ORDER BY d.updated_at DESC LIMIT 1`, started);
+  if (!draft) return null;
+  const menu = JSON.parse(draft.menu_json || '{}');
+  const title = /^nuovo contatto/i.test(draft.client_name || '') ? '' : draft.client_name;
+  if (press) return previewCard({ menu, title, draftId: draft.id, requestId: draft.request_id, mode: 'bozza' });
+  let before = null, mode = 'modifica';
+  let undo = null; try { undo = JSON.parse(await missions.setting(db, 'draft_undo') || 'null'); } catch {}
+  if (undo?.draftId === draft.id && String(undo.at) >= started) before = JSON.parse(undo.menu_json || 'null');
+  else if (String(draft.request_at) >= started && ['aggiornamento', 'prezzo'].includes(draft.kind) && String(env?.GITHUB_PROVIDER || 'mock').trim() === 'live') {
+    const live = await readCurrentMenu(env, draft.slug, typeof (env?.GITHUB_FETCH || env?.fetch) === 'function' ? { fetch: env.GITHUB_FETCH || env.fetch } : {}).catch(() => null);
+    if (live?.exists) { before = live.menu; mode = 'online'; }
+  } else if (String(draft.request_at) >= started) mode = 'nuova';
+  if (!before && mode === 'modifica') mode = 'bozza';
+  return previewCard({ menu, before, title, draftId: draft.id, requestId: draft.request_id, mode });
 }
 // Orecchio di Jarvis per la Control Room: la frase registrata (WAV) diventa testo con Whisper su Workers AI.
 export async function jarvisHear(env, bytes) {
@@ -2043,6 +2112,7 @@ export async function onRequest(context) {
         return answer(await jarvisHear(context.env, bytes));
       }
       if (segments.join('/') === 'jarvis/live') return answer(await jarvisLive(context.env));
+      if (segments.join('/') === 'jarvis/pronto') return answer(await jarvisReady(context.env));
       if (segments[0] === 'jarvis' && ['ask', 'voice'].includes(segments[1]) && segments.length === 2) {
         assert(request.headers.get('content-type')?.startsWith('application/json'), 'Serve application/json.', 415);
         assert(Number(request.headers.get('content-length') || 0) <= 20_000, 'Messaggio troppo lungo.');

@@ -2,6 +2,12 @@
 
 Si aggiunge una voce a ogni pull request che cambia un comportamento di Jarvis o della Control Room, insieme all'aggiornamento di README, policy e funzionamento quando serve. Le voci più recenti stanno in alto.
 
+## 15 ottobre 2026
+
+- **Anteprima dal vivo nella conversazione:** quando chiedi a Jarvis una modifica («al Tralcio il frico costa 14», «aggiungi la gubana nei dolci»), sotto la risposta compare il menu come lo vede il cliente sul telefono, con le voci cambiate evidenziate (prezzo vecchio barrato, «nuovo», «tolto», nome cambiato) e i tasti di sempre (Annulla, Affida a Jarvis, Apri in Revisione). Vale anche per gli aggiornamenti di menu già online (confronto con il menu pubblicato) e per «Mostrami la bozza». Solo confronto di dati, nessun costo (`_lib/menu-diff.js`).
+- **Briefing a voce:** «fammi il briefing» (o il tasto «▶ Briefing a voce» nella home) e Jarvis legge una alla volta le decisioni che ha preparato; rispondi «sì», «no», «salta» o «basta», a voce o con i pulsanti. «Sì» vale come il tocco, tranne pubblicare, che resta un tocco sul pulsante. All'apertura il saluto dice quante decisioni sono pronte.
+- **Pronto per te:** in cima alla conversazione ci sono le cose che Jarvis ha già preparato, ognuna con i suoi pulsanti: menu da pubblicare, promemoria ai locali già scritti, risposte ai clienti pronte da mandare, bozze da affidare, pratiche ferme, proposte. In più Jarvis prepara da solo (lingue, schede, foto) le bozze di pratiche nuove con il piano deciso ferme in Revisione da più di 3 ore, poi chiede solo «la mando al locale?». Niente parte senza il tuo SÌ.
+
 ## 14 ottobre 2026
 
 - **Pubblicazione senza blocchi:** al SÌ su Telegram Jarvis e l'orologio potevano aprire la PR del menu nello stesso momento; il secondo vedeva la riserva del primo, la segnava «da riconciliare» e la pratica si fermava anche se la PR era aperta e giusta (successo con Osteria Al Tralcio). Ora l'orologio lascia la pubblicazione appena partita a chi l'ha avviata, una seconda apertura aspetta invece di bloccare, e se una PR resta «da riconciliare» Jarvis la ritrova da solo sul branch esatto della riserva (anche quando la bozza ha solo cambiato numero di versione con lo stesso menu). Se il locale ha già approvato quella versione, riaffidare la pratica o scrivere «pubblica …» chiede solo il SÌ, senza una nuova anteprima. Nei vini «Nome - Cantina» vale la cantina scritta dal locale, non quella trovata online. Nuovi test.

@@ -71,13 +71,43 @@ export async function uploadMediaImage(mediaId, blob) {
 export async function askJarvis(payload) {
   requireAuthorizedHost();
   if (isDemoMode) {
+    if (payload.choose?.length) {
+      const text = `Demo: per «${String(payload.text || '').slice(0, 80)}» avrei scelto il pulsante giusto. Qui non parte nulla.`;
+      return { messages: [{ kind: 'text', text, say: text, buttons: [] }] };
+    }
     const text = payload.press ? 'Demo: pulsante ricevuto, nessuna azione eseguita.' : `Demo: ho capito «${String(payload.text || '').slice(0, 120)}». Nella Control Room vera ti risponde Jarvis con lo stesso cervello di Telegram.`;
-    return { messages: [{ kind: 'text', text, say: text, buttons: payload.press ? [] : [['Va bene', 'demo:ok']] }] };
+    // Nella demo una correzione di prezzo mostra l'anteprima dal vivo finta.
+    const card = !payload.press && /\b(?:costa|costano|metti|aggiungi|togli|prezzo)\b/i.test(String(payload.text || '')) ? DEMO_CARD : null;
+    return { messages: [{ kind: 'text', text, say: text, buttons: payload.press ? [] : [['Annulla', 'demo:undo'], ['Affida a Jarvis', 'demo:ok']], ...(card ? { card } : {}) }] };
   }
   const response = await fetch('/control-room/api/jarvis/ask', {
     method: 'POST', credentials: 'same-origin',
     headers: { 'Content-Type': 'application/json', Accept: 'application/json' },
     body: JSON.stringify(payload)
+  });
+  return parseResponse(response);
+}
+
+const DEMO_CARD = {
+  title: 'Osteria Demo', draftId: 'demo', requestId: '', mode: 'modifica', premium: false, total: 2,
+  lines: ['Frico con polenta: € 12 → € 14', 'Nuova voce in Dolci: Gubana della casa (€ 6)'],
+  sections: [
+    { name: 'Secondi', items: [{ n: 'Frico con polenta', p: '€ 14', mark: 'prezzo', was: '€ 12', d: 'Patate, formaggio Montasio' }, { n: 'Cevapcici', p: '€ 13' }] },
+    { name: 'Dolci', items: [{ n: 'Strudel di mele', p: '€ 5' }, { n: 'Gubana della casa', p: '€ 6', mark: 'nuovo' }] }
+  ],
+  more: 0
+};
+const DEMO_READY = [
+  { kind: 'pubblica', text: '«Osteria Demo» aspetta il tuo SÌ per la pubblicazione. Vuoi che pubblichi?', say: 'Osteria Demo aspetta il tuo SÌ per la pubblicazione. Vuoi che pubblichi?', buttons: [['SÌ, pubblica', 'demo:pub'], ['Non ancora', 'demo:no']] },
+  { kind: 'risposta', text: '«Bar Demo» ha scritto: «Quando è pronto il menu?»\n\nTi propongo questa risposta: «Buongiorno, la bozza è pronta: vi mando l’anteprima entro oggi.»\n\nParte solo se tocchi «Manda».', say: 'Bar Demo ha scritto: quando è pronto il menu? Ti propongo questa risposta: la bozza è pronta, vi mando l’anteprima entro oggi. Parte solo se tocchi Manda.', buttons: [['Manda', 'demo:send'], ['Cambia', 'demo:edit'], ['Non rispondere', 'demo:skip']] }
+];
+/** «Pronto per te» e briefing a voce: le decisioni che Jarvis ha già preparato, ognuna con i suoi pulsanti. */
+export async function jarvisReady() {
+  requireAuthorizedHost();
+  if (isDemoMode) return { items: DEMO_READY };
+  const response = await fetch('/control-room/api/jarvis/pronto', {
+    method: 'POST', credentials: 'same-origin',
+    headers: { 'Content-Type': 'application/json', Accept: 'application/json' }, body: '{}'
   });
   return parseResponse(response);
 }

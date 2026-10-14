@@ -1539,18 +1539,21 @@ export function createMissions(deps) {
     body: ['Buongiorno,', '', `vi scrivo per sapere se avete avuto modo di guardare l’anteprima del menu digitale di ${venue}:`, approval.preview_url || '', '',
       'Se è tutto corretto, rispondete a questa email scrivendo «Approvo». Se qualcosa va cambiato, indicatelo nella risposta e prepariamo una nuova anteprima.', '', 'Grazie,', 'Riccardo · RenMenu', '', `Riferimento anteprima: ${approval.reference_code}`].join('\n')
   });
-  async function morningProposals(db, env) {
-    const chat = await setting(db, 'telegram_chat_id');
-    if (!chat || !telegramReady(env)) return [];
+  /**
+   * Le decisioni che aspettano Riccardo, ognuna con l'azione già pronta (un tocco): pubblicazioni in attesa del SÌ,
+   * promemoria ai locali già scritti, pratiche ferme, bozze da affidare, risposte ai clienti preparate da Jarvis.
+   * mark: solo il giro del mattino conta i promemoria proposti (così non li ripropone ogni giorno).
+   */
+  async function decisionItems(db, env, { mark = false } = {}) {
     const items = [];
     const safe = (sql, ...args) => Promise.resolve().then(() => rows(db, sql, ...args)).catch(() => []);
     const missionRows = await safe("SELECT m.id,m.status,m.note,m.request_id,m.draft_id,m.reminded_at,m.attempts,m.revision,m.step_started_at,d.menu_json,d.slug FROM jarvis_missions m JOIN drafts d ON d.id=m.draft_id WHERE m.status IN ('attesa_si','ferma','attesa_cliente')");
-    const nameOf = (row) => { try { return JSON.parse(row.menu_json).nome || row.slug; } catch { return row.slug; } };
+    const nameOf = (row) => { try { const nome = JSON.parse(row.menu_json).nome; return (typeof nome === 'string' ? nome : nome?.it) || row.slug; } catch { return row.slug; } };
     for (const m of missionRows.filter((x) => x.status === 'attesa_si')) {
       const approval = await Promise.resolve().then(() => getOne(db, 'SELECT snapshot_sha FROM publication_approvals WHERE draft_id=?', m.draft_id)).catch(() => null);
       const stale = approval?.snapshot_sha && approval.snapshot_sha !== await sha256Hex(m.menu_json);
-      items.push(stale ? { text: `«${nameOf(m)}»: la bozza è cambiata dopo l’anteprima, il SÌ non vale più. Guardala e riaffidamela.`, buttons: [['Mostrami la bozza', `peek:${m.draft_id}`], ['Affida a Jarvis', `affq:${m.draft_id}`]] }
-        : { text: `«${nameOf(m)}» aspetta il tuo SÌ per la pubblicazione. Vuoi che pubblichi?`, buttons: [['SÌ, pubblica', `pub:${m.id}`], ['Non ancora', `no:${m.id}`]] });
+      items.push(stale ? { kind: 'ferma', requestId: m.request_id, text: `«${nameOf(m)}»: la bozza è cambiata dopo l’anteprima, il SÌ non vale più. Guardala e riaffidamela.`, buttons: [['Mostrami la bozza', `peek:${m.draft_id}`], ['Affida a Jarvis', `affq:${m.draft_id}`]] }
+        : { kind: 'pubblica', requestId: m.request_id, text: `«${nameOf(m)}» aspetta il tuo SÌ per la pubblicazione. Vuoi che pubblichi?`, buttons: [['SÌ, pubblica', `pub:${m.id}`], ['Non ancora', `no:${m.id}`]] });
     }
     for (const m of missionRows.filter((x) => x.status === 'attesa_cliente')) {
       const approval = await Promise.resolve().then(() => getOne(db, "SELECT * FROM publication_approvals WHERE draft_id=? AND status='anteprima_inviata' AND sent_at IS NOT NULL", m.draft_id)).catch(() => null);
@@ -1561,21 +1564,40 @@ export function createMissions(deps) {
       if (Number(done?.n) >= 2 || m.attempts >= 3 || Date.now() - anchor < wait) continue;
       const mail = reminderDraft(nameOf(m), approval);
       const days = Math.floor((Date.now() - Date.parse(approval.sent_at)) / DAY_MS);
-      await db.prepare('UPDATE jarvis_missions SET attempts=attempts+1,reminded_at=?,updated_at=? WHERE id=? AND revision=?').bind(now(), now(), m.id, m.revision).run();
-      items.push({ text: `«${nameOf(m)}» non ha risposto all’anteprima da ${days} giorni. Ti propongo questo promemoria, da ${senderName(env)}:\n\n«${mail.body.split('\n').slice(0, 6).join(' ').replace(/\s+/g, ' ')}»\n\nLo mando solo se tocchi il pulsante.`, buttons: [['Manda il promemoria', `soll:${m.id}`], ['Aspetto ancora', 'sollno:x']] });
+      if (mark) await db.prepare('UPDATE jarvis_missions SET attempts=attempts+1,reminded_at=?,updated_at=? WHERE id=? AND revision=?').bind(now(), now(), m.id, m.revision).run();
+      items.push({ kind: 'promemoria', requestId: m.request_id, text: `«${nameOf(m)}» non ha risposto all’anteprima da ${days} giorni. Ti propongo questo promemoria, da ${senderName(env)}:\n\n«${mail.body.split('\n').slice(0, 6).join(' ').replace(/\s+/g, ' ')}»\n\nLo mando solo se tocchi il pulsante.`, buttons: [['Manda il promemoria', `soll:${m.id}`], ['Aspetto ancora', 'sollno:x']] });
     }
-    for (const m of missionRows.filter((x) => x.status === 'ferma')) items.push({ text: `«${nameOf(m)}» è ferma${m.note ? `: ${String(m.note).slice(0, 200)}` : ''}. Guardala e, se vuoi riprendere, riaffidamela.`, buttons: [['Mostrami la bozza', `peek:${m.draft_id}`], ['Affida a Jarvis', `affq:${m.draft_id}`]] });
+    for (const m of missionRows.filter((x) => x.status === 'ferma')) items.push({ kind: 'ferma', requestId: m.request_id, text: `«${nameOf(m)}» è ferma${m.note ? `: ${String(m.note).slice(0, 200)}` : ''}. Guardala e, se vuoi riprendere, riaffidamela.`, buttons: [['Mostrami la bozza', `peek:${m.draft_id}`], ['Affida a Jarvis', `affq:${m.draft_id}`]] });
+    // Risposte ai locali che Jarvis ha già scritto e che aspettano solo «Manda».
+    for (const row of await safe("SELECT key,value FROM jarvis_settings WHERE key LIKE 'reply\\_%' ESCAPE '\\' AND key NOT IN ('reply_enabled','reply_queue','reply_editing') ORDER BY updated_at DESC LIMIT 5")) {
+      let saved = null; try { saved = JSON.parse(row.value || 'null'); } catch {}
+      if (!saved?.text || !saved.id) continue;
+      items.push({ kind: 'risposta', requestId: saved.id, ...replyShown(saved, `«${saved.name}» ha scritto: «${String(saved.message || '').slice(0, 200)}${String(saved.message || '').length > 200 ? '…' : ''}»\n\nTi propongo questa risposta`) });
+    }
     const followed = new Set((await safe('SELECT request_id FROM jarvis_missions')).map((x) => x.request_id));
     for (const d of (await safe(OPEN_DRAFTS)).filter((x) => !followed.has(x.request_id))) {
       const idle = Math.floor((Date.now() - (Date.parse(d.updated_at || '') || Date.now())) / DAY_MS);
-      items.push({ key: `bozza:${d.id}`, text: `«${d.client_name || d.subject}»: la bozza è pronta da guardare${idle >= 2 ? ` da ${idle} giorni` : ''}. Se ti va bene, affidamela.`, buttons: [['Mostrami la bozza', `peek:${d.id}`], ['Affida a Jarvis', `affq:${d.id}`]] });
+      items.push({ kind: 'bozza', key: `bozza:${d.id}`, requestId: d.request_id, text: `«${d.client_name || d.subject}»: la bozza è pronta da guardare${idle >= 2 ? ` da ${idle} giorni` : ''}. Se ti va bene, affidamela.`, buttons: [['Mostrami la bozza', `peek:${d.id}`], ['Affida a Jarvis', `affq:${d.id}`]] });
     }
-    // Più le proposte di Jarvis che il giro del mattino non copre già (scadenze, richieste senza bozza…).
+    // Più le proposte di Jarvis che il giro non copre già (scadenze, richieste senza bozza…).
     const memory = await initiativeMemory(db);
     const covered = new Set(['si', 'ferma', 'bozza']);
-    const ideas = activeInitiatives(await loadInitiatives(db).catch(() => []), memory).filter((i) => !covered.has(i.kind) && !recentlyProposed(memory, i.key)).slice(0, 2);
-    const sent = [...items.slice(0, 5), ...ideas.map((i) => ({ key: i.key, text: i.text, buttons: initiativeButtons(i) }))];
-    for (const [i, item] of sent.entries()) await sendTg(db, env, chat, `${i === 0 ? `Da decidere stamattina (${sent.length}${items.length + ideas.length > sent.length ? ` di ${items.length + ideas.length}` : ''}):\n\n` : ''}${item.text}`, item.buttons, deps.fetchImpl, { stacked: true });
+    const ideas = activeInitiatives(await loadInitiatives(db).catch(() => []), memory).filter((i) => !covered.has(i.kind) && !recentlyProposed(memory, i.key)).slice(0, 2)
+      .map((i) => ({ kind: 'idea', key: i.key, requestId: i.requestId || null, text: i.text, buttons: initiativeButtons(i) }));
+    return { items, ideas, missionRows, memory };
+  }
+  /** Per la Control Room («Pronto per te» e briefing a voce): le stesse decisioni, senza toccare nulla. */
+  async function readyItems(db, env) {
+    const { items, ideas } = await decisionItems(db, env);
+    return [...items.slice(0, 8), ...ideas];
+  }
+  async function morningProposals(db, env) {
+    const chat = await setting(db, 'telegram_chat_id');
+    if (!chat || !telegramReady(env)) return [];
+    const { items, ideas, missionRows, memory } = await decisionItems(db, env, { mark: true });
+    const sent = [...items.filter((i) => i.kind !== 'risposta').slice(0, 5), ...ideas];
+    const total = items.filter((i) => i.kind !== 'risposta').length + ideas.length;
+    for (const [i, item] of sent.entries()) await sendTg(db, env, chat, `${i === 0 ? `Da decidere stamattina (${sent.length}${total > sent.length ? ` di ${total}` : ''}):\n\n` : ''}${item.text}`, item.buttons, deps.fetchImpl, { stacked: true });
     // Chi è già passato stamattina non torna nel giro del pomeriggio.
     for (const m of missionRows) if (m.status === 'attesa_si' || m.status === 'ferma') { const key = `${m.status === 'attesa_si' ? 'si' : 'ferma'}:${m.id}`; memory[key] = { ...memory[key], last: now() }; }
     for (const item of sent) if (item.key) memory[item.key] = { ...memory[item.key], last: now() };
@@ -2321,5 +2343,5 @@ export function createMissions(deps) {
     }
     return out;
   }
-  return { entrustBrief, runEntrust, alertOnce, announceExternal, replyTick, phoneTick, proposeReply, statusText, initiatives, initiativeTick, ping, entrust, tick, watchTick, watchRegister, reflect, queueOnlineEmail, checkOnlineMails, makeMenuQr, decide, telegramUpdate, probeIntents, setting, putSetting, briefing, notify, startChecks, answerCheck, draftAfterChecks, translateAfterEdit, undoDraftEdit, draftTarget, voiceEditDraft, editDraftFromClient };
+  return { readyItems, entrustBrief, runEntrust, alertOnce, announceExternal, replyTick, phoneTick, proposeReply, statusText, initiatives, initiativeTick, ping, entrust, tick, watchTick, watchRegister, reflect, queueOnlineEmail, checkOnlineMails, makeMenuQr, decide, telegramUpdate, probeIntents, setting, putSetting, briefing, notify, startChecks, answerCheck, draftAfterChecks, translateAfterEdit, undoDraftEdit, draftTarget, voiceEditDraft, editDraftFromClient };
 }
