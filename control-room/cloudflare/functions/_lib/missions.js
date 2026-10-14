@@ -12,7 +12,7 @@ import { assessReply, proposeReplyChanges, referenceCode, sha256Hex } from './ap
 import { sendOwnerNotification } from './owner-notifications.js';
 import { clientMailConfig, sendClientMail } from './client-mail.js';
 import { briefingDue, buildBriefing, romeDay } from './briefing.js';
-import { COMMANDS, COMMANDS_VERSION, answerCallback, clearButtons, downloadTelegramFile, sendDocument, sendPhoto, sendTelegram, sendVoice, setMyCommands, telegramReady } from './telegram.js';
+import { COMMANDS, COMMANDS_VERSION, KEYBOARD_VERSION, MENU_BUTTON, answerCallback, clearButtons, downloadTelegramFile, sendDocument, sendMenuKeyboard, sendPhoto, sendTelegram, sendVoice, setMyCommands, telegramReady } from './telegram.js';
 import { buildMenuQr, menuLink } from './qr.js';
 import { isBlanchSlug, publicMenuJsonUrl, publicMenuPageUrl } from './blanch.js';
 import { CHAT_MODEL, chat as freeChat, matchVenue, planFromText, speak, transcribe, understand, venueSaid } from './voice.js';
@@ -795,9 +795,9 @@ export function createMissions(deps) {
       return;
     }
     if (!chat || from !== chat) return;
-    await syncCommands(db, env);
+    await syncCommands(db, env, chat);
     // Solo «/menu» o «comandi»: «menu» da solo può essere la risposta a un pulsante (titolo di una pratica).
-    if (/^\/menu\b/i.test(text) || /^\W*(?:jarvis[\s,!.]*)?(?:i\s+)?comandi[\s?!.]*$/i.test(text)) { await commandsMenu(db, env, chat); return; }
+    if (/^\/menu\b/i.test(text) || text === MENU_BUTTON || /^☰\s*menu$/i.test(text) || /^\W*(?:jarvis[\s,!.]*)?(?:i\s+)?comandi[\s?!.]*$/i.test(text)) { await commandsMenu(db, env, chat); return; }
     if (await replyEditTurn(db, env, chat, text)) return;
     // Dubbi aperti: un prezzo scritto («7,50») risponde al dubbio in corso.
     if (normalizePrice(text)) {
@@ -870,10 +870,17 @@ export function createMissions(deps) {
     await sendTg(db, env, chat, intro, COMMANDS.filter(([name]) => name !== 'menu').map(([name, , label]) => [label, `cmd:${name}`]), deps.fetchImpl, { columns: 2 });
   }
   // Il menu «/» accanto al campo di scrittura si aggiorna una volta per versione dell'elenco.
-  async function syncCommands(db, env) {
-    if ((await setting(db, 'tg_commands_v').catch(() => null)) === COMMANDS_VERSION) return;
-    const out = await setMyCommands(env, deps.fetchImpl).catch(() => null);
-    if (out?.ok) await putSetting(db, 'tg_commands_v', COMMANDS_VERSION).catch(() => {});
+  // Anche il pulsante fisso «☰ Menu» sotto il campo di scrittura: si mette una volta, con un breve messaggio.
+  async function syncCommands(db, env, chat) {
+    if (deps.captured) return; // dalla Control Room le chiamate a Telegram non partono davvero
+    if ((await setting(db, 'tg_commands_v').catch(() => null)) !== COMMANDS_VERSION) {
+      const out = await setMyCommands(env, deps.fetchImpl).catch(() => null);
+      if (out?.ok) await putSetting(db, 'tg_commands_v', COMMANDS_VERSION).catch(() => {});
+    }
+    if (chat && (await setting(db, 'tg_keyboard_v').catch(() => null)) !== KEYBOARD_VERSION) {
+      const out = await sendMenuKeyboard(env, chat, `Sotto il campo di scrittura trovi il pulsante «${MENU_BUTTON}»: toccalo quando vuoi e ti mostro tutti i comandi.`, deps.fetchImpl).catch(() => null);
+      if (out?.ok) await putSetting(db, 'tg_keyboard_v', KEYBOARD_VERSION).catch(() => {});
+    }
   }
 
   // ——— Telefonata vera (ElevenLabs + numero Twilio importato) ———
