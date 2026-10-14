@@ -184,6 +184,55 @@ describe('Premium su misura', () => {
     } finally { db.close(); }
   });
 
+  it('schede Premium: Jarvis propone con Gemini, Riccardo approva o scarta, il menu resta valido', async () => {
+    const db = database();
+    const answer = (voci) => ({ voci: voci.map((v) => (v.tipo === 'vino'
+      ? { id: v.id, certezza: v.id === 0 ? 'bassa' : 'alta', vitigno: { it: 'Ribolla Gialla', en: 'Ribolla Gialla' }, territorio: { it: 'Collio', en: 'Collio' }, colore: { it: 'Giallo paglierino', en: 'Straw yellow' },
+        profumo: { it: 'Fiori bianchi e agrumi', en: 'White flowers and citrus' }, gusto: { it: 'Fresco e sapido', en: 'Fresh and savoury' }, temperatura: '8-10 °C', profilo: { aromi: 60, struttura: 50, acidita: 70, dolcezza: 10, corpo: 45 } }
+      : { id: v.id, certezza: 'alta', descrizione: { it: `Ricetta tipica: ${v.nome.toLowerCase()}`, en: `Traditional recipe: ${v.nome}` } })) });
+    const calls = [];
+    const before = globalThis.fetch;
+    globalThis.fetch = async (url, options) => {
+      if (!String(url).startsWith('https://generativelanguage.googleapis.com/')) return before(url, options);
+      const body = JSON.parse(options.body); calls.push(body);
+      return Response.json({ candidates: [{ content: { parts: [{ text: JSON.stringify(answer(JSON.parse(body.contents[0].parts[0].text).voci)) }] } }] });
+    };
+    try {
+      const text = readFileSync(new URL('./fixtures-email-premium-isonzo.txt', import.meta.url), 'utf8');
+      const requestId = await importEmail(db, email('iso2', 'Nuovo menu Premium su misura · Enoteca Isonzo Test (TEST)', text));
+      await action(db, 'runAutopilot', {});
+      const generated = await action(db, 'generateDraft', { requestId });
+      const draft = generated.body.state.drafts.find((d) => d.requestId === requestId);
+      const noKey = await action(db, 'proposeSchede', { id: draft.id, revision: draft.revision });
+      assert.equal(noKey.status, 503, 'senza chiave Gemini non si inventa nulla');
+      db.prepare("INSERT INTO jarvis_settings (key,value,updated_at) VALUES ('gemini_api_key','gem-test','x'),('gemini_models','[\"gemini-2.5-flash\"]','x')").bind().run();
+      const proposed = await action(db, 'proposeSchede', { id: draft.id, revision: draft.revision });
+      assert.equal(proposed.status, 200, String(proposed.body.error));
+      const after = proposed.body.state.drafts.find((d) => d.id === draft.id);
+      assert.equal(after.revision, draft.revision, 'proporre non cambia la bozza');
+      assert.deepEqual(after.menu, draft.menu);
+      const list = after.creative.schede.proposals;
+      assert.ok(list.length >= 2 && list.every((x) => x.stato === 'proposta'), JSON.stringify(proposed.body.result));
+      assert.ok(after.creative.schede.skipped.some((x) => /sicurezza/.test(x.reason)), 'il vino che Jarvis non conosce resta al cliente');
+      assert.match(calls[0].system_instruction.parts[0].text, /Mai: prezzi, annate/);
+      const wine = list.find((x) => x.kind === 'vino'), dish = list.find((x) => x.kind === 'piatto');
+      const discarded = await action(db, 'discardSchede', { id: draft.id, revision: after.revision, keys: [dish.key] });
+      assert.equal(discarded.status, 200, String(discarded.body.error));
+      const applied = await action(db, 'applySchede', { id: draft.id, revision: after.revision, all: true });
+      assert.equal(applied.status, 200, String(applied.body.error));
+      const done = applied.body.state.drafts.find((d) => d.id === draft.id);
+      assert.equal(done.revision, after.revision + 1);
+      assert.deepEqual(validateMenu(done.menu).errors, []);
+      const voce = done.menu.sezioni.flatMap((s) => s.voci).find((v) => (v.nome.it || v.nome) === wine.name);
+      assert.equal(voce.scheda.vitigno.it, 'Ribolla Gialla');
+      assert.equal(voce.scheda.temperatura, '8-10 °C');
+      assert.ok(!done.menu.sezioni.flatMap((s) => s.voci).some((v) => (v.nome.it || v.nome) === dish.name && /Ricetta tipica/.test(v.descrizione?.it || '')), 'la scheda scartata non entra');
+      assert.ok(done.provenance.some((e) => /approvata da Riccardo/.test(e.source) && e.status === 'da_verificare'));
+      assert.equal(done.checks.prices, false, 'contenuti cambiati: checklist azzerata');
+      assert.equal((await action(db, 'applySchede', { id: draft.id, revision: done.revision, all: true })).status, 422, 'niente da approvare due volte');
+    } finally { globalThis.fetch = before; db.close(); }
+  });
+
   it('i menu Standard restano invariati: tema sì, premium no', async () => {
     const db = database();
     try {

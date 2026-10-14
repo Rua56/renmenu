@@ -1105,3 +1105,10 @@ h1, h2, .view-header h1 { font-family: var(--serif); font-weight: 600; letter-sp
 .savebar { position: sticky; bottom: calc(76px + env(safe-area-inset-bottom)); z-index: 5; display: flex; align-items: center; justify-content: space-between; gap: .8rem; margin-top: 1rem; border: 1px solid var(--line-strong); border-radius: var(--radius); padding: .7rem .9rem; background: var(--surface-raised); box-shadow: var(--shadow); font-size: .84rem; }
 @media (min-width: 769px) { .savebar { bottom: 1rem; } }
 .oggi-block { margin-top: 1.1rem; }
+/* Schede Premium proposte da Jarvis */
+.schede-grid { display: grid; gap: 12px; grid-template-columns: repeat(auto-fill, minmax(300px, 1fr)); margin-top: 12px; }
+.scheda-card { border: 1px solid var(--line); border-radius: 14px; padding: 14px 16px; background: var(--panel, transparent); }
+.scheda-card h3 { margin: 4px 0 8px; font-size: 1.05rem; }
+.schede-dl { display: grid; grid-template-columns: max-content 1fr; gap: 4px 12px; margin: 0; font-size: .9rem; }
+.schede-dl dt { color: var(--muted, inherit); opacity: .75; }
+.schede-dl dd { margin: 0; }
