@@ -945,9 +945,21 @@ function showOnHome(phrase) {
   requestAnimationFrame(() => $('#hud-display')?.scrollIntoView({ behavior: 'smooth', block: 'start' }));
   return shown;
 }
+// «Jarvis propone»: cose ferme o in scadenza che Jarvis ha trovato da solo (stesse proposte di Telegram).
+function proposeBlock() {
+  const list = Array.isArray(state?.initiatives) ? state.initiatives.slice(0, 3) : [];
+  if (!list.length) return '';
+  const row = (item) => {
+    const body = `<span class="hud-dot hot" aria-hidden="true"></span><span class="hud-row-main"><strong>${escapeHtml(item.venue || 'Jarvis')}</strong><small>${escapeHtml(item.text)}</small></span>`;
+    if (item.requestId) return `<button class="hud-row" type="button" data-select-request="${escapeHtml(item.requestId)}" data-route="pratica">${body}</button>`;
+    if (item.clientId) return `<button class="hud-row" type="button" data-select-client="${escapeHtml(item.clientId)}" data-route="locale">${body}</button>`;
+    return `<div class="hud-row">${body}</div>`;
+  };
+  return `<section class="hud-display hud-propose" aria-label="Jarvis propone"><div class="hud-display-head"><p class="eyebrow">JARVIS PROPONE · ${state.initiatives.length}</p></div><div class="hud-rows">${list.map(row).join('')}</div></section>`;
+}
 function renderCommand() {
   const all = allPratiche();
-  return `<div class="view-wrap jarvis-home">${jarvisHero()}${demoNotice()}${adessoBlock(all)}${hudReadouts(all)}${hudDisplay()}${jarvisPanel()}</div>`;
+  return `<div class="view-wrap jarvis-home">${jarvisHero()}${demoNotice()}${adessoBlock(all)}${proposeBlock()}${hudReadouts(all)}${hudDisplay()}${jarvisPanel()}</div>`;
 }
 function renderPratiche() {
   const all = allPratiche();

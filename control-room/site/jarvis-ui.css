@@ -243,3 +243,5 @@ div.hud-row { cursor: default; }
 .chat-live:disabled { opacity: .55; cursor: default; }
 body[data-live] .bottom-nav .ask { box-shadow: 0 0 0 2px var(--teal), 0 0 18px rgba(70, 214, 255, .35); }
 body[data-live] .bottom-nav .ask span::after { content: " · dal vivo"; color: var(--teal); }
+.hud-propose { margin-top: 12px; }
+.hud-propose .hud-row small { white-space: normal; }

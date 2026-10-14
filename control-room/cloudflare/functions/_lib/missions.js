@@ -29,6 +29,7 @@ import { pickButton } from './short-reply.js';
 import { callOutcome, callOwner, ensureAgent, phoneNumber, twilioNumber } from './phone.js';
 import { approveSender, blockSender, takeUnannouncedHeld } from './whatsapp-in.js';
 import { lastReadingTest, startReadingTest } from './reading-test.js';
+import { LATER_MS, MUTE_MS, REPEAT_MS, activeInitiatives, loadInitiatives } from './initiative.js';
 
 export const PARTIAL_MARK = '[Testo parziale: leggi l’email completa in Gmail prima di decidere]';
 export const OWNER_REVIEW = 'telegram:riccardo';
@@ -53,6 +54,8 @@ const EDIT_WORDS = /(?:\d|\beuro\b|€|\bcost\w*|\bprezz\w*|\baggiung\w*|\btogli
 // Frasi che chiedono di cambiare il menu, non il QR (es. «metti il QR nel menu»): non sono richieste di QR.
 const EDIT_WORDS_STRICT = /\b(?:aggiung\w*|togli\w*|rimuov\w*|prezzo|costa\w*|rinomin\w*)\b/i;
 const REREAD = /\b(?:rileggi\w*|rilegg\w+|rileggere|rifai la lettura|leggi(?:le|li)? (?:di nuovo|ancora))\b/i;
+// «cosa mi proponi?», «che faccio adesso?»: le proposte di Jarvis (initiative.js).
+const IDEAS_WORDS = /^\W*(?:ok\s+)?(?:jarvis[\s,!.]*)?(?:cosa|che cosa|che)\s+(?:mi\s+)?(?:proponi|suggerisci|consigli|dovrei fare|faccio(?:\s+adesso|\s+ora)?|c[’']?è da fare)[\s?!.]*$/i;
 const STATUS_WORDS = /^\W*(?:ok\s+)?(?:jarvis[\s,!.]*)?(?:\/)?stato[\s?!.]*$/i;
 
 export function createMissions(deps) {
@@ -161,7 +164,8 @@ export function createMissions(deps) {
       queued ? `File in attesa di lettura: ${queued}${retrying ? `, di cui ${retrying} rimandati perché Google era lento` : ''}.` : 'Nessun file in attesa di lettura.',
       lastMail ? `Ultimo allegato arrivato da Gmail: ${when(lastMail)}.` : 'Da Gmail non è ancora arrivato nessun allegato.'
     ];
-    return `${lines.length ? `Pratiche affidate a me:\n${lines.join('\n')}` : 'Nessuna pratica affidata in corso.'}\nRichieste aperte nella Control Room: ${pending}.\n\n${health.join('\n')}`;
+    const ideas = (await initiatives(db).catch(() => [])).slice(0, 3);
+    return `${lines.length ? `Pratiche affidate a me:\n${lines.join('\n')}` : 'Nessuna pratica affidata in corso.'}\nRichieste aperte nella Control Room: ${pending}.${ideas.length ? `\n\nCosa ti propongo:\n${ideas.map((i) => `- ${i.text}`).join('\n')}` : ''}\n\n${health.join('\n')}`;
   }
   async function putSetting(db, key, value) {
     await db.prepare('INSERT INTO jarvis_settings (key,value,updated_at) VALUES (?,?,?) ON CONFLICT(key) DO UPDATE SET value=excluded.value,updated_at=excluded.updated_at')
@@ -664,6 +668,13 @@ export function createMissions(deps) {
       if (!outcome.silent) await sendTg(db, env, chat, outcome.text, null, deps.fetchImpl);
       return;
     }
+    if (verb === 'ini') {
+      const text = await answerInitiative(db, `${extra}:${arg4}`, missionId === 'mute' ? 'mute' : 'later');
+      await ack(missionId === 'mute' ? 'Lascio stare' : 'Più tardi');
+      await clear();
+      await sendTg(db, env, chat, text, null, deps.fetchImpl);
+      return;
+    }
     if (verb === 'tel') {
       await putSetting(db, 'phone_alerts', missionId === 'si' ? 'si' : 'no');
       await ack('Fatto');
@@ -810,12 +821,18 @@ export function createMissions(deps) {
       return;
     }
     if (/^\/settimana\b/i.test(text)) { await sendTg(db, env, chat, digestText(await buildDigest(db)), null, deps.fetchImpl); return; }
+    if (/^\/idee\b/i.test(text) || IDEAS_WORDS.test(text)) {
+      const on = /^\/idee\s+(?:si|sì|on)\b/i.test(text) ? 'si' : /^\/idee\s+(?:no|off)\b/i.test(text) ? 'no' : null;
+      if (on) { await putSetting(db, 'ini_enabled', on); await sendTg(db, env, chat, on === 'si' ? 'Va bene: tra le 11 e le 19 ti propongo io le cose ferme o in scadenza, al massimo due al giorno.' : 'Va bene: durante il giorno non ti propongo più nulla da solo. Restano il giro delle 8 e «/idee» quando vuoi.', null, deps.fetchImpl); return; }
+      await ideasText(db, chat, env);
+      return;
+    }
     if (/^\/stato\b/i.test(text) || STATUS_WORDS.test(text)) {
       await sendTg(db, env, chat, await statusText(db), null, deps.fetchImpl);
       return;
     }
     if (/^\/aiuto\b|^\/help\b/i.test(text) || text.startsWith('/')) {
-      await sendTg(db, env, chat, 'Puoi scrivermi o mandarmi un vocale: «com’è la situazione?», «al Bakaro il frico ora costa 14», «crea una nuova pratica per il locale … con piano Standard», «pubblica il menu di …». Capisco anche /stato, /briefing, /settimana, /voce, /chiamami, /claude, /provaemail, /prova lettura, /proposte, /rifletti, le foto e i PDF dei menu. Pubblicare richiede sempre il tuo SÌ col pulsante.', null, deps.fetchImpl);
+      await sendTg(db, env, chat, 'Puoi scrivermi o mandarmi un vocale: «com’è la situazione?», «al Bakaro il frico ora costa 14», «crea una nuova pratica per il locale … con piano Standard», «pubblica il menu di …». Capisco anche /stato, /idee, /briefing, /settimana, /voce, /chiamami, /claude, /provaemail, /prova lettura, /proposte, /rifletti, le foto e i PDF dei menu. Pubblicare richiede sempre il tuo SÌ col pulsante.', null, deps.fetchImpl);
       return;
     }
     await converse(db, env, chat, text, false);
@@ -1074,7 +1091,7 @@ export function createMissions(deps) {
       return key && chain.length ? { key, models: live.length ? live : chain, fetchImpl: deps.fetchImpl } : null;
     } catch { return null; }
   }
-  const OPEN_DRAFTS = "SELECT d.id,d.request_id,d.slug,d.status,d.revision,d.menu_json,d.provenance_json,r.subject,c.id AS client_id,c.name AS client_name FROM drafts d JOIN requests r ON r.id=d.request_id LEFT JOIN clients c ON c.id=r.client_id WHERE d.status IN ('bozza','revisione','pronta_pr') AND r.status NOT IN ('completata','archiviata','chiusa') ORDER BY d.updated_at DESC LIMIT 20";
+  const OPEN_DRAFTS = "SELECT d.id,d.request_id,d.slug,d.status,d.revision,d.updated_at,d.menu_json,d.provenance_json,r.subject,c.id AS client_id,c.name AS client_name FROM drafts d JOIN requests r ON r.id=d.request_id LEFT JOIN clients c ON c.id=r.client_id WHERE d.status IN ('bozza','revisione','pronta_pr') AND r.status NOT IN ('completata','archiviata','chiusa') ORDER BY d.updated_at DESC LIMIT 20";
   // Cliente arrivato via email senza nome («Nuovo contatto email»): per parlare della bozza vale il nome del locale scritto nel menu.
   const GENERIC_CLIENT = /^nuovo contatto email$/i;
   const withVenueName = (list) => list.map((d) => {
@@ -1393,9 +1410,20 @@ export function createMissions(deps) {
     }
     for (const m of missionRows.filter((x) => x.status === 'ferma')) items.push({ text: `«${nameOf(m)}» è ferma${m.note ? `: ${String(m.note).slice(0, 200)}` : ''}. Guardala e, se vuoi riprendere, riaffidamela.`, buttons: [['Mostrami la bozza', `peek:${m.draft_id}`], ['Affida a Jarvis', `affq:${m.draft_id}`]] });
     const followed = new Set((await safe('SELECT request_id FROM jarvis_missions')).map((x) => x.request_id));
-    for (const d of (await safe(OPEN_DRAFTS)).filter((x) => !followed.has(x.request_id))) items.push({ text: `«${d.client_name || d.subject}»: la bozza è pronta da guardare. Se ti va bene, affidamela.`, buttons: [['Mostrami la bozza', `peek:${d.id}`], ['Affida a Jarvis', `affq:${d.id}`]] });
-    const sent = items.slice(0, 5);
-    for (const [i, item] of sent.entries()) await sendTg(db, env, chat, `${i === 0 ? `Da decidere stamattina (${sent.length}${items.length > sent.length ? ` di ${items.length}` : ''}):\n\n` : ''}${item.text}`, item.buttons, deps.fetchImpl, { stacked: true });
+    for (const d of (await safe(OPEN_DRAFTS)).filter((x) => !followed.has(x.request_id))) {
+      const idle = Math.floor((Date.now() - (Date.parse(d.updated_at || '') || Date.now())) / DAY_MS);
+      items.push({ key: `bozza:${d.id}`, text: `«${d.client_name || d.subject}»: la bozza è pronta da guardare${idle >= 2 ? ` da ${idle} giorni` : ''}. Se ti va bene, affidamela.`, buttons: [['Mostrami la bozza', `peek:${d.id}`], ['Affida a Jarvis', `affq:${d.id}`]] });
+    }
+    // Più le proposte di Jarvis che il giro del mattino non copre già (scadenze, richieste senza bozza…).
+    const memory = await initiativeMemory(db);
+    const covered = new Set(['si', 'ferma', 'bozza']);
+    const ideas = activeInitiatives(await loadInitiatives(db).catch(() => []), memory).filter((i) => !covered.has(i.kind) && !recentlyProposed(memory, i.key)).slice(0, 2);
+    const sent = [...items.slice(0, 5), ...ideas.map((i) => ({ key: i.key, text: i.text, buttons: initiativeButtons(i) }))];
+    for (const [i, item] of sent.entries()) await sendTg(db, env, chat, `${i === 0 ? `Da decidere stamattina (${sent.length}${items.length + ideas.length > sent.length ? ` di ${items.length + ideas.length}` : ''}):\n\n` : ''}${item.text}`, item.buttons, deps.fetchImpl, { stacked: true });
+    // Chi è già passato stamattina non torna nel giro del pomeriggio.
+    for (const m of missionRows) if (m.status === 'attesa_si' || m.status === 'ferma') { const key = `${m.status === 'attesa_si' ? 'si' : 'ferma'}:${m.id}`; memory[key] = { ...memory[key], last: now() }; }
+    for (const item of sent) if (item.key) memory[item.key] = { ...memory[item.key], last: now() };
+    await saveInitiativeMemory(db, memory);
     return sent;
   }
   async function runReminder(db, env, missionId) {
@@ -1797,6 +1825,66 @@ export function createMissions(deps) {
   }
 
   // Briefing del mattino: una volta al giorno, lun–sab alle 8 (ora italiana).
+  // ——— Jarvis propositivo: durante il giorno propone da solo una cosa ferma o in scadenza (initiative.js) ———
+  async function initiativeMemory(db) {
+    try { const memory = JSON.parse(await setting(db, 'ini_memory') || '{}'); return memory && typeof memory === 'object' ? memory : {}; } catch { return {}; }
+  }
+  async function saveInitiativeMemory(db, memory) {
+    // Si tiene un mese di ricordi: basta per «lascia stare» (due settimane) e non cresce per sempre.
+    const limit = Date.now() - 30 * DAY_MS;
+    const kept = Object.fromEntries(Object.entries(memory).filter(([, v]) => [v?.last, v?.later, v?.mute].some((t) => (Date.parse(t || '') || 0) > limit)).slice(-200));
+    await putSetting(db, 'ini_memory', JSON.stringify(kept));
+  }
+  const recentlyProposed = (memory, key) => Date.now() - (Date.parse(memory[key]?.last || '') || 0) < REPEAT_MS;
+  const initiativeButtons = (item) => [...item.buttons, ['Più tardi', `ini:later:${item.key}`], ['Lascia stare', `ini:mute:${item.key}`]];
+  /** Proposte attive in questo momento (per /idee, la Control Room e la situazione detta al telefono). */
+  async function initiatives(db) {
+    return activeInitiatives(await loadInitiatives(db).catch(() => []), await initiativeMemory(db));
+  }
+  // Dalle 11 alle 19, al massimo una volta all'ora e due volte al giorno, e mai mentre ne aspetta una.
+  async function initiativeTick(db, env, { now: at = new Date() } = {}) {
+    if ((await setting(db, 'ini_enabled')) === 'no') return null;
+    const chat = await setting(db, 'telegram_chat_id');
+    if (!chat || !telegramReady(env)) return null;
+    const hour = Number(new Intl.DateTimeFormat('en-GB', { timeZone: 'Europe/Rome', hour: '2-digit', hourCycle: 'h23' }).format(at));
+    if (hour < 11 || hour >= 19) return null;
+    if (Date.now() - (Date.parse(await setting(db, 'ini_last_run') || '') || 0) < 60 * MINUTE) return null;
+    await putSetting(db, 'ini_last_run', now());
+    const day = romeDay(at);
+    let count = null; try { count = JSON.parse(await setting(db, 'ini_day') || 'null'); } catch { count = null; }
+    const sentToday = count?.day === day ? count.n : 0;
+    if (sentToday >= 2) return null;
+    const memory = await initiativeMemory(db);
+    const pending = Object.values(memory).some((v) => v?.pending && Date.now() - (Date.parse(v.last || '') || 0) < 3 * 3600_000);
+    if (pending) return null;
+    const pick = activeInitiatives(await loadInitiatives(db).catch(() => []), memory).find((i) => !recentlyProposed(memory, i.key));
+    if (!pick) return null;
+    await sendTg(db, env, chat, `Ti propongo una cosa, Riccardo. ${pick.text}`, initiativeButtons(pick), deps.fetchImpl, { stacked: true });
+    memory[pick.key] = { ...memory[pick.key], last: now(), pending: true };
+    await saveInitiativeMemory(db, memory);
+    await putSetting(db, 'ini_day', JSON.stringify({ day, n: sentToday + 1 }));
+    await recordEvent(db, 'jarvis.proposta', { detail: { tipo: pick.kind } }).catch(() => null);
+    return pick;
+  }
+  async function answerInitiative(db, key, choice) {
+    const memory = await initiativeMemory(db);
+    const until = new Date(Date.now() + (choice === 'mute' ? MUTE_MS : LATER_MS)).toISOString();
+    memory[key] = { ...memory[key], pending: false, ...(choice === 'mute' ? { mute: until } : { later: until }) };
+    await saveInitiativeMemory(db, memory);
+    return choice === 'mute' ? 'Va bene, lascio stare: non te lo ripropongo per due settimane.' : 'Va bene, te lo ripropongo domani.';
+  }
+  async function ideasText(db, chat, env) {
+    const list = await initiatives(db);
+    if (!list.length) { await sendTg(db, env, chat, 'Non vedo niente di fermo o in scadenza: per ora non ho proposte. Te le mando io quando serve, tra le 11 e le 19.', null, deps.fetchImpl); return; }
+    const shown = list.slice(0, 5);
+    const memory = await initiativeMemory(db);
+    for (const [i, item] of shown.entries()) {
+      await sendTg(db, env, chat, `${i === 0 ? `Ecco cosa ti propongo (${shown.length}${list.length > shown.length ? ` di ${list.length}` : ''}):\n\n` : ''}${item.text}`, initiativeButtons(item), deps.fetchImpl, { stacked: true });
+      memory[item.key] = { ...memory[item.key], last: now() };
+    }
+    await saveInitiativeMemory(db, memory);
+  }
+
   async function briefing(db, env, { force = false, now: at = new Date() } = {}) {
     const day = romeDay(at);
     // L'orologio passa di qui ogni minuto: il lunedì alle 8:15 parte anche la riflessione settimanale.
@@ -1904,5 +1992,5 @@ export function createMissions(deps) {
     }
     return out;
   }
-  return { alertOnce, announceExternal, statusText, ping, entrust, tick, watchTick, watchRegister, reflect, queueOnlineEmail, checkOnlineMails, makeMenuQr, decide, telegramUpdate, probeIntents, setting, putSetting, briefing, notify, startChecks, answerCheck, draftAfterChecks, translateAfterEdit, undoDraftEdit, draftTarget, voiceEditDraft, editDraftFromClient };
+  return { alertOnce, announceExternal, statusText, initiatives, initiativeTick, ping, entrust, tick, watchTick, watchRegister, reflect, queueOnlineEmail, checkOnlineMails, makeMenuQr, decide, telegramUpdate, probeIntents, setting, putSetting, briefing, notify, startChecks, answerCheck, draftAfterChecks, translateAfterEdit, undoDraftEdit, draftTarget, voiceEditDraft, editDraftFromClient };
 }
