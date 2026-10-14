@@ -15,7 +15,7 @@ jobs:
         run: |
           set -u
           : > prove-lettura/scaricate.log
-          while read -r dir url; do
+          while read -r dir url pages; do
             [ -z "${dir:-}" ] && continue
             case "$dir" in \#*) continue;; esac
             mkdir -p "prove-lettura/$dir"
@@ -26,7 +26,8 @@ jobs:
             case "$type" in image/jpeg) ext=jpg;; image/png) ext=png;; image/webp) ext=webp;; application/pdf) ext=pdf;; *) ext="";; esac
             if [ "$code" = 200 ] && [ "$ext" = pdf ]; then
               # Menu in PDF: le prime due pagine diventano immagini (come uno screenshot).
-              pdftoppm -r 110 -jpeg -jpegopt quality=85 -f 1 -l 2 "$tmp" "/tmp/pag"
+              first=${pages%-*}; last=${pages#*-}; first=${first:-1}; last=${last:-2}
+              rm -f /tmp/pag*; pdftoppm -r 110 -jpeg -jpegopt quality=85 -f "$first" -l "$last" "$tmp" "/tmp/pag"
               for f in /tmp/pag*.jpg; do n=$((n+1)); out="prove-lettura/$dir/foto-$n.jpg"; mv "$f" "$out"; echo "ok $dir $out $(stat -c%s "$out") pdf $url" >> prove-lettura/scaricate.log; done
               rm -f "$tmp"
             elif [ "$code" = 200 ] && [ -n "$ext" ]; then
