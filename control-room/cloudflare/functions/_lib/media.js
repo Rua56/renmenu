@@ -206,7 +206,12 @@ export function proposeTargets(menu, mediaRows) {
   for (const { media, slot, score } of candidates) {
     if (out.has(media.id) || taken.has(slot.target)) continue;
     taken.add(slot.target);
-    out.set(media.id, { target: slot.target, score: Math.round(score * 100) / 100, why: media.kind === 'bottiglia' ? `etichetta simile a «${slot.name}»` : `piatto simile a «${slot.name}»` });
+    // Un piatto riconosciuto solo dalla foto (prova del 14 ottobre: «cicchetto1.jpg», cotto e kren, visto come «frico
+    // con prosciutto e formaggio» e messo sul tagliere di formaggi) resta una proposta: lo mette Riccardo. Da solo
+    // Jarvis mette un piatto solo se anche il nome del file indica lo stesso piatto.
+    const byFile = media.kind === 'piatto' ? bestFood(media.filename, slots, df) : null;
+    const sure = media.kind !== 'piatto' || byFile?.slot.target === slot.target;
+    out.set(media.id, { target: slot.target, score: Math.round(score * 100) / 100, why: media.kind === 'bottiglia' ? `etichetta simile a «${slot.name}»` : sure ? `piatto simile a «${slot.name}»` : `piatto simile a «${slot.name}» (solo dalla foto): controlla tu`, ...(sure ? {} : { sure: false }) });
   }
   // Proposte incerte: un posto suggerito, ma «sure: false» (la preparazione automatica non le mette nel menu).
   for (const { media, slot, score, why } of doubtful) {

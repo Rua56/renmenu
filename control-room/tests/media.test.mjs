@@ -131,11 +131,12 @@ describe('Foto per il menu · nome del file e foto in disaccordo (prova del 14 o
     assert.equal(p.get('tiramisu').target, 'voce:0:1');
     assert.equal(p.get('tiramisu').sure, false);
     assert.equal(p.get('IMG_1').target, null);
-    // Nome del file e foto d'accordo (o nome generico): proposta sicura come prima.
+    // Nome del file e foto d'accordo: proposta sicura; nome generico: proposta da controllare.
     const q = proposeTargets(menu, [row('frico', 'piatto', { description: 'frico con polenta' }), row('IMG_2', 'piatto', { description: 'tiramisù' })]);
     assert.equal(q.get('frico').target, 'voce:0:0');
-    assert.equal(q.get('frico').sure, undefined);
+    assert.equal(q.get('frico').sure, undefined, 'file e foto d’accordo: Jarvis la mette da solo');
     assert.equal(q.get('IMG_2').target, 'voce:0:1');
+    assert.equal(q.get('IMG_2').sure, false, 'solo dalla foto: la mette Riccardo');
   });
 });
 
