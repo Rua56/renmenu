@@ -69,5 +69,20 @@ test('trova la bottiglia giusta e scarta quella di un altro vino', async () => {
   assert.match(wrong.reason, /etichetta/);
   const notBottle = await findBottle({ key: 'k', models: [] }, slot, slotFrequencies(menuSlots(menu)), { classify: async () => ({ ok: true, kind: 'locale', label: {} }), fetchImpl: fakeWeb(pages) });
   assert.equal(notBottle.found, undefined);
-  assert.deepEqual(await findBottle(null, slot, new Map(), { classify }), { reason: 'nessuna pagina trovata' });
+  assert.deepEqual(await findBottle(null, slot, new Map(), { classify }), { reason: 'nessuna pagina trovata (manca la chiave Gemini)' });
+});
+
+test('la ricerca usa prima i modelli che stanno rispondendo, senza «pensiero», e dice perché non trova', async () => {
+  const [slot] = winesWithoutPhoto(menu);
+  const asked = [];
+  const fetchImpl = async (url, options = {}) => {
+    const model = /models\/([^:]+):/.exec(String(url))[1];
+    asked.push([model, JSON.parse(options.body).generationConfig]);
+    return new Response('{}', { status: model === 'gemini-3.1-flash-lite' ? 429 : 404 });
+  };
+  const res = await findBottle({ key: 'k', models: ['gemini-3.1-flash-lite', 'gemini-2.5-flash'] }, slot, new Map(), { classify: async () => null, fetchImpl });
+  assert.deepEqual(asked.map(([m]) => m), ['gemini-3.1-flash-lite', 'gemini-2.5-flash', 'gemini-2.5-flash-lite']);
+  assert.deepEqual(asked[1][1].thinkingConfig, { thinkingBudget: 0 }, 'il pensiero non consuma la risposta');
+  assert.ok(asked[1][1].maxOutputTokens >= 2048);
+  assert.equal(res.reason, 'nessuna pagina trovata (gemini-3.1-flash-lite 429, gemini-2.5-flash 404, gemini-2.5-flash-lite 404)');
 });

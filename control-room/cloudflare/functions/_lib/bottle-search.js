@@ -11,6 +11,7 @@ const MAX_PAGES = 3, MAX_IMAGES = 2, MAX_BYTES = 4_000_000, MAX_HTML = 1_500_000
 const TYPES = new Set(['image/jpeg', 'image/png', 'image/webp']);
 const SKIP_IMG = /logo|icon|sprite|banner|placeholder|avatar|flag|bandier|social|facebook|instagram|payment|pagament|cookie|loader|spinner|header|footer|bg[-_]|background|award|medaglia|premio/i;
 const SEARCH_MODELS = ['gemini-2.5-flash', 'gemini-2.5-flash-lite', 'gemini-2.0-flash'];
+const SEARCH_TRIES = 3;
 
 const norm = (v) => String(v || '').toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g, '').replace(/[^a-z0-9]+/g, ' ').trim();
 const words = (v) => norm(v).split(' ').filter((w) => w.length >= 3 && !['doc', 'docg', 'igt', 'vino', 'the', 'and'].includes(w));
@@ -38,23 +39,30 @@ export function publicHttps(raw) {
 }
 
 /** Gemini con la ricerca Google: pagine dove si vede la bottiglia di questo vino. */
-export async function searchWinePages(gemini, slot, { fetchImpl = globalThis.fetch, timeoutMs = 25_000 } = {}) {
-  if (!gemini?.key) return [];
+export async function searchWinePages(gemini, slot, options = {}) {
+  return (await searchPages(gemini, slot, options)).pages;
+}
+// Prima i modelli che stanno rispondendo davvero (gemini.models mette per primi quelli andati a buon fine),
+// poi quelli adatti alla ricerca. I 2.5 «pensano» e il pensiero consuma i token della risposta: lo si spegne.
+async function searchPages(gemini, slot, { fetchImpl = globalThis.fetch, timeoutMs = 25_000 } = {}) {
+  if (!gemini?.key) return { pages: [], why: 'manca la chiave Gemini' };
   const prompt = [
     `Cerca sul web la pagina del vino «${slot.name}»${slot.section ? ` (carta dei vini, sezione «${slot.section}»)` : ''} sul sito ufficiale della cantina che lo produce.`,
     'Se il sito della cantina non ha una pagina del vino, va bene la scheda di un\'enoteca online dove si vede la foto della bottiglia.',
     'Rispondi solo con JSON: {"pagine": ["https://…"]}, al massimo 3 indirizzi, il sito della cantina per primo. Non inventare indirizzi: solo pagine trovate con la ricerca.'
   ].join('\n');
-  const models = [...new Set([...SEARCH_MODELS.filter((m) => gemini.models?.includes(m)), ...SEARCH_MODELS])];
-  for (const model of models.slice(0, 2)) {
+  const models = [...new Set([...(gemini.models || []), ...SEARCH_MODELS])].slice(0, SEARCH_TRIES);
+  const failures = [];
+  for (const model of models) {
     const controller = typeof AbortController === 'function' ? new AbortController() : null;
     const timer = setTimeout(() => controller?.abort(), timeoutMs);
+    const thinking = /^gemini-2\.5/.test(model) ? { thinkingConfig: { thinkingBudget: 0 } } : /^gemini-3/.test(model) ? { thinkingConfig: { thinkingLevel: 'low' } } : {};
     try {
       const response = await fetchImpl(`https://generativelanguage.googleapis.com/v1beta/models/${encodeURIComponent(model)}:generateContent`, {
         method: 'POST', headers: { 'Content-Type': 'application/json', 'x-goog-api-key': gemini.key }, signal: controller?.signal,
-        body: JSON.stringify({ contents: [{ role: 'user', parts: [{ text: prompt }] }], tools: [{ google_search: {} }], generationConfig: { temperature: 0.1, maxOutputTokens: 600 } })
+        body: JSON.stringify({ contents: [{ role: 'user', parts: [{ text: prompt }] }], tools: [{ google_search: {} }], generationConfig: { temperature: 0.1, maxOutputTokens: 2048, ...thinking } })
       });
-      if (!response.ok) continue;
+      if (!response.ok) { failures.push(`${model} ${response.status}`); continue; }
       const data = await response.json();
       const candidate = data?.candidates?.[0] || {};
       const raw = (candidate.content?.parts || []).map((p) => p.text || '').join('');
@@ -63,10 +71,11 @@ export async function searchWinePages(gemini, slot, { fetchImpl = globalThis.fet
       // Le fonti vere della ricerca (anche se il testo è sbagliato): indirizzi di rimando di Google verso le pagine.
       const grounded = (candidate.groundingMetadata?.groundingChunks || []).map((c) => c?.web?.uri).filter(Boolean);
       const pages = [...new Set([...fromText, ...grounded].map(publicHttps).filter(Boolean))].slice(0, MAX_PAGES);
-      if (pages.length) return pages;
-    } catch { /* modello successivo */ } finally { clearTimeout(timer); }
+      if (pages.length) return { pages, why: '' };
+      failures.push(`${model} senza pagine`);
+    } catch (error) { failures.push(`${model} ${error?.name === 'AbortError' ? 'lento' : 'non raggiungibile'}`); } finally { clearTimeout(timer); }
   }
-  return [];
+  return { pages: [], why: failures.join(', ') };
 }
 
 // «%» non valido nell'indirizzo di un'immagine (succede sui siti veri): decodeURIComponent lancerebbe un errore.
@@ -113,8 +122,8 @@ async function fetchLimited(url, fetchImpl, max, accept) {
  * Restituisce { found: { bytes, mime, page, image, seen } } oppure { reason }.
  */
 export async function findBottle(gemini, slot, df, { classify, fetchImpl = globalThis.fetch } = {}) {
-  const pages = await searchWinePages(gemini, slot, { fetchImpl });
-  if (!pages.length) return { reason: 'nessuna pagina trovata' };
+  const { pages, why } = await searchPages(gemini, slot, { fetchImpl });
+  if (!pages.length) return { reason: `nessuna pagina trovata${why ? ` (${why})` : ''}`.slice(0, 160) };
   let tried = 0;
   for (const page of pages) {
     let html;
