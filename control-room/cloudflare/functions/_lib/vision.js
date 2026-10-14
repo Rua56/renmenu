@@ -6,6 +6,7 @@
 // PDF: si usa il testo incorporato nel file (conversione esatta, nessuna interpretazione); un PDF
 // scansionato senza testo va mandato come foto.
 import { extractMenuFromText } from './menu.js';
+import { LABELS } from './menu-structure.js';
 
 export const VISION_MODELS = ['@cf/meta/llama-4-scout-17b-16e-instruct', '@cf/mistralai/mistral-small-3.1-24b-instruct'];
 // Se uno dei due non risponde (es. errore 5026 su una certa foto), un terzo modello diverso fa la seconda lettura:
@@ -23,7 +24,8 @@ const PROMPT = [
   '- simboli o icone accanto al nome (foglia, spiga barrata, peperoncino…) NON vanno scritti nel nome;',
   '- un piatto o una bevanda per riga, nel formato: Nome — prezzo (il prezzo è il numero scritto accanto o allineato a destra, senza simbolo €);',
   '- la descrizione o gli ingredienti scritti sotto o accanto al nome vanno nella riga SUBITO DOPO, che inizia con "> " (es. > con burro e salvia (1-7)); il nome del piatto resta nella riga col prezzo;',
-  '- se una voce ha più prezzi (es. calice e bottiglia, piccola e grande) scrivili sulla stessa riga con le etichette: Nome — calice 5 / bottiglia 40; se le etichette sono in testa alle colonne (es. "calice  bottiglia") usa quelle;',
+  '- se una voce ha più prezzi (es. calice e bottiglia, piccola e grande) scrivili sulla stessa riga con le etichette: Nome — calice 5 / bottiglia 40; se le etichette sono in testa alle colonne (es. "calice  bottiglia", "normale  famiglia", "tonda  50 cm  1 metro") ripetile su OGNI riga: Margherita — normale 6,50 / famiglia 8,50; scrivi TUTTI i prezzi della riga, anche 3 o 4;',
+  '- i numeri degli allergeni scritti accanto al prezzo vanno nella riga della descrizione, non dopo il prezzo (es. Polenta concia — 12 poi > (8-14));',
   '- percorso o menu degustazione: titolo con il prezzo su una riga, es. # Percorso degustazione — 55 a persona; poi una portata per riga, senza prezzo; supplementi come "Abbinamento vini — 25";',
   '- copia le parole come sono scritte: non tradurre, non correggere, non completare, non aggiungere ingredienti o allergeni non scritti;',
   '- se un nome o un prezzo non si legge con sicurezza scrivi [?] al suo posto;',
@@ -77,9 +79,12 @@ async function transcribe(ai, model, dataUrl, timeoutMs) {
 }
 
 const clean = (line) => line.replace(/^[-•*]\s*/, '').replace(/\*\*/g, '').trim();
-const priceKey = (item) => (item.prezzi ? item.prezzi.map((p) => `${norm(p.etichetta.it)}=${p.prezzo}`).join('|') : item.prezzo || '');
+// Etichette libere («Pizze tonde», «tonda», «normale»): due modelli le scrivono in modo diverso, contano gli importi.
+// Calice/bottiglia e le altre etichette note restano confrontate anche nell'etichetta.
+const KNOWN_LABELS = new Set(LABELS.map(([label]) => norm(label)));
+const priceKey = (item) => (item.prezzi ? item.prezzi.map((p) => (KNOWN_LABELS.has(norm(p.etichetta.it)) ? `${norm(p.etichetta.it)}=${p.prezzo}` : p.prezzo)).join('|') : item.prezzo || '');
 const amountsKey = (item) => (item.prezzi ? item.prezzi.map((p) => p.prezzo).join('|') : item.prezzo || '');
-const priceText = (item) => (item.prezzi ? item.prezzi.map((p) => `${p.etichetta.it.toLowerCase()} ${p.prezzo}`).join(' / ') : item.prezzo);
+const priceText = (item) => (item.prezzi ? item.prezzi.map((p) => (/^prezzo \d$/i.test(p.etichetta.it) ? p.prezzo : `${p.etichetta.it.toLowerCase()} ${p.prezzo}`)).join(' / ') : item.prezzo);
 
 /** Una lettura → voci strutturate (sezione, nome, prezzo o prezzi, descrizione) + righe dubbie. */
 /* Alcuni modelli non seguono il formato «Nome — prezzo»: scrivono il prezzo sulla riga dopo e gli
@@ -152,11 +157,17 @@ export function tidyReading(text) {
       continue;
     }
     let name = line, list = '';
+    // «Polenta concia — 12,00 (14)», «Lasagne — 12,00 (8-14)»: i numeri dopo il prezzo sono gli allergeni, non parte della voce.
+    const after = name.match(/^(.*\S\s*[—–-]\s*(?:€\s*)?\d{1,4}[.,]\d{2}\s*€?)\s*\(\s*(\d{1,2}(?:\s*[-,/]\s*\d{1,2})*)\s*\)\s*\*?\s*$/);
+    if (after && codes(after[2])) { name = after[1].trimEnd(); list = codes(after[2]); }
+    // «Jota: minestra triestina. [1][3][8][9] — 13,00»: allergeni tra parentesi quadre nel nome.
+    const squared = name.match(/^(.*?\S)\s*((?:\[\s*\d{1,2}\s*\]\s*){1,14})\s*((?:[—–-]\s*)?(?:€\s*)?\d{1,4}(?:[.,]\d{1,2})?\s*€?)?\s*$/);
+    if (squared && codes(squared[2])) { const base = squared[1].replace(/[.,;:\s]+$/, ''); name = squared[3] ? `${base} — ${squared[3].replace(/^[—–-]\s*/, '')}` : base; list = codes(squared[2]); }
     // «Amari, liquori — Likerji 2,50»: il trattino lungo separa le due lingue, non il prezzo.
     const tailPrice = name.match(/^(.*\S)\s+(?:€\s*)?(\d{1,4}[.,]\d{2})\s*€?\s*$/);
-    if (tailPrice && /\s—\s/.test(tailPrice[1]) && !/a[lf]{1,3}er+g[ei]ni/i.test(tailPrice[1])) name = `${tailPrice[1].replace(/\s—\s/g, ' - ')} — ${tailPrice[2]}`;
+    if (tailPrice && /\s—\s/.test(tailPrice[1]) && !/a[lf]{1,3}er+g[ei]ni/i.test(tailPrice[1]) && !/\s—\s.*\d[.,]?\d*\s*€?\s*\//.test(tailPrice[1])) name = `${tailPrice[1].replace(/\s—\s/g, ' - ')} — ${tailPrice[2]}`;
     const tail = name.match(ALLERGEN_TAIL);
-    if (tail && !hasPrice(name)) { list = codes(tail[1]); name = name.slice(0, tail.index).trimEnd(); }
+    if (tail && !hasPrice(name)) { list = codes(tail[1]) || list; name = name.slice(0, tail.index).trimEnd(); }
     else if (hasPrice(name)) {
       const m = name.match(/^(.*?)\s*[-–—,(]\s*a[lf]{1,3}er+g[ei]ni\s*[:.]?\s*(\d{1,2}(?:\s*[-,/]\s*\d{1,2})*)?\)?\s*((?:\s[-–]|—)\s*€?\s*\d{1,4}(?:[.,]\d{1,2})?\s*€?)\s*$/i);
       if (m) { name = `${m[1]} ${m[3]}`; list = codes(m[2]); }
@@ -264,7 +275,10 @@ export function combineReadings(first, second, third = '') {
     const other = hit.other;
     // Nome scritto tutto in maiuscolo da una lettura e normale dall'altra: si tiene quello normale.
     if (shouting(name) && !shouting(other.name) && similar(name, other.name)) name = other.name;
-    lines.push(row.course ? name : `${name} — ${priceText(row)}`);
+    // Stessi importi, ma solo l'altra lettura ha scritto le etichette dei formati («normale», «famiglia»): si tengono quelle.
+    const unnamedPrices = (it) => it.prezzi?.every((p) => /^prezzo \d$/i.test(p.etichetta.it));
+    const priced = row.prezzi && other.prezzi && unnamedPrices(row) && !unnamedPrices(other) ? other : row;
+    lines.push(row.course ? name : `${name} — ${priceText(priced)}`);
     // Descrizione: solo se confermata da entrambe le letture (anche quando l'altra l'ha scritta come nome).
     const descA = row.descr || (aNameIsDesc ? row.name : ''), descB = other.descr || (!aNameIsDesc && descriptionAsName(other.name) && !similar(other.name, name) ? other.name : '');
     // Solo numeri di allergeni («(1)», «(1-2-4)»): bastano anche da una lettura, tanto restano una proposta da

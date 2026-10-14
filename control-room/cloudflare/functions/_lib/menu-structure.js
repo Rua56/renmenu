@@ -90,6 +90,37 @@ export function unlabeledVariants(row, { section = '', columns = null } = {}) {
   return { name, variants: [{ label: 'Calice', amount: a }, { label: 'Bottiglia', amount: b }], inferred: true };
 }
 
+/** Formato della lettura foto con prezzi per formato: «Focaccia — tonda 3,50 / 50 cm 6,00 / un metro 12,00»,
+ * «Zia Giada — normale 11,50 / famiglia 13,50» o solo i numeri «Zia Giada — 11,50 / 13,50». Le etichette sono
+ * quelle scritte (qualsiasi parola, non solo calice/bottiglia); senza etichette tornano i soli importi e decide Riccardo. */
+const FREE_AMOUNT = '(?:€\\s*)?(\\d{1,4}(?:[.,]\\d{1,2})?)\\s*(?:€|euro)?';
+const FREE_BEFORE = new RegExp(`^(.{1,30}?)\\s*[:=]?\\s*${FREE_AMOUNT}$`, 'i');
+const FREE_AFTER = new RegExp(`^${FREE_AMOUNT}\\s+(.{1,30})$`, 'i');
+const FREE_ONLY = new RegExp(`^${FREE_AMOUNT}$`, 'i');
+export function freeVariants(row) {
+  const m = String(row).match(/^(.{3,}?)\s+[—–]\s+(.+)$/);
+  if (!m) return null;
+  const name = m[1].replace(/[\s—–\-:|,(]+$/, '').trim();
+  if (!/[A-Za-zÀ-ÿ]{3}/.test(name) || STOP.test(name)) return null;
+  const parts = m[2].replace(/[\s/—–-]+$/, '').split(/\s+\/\s+|\s*\/\s*(?=€?\s*\d)|\s+[—–]\s+/).map((x) => x.trim()).filter(Boolean);
+  if (parts.length < 2 || parts.length > 6) return null;
+  const okLabel = (l) => /[A-Za-zÀ-ÿ]/.test(l) && l.split(/\s+/).length <= 4 && !STOP.test(l) && !/[,;]/.test(l);
+  const variants = [];
+  for (const part of parts) {
+    const only = part.match(FREE_ONLY);
+    if (only) { variants.push({ label: '', amount: only[1] }); continue; }
+    const before = part.match(FREE_BEFORE), after = !before && part.match(FREE_AFTER);
+    const label = before ? before[1].trim() : after ? after[2].trim() : '';
+    if (!label || !okLabel(label)) return null;
+    variants.push({ label: label.charAt(0).toUpperCase() + label.slice(1), amount: before ? before[2] : after[1] });
+  }
+  const labeled = variants.filter((v) => v.label).length;
+  if (labeled && labeled !== variants.length) return null;
+  if (!variants.every((v) => positive(v.amount))) return null;
+  if (labeled && new Set(variants.map((v) => v.label.toLowerCase())).size !== variants.length) return null;
+  return { name, variants, unnamed: !labeled };
+}
+
 /** Riga di sola etichetta e prezzo sotto il nome del vino: «calice 5», «Bottiglia € 40,00», «- al calice: 5 €». */
 /** Riga che inizia con un'etichetta e ha più prezzi («piccola 3 grande 5»): manca il nome, va sotto la riga prima. */
 export function namelessVariants(row) {

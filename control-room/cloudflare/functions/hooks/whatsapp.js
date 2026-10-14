@@ -59,6 +59,12 @@ async function traceDelivery(db, request, outcome) {
       const body = JSON.parse(await request.text());
       entries = (body?.entry || []).slice(0, 5).map((e) => String(e?.id || '').slice(0, 30));
       fields = [...new Set((body?.entry || []).flatMap((e) => (e?.changes || []).map((c) => String(c?.field || '').slice(0, 40))))].slice(0, 10);
+      // Il numero WhatsApp di RenMenu (identificativo Meta, non segreto): serve a Jarvis per rispondere ai locali.
+      const phoneId = String(body?.entry?.[0]?.changes?.[0]?.value?.metadata?.phone_number_id || '');
+      if (/^OK\b/.test(String(outcome)) && /^\d{5,32}$/.test(phoneId)) {
+        await db.prepare('INSERT INTO jarvis_settings (key,value,updated_at) VALUES (?,?,?) ON CONFLICT(key) DO UPDATE SET value=excluded.value,updated_at=excluded.updated_at')
+          .bind('wa_phone_number_id', phoneId, new Date().toISOString()).run();
+      }
     } catch {}
     const trace = { at: new Date().toISOString(), outcome: String(outcome).slice(0, 60), path: url.pathname.slice(0, 60), hasKey: url.searchParams.has('k'), signed: request.headers.has('x-hub-signature-256'), entries, fields };
     await db.prepare('INSERT INTO jarvis_settings (key,value,updated_at) VALUES (?,?,?) ON CONFLICT(key) DO UPDATE SET value=excluded.value,updated_at=excluded.updated_at')
