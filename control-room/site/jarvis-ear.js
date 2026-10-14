@@ -1,33 +1,64 @@
 /* Orecchio di Jarvis nella Control Room: registra dal microfono solo mentre ascolta, capisce da solo
  * quando hai finito di parlare (un attimo di silenzio dopo la voce) e restituisce l'audio in WAV 16 kHz,
- * che Jarvis trascrive con Whisper su Workers AI (gratis). Funziona allo stesso modo su iPhone e Android
- * anche dopo che Jarvis ha parlato: il riconoscimento vocale del browser, invece, spesso si blocca dopo
- * la prima frase. Il microfono si chiude a ogni turno, così la voce di Jarvis esce a volume pieno. */
+ * che Jarvis trascrive con Whisper su Workers AI (gratis). Il microfono si chiude a ogni turno, così la
+ * voce di Jarvis esce a volume pieno.
+ * Dopo che il telefono ha parlato, iPhone a volte mette l'audio «in pausa» o fa arrivare solo silenzio
+ * dal microfono: l'orecchio se ne accorge da solo (orologio vero, non solo i campioni audio), riapre
+ * l'audio da zero e riprova; se proprio non sente nulla lo dice invece di restare appeso. */
 const Context = globalThis.AudioContext || globalThis.webkitAudioContext;
 export const earAvailable = Boolean(globalThis.navigator?.mediaDevices?.getUserMedia && Context);
 
 let ctx = null;
 let current = null; // turno di ascolto in corso: { finish(keep) }
+let generation = 0; // cresce a ogni stopHearing: un ascolto ancora in apertura sa che è stato annullato
+const STUCK = Symbol('stuck');
+const NO_FRAMES_MS = 2500;
 
 /** Da chiamare dentro il tocco dell'utente: iPhone fa partire l'audio solo da un gesto. */
 export function unlockEar() {
   if (!Context) return;
-  if (!ctx) ctx = new Context();
-  if (ctx.state === 'suspended') ctx.resume().catch(() => {});
+  if (!ctx || ctx.state === 'closed') ctx = new Context();
+  if (ctx.state !== 'running') ctx.resume().catch(() => {});
 }
 
 /** Chiude l'ascolto in corso: keep=true manda ciò che ha sentito, keep=false lo butta. */
-export function stopHearing(keep = true) { current?.finish(keep); }
+export function stopHearing(keep = true) {
+  if (!keep) generation += 1;
+  current?.finish(keep);
+}
+
+function resetContext() {
+  const old = ctx;
+  ctx = null;
+  try { old?.close(); } catch { /* già chiuso */ }
+}
+const within = (promise, ms) => Promise.race([promise, new Promise((resolve) => setTimeout(resolve, ms))]);
 
 /**
- * Ascolta una frase. Restituisce un Blob WAV, oppure null se non hai parlato.
+ * Ascolta una frase. Restituisce un Blob WAV, oppure null se non hai parlato (o se l'ascolto è stato
+ * annullato). Se il microfono non manda audio nemmeno dopo aver riaperto tutto, lancia un errore EarStuck.
  * onLevel(0..1) serve all'animazione; i tempi sono in millisecondi.
  */
-export async function hear({ onLevel = () => {}, waitMs = 8000, silenceMs = 1100, maxMs = 20000 } = {}) {
-  unlockEar();
+export async function hear(options = {}) {
   stopHearing(false);
+  const mine = generation;
+  for (let attempt = 0; attempt < 2; attempt += 1) {
+    const result = await hearOnce(options, mine);
+    if (result !== STUCK) return result;
+    if (mine !== generation) return null;
+    resetContext();
+  }
+  const error = new Error('Il microfono non manda audio.');
+  error.name = 'EarStuck';
+  throw error;
+}
+
+async function hearOnce({ onLevel = () => {}, waitMs = 8000, silenceMs = 1100, maxMs = 20000 }, mine) {
+  unlockEar();
   const stream = await navigator.mediaDevices.getUserMedia({ audio: { echoCancellation: true, noiseSuppression: true, autoGainControl: true } });
-  if (ctx.state === 'suspended') await ctx.resume().catch(() => {});
+  if (mine !== generation) { stream.getTracks().forEach((track) => track.stop()); return null; }
+  // iPhone: «interrupted» dopo la voce del telefono; con il microfono acceso il resume è permesso.
+  if (ctx.state !== 'running') await within(ctx.resume().catch(() => {}), 800);
   return new Promise((resolve) => {
     const source = ctx.createMediaStreamSource(stream);
     const processor = ctx.createScriptProcessor(4096, 1, 1);
@@ -36,24 +67,34 @@ export async function hear({ onLevel = () => {}, waitMs = 8000, silenceMs = 1100
     source.connect(processor); processor.connect(mute); mute.connect(ctx.destination);
     const rate = ctx.sampleRate, started = performance.now();
     const chunks = [], preroll = [];
-    let floor = 0.004, spoke = false, lastVoice = 0, done = false;
+    let floor = 0.004, spoke = false, lastVoice = 0, done = false, alive = false;
     const finish = (keep) => {
       if (done) return;
       done = true;
+      clearInterval(clock);
       if (current?.finish === finish) current = null;
       processor.onaudioprocess = null;
       try { source.disconnect(); processor.disconnect(); mute.disconnect(); } catch { /* già scollegati */ }
       stream.getTracks().forEach((track) => track.stop());
       onLevel(0);
-      resolve(keep && spoke && chunks.length ? toWav(chunks, rate) : null);
+      resolve(keep === STUCK ? STUCK : keep && spoke && chunks.length ? toWav(chunks, rate) : null);
     };
     current = { finish };
+    // Orologio vero: se l'audio non arriva (contesto in pausa) o arriva solo silenzio assoluto
+    // (microfono «muto» dopo la voce del telefono), il turno non resta appeso.
+    const clock = setInterval(() => {
+      const now = performance.now();
+      if (!alive && now - started > NO_FRAMES_MS) { finish(STUCK); return; }
+      if (!spoke && now - started > waitMs + 500) finish(false);
+      else if (spoke && (now - lastVoice > silenceMs + 1500 || now - started > maxMs + 500)) finish(true);
+    }, 250);
     processor.onaudioprocess = (event) => {
       if (done) return;
       const data = new Float32Array(event.inputBuffer.getChannelData(0));
       let sum = 0;
       for (let i = 0; i < data.length; i += 1) sum += data[i] * data[i];
       const rms = Math.sqrt(sum / data.length), now = performance.now();
+      if (sum > 0) alive = true;
       onLevel(Math.min(1, rms * 12));
       const loud = rms > Math.max(0.012, floor * 3);
       if (!spoke) {
