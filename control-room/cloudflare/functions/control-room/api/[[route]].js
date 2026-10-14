@@ -11,7 +11,7 @@ import { ensureLiveAgent, liveSignedUrl } from '../../_lib/phone.js';
 import { OWNER_REVIEW } from '../../_lib/missions.js';
 import { readCurrentMenu } from '../../_lib/github-live.js';
 import { isSameOriginWrite, verifyOwner } from '../../_lib/auth.js';
-import { DEFAULT_SECTION, slugify, validateMenu, venueFromSource } from '../../_lib/menu.js';
+import { DEFAULT_SECTION, extractMenuFromText, slugify, validateMenu, venueFromSource } from '../../_lib/menu.js';
 import { integrations } from '../../_lib/integrations.js';
 import { reviewIssues, EVIDENCE_LABELS } from '../../_lib/editorial.js';
 import { runPrivateIntegrationAction } from '../../_lib/operations.js';
@@ -248,7 +248,7 @@ async function readPendingInner(db, env, calm) {
       // Più foto della stessa pratica in questo giro: la bozza e il riepilogo li fa la prima, le altre aspettano con lei.
       if (outcome.ok && handled.has(material.request_id)) { outcome.waiting = true; done.push({ material, outcome }); continue; }
       // Pratica già classificata e senza bozza (es. foto aggiunta da Telegram): Jarvis prepara la bozza.
-      const request = await getOne(db, 'SELECT id,category,plan,kind,subject FROM requests WHERE id=?', material.request_id);
+      const request = await getOne(db, 'SELECT id,category,plan,kind,subject,source_text FROM requests WHERE id=?', material.request_id);
       const stillUnread = await getOne(db, "SELECT id FROM materials WHERE request_id=? AND processing_status='da_trascrivere' AND archived_at IS NULL", material.request_id);
       if (stillUnread) { outcome.waiting = true; done.push({ material, request, outcome }); continue; } // bozza dopo l'ultima foto
       handled.add(material.request_id);
@@ -271,7 +271,10 @@ async function readPendingInner(db, env, calm) {
       const openChecks = weakRows.length ? (await rows(db, "SELECT a.provenance_json AS p FROM material_analyses a JOIN materials m ON m.id=a.material_id WHERE a.request_id=? AND m.archived_at IS NULL", material.request_id).catch(() => []))
         .reduce((n, r) => { try { return n + (JSON.parse(r.p || '[]')[0]?.checks || []).filter((c) => c.resolved === undefined).length; } catch { return n; } }, 0) : 0;
       if (outcome.ok && !hasDraft && openChecks > 0 && env.TELEGRAM_BOT_TOKEN) { outcome.checks = { count: openChecks, sure, unsure }; done.push({ material, request, outcome }); continue; }
-      if (outcome.ok && !hasDraft && unsure >= 10 && sure < unsure) { outcome.weak = { sure, unsure, sections: weakRows.flatMap((r) => { try { return JSON.parse(r.w || '[]'); } catch { return []; } }).filter((w) => /^Sezioni meno sicure: /.test(w)).map((w) => w.replace(/^Sezioni meno sicure: /, '').replace(/\.$/, '')).join(', ') }; done.push({ material, request, outcome }); continue; }
+      // Il menu è già scritto nell'email (prova del 14 ottobre): la bozza parte dal testo, le foto deboli non la fermano.
+      let writtenMenu = 0;
+      try { writtenMenu = extractMenuFromText('x', prepareEmailSource(request?.source_text || ''), 'x').menu.sezioni.reduce((n, sec) => n + sec.voci.length, 0); } catch { writtenMenu = 0; }
+      if (outcome.ok && !hasDraft && unsure >= 10 && sure < unsure && writtenMenu < 5) { outcome.weak = { sure, unsure, sections: weakRows.flatMap((r) => { try { return JSON.parse(r.w || '[]'); } catch { return []; } }).filter((w) => /^Sezioni meno sicure: /.test(w)).map((w) => w.replace(/^Sezioni meno sicure: /, '').replace(/\.$/, '')).join(', ') }; done.push({ material, request, outcome }); continue; }
       if (outcome.ok && request?.category && !hasDraft) {
         try { await action(jarvis, 'generateDraft', { requestId: request.id }, env); outcome.drafted = true; outcome.notesText = notesSummary(await draftNotes(db, request.id)); outcome.prep = await enrollAutoPrep(db, request.id).catch(() => false); }
         catch (error) { outcome.draftError = String(error?.message || 'errore').slice(0, 240); }
@@ -302,6 +305,17 @@ async function understandForAutopilot(db, env, request, regex) {
   return understood;
 }
 export async function runAutopilot(db, env = {}) {
+  // Un giro alla volta: due giri dell'orologio sovrapposti mandavano la stessa proposta due volte (prova del 14 ottobre).
+  try {
+    const stamp = new Date().toISOString(), stale = new Date(Date.now() - 6 * 60_000).toISOString();
+    await db.prepare("INSERT OR IGNORE INTO jarvis_settings (key,value,updated_at) VALUES ('autopilot_lock','',?)").bind('1970-01-01T00:00:00.000Z').run();
+    const got = await db.prepare("UPDATE jarvis_settings SET value='busy',updated_at=? WHERE key='autopilot_lock' AND (value<>'busy' OR updated_at<?)").bind(stamp, stale).run();
+    if (got?.meta && got.meta.changes === 0) return [];
+  } catch { /* tabella assente nei test vecchi */ }
+  try { return await runAutopilotInner(db, env); }
+  finally { try { await db.prepare("UPDATE jarvis_settings SET value='',updated_at=? WHERE key='autopilot_lock'").bind(new Date().toISOString()).run(); } catch { /* scade da solo */ } }
+}
+async function runAutopilotInner(db, env) {
   const done = [];
   for (const request of await autopilotPending(db)) {
     const regex = classifyRequest(request.subject, request.source_text);
@@ -370,10 +384,12 @@ async function autoPlaceMedia(db, env, draft) {
   catch (error) { if (/no such table/i.test(String(error?.message))) return { placed: [], heavy: [] }; throw error; }
   const group = found.map((row) => ({ ...row, label: parseLabel(row.label_json) }));
   const proposals = proposeTargets(JSON.parse(draft.menu_json), group);
-  const placed = [], heavy = [];
+  const placed = [], heavy = [], unsure = [];
   for (const media of group) {
     const proposal = proposals.get(media.id);
-    if (media.status !== 'proposta' || !proposal?.target) continue;
+    if (media.status !== 'proposta') continue;
+    // Posto incerto (nome del file e foto non d'accordo, o foto non riconosciuta): la sceglie Riccardo.
+    if (!proposal?.target || proposal.sure === false) { unsure.push(media.filename); continue; }
     if (!media.public_url) {
       if (!env.BUCKET?.get || !env.BUCKET?.put) break;
       const object = await env.BUCKET.get(media.r2_key);
@@ -392,7 +408,7 @@ async function autoPlaceMedia(db, env, draft) {
       placed.push(media.filename);
     } catch { heavy.push(media.filename); }
   }
-  return { placed, heavy };
+  return { placed, heavy, unsure };
 }
 async function prepStep(db, env, draft, step, entry) {
   const jarvis = asJarvis(db);
@@ -436,8 +452,9 @@ async function prepStep(db, env, draft, step, entry) {
   }
   if (step === 'foto') {
     if (!menu.premium) return {};
-    const { placed, heavy } = await autoPlaceMedia(db, env, draft);
-    const parts = [placed.length ? `foto messe nel menu: ${placed.length}` : '', heavy.length ? `${heavy.length} da sistemare tu in Revisione (troppo grandi o senza posto sicuro)` : ''].filter(Boolean);
+    const { placed, heavy, unsure = [] } = await autoPlaceMedia(db, env, draft);
+    const parts = [placed.length ? `foto messe nel menu: ${placed.length}` : '', heavy.length ? `${heavy.length} troppo grandi da sistemare tu in Revisione (${heavy.slice(0, 3).join(', ')})` : '',
+      unsure.length ? `${unsure.length} senza un posto sicuro, scegli tu in Revisione (${unsure.slice(0, 3).join(', ')})` : ''].filter(Boolean);
     return { note: parts.join('; ') };
   }
   return {};
@@ -471,7 +488,7 @@ export async function autoPrepareTick(db, env = {}, { budgetMs = 50_000, calmMs 
       if (!step || step === 'pronta') {
         await save(null);
         const brief = await missions.entrustBrief(db, env, draft.id);
-        const venue = (() => { try { return JSON.parse(draft.menu_json).nome; } catch { return ''; } })() || 'la pratica';
+        const venue = (() => { try { const nome = JSON.parse(draft.menu_json).nome; return typeof nome === 'string' ? nome : nome?.it || ''; } catch { return ''; } })() || 'la pratica';
         const done = (entry.log || []).length ? `Ho preparato da solo:\n${entry.log.map((line) => `• ${line}`).join('\n')}\n\n` : '';
         const ask = (brief.buttons || []).some(([, data]) => String(data).startsWith('aff:')) ? `Anteprima pronta per «${venue}»: la mando al locale?` : `«${venue}»: ho preparato tutto quello che potevo, ma l’anteprima non può ancora partire.`;
         const text = `${ask}\n\n${done}${brief.text}`;
@@ -1645,12 +1662,14 @@ async function action(db, type, input, env = {}) {
     // Premium su misura: prima Jarvis guarda che cosa mostra la foto (una lettura sola). Logo,
     // bottiglie, piatti e locale non sono pagine di menu: vanno tra le «Foto per il menu», da
     // confermare in Revisione, e non consumano la lettura doppia. Nel dubbio si legge come menu.
+    let premiumPhoto = false;
     if (material.mime !== 'application/pdf' && p.asMenu !== true) {
       const owner = await getOne(db, 'SELECT r.plan,r.category,r.subject,r.source_text,c.plan AS client_plan FROM requests r LEFT JOIN clients c ON c.id=r.client_id WHERE r.id=?', request.id);
       // Anche una pratica appena arrivata, non ancora classificata, se il testo chiede chiaramente il
       // Premium (un solo piano, senza esitazioni): le foto restano comunque proposte da confermare.
       const premium = owner && (owner.plan === 'premium' || owner.category === 'nuovo_premium' || owner.client_plan === 'premium'
         || (!['standard', 'annuale'].includes(owner.plan) && classifyRequest(owner.subject, owner.source_text).plan === 'premium'));
+      premiumPhoto = Boolean(premium);
       if (premium) {
         const seen = await classifyPhoto(env.AI, bytes, material.mime);
         if (seen.ok && !isMenuPhotoKind(seen.kind)) {
@@ -1716,6 +1735,21 @@ async function action(db, type, input, env = {}) {
     }
     // Letta come pagina di menu (anche su richiesta di Riccardo): non è più una «foto per il menu».
     if (read.ok && material.mime !== 'application/pdf') { try { await db.prepare("UPDATE media_items SET status='scartata',updated_at=? WHERE material_id=? AND status<>'confermata'").bind(stamp, materialId).run(); } catch { /* tabella assente */ } }
+    // Premium: le letture erano tutte inventate (non è una pagina di menu). La foto resta tra le «Foto per il
+    // menu», senza un posto sicuro: decide Riccardo in Revisione, Jarvis non la mette da solo.
+    if (!read.ok && read.notMenu && premiumPhoto) {
+      const note = 'Foto per il menu: non sembra una pagina di menu (forse un piatto o il locale): scegli tu dove metterla';
+      let stored = true;
+      try {
+        await auditedBatch(db, [
+          db.prepare(`INSERT INTO media_items (id,request_id,material_id,kind,description,label_json,status,created_at,updated_at) VALUES (?,?,?,'altro','','{}','proposta',?,?)
+            ON CONFLICT(material_id) DO UPDATE SET kind='altro', description='', label_json='{}', status='proposta', target=NULL, target_name=NULL, updated_at=excluded.updated_at`)
+            .bind(uid(), request.id, materialId, stamp, stamp),
+          db.prepare("UPDATE materials SET processing_status='foto_per_il_menu',text_preview=? WHERE id=?").bind(note, materialId)
+        ], 'material.media.jarvis', `Jarvis non vede un menu in «${material.filename}»: ${note}.`.slice(0, 600), request.id);
+      } catch { stored = false; }
+      if (stored) { result = { ok: true, media: true, kind: 'altro', description: '', label: {}, warnings: [note] }; return { state: await state(db, env), result }; }
+    }
     if (!read.ok) {
       await auditedBatch(db, [db.prepare("UPDATE materials SET processing_status='non_leggibile' WHERE id=?").bind(materialId)],
         'material.read.failed', `Jarvis non è riuscito a leggere «${material.filename}»: ${read.reason}.`.slice(0, 600), request.id);

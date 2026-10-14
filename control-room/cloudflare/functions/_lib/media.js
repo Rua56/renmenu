@@ -32,6 +32,7 @@ const PROMPT = [
   'Se nella foto ci sono più prezzi o un elenco di piatti, il tipo è "menu".'
 ].join('\n');
 
+const MIN_SCORE = 0.5;
 const norm = (v) => String(v || '').toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/[^a-z0-9]+/g, ' ').trim();
 const STOP = new Set(['di', 'del', 'della', 'dei', 'delle', 'al', 'alla', 'alle', 'ai', 'con', 'e', 'il', 'la', 'le', 'lo', 'i', 'gli', 'un', 'una', 'in', 'da', 'doc', 'docg', 'igt', 'dop', 'vino', 'bianco', 'rosso', 'the', 'and', 'bottiglia', 'piatto', 'foto', 'img', 'jpg', 'jpeg', 'png', 'image', 'casa', 'nostro', 'nostra']);
 const tokens = (v) => norm(v).split(' ').filter((w) => w.length > 1 && !STOP.has(w));
@@ -153,8 +154,18 @@ export function slotScore(media, slot, df = slotFrequencies([slot])) {
   }
   return 0;
 }
+// Il miglior piatto secondo una sola fonte (descrizione della foto o nome del file).
+function bestFood(source, slots, df) {
+  let best = null;
+  for (const slot of slots) {
+    if (slot.wine) continue;
+    const score = coverage(source, slot.name, df.food);
+    if (score >= MIN_SCORE && (!best || score > best.score)) best = { slot, score };
+  }
+  return best;
+}
 
-const MIN_SCORE = 0.5;
+
 /**
  * Proposte per le foto ancora da confermare. Ogni voce riceve al massimo una foto (anche contando
  * quelle già confermate); a parità vince la somiglianza più alta. Logo: uno solo.
@@ -165,25 +176,52 @@ export function proposeTargets(menu, mediaRows) {
   const taken = new Set(mediaRows.filter((m) => m.status === 'confermata' && m.target?.startsWith('voce:')).map((m) => m.target));
   let logoTaken = mediaRows.some((m) => m.status === 'confermata' && m.target === 'logo');
   const out = new Map();
-  const candidates = [];
+  const candidates = [], doubtful = [];
   for (const media of mediaRows) {
     if (media.status !== 'proposta') continue;
     if (media.kind === 'logo') { out.set(media.id, logoTaken ? { target: 'galleria', score: 0.3, why: 'c\'è già un logo: la propongo tra le foto del locale' } : { target: 'logo', score: 0.9, why: 'logo del locale: va all\'apertura del menu' }); logoTaken = true; continue; }
     if (media.kind === 'locale') { out.set(media.id, { target: 'galleria', score: 0.8, why: 'foto del locale: va nella scheda «La nostra storia»' }); continue; }
+    if (media.kind === 'piatto') {
+      // Prova del 14 ottobre: «dentice.jpg» (il cliente: «la crema di dentice») visto dal modello come «frico con
+      // polenta». Quando il nome del file e la foto indicano due piatti diversi, Jarvis propone quello del file
+      // (parole del cliente) ma non lo mette da solo: decide Riccardo.
+      const byFile = bestFood(media.filename, slots, df), byPhoto = bestFood(media.description, slots, df);
+      if (byFile && byPhoto && byFile.slot.target !== byPhoto.slot.target) {
+        doubtful.push({ media, slot: byFile.slot, score: byFile.score * 0.9, why: `il nome del file indica «${byFile.slot.name}», la foto sembra «${byPhoto.slot.name}»: controlla tu` });
+        continue;
+      }
+    }
+    if (media.kind === 'altro') {
+      // Foto che non sembra un menu e non si riconosce: solo il nome del file può suggerire il piatto.
+      const byFile = bestFood(media.filename, slots, df);
+      if (byFile) { doubtful.push({ media, slot: byFile.slot, score: byFile.score * 0.9, why: `il nome del file indica «${byFile.slot.name}»: controlla la foto` }); continue; }
+    }
     if (media.kind === 'bottiglia' || media.kind === 'piatto') {
       for (const slot of slots) { const score = slotScore(media, slot, df); if (score >= MIN_SCORE) candidates.push({ media, slot, score }); }
       continue;
     }
-    out.set(media.id, { target: null, score: 0, why: 'non so dove metterla: scegli tu' });
+    if (media.kind !== 'altro') out.set(media.id, { target: null, score: 0, why: 'non so dove metterla: scegli tu' });
   }
   candidates.sort((a, b) => b.score - a.score);
   for (const { media, slot, score } of candidates) {
     if (out.has(media.id) || taken.has(slot.target)) continue;
     taken.add(slot.target);
-    out.set(media.id, { target: slot.target, score: Math.round(score * 100) / 100, why: media.kind === 'bottiglia' ? `etichetta simile a «${slot.name}»` : `piatto simile a «${slot.name}»` });
+    // Un piatto riconosciuto solo dalla foto (prova del 14 ottobre: «cicchetto1.jpg», cotto e kren, visto come «frico
+    // con prosciutto e formaggio» e messo sul tagliere di formaggi) resta una proposta: lo mette Riccardo. Da solo
+    // Jarvis mette un piatto solo se anche il nome del file indica lo stesso piatto.
+    const byFile = media.kind === 'piatto' ? bestFood(media.filename, slots, df) : null;
+    const sure = media.kind !== 'piatto' || byFile?.slot.target === slot.target;
+    out.set(media.id, { target: slot.target, score: Math.round(score * 100) / 100, why: media.kind === 'bottiglia' ? `etichetta simile a «${slot.name}»` : sure ? `piatto simile a «${slot.name}»` : `piatto simile a «${slot.name}» (solo dalla foto): controlla tu`, ...(sure ? {} : { sure: false }) });
+  }
+  // Proposte incerte: un posto suggerito, ma «sure: false» (la preparazione automatica non le mette nel menu).
+  for (const { media, slot, score, why } of doubtful) {
+    if (out.has(media.id)) continue;
+    const free = !taken.has(slot.target);
+    if (free) taken.add(slot.target);
+    out.set(media.id, { target: free ? slot.target : null, score: Math.round(score * 100) / 100, why, sure: false });
   }
   for (const media of mediaRows) if (media.status === 'proposta' && !out.has(media.id))
-    out.set(media.id, { target: null, score: 0, why: media.kind === 'bottiglia' ? 'non trovo un vino con questo nome nella bozza: scegli tu' : 'non trovo un piatto con questo nome nella bozza: scegli tu' });
+    out.set(media.id, { target: null, score: 0, why: media.kind === 'altro' ? 'non so dove metterla: scegli tu' : media.kind === 'bottiglia' ? 'non trovo un vino con questo nome nella bozza: scegli tu' : 'non trovo un piatto con questo nome nella bozza: scegli tu' });
   return out;
 }
 
