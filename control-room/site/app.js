@@ -1437,6 +1437,9 @@ function confirmationSummary(kind, draft) {
 async function handleClick(event) {
   const trigger = event.target.closest('[data-action], [data-route], [data-select-request]');
   if (!trigger || trigger.disabled) return;
+  // Le tendine (es. «Pratica» in Revisione) cambiano con «change»: il tocco che le apre non deve ridisegnare la
+  // pagina, altrimenti sul telefono la scelta finisce sulla tendina vecchia, già tolta, e non succede niente.
+  if (trigger.matches('select')) return;
   if (trigger.dataset.selectClient !== undefined) {
     event.preventDefault();
     selectedClientId = trigger.dataset.selectClient || null;
