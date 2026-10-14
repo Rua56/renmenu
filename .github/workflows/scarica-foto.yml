@@ -10,6 +10,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+      - run: sudo apt-get install -y -qq poppler-utils imagemagick >/dev/null
       - name: Scarica le foto dei menu
         run: |
           set -u
@@ -22,10 +23,17 @@ jobs:
             tmp=$(mktemp)
             code=$(curl -sSL -A "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 Chrome/124 Safari/537.36" -o "$tmp" -w '%{http_code}' --max-time 60 "$url" || echo 000)
             type=$(file -b --mime-type "$tmp")
-            case "$type" in image/jpeg) ext=jpg;; image/png) ext=png;; image/webp) ext=webp;; *) ext="";; esac
-            if [ "$code" = 200 ] && [ -n "$ext" ]; then
+            case "$type" in image/jpeg) ext=jpg;; image/png) ext=png;; image/webp) ext=webp;; application/pdf) ext=pdf;; *) ext="";; esac
+            if [ "$code" = 200 ] && [ "$ext" = pdf ]; then
+              # Menu in PDF: le prime due pagine diventano immagini (come uno screenshot).
+              pdftoppm -r 110 -jpeg -jpegopt quality=85 -f 1 -l 2 "$tmp" "/tmp/pag"
+              for f in /tmp/pag*.jpg; do n=$((n+1)); out="prove-lettura/$dir/foto-$n.jpg"; mv "$f" "$out"; echo "ok $dir $out $(stat -c%s "$out") pdf $url" >> prove-lettura/scaricate.log; done
+              rm -f "$tmp"
+            elif [ "$code" = 200 ] && [ -n "$ext" ]; then
               out="prove-lettura/$dir/foto-$((n+1)).$ext"; mv "$tmp" "$out"
-              echo "ok $dir $out $(stat -c%s "$out") $url" >> prove-lettura/scaricate.log
+              # Come Jarvis le riceverebbe: lato lungo al massimo 2400 px, sotto i 9 MB.
+              mogrify -resize '2400x2400>' "$out" || true
+              echo "ok $dir $out $(stat -c%s "$out") $(identify -format '%wx%h' "$out" 2>/dev/null) $url" >> prove-lettura/scaricate.log
             else
               echo "ko $dir http=$code type=$type $url" >> prove-lettura/scaricate.log; rm -f "$tmp"
             fi
