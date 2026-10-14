@@ -286,6 +286,13 @@ div.hud-row { cursor: default; }
 .hud-log-cursor i { font-style: normal; animation: log-blink 1s steps(1) infinite; }
 @keyframes log-blink { 50% { opacity: 0; } }
 @media (prefers-reduced-motion: reduce) { .log-line.fresh, .log-line.fresh span, .hud-log-cursor i { animation: none; } }
+/* Cambio schermata in stile HUD: entra dal basso con una linea di scansione */
+#view.view-enter > * { animation: view-in .34s cubic-bezier(.2, .8, .2, 1) both; }
+#view.view-enter { position: relative; }
+#view.view-enter::before { position: absolute; z-index: 5; left: 0; right: 0; top: 0; height: 2px; background: linear-gradient(90deg, transparent, var(--teal), transparent); box-shadow: 0 0 12px var(--teal); content: ""; pointer-events: none; animation: view-scan .42s ease-out both; }
+@keyframes view-in { from { opacity: 0; transform: translateY(10px); filter: blur(2px); } }
+@keyframes view-scan { from { opacity: 1; transform: translateY(0); } to { opacity: 0; transform: translateY(60vh); } }
+@media (prefers-reduced-motion: reduce) { #view.view-enter > *, #view.view-enter::before { animation: none; } }
 @keyframes hud-open { from { opacity: 0; transform: translateY(8px) scale(.98); } }
 @media (prefers-reduced-motion: reduce) { .hud-display { animation: none; } }
 /* Dialogo dal vivo con Jarvis (ElevenLabs) */
