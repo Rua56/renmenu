@@ -1,0 +1,152 @@
+{
+ "nome": "Osteria Alle Volte (Udine)",
+ "sezioni": [
+  {
+   "nome": {
+    "it": "PRIMI PIATTI"
+   },
+   "voci": [
+    {
+     "nome": {
+      "it": "Spaghettone monograno Felicetti con aglio nero friulano, peperoncino e riccio di mare"
+     },
+     "prezzo": "16,00"
+    },
+    {
+     "nome": {
+      "it": "Spaghettone monograno Felicetti con le vongole veraci e bottarga di muggine"
+     },
+     "prezzo": "16,00"
+    },
+    {
+     "nome": {
+      "it": "Linguine monograno Felicetti con l'aragosta"
+     },
+     "prezzo": "26,00"
+    },
+    {
+     "nome": {
+      "it": "Risotto con gambero rosso di Mazara del Vallo fiori di zucchine e zafferano"
+     },
+     "prezzo": "16,00"
+    },
+    {
+     "nome": {
+      "it": "Taliolini all'uovo con tartufo bianco D'Alba"
+     },
+     "prezzo": "6,00"
+    },
+    {
+     "nome": {
+      "it": "Ravioli con ricotta di bufala e tartufo estivo"
+     },
+     "prezzo": "16,00"
+    },
+    {
+     "nome": {
+      "it": "Cappellotti di melanzane fatti in casa con pachino fresco, mozzarella di bufala e basilico"
+     },
+     "prezzo": "14,00"
+    },
+    {
+     "nome": {
+      "it": "Cjarsons alle erbe in salsa allo speck e ricotta affumicata"
+     },
+     "prezzo": "14,00"
+    },
+    {
+     "nome": {
+      "it": "Spaghetti al pomodoro e basilico"
+     },
+     "prezzo": "10,00"
+    },
+    {
+     "nome": {
+      "it": "Spaghetti alla bolognese"
+     },
+     "prezzo": "14,00"
+    }
+   ]
+  },
+  {
+   "nome": {
+    "it": "SECONDI PIATTI"
+   },
+   "voci": [
+    {
+     "nome": {
+      "it": "Fritto di calamaretti , gamberi e verdure croccanti"
+     },
+     "prezzo": "15,00"
+    },
+    {
+     "nome": {
+      "it": "Pescato del giorno al forno o in crosta di sale"
+     },
+     "prezzo": "6,50"
+    },
+    {
+     "nome": {
+      "it": "Tagliata di tonno pinna gialla alla mediterranea"
+     },
+     "prezzo": "18,00"
+    },
+    {
+     "nome": {
+      "it": "Trancio di ricciola con fughi porcini e tartufo estivo"
+     },
+     "prezzo": "25,00"
+    },
+    {
+     "nome": {
+      "it": "Millefoglie di filetto di cotto a bassa temperatura fis gras, mela glassata,riduzione di calvados e Tartufo bianco D'Alba"
+     },
+     "prezzo": "28,00"
+    },
+    {
+     "nome": {
+      "it": "Tagliata di Angus con scaglie di parmiggiano reggianao, riduzione balsamica e patate al forno"
+     },
+     "prezzo": "20,00"
+    },
+    {
+     "nome": {
+      "it": "Tagliata di Angus con patate al forno"
+     },
+     "prezzo": "18,00"
+    }
+   ]
+  },
+  {
+   "nome": {
+    "it": "CONTORNI"
+   },
+   "voci": [
+    {
+     "nome": {
+      "it": "Patate fritte house"
+     },
+     "prezzo": "4,00"
+    },
+    {
+     "nome": {
+      "it": "Patate al forno"
+     },
+     "prezzo": "4,00"
+    },
+    {
+     "nome": {
+      "it": "Funghi misti del bosco trifolati"
+     },
+     "prezzo": "6,00"
+    },
+    {
+     "nome": {
+      "it": "Insalata di stagione mista"
+     },
+     "prezzo": "5,00"
+    }
+   ]
+  }
+ ]
+}

@@ -1,0 +1,21 @@
+FOTO: foto-3.jpg foto-5.jpg
+# Antipasti
+Antipasto Granseola | 25,00
+Polpo scottato su crema di ceci | 19,00
+Capesante al gratin | 15,00
+Insalata di pesce | 15,00
+Prosciutto crudo “San Daniele” | 13,00
+# Menù Cozze
+SAUTÈ DI COZZE + PATATINE FRITTE | 18,00
+# Primi Piatti
+Tagliolini alla Granseola | 19,00
+Risotto con capesante e verdure di stagione | 18,00
+Spaghetti alla Scogliera | 20,00
+Spaghetti alle vongole veraci/pevarasse | 18,00
+Spaghetti alla carbonara | 13,00
+Bucatini all’amatriciana | 13,00
+# Gnocchi
+Gnocchi ai frutti di mare | 16,00
+Gnocchi al salmone | 15,00
+Gnocchi alla sorrentina | 13,00
+Gnocchi gorgonzola e spinaci | 13,00

@@ -1,0 +1,17 @@
+FOTO: foto-2.jpg
+# CLASSICHE
+Marinara | 6,00
+Margherita | 7,00
+Prosciutto | 9,00
+San Daniele | 11,00
+Prosciutto e Funghi | 9,50
+Capricciosa | 10,50
+4 Stagioni | 10,50
+Diavola | 9,00
+Patatosa | 10,50
+Calzone | 10,00
+Zucchine | 9,00
+Parmigiana | 10,00
+4 Formaggi | 11,00
+Salamino e Peperoni | 9,50
+Vegetariana | 11,00

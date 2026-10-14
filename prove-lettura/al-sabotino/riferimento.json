@@ -1,0 +1,173 @@
+{
+ "nome": "Osteria Al Sabotino (Gorizia)",
+ "sezioni": [
+  {
+   "nome": {
+    "it": "Antipasti"
+   },
+   "voci": [
+    {
+     "nome": {
+      "it": "Salame cotto nell'aceto"
+     },
+     "prezzo": "10,00"
+    },
+    {
+     "nome": {
+      "it": "Crostoni con liptauer"
+     },
+     "prezzo": "9,00"
+    },
+    {
+     "nome": {
+      "it": "Melanzane impanate"
+     },
+     "prezzo": "8,00"
+    },
+    {
+     "nome": {
+      "it": "Canestrelli grigliati"
+     },
+     "prezzo": "15,00"
+    },
+    {
+     "nome": {
+      "it": "Cozze in scottadeo"
+     },
+     "prezzo": "13,00"
+    }
+   ]
+  },
+  {
+   "nome": {
+    "it": "Primi piatti"
+   },
+   "voci": [
+    {
+     "nome": {
+      "it": "Gnocchi di patate con pesto di aglio ursino e ricotta"
+     },
+     "prezzo": "15,00"
+    },
+    {
+     "nome": {
+      "it": "Biechi(blecs) con prosciutto di S.Daniele e noci"
+     },
+     "prezzo": "14,00"
+    },
+    {
+     "nome": {
+      "it": "Zlikrofi con sugo di arrosto"
+     },
+     "prezzo": "16,50"
+    },
+    {
+     "nome": {
+      "it": "Spaghetti con busara di scampi e mazzancolle"
+     },
+     "prezzo": "16,50"
+    },
+    {
+     "nome": {
+      "it": "Linguine con le peverasse (lupini)"
+     },
+     "prezzo": "15,00"
+    },
+    {
+     "nome": {
+      "it": "Linguine con bottarga di muggine di Cabras"
+     },
+     "prezzo": "15,50"
+    }
+   ]
+  },
+  {
+   "nome": {
+    "it": "Secondi piatti"
+   },
+   "voci": [
+    {
+     "nome": {
+      "it": "Guance di maiale al forno marinate con vino terrano"
+     },
+     "prezzo": "16,00"
+    },
+    {
+     "nome": {
+      "it": "Tagliata di manzo (cube roll) guarnita"
+     },
+     "prezzo": "25,00"
+    },
+    {
+     "nome": {
+      "it": "Goulasch di manzo con canederli"
+     },
+     "prezzo": "16,00"
+    },
+    {
+     "nome": {
+      "it": "Polpette di baccalà"
+     },
+     "prezzo": "15,00"
+    },
+    {
+     "nome": {
+      "it": "Seppie in umido con polenta e riso basmati"
+     },
+     "prezzo": "16,00"
+    },
+    {
+     "nome": {
+      "it": "Calamari fritti"
+     },
+     "prezzo": "15,00"
+    }
+   ]
+  },
+  {
+   "nome": {
+    "it": "Piatti"
+   },
+   "voci": [
+    {
+     "nome": {
+      "it": "Contorni"
+     },
+     "prezzi": [
+      {
+       "etichetta": {
+        "it": "Prezzo 1"
+       },
+       "prezzo": "6,00"
+      },
+      {
+       "etichetta": {
+        "it": "Prezzo 2"
+       },
+       "prezzo": "8,00"
+      }
+     ]
+    },
+    {
+     "nome": {
+      "it": "Dessert"
+     },
+     "prezzi": [
+      {
+       "etichetta": {
+        "it": "Prezzo 1"
+       },
+       "prezzo": "6,00"
+      },
+      {
+       "etichetta": {
+        "it": "Prezzo 2"
+       },
+       "prezzo": "8,00"
+      }
+     ]
+    }
+   ]
+  }
+ ]
+}

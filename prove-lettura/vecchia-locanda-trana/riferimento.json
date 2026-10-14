@@ -1,0 +1,357 @@
+{
+ "nome": "La Vecchia Locanda (Trana)",
+ "sezioni": [
+  {
+   "nome": {
+    "it": "FOCACCE"
+   },
+   "voci": [
+    {
+     "nome": {
+      "it": "LARDO"
+     },
+     "prezzo": "6,50"
+    },
+    {
+     "nome": {
+      "it": "SPECK"
+     },
+     "prezzo": "6,50"
+    },
+    {
+     "nome": {
+      "it": "PROSCIUTTO CRUDO"
+     },
+     "prezzo": "6,50"
+    },
+    {
+     "nome": {
+      "it": "POMODORINI FRESCHI"
+     },
+     "prezzo": "6,00"
+    },
+    {
+     "nome": {
+      "it": "MICKY"
+     },
+     "prezzo": "7,00"
+    },
+    {
+     "nome": {
+      "it": "ESTIVA"
+     },
+     "prezzo": "8,50"
+    }
+   ]
+  },
+  {
+   "nome": {
+    "it": "PANZEROTTI AL FORNO"
+   },
+   "voci": [
+    {
+     "nome": {
+      "it": "FOCOSO"
+     },
+     "prezzo": "8,00"
+    },
+    {
+     "nome": {
+      "it": "GOLOSO"
+     },
+     "prezzo": "8,00"
+    },
+    {
+     "nome": {
+      "it": "AFFUMICATO"
+     },
+     "prezzo": "8,00"
+    },
+    {
+     "nome": {
+      "it": "ITALICO"
+     },
+     "prezzo": "8,00"
+    }
+   ]
+  },
+  {
+   "nome": {
+    "it": "CALZONI"
+   },
+   "voci": [
+    {
+     "nome": {
+      "it": "PROSCIUTTO COTTO"
+     },
+     "prezzo": "7,50"
+    },
+    {
+     "nome": {
+      "it": "FARCITO"
+     },
+     "prezzo": "8,00"
+    }
+   ]
+  },
+  {
+   "nome": {
+    "it": "PIZZE"
+   },
+   "voci": [
+    {
+     "nome": {
+      "it": "MARGHERITA"
+     },
+     "prezzo": "6,00"
+    },
+    {
+     "nome": {
+      "it": "GRECA"
+     },
+     "prezzo": "6,50"
+    },
+    {
+     "nome": {
+      "it": "AMERICANA"
+     },
+     "prezzo": "6,50"
+    },
+    {
+     "nome": {
+      "it": "NAPOLETANA"
+     },
+     "prezzo": "7,00"
+    },
+    {
+     "nome": {
+      "it": "SICILIANA"
+     },
+     "prezzo": "7,00"
+    },
+    {
+     "nome": {
+      "it": "CALABRISELLA"
+     },
+     "prezzo": "7,50"
+    },
+    {
+     "nome": {
+      "it": "VALDOSTANA"
+     },
+     "prezzo": "7,00"
+    },
+    {
+     "nome": {
+      "it": "DIAVOLA"
+     },
+     "prezzo": "7,00"
+    },
+    {
+     "nome": {
+      "it": "BOSCAIOLA"
+     },
+     "prezzo": "8,00"
+    },
+    {
+     "nome": {
+      "it": "SPECK E PANNA"
+     },
+     "prezzo": "7,50"
+    },
+    {
+     "nome": {
+      "it": "SPECK E BRIE"
+     },
+     "prezzo": "8,00"
+    },
+    {
+     "nome": {
+      "it": "MONTANARA"
+     },
+     "prezzo": "8,50"
+    },
+    {
+     "nome": {
+      "it": "MARINARA"
+     },
+     "prezzo": "4,50"
+    },
+    {
+     "nome": {
+      "it": "CONTADINA"
+     },
+     "prezzo": "8,00"
+    },
+    {
+     "nome": {
+      "it": "BERGÈ"
+     },
+     "prezzo": "7,00"
+    },
+    {
+     "nome": {
+      "it": "TONNO"
+     },
+     "prezzo": "6,50"
+    },
+    {
+     "nome": {
+      "it": "LUCA"
+     },
+     "prezzo": "8,00"
+    },
+    {
+     "nome": {
+      "it": "BUFALINA"
+     },
+     "prezzo": "7,50"
+    },
+    {
+     "nome": {
+      "it": "GORGONZOLA E NOCI"
+     },
+     "prezzo": "7,00"
+    },
+    {
+     "nome": {
+      "it": "GORGONZOLA E PERE"
+     },
+     "prezzo": "7,00"
+    },
+    {
+     "nome": {
+      "it": "GORGONZOLA E CIPOLLA"
+     },
+     "prezzo": "7,00"
+    },
+    {
+     "nome": {
+      "it": "SFIZIOSA"
+     },
+     "prezzo": "8,50"
+    },
+    {
+     "nome": {
+      "it": "MESSICANA"
+     },
+     "prezzo": "8,50"
+    },
+    {
+     "nome": {
+      "it": "PROSCIUTTO COTTO"
+     },
+     "prezzo": "7,00"
+    },
+    {
+     "nome": {
+      "it": "PROSCIUTTO COTTO E FUNGHI PORCINI"
+     },
+     "prezzo": "8,00"
+    },
+    {
+     "nome": {
+      "it": "PORCINI"
+     },
+     "prezzo": "7,50"
+    },
+    {
+     "nome": {
+      "it": "QUATTRO FORMAGGI"
+     },
+     "prezzo": "8,00"
+    },
+    {
+     "nome": {
+      "it": "QUATTRO STAGIONI"
+     },
+     "prezzo": "8,00"
+    },
+    {
+     "nome": {
+      "it": "RUSTICA"
+     },
+     "prezzo": "7,50"
+    },
+    {
+     "nome": {
+      "it": "VEGETARIANA"
+     },
+     "prezzo": "8,00"
+    },
+    {
+     "nome": {
+      "it": "WURSTEL"
+     },
+     "prezzo": "6,50"
+    },
+    {
+     "nome": {
+      "it": "SALSICCIA"
+     },
+     "prezzo": "7,00"
+    },
+    {
+     "nome": {
+      "it": "SALSICCIA E PATATE"
+     },
+     "prezzo": "7,50"
+    },
+    {
+     "nome": {
+      "it": "SALSICCIA E FRIARIELLI"
+     },
+     "prezzo": "7,50"
+    },
+    {
+     "nome": {
+      "it": "KAORI"
+     },
+     "prezzo": "7,50"
+    },
+    {
+     "nome": {
+      "it": "LIGURE"
+     },
+     "prezzo": "7,00"
+    },
+    {
+     "nome": {
+      "it": "STRACCHINO E RUCOLA"
+     },
+     "prezzo": "7,00"
+    },
+    {
+     "nome": {
+      "it": "VECCHIA LOCANDA"
+     },
+     "prezzo": "8,00"
+    },
+    {
+     "nome": {
+      "it": "PAZZA"
+     },
+     "prezzo": "8,00"
+    },
+    {
+     "nome": {
+      "it": "BURRATA"
+     },
+     "prezzo": "8,50"
+    },
+    {
+     "nome": {
+      "it": "DELICATA"
+     },
+     "prezzo": "8,00"
+    },
+    {
+     "nome": {
+      "it": "BOMBA"
+     },
+     "prezzo": "8,50"
+    }
+   ]
+  }
+ ]
+}

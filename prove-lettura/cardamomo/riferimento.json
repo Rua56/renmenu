@@ -1,0 +1,203 @@
+{
+ "nome": "Cardamomo (Grado)",
+ "sezioni": [
+  {
+   "nome": {
+    "it": "Per iniziare"
+   },
+   "voci": [
+    {
+     "nome": {
+      "it": "Baccalà Mantecato"
+     },
+     "prezzo": "12,00"
+    },
+    {
+     "nome": {
+      "it": "Ostrica Gillardeau/Alla Bourguignonne"
+     },
+     "prezzi": [
+      {
+       "etichetta": {
+        "it": "Prezzo 1"
+       },
+       "prezzo": "7,00"
+      },
+      {
+       "etichetta": {
+        "it": "Prezzo 2"
+       },
+       "prezzo": "8,00"
+      }
+     ]
+    },
+    {
+     "nome": {
+      "it": "Gamberesse Fritte"
+     },
+     "prezzo": "16,00"
+    }
+   ]
+  },
+  {
+   "nome": {
+    "it": "Antipasti"
+   },
+   "voci": [
+    {
+     "nome": {
+      "it": "Seppie, Patata e Nduja"
+     },
+     "prezzo": "20,00"
+    },
+    {
+     "nome": {
+      "it": "Trippa di Baccalà alla Parmigiana e Origano Cubano"
+     },
+     "prezzo": "25,00"
+    },
+    {
+     "nome": {
+      "it": "Tartare di Pecora, Ostrica, Nocciola e Limone Candito"
+     },
+     "prezzo": "23,00"
+    },
+    {
+     "nome": {
+      "it": "Crudo Misto di Pesce"
+     },
+     "prezzo": "40,00"
+    },
+    {
+     "nome": {
+      "it": "Carpaccio di Ricciola Dry Age, Porcini e Salicornia"
+     },
+     "prezzo": "30,00"
+    }
+   ]
+  },
+  {
+   "nome": {
+    "it": "Primi"
+   },
+   "voci": [
+    {
+     "nome": {
+      "it": "Linguina con Acciughe, Burro Affumicato, Alghe e Pane al Miele"
+     },
+     "prezzo": "20,00"
+    },
+    {
+     "nome": {
+      "it": "Spaghetti alle Vongole e Bottarga"
+     },
+     "prezzo": "24,00"
+    },
+    {
+     "nome": {
+      "it": "Bottoni di Faraona, Formaggio di Capra, Rabarbaro"
+     },
+     "prezzo": "22,00"
+    },
+    {
+     "nome": {
+      "it": "Plin di Ricotta, Gambero Rosso, Kumquat Candito"
+     },
+     "prezzo": "25,00"
+    }
+   ]
+  },
+  {
+   "nome": {
+    "it": "Secondi"
+   },
+   "voci": [
+    {
+     "nome": {
+      "it": "Pescato del Giorno al Bbq, Carciofi, Topinambur e Salsa al Pepe"
+     },
+     "prezzo": "30,00"
+    },
+    {
+     "nome": {
+      "it": "Schnitzel di Baccalà, Pil Pil, Tuberi e Radicchio in Agro"
+     },
+     "prezzo": "30,00"
+    },
+    {
+     "nome": {
+      "it": "Capriolo, Bagnacauda, Bieta e Limone Fermentato"
+     },
+     "prezzo": "30,00"
+    },
+    {
+     "nome": {
+      "it": "Rombo, Finferli e Tartufo"
+     },
+     "prezzo": "40,00"
+    }
+   ]
+  },
+  {
+   "nome": {
+    "it": "Dolci"
+   },
+   "voci": [
+    {
+     "nome": {
+      "it": "Brownie al Cioccolato, Nocciola e Cardamomo"
+     },
+     "prezzo": "10,00"
+    },
+    {
+     "nome": {
+      "it": "Cioccolato Bianco, Tè Nero e Pesca"
+     },
+     "prezzo": "10,00"
+    },
+    {
+     "nome": {
+      "it": "Tiramisù"
+     },
+     "prezzo": "8,00"
+    },
+    {
+     "nome": {
+      "it": "Meringa d’Asina, Pane Noci e Uvetta, Mostarda di Fichi"
+     },
+     "prezzo": "12,00"
+    },
+    {
+     "nome": {
+      "it": "Percorso Degustazione con 5 Portate dalla Cucina & Dolce"
+     },
+     "prezzo": "90,00"
+    },
+    {
+     "nome": {
+      "it": "Abbinamento 5 Vini"
+     },
+     "prezzo": "50,00"
+    },
+    {
+     "nome": {
+      "it": "Acqua"
+     },
+     "prezzo": "3,50"
+    },
+    {
+     "nome": {
+      "it": "Pane Ripasso"
+     },
+     "prezzo": "2,50"
+    },
+    {
+     "nome": {
+      "it": "Caffè"
+     },
+     "prezzo": "2,50"
+    }
+   ]
+  }
+ ]
+}

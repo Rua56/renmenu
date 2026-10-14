@@ -1,0 +1,24 @@
+FOTO: foto-1.jpg
+# Antipasti
+Salame cotto nell'aceto | 10,00
+Crostoni con liptauer | 9,00
+Melanzane impanate | 8,00
+Canestrelli grigliati | 15,00
+Cozze in scottadeo | 13,00
+# Primi piatti
+Gnocchi di patate con pesto di aglio ursino e ricotta | 15,00
+Biechi(blecs) con prosciutto di S.Daniele e noci | 14,00
+Zlikrofi con sugo di arrosto | 16,50
+Spaghetti con busara di scampi e mazzancolle | 16,50
+Linguine con le peverasse (lupini) | 15,00
+Linguine con bottarga di muggine di Cabras | 15,50
+# Secondi piatti
+Guance di maiale al forno marinate con vino terrano | 16,00
+Tagliata di manzo (cube roll) guarnita | 25,00
+Goulasch di manzo con canederli | 16,00
+Polpette di baccalà | 15,00
+Seppie in umido con polenta e riso basmati | 16,00
+Calamari fritti | 15,00
+# Piatti
+Contorni | 6,00 / 8,00
+Dessert | 6,00 / 8,00

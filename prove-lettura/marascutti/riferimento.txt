@@ -1,0 +1,39 @@
+FOTO: foto-1.jpg
+# Antipasti
+Prosciutto cotto triestino etto/hecto | 9,00
+Prosciutto crudo di Sauris etto/hecto | 12,00
+Kajmak Formaggio fresco | 12,00
+Tagliere di prosciutto cotto triestino, prosciutto crudo di Sauris e formaggi | 20,00
+# Primi piatti
+Gnocchi di patate con gulasch | 15,00
+Gnocchi di patate con ragù | 15,00
+Gnocchi di pane al gulash | 16,00
+Gnocchi di pane al ragù | 16,00
+Jota | 12,00
+Pappardelle fatte in casa con selvaggina | 16,00
+Baccalà in umido con polenta | 19,00
+Fusi con sugo di gallina all’istriana | 16,00
+Gnocchi con selvaggina | 16,00
+# Secondi piatti
+Wiener Schnitzel (di vitello) | 18,00
+Tagliata di manzo con rucola e pomodorini | 24,00
+Tagliata di manzo con rucola e grana | 24,00
+# Secondi piatti
+Arrosto di maiale con patate in tecia | 16,00
+Ljubljanska con contorno | 25,00
+Giulianska con contorno | 26,00
+Stinco di maiale con patate in tecia | 35,00
+# Bolliti di Maiale
+Porcina | 8,00
+Vienna | 8,00
+Musetto | 8,00
+Coppa affumicata | 8,00
+Pancetta cotta | 8,00
+Kranjska klobasa (cragno) | 10,00
+Bollito misto con contorno | 22,00
+Piatto marascutti (per 2 persone) | 35,00
+# Contorni
+Patate in tecia | 6,00
+Patate fritte | 6,00
+Insalata mista | 6,00
+Crauti | 6,00

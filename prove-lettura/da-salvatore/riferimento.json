@@ -1,0 +1,102 @@
+{
+ "nome": "Da Salvatore (Lignano)",
+ "sezioni": [
+  {
+   "nome": {
+    "it": "CLASSICHE"
+   },
+   "voci": [
+    {
+     "nome": {
+      "it": "Marinara"
+     },
+     "prezzo": "6,00"
+    },
+    {
+     "nome": {
+      "it": "Margherita"
+     },
+     "prezzo": "7,00"
+    },
+    {
+     "nome": {
+      "it": "Prosciutto"
+     },
+     "prezzo": "9,00"
+    },
+    {
+     "nome": {
+      "it": "San Daniele"
+     },
+     "prezzo": "11,00"
+    },
+    {
+     "nome": {
+      "it": "Prosciutto e Funghi"
+     },
+     "prezzo": "9,50"
+    },
+    {
+     "nome": {
+      "it": "Capricciosa"
+     },
+     "prezzo": "10,50"
+    },
+    {
+     "nome": {
+      "it": "4 Stagioni"
+     },
+     "prezzo": "10,50"
+    },
+    {
+     "nome": {
+      "it": "Diavola"
+     },
+     "prezzo": "9,00"
+    },
+    {
+     "nome": {
+      "it": "Patatosa"
+     },
+     "prezzo": "10,50"
+    },
+    {
+     "nome": {
+      "it": "Calzone"
+     },
+     "prezzo": "10,00"
+    },
+    {
+     "nome": {
+      "it": "Zucchine"
+     },
+     "prezzo": "9,00"
+    },
+    {
+     "nome": {
+      "it": "Parmigiana"
+     },
+     "prezzo": "10,00"
+    },
+    {
+     "nome": {
+      "it": "4 Formaggi"
+     },
+     "prezzo": "11,00"
+    },
+    {
+     "nome": {
+      "it": "Salamino e Peperoni"
+     },
+     "prezzo": "9,50"
+    },
+    {
+     "nome": {
+      "it": "Vegetariana"
+     },
+     "prezzo": "11,00"
+    }
+   ]
+  }
+ ]
+}

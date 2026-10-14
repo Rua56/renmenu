@@ -1,0 +1,882 @@
+{
+ "nome": "Pizza al Volo (Cavenago di Brianza)",
+ "sezioni": [
+  {
+   "nome": {
+    "it": "LE PIADINE"
+   },
+   "voci": [
+    {
+     "nome": {
+      "it": "COTTO E FONTINA"
+     },
+     "prezzo": "5,00"
+    },
+    {
+     "nome": {
+      "it": "CRUDO E MOZZARELLA"
+     },
+     "prezzo": "5,00"
+    },
+    {
+     "nome": {
+      "it": "WURSTEL E MOZZARELLA"
+     },
+     "prezzo": "5,00"
+    },
+    {
+     "nome": {
+      "it": "ROTOLO SALAME E MOZZARELLA"
+     },
+     "prezzo": "5,00"
+    }
+   ]
+  },
+  {
+   "nome": {
+    "it": "I PANINI E MENÙ"
+   },
+   "voci": [
+    {
+     "nome": {
+      "it": "HOT DOG CLASSICO"
+     },
+     "prezzo": "4,00"
+    },
+    {
+     "nome": {
+      "it": "HOT DOG FARCITO"
+     },
+     "prezzo": "4,50"
+    },
+    {
+     "nome": {
+      "it": "HAMBURGER"
+     },
+     "prezzo": "4,00"
+    },
+    {
+     "nome": {
+      "it": "KEBABBO"
+     },
+     "prezzo": "6,00"
+    },
+    {
+     "nome": {
+      "it": "COTOLETTA"
+     },
+     "prezzo": "5,00"
+    },
+    {
+     "nome": {
+      "it": "MENÙ KEBABBO"
+     },
+     "prezzo": "8,50"
+    },
+    {
+     "nome": {
+      "it": "MENÙ COTOLETTA"
+     },
+     "prezzo": "8,00"
+    },
+    {
+     "nome": {
+      "it": "MENÙ GNOCCO FRITTO"
+     },
+     "prezzo": "8,00"
+    }
+   ]
+  },
+  {
+   "nome": {
+    "it": "LE INSALATONE"
+   },
+   "voci": [
+    {
+     "nome": {
+      "it": "ALPINA"
+     },
+     "prezzo": "6,00"
+    },
+    {
+     "nome": {
+      "it": "BETTY"
+     },
+     "prezzo": "6,00"
+    },
+    {
+     "nome": {
+      "it": "COCCODÈ"
+     },
+     "prezzo": "6,00"
+    },
+    {
+     "nome": {
+      "it": "GAMBERATA"
+     },
+     "prezzo": "6,00"
+    },
+    {
+     "nome": {
+      "it": "INSALATONA RANDOM"
+     },
+     "prezzo": "6,00"
+    },
+    {
+     "nome": {
+      "it": "LIGHT"
+     },
+     "prezzo": "6,00"
+    },
+    {
+     "nome": {
+      "it": "NOCINA"
+     },
+     "prezzo": "6,00"
+    },
+    {
+     "nome": {
+      "it": "PORCINA"
+     },
+     "prezzo": "6,00"
+    },
+    {
+     "nome": {
+      "it": "VEGETARIANA"
+     },
+     "prezzo": "6,00"
+    },
+    {
+     "nome": {
+      "it": "MENU INSALATONA"
+     },
+     "prezzo": "8,00"
+    }
+   ]
+  },
+  {
+   "nome": {
+    "it": "I DOLCI"
+   },
+   "voci": [
+    {
+     "nome": {
+      "it": "FOCACCIA ALLA NUTELLA"
+     },
+     "prezzo": "6,00"
+    },
+    {
+     "nome": {
+      "it": "GNOCCO FRITTO"
+     },
+     "prezzo": "4,50"
+    },
+    {
+     "nome": {
+      "it": "PATANUTELLA"
+     },
+     "prezzo": "6,50"
+    },
+    {
+     "nome": {
+      "it": "PERINA"
+     },
+     "prezzo": "6,50"
+    },
+    {
+     "nome": {
+      "it": "SORRISO ALLA NUTELLA"
+     },
+     "prezzo": "6,00"
+    },
+    {
+     "nome": {
+      "it": "CANNOLO SICILIANO"
+     },
+     "prezzo": "3,50"
+    }
+   ]
+  },
+  {
+   "nome": {
+    "it": "I FRITTI"
+   },
+   "voci": [
+    {
+     "nome": {
+      "it": "ALETTE DI POLLO"
+     },
+     "prezzo": "4,00"
+    },
+    {
+     "nome": {
+      "it": "CHELE DI GRANCHIO"
+     },
+     "prezzo": "4,00"
+    },
+    {
+     "nome": {
+      "it": "CROCCHETTE DI PATATE"
+     },
+     "prezzo": "4,00"
+    },
+    {
+     "nome": {
+      "it": "FIORI DI ZUCCA"
+     },
+     "prezzo": "4,00"
+    },
+    {
+     "nome": {
+      "it": "GNOCCO FRITTO"
+     },
+     "prezzo": "4,00"
+    },
+    {
+     "nome": {
+      "it": "MOZZARELLINE"
+     },
+     "prezzo": "4,00"
+    },
+    {
+     "nome": {
+      "it": "NUGGETS DI POLLO"
+     },
+     "prezzo": "4,00"
+    },
+    {
+     "nome": {
+      "it": "OLIVE ALL'ASCOLANA"
+     },
+     "prezzo": "4,00"
+    },
+    {
+     "nome": {
+      "it": "PATATINE"
+     },
+     "prezzi": [
+      {
+       "etichetta": {
+        "it": "Prezzo 1"
+       },
+       "prezzo": "2,50"
+      },
+      {
+       "etichetta": {
+        "it": "Prezzo 2"
+       },
+       "prezzo": "3,50"
+      },
+      {
+       "etichetta": {
+        "it": "Prezzo 3"
+       },
+       "prezzo": "4,50"
+      }
+     ]
+    },
+    {
+     "nome": {
+      "it": "VERDURE MISTE IN PASTELLA"
+     },
+     "prezzo": "4,00"
+    },
+    {
+     "nome": {
+      "it": "ARANCINA"
+     },
+     "prezzo": "4,00"
+    },
+    {
+     "nome": {
+      "it": "ARANCINI MIGNON"
+     },
+     "prezzo": "4,00"
+    },
+    {
+     "nome": {
+      "it": "PANZEROTTINI"
+     },
+     "prezzo": "4,00"
+    },
+    {
+     "nome": {
+      "it": "JUMBO BOX"
+     },
+     "prezzo": "12,00"
+    }
+   ]
+  },
+  {
+   "nome": {
+    "it": "LE CLASSICHE"
+   },
+   "voci": [
+    {
+     "nome": {
+      "it": "4 STAGIONI"
+     },
+     "prezzo": "9,00"
+    },
+    {
+     "nome": {
+      "it": "4 FORMAGGI"
+     },
+     "prezzo": "9,00"
+    },
+    {
+     "nome": {
+      "it": "BRESAOLA"
+     },
+     "prezzo": "7,50"
+    },
+    {
+     "nome": {
+      "it": "BUFALINA"
+     },
+     "prezzo": "8,00"
+    },
+    {
+     "nome": {
+      "it": "CAPRICCIOSA"
+     },
+     "prezzo": "9,00"
+    },
+    {
+     "nome": {
+      "it": "CONTADINA"
+     },
+     "prezzo": "9,00"
+    },
+    {
+     "nome": {
+      "it": "CRUDO"
+     },
+     "prezzo": "7,50"
+    },
+    {
+     "nome": {
+      "it": "DELICATA"
+     },
+     "prezzo": "8,50"
+    },
+    {
+     "nome": {
+      "it": "DELIZIA"
+     },
+     "prezzo": "9,00"
+    },
+    {
+     "nome": {
+      "it": "DIAVOLA"
+     },
+     "prezzo": "7,00"
+    },
+    {
+     "nome": {
+      "it": "FRUTTI DI MARE"
+     },
+     "prezzo": "9,50"
+    },
+    {
+     "nome": {
+      "it": "FUNGHI"
+     },
+     "prezzo": "7,00"
+    },
+    {
+     "nome": {
+      "it": "GAMBERITA"
+     },
+     "prezzo": "7,50"
+    },
+    {
+     "nome": {
+      "it": "LIGURE"
+     },
+     "prezzo": "9,00"
+    },
+    {
+     "nome": {
+      "it": "MANSURA"
+     },
+     "prezzo": "9,00"
+    },
+    {
+     "nome": {
+      "it": "MARGHERITA"
+     },
+     "prezzo": "6,00"
+    },
+    {
+     "nome": {
+      "it": "MARINARA"
+     },
+     "prezzo": "5,50"
+    },
+    {
+     "nome": {
+      "it": "MONZESE"
+     },
+     "prezzo": "7,00"
+    },
+    {
+     "nome": {
+      "it": "MUGNAIA"
+     },
+     "prezzo": "8,00"
+    },
+    {
+     "nome": {
+      "it": "NAPOLI"
+     },
+     "prezzo": "7,00"
+    },
+    {
+     "nome": {
+      "it": "ORTOLANA"
+     },
+     "prezzo": "9,00"
+    },
+    {
+     "nome": {
+      "it": "PATAPIZZA"
+     },
+     "prezzo": "7,00"
+    },
+    {
+     "nome": {
+      "it": "PATAWÜRSTEL"
+     },
+     "prezzo": "8,00"
+    },
+    {
+     "nome": {
+      "it": "PORCINI"
+     },
+     "prezzo": "8,00"
+    },
+    {
+     "nome": {
+      "it": "PROSCIUTTO"
+     },
+     "prezzo": "7,00"
+    },
+    {
+     "nome": {
+      "it": "PUGLIESE"
+     },
+     "prezzo": "7,00"
+    },
+    {
+     "nome": {
+      "it": "ROMANA"
+     },
+     "prezzo": "8,00"
+    },
+    {
+     "nome": {
+      "it": "SFIZIOSA"
+     },
+     "prezzo": "9,50"
+    },
+    {
+     "nome": {
+      "it": "SICILIANA"
+     },
+     "prezzo": "7,00"
+    },
+    {
+     "nome": {
+      "it": "SPECK"
+     },
+     "prezzo": "7,50"
+    },
+    {
+     "nome": {
+      "it": "SPINACI E RICOTTA"
+     },
+     "prezzo": "8,00"
+    },
+    {
+     "nome": {
+      "it": "TIROLESE"
+     },
+     "prezzo": "9,00"
+    },
+    {
+     "nome": {
+      "it": "TONNO"
+     },
+     "prezzo": "7,00"
+    },
+    {
+     "nome": {
+      "it": "TONNO E CIPOLLA"
+     },
+     "prezzo": "8,00"
+    },
+    {
+     "nome": {
+      "it": "VALTELLINA"
+     },
+     "prezzo": "9,50"
+    },
+    {
+     "nome": {
+      "it": "VIENNESE"
+     },
+     "prezzo": "7,00"
+    }
+   ]
+  },
+  {
+   "nome": {
+    "it": "LE PARTICOLARI"
+   },
+   "voci": [
+    {
+     "nome": {
+      "it": "AL VOLO"
+     },
+     "prezzo": "9,50"
+    },
+    {
+     "nome": {
+      "it": "BISMARK"
+     },
+     "prezzo": "8,50"
+    },
+    {
+     "nome": {
+      "it": "BRACCIO DI FERRO"
+     },
+     "prezzo": "9,00"
+    },
+    {
+     "nome": {
+      "it": "BROCCOLINA"
+     },
+     "prezzo": "9,00"
+    },
+    {
+     "nome": {
+      "it": "BURGY"
+     },
+     "prezzo": "8,50"
+    },
+    {
+     "nome": {
+      "it": "CICCIARIELLA"
+     },
+     "prezzo": "9,50"
+    },
+    {
+     "nome": {
+      "it": "FILARIELLA"
+     },
+     "prezzo": "9,00"
+    },
+    {
+     "nome": {
+      "it": "FUORI DI ZUCCA"
+     },
+     "prezzo": "9,00"
+    },
+    {
+     "nome": {
+      "it": "INNAMORATI"
+     },
+     "prezzo": "9,00"
+    },
+    {
+     "nome": {
+      "it": "MEDITERRANEA"
+     },
+     "prezzo": "9,50"
+    },
+    {
+     "nome": {
+      "it": "MEXICO"
+     },
+     "prezzo": "9,00"
+    },
+    {
+     "nome": {
+      "it": "MONACO"
+     },
+     "prezzo": "8,00"
+    },
+    {
+     "nome": {
+      "it": "'NDUJA"
+     },
+     "prezzo": "9,50"
+    },
+    {
+     "nome": {
+      "it": "NANO"
+     },
+     "prezzo": "9,00"
+    },
+    {
+     "nome": {
+      "it": "NUGGETS"
+     },
+     "prezzo": "8,50"
+    },
+    {
+     "nome": {
+      "it": "PATAKEBABBO"
+     },
+     "prezzo": "9,00"
+    },
+    {
+     "nome": {
+      "it": "PIZZAKEBABBO"
+     },
+     "prezzo": "9,00"
+    },
+    {
+     "nome": {
+      "it": "ROSA"
+     },
+     "prezzo": "9,50"
+    },
+    {
+     "nome": {
+      "it": "SUPERGENOVA"
+     },
+     "prezzo": "9,50"
+    },
+    {
+     "nome": {
+      "it": "TEO"
+     },
+     "prezzo": "9,50"
+    },
+    {
+     "nome": {
+      "it": "TREVIGIANA"
+     },
+     "prezzo": "8,50"
+    },
+    {
+     "nome": {
+      "it": "ZOLA e MELA/PERA"
+     },
+     "prezzo": "8,00"
+    },
+    {
+     "nome": {
+      "it": "ZOLA e NOCI"
+     },
+     "prezzo": "8,00"
+    },
+    {
+     "nome": {
+      "it": "CRISPY"
+     },
+     "prezzo": "10,00"
+    }
+   ]
+  },
+  {
+   "nome": {
+    "it": "AI SUGHI"
+   },
+   "voci": [
+    {
+     "nome": {
+      "it": "BOSCAIOLA"
+     },
+     "prezzo": "9,50"
+    },
+    {
+     "nome": {
+      "it": "CARBONARA"
+     },
+     "prezzo": "9,50"
+    },
+    {
+     "nome": {
+      "it": "MARI E MONTI"
+     },
+     "prezzo": "9,50"
+    },
+    {
+     "nome": {
+      "it": "NORMA"
+     },
+     "prezzo": "8,00"
+    },
+    {
+     "nome": {
+      "it": "RAGUTTINA"
+     },
+     "prezzo": "9,50"
+    },
+    {
+     "nome": {
+      "it": "VIAGRA"
+     },
+     "prezzo": "9,50"
+    }
+   ]
+  },
+  {
+   "nome": {
+    "it": "LE SPECIALITA' BIANCHE"
+   },
+   "voci": [
+    {
+     "nome": {
+      "it": "CURRY"
+     },
+     "prezzo": "8,00"
+    },
+    {
+     "nome": {
+      "it": "PUZZOLA"
+     },
+     "prezzo": "9,00"
+    },
+    {
+     "nome": {
+      "it": "TARTUFINA"
+     },
+     "prezzo": "9,50"
+    },
+    {
+     "nome": {
+      "it": "ZUCCHETTA"
+     },
+     "prezzo": "9,00"
+    }
+   ]
+  },
+  {
+   "nome": {
+    "it": "LE FOCACCE AL VOLO"
+   },
+   "voci": [
+    {
+     "nome": {
+      "it": "FOCACCIA GAMBERINA"
+     },
+     "prezzo": "8,00"
+    },
+    {
+     "nome": {
+      "it": "FOCACCIA LIGHT"
+     },
+     "prezzo": "6,00"
+    },
+    {
+     "nome": {
+      "it": "FOCACCIA LISCIA"
+     },
+     "prezzo": "5,50"
+    },
+    {
+     "nome": {
+      "it": "FOCACCIA PUGLIESE"
+     },
+     "prezzo": "6,50"
+    },
+    {
+     "nome": {
+      "it": "FOCACCIA REGINA"
+     },
+     "prezzo": "8,00"
+    },
+    {
+     "nome": {
+      "it": "FOCACCIA VEGETARIANA"
+     },
+     "prezzo": "8,00"
+    }
+   ]
+  },
+  {
+   "nome": {
+    "it": "I CALZONI AL VOLO"
+   },
+   "voci": [
+    {
+     "nome": {
+      "it": "CALZONE FARCITO"
+     },
+     "prezzo": "7,50"
+    },
+    {
+     "nome": {
+      "it": "CALZONE LISCIO"
+     },
+     "prezzo": "6,50"
+    },
+    {
+     "nome": {
+      "it": "CALZONE ORTOLANO"
+     },
+     "prezzo": "7,50"
+    },
+    {
+     "nome": {
+      "it": "CALZONE RICOTTINO"
+     },
+     "prezzo": "7,50"
+    },
+    {
+     "nome": {
+      "it": "CALZONE SPINACIONE"
+     },
+     "prezzo": "7,50"
+    }
+   ]
+  },
+  {
+   "nome": {
+    "it": "I SORRISI AL VOLO"
+   },
+   "voci": [
+    {
+     "nome": {
+      "it": "BRESAOLA, RUCOLA e GRANA"
+     },
+     "prezzo": "6,00"
+    },
+    {
+     "nome": {
+      "it": "CRUDO e MOZZARELLA di BUFALA"
+     },
+     "prezzo": "6,00"
+    },
+    {
+     "nome": {
+      "it": "INSALATA, TONNO, POMODORINI, MAIONESE"
+     },
+     "prezzo": "6,00"
+    },
+    {
+     "nome": {
+      "it": "RUCOLA, POMODORINI e BUFALA"
+     },
+     "prezzo": "6,00"
+    },
+    {
+     "nome": {
+      "it": "SPECK e BRIE"
+     },
+     "prezzo": "6,00"
+    },
+    {
+     "nome": {
+      "it": "WÜRSTEL e CIPOLLA GRIGLIATA"
+     },
+     "prezzo": "6,00"
+    }
+   ]
+  }
+ ]
+}

@@ -1,0 +1,177 @@
+{
+ "nome": "La Locanda (Albinea)",
+ "sezioni": [
+  {
+   "nome": {
+    "it": "ANTIPASTO"
+   },
+   "voci": [
+    {
+     "nome": {
+      "it": "Antipasto La Locanda"
+     },
+     "prezzo": "8,00"
+    }
+   ]
+  },
+  {
+   "nome": {
+    "it": "PRIMI PIATTI"
+   },
+   "voci": [
+    {
+     "nome": {
+      "it": "Tortelli verdi"
+     },
+     "prezzo": "12,00"
+    },
+    {
+     "nome": {
+      "it": "Tortelli di zucca"
+     },
+     "prezzo": "12,00"
+    },
+    {
+     "nome": {
+      "it": "Tortelli di radicchio"
+     },
+     "prezzo": "12,00"
+    },
+    {
+     "nome": {
+      "it": "Bigoli alla salamella"
+     },
+     "prezzo": "10,00"
+    },
+    {
+     "nome": {
+      "it": "Gnocchi di zucca con fonduta alla gorgonzola di bufala"
+     },
+     "prezzo": "14,00"
+    },
+    {
+     "nome": {
+      "it": "Gnocchi al soffritto"
+     },
+     "prezzo": "10,00"
+    },
+    {
+     "nome": {
+      "it": "Cappelletti in brodo di cappone"
+     },
+     "prezzo": "15,00"
+    },
+    {
+     "nome": {
+      "it": "Zuppa di cipolle"
+     },
+     "prezzo": "10,00"
+    }
+   ]
+  },
+  {
+   "nome": {
+    "it": "BOLLICINE"
+   },
+   "voci": [
+    {
+     "nome": {
+      "it": "Champagne brut nature Zero"
+     },
+     "prezzo": "80,00"
+    },
+    {
+     "nome": {
+      "it": "Franciacorta satèn"
+     },
+     "prezzo": "45,00"
+    },
+    {
+     "nome": {
+      "it": "Trentodoc pas dosé Giulio Larcher"
+     },
+     "prezzo": "38,00"
+    },
+    {
+     "nome": {
+      "it": "Trentodoc nature"
+     },
+     "prezzo": "38,00"
+    },
+    {
+     "nome": {
+      "it": "Trentodoc brut rosé"
+     },
+     "prezzo": "40,00"
+    },
+    {
+     "nome": {
+      "it": "Prosecco extra brut"
+     },
+     "prezzo": "18,00"
+    },
+    {
+     "nome": {
+      "it": "Spergola metodo classico Le Nebbie"
+     },
+     "prezzo": "30,00"
+    },
+    {
+     "nome": {
+      "it": "Spergola"
+     },
+     "prezzo": "18,00"
+    },
+    {
+     "nome": {
+      "it": "Levante 90"
+     },
+     "prezzo": "17,00"
+    },
+    {
+     "nome": {
+      "it": "Lusvardi rosé"
+     },
+     "prezzo": "18,00"
+    }
+   ]
+  },
+  {
+   "nome": {
+    "it": "BIANCHI FERMI"
+   },
+   "voci": [
+    {
+     "nome": {
+      "it": "Chardonnay Riserva Villanova"
+     },
+     "prezzo": "38,00"
+    },
+    {
+     "nome": {
+      "it": "Sauvignon"
+     },
+     "prezzo": "24,00"
+    },
+    {
+     "nome": {
+      "it": "Albana Albarara"
+     },
+     "prezzo": "22,00"
+    },
+    {
+     "nome": {
+      "it": "Ribolla Gialla Rjalla"
+     },
+     "prezzo": "24,00"
+    },
+    {
+     "nome": {
+      "it": "Gewürztraminer Selida"
+     },
+     "prezzo": "24,00"
+    }
+   ]
+  }
+ ]
+}

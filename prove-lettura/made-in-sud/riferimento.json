@@ -1,0 +1,558 @@
+{
+ "nome": "Pizzeria Made in Sud (Bologna)",
+ "sezioni": [
+  {
+   "nome": {
+    "it": "PIZZE CLASSICHE"
+   },
+   "voci": [
+    {
+     "nome": {
+      "it": "PIADA"
+     },
+     "prezzo": "2,20"
+    },
+    {
+     "nome": {
+      "it": "MARINARA"
+     },
+     "prezzo": "3,20"
+    },
+    {
+     "nome": {
+      "it": "MARGHERITA"
+     },
+     "prezzo": "3,50"
+    },
+    {
+     "nome": {
+      "it": "BIANCANEVE"
+     },
+     "prezzo": "3,20"
+    },
+    {
+     "nome": {
+      "it": "FAINA"
+     },
+     "prezzo": "4,00"
+    },
+    {
+     "nome": {
+      "it": "CIPOLLA"
+     },
+     "prezzo": "4,00"
+    },
+    {
+     "nome": {
+      "it": "FUNGHI FRESCHI"
+     },
+     "prezzo": "4,50"
+    },
+    {
+     "nome": {
+      "it": "FUNGHI TRIFOLATI"
+     },
+     "prezzo": "4,50"
+    },
+    {
+     "nome": {
+      "it": "CARCIOFINI"
+     },
+     "prezzo": "4,50"
+    },
+    {
+     "nome": {
+      "it": "GRECA"
+     },
+     "prezzo": "4,50"
+    },
+    {
+     "nome": {
+      "it": "ZUCCHINE"
+     },
+     "prezzo": "4,50"
+    },
+    {
+     "nome": {
+      "it": "PEPERONI"
+     },
+     "prezzo": "4,50"
+    },
+    {
+     "nome": {
+      "it": "MORGANA"
+     },
+     "prezzo": "4,50"
+    },
+    {
+     "nome": {
+      "it": "RADICCHIO"
+     },
+     "prezzo": "4,50"
+    },
+    {
+     "nome": {
+      "it": "CAMPAGNOLA"
+     },
+     "prezzo": "4,50"
+    },
+    {
+     "nome": {
+      "it": "PATATE AL FORNO"
+     },
+     "prezzo": "4,50"
+    },
+    {
+     "nome": {
+      "it": "PATATINE FRITTE"
+     },
+     "prezzo": "4,50"
+    },
+    {
+     "nome": {
+      "it": "NAPOLI"
+     },
+     "prezzo": "4,50"
+    },
+    {
+     "nome": {
+      "it": "TONNO"
+     },
+     "prezzo": "4,50"
+    },
+    {
+     "nome": {
+      "it": "SALSICCIA"
+     },
+     "prezzo": "4,50"
+    },
+    {
+     "nome": {
+      "it": "VIENNESE"
+     },
+     "prezzo": "4,50"
+    },
+    {
+     "nome": {
+      "it": "DIAVOLA"
+     },
+     "prezzo": "4,50"
+    },
+    {
+     "nome": {
+      "it": "COTTO"
+     },
+     "prezzo": "4,50"
+    },
+    {
+     "nome": {
+      "it": "VALDOSTANA"
+     },
+     "prezzo": "5,00"
+    },
+    {
+     "nome": {
+      "it": "VESUVIANA"
+     },
+     "prezzo": "5,00"
+    },
+    {
+     "nome": {
+      "it": "ROMANA"
+     },
+     "prezzo": "5,00"
+    },
+    {
+     "nome": {
+      "it": "SICILIANA"
+     },
+     "prezzo": "5,00"
+    },
+    {
+     "nome": {
+      "it": "GORGONZOLA"
+     },
+     "prezzo": "5,00"
+    },
+    {
+     "nome": {
+      "it": "BUFALA"
+     },
+     "prezzo": "5,50"
+    },
+    {
+     "nome": {
+      "it": "STRACCHINELLA"
+     },
+     "prezzo": "5,50"
+    },
+    {
+     "nome": {
+      "it": "4 FORMAGGI"
+     },
+     "prezzo": "5,50"
+    },
+    {
+     "nome": {
+      "it": "4 STAGIONI"
+     },
+     "prezzo": "5,50"
+    },
+    {
+     "nome": {
+      "it": "CAPRICCIOSA"
+     },
+     "prezzo": "5,50"
+    },
+    {
+     "nome": {
+      "it": "VEGETARIANA"
+     },
+     "prezzo": "5,50"
+    },
+    {
+     "nome": {
+      "it": "TREVISANA"
+     },
+     "prezzo": "5,50"
+    },
+    {
+     "nome": {
+      "it": "PUGLIESE"
+     },
+     "prezzo": "5,50"
+    },
+    {
+     "nome": {
+      "it": "AMERICANA"
+     },
+     "prezzo": "5,50"
+    },
+    {
+     "nome": {
+      "it": "SALSICCIA&PATATINE"
+     },
+     "prezzo": "5,50"
+    },
+    {
+     "nome": {
+      "it": "BRESAOLA"
+     },
+     "prezzo": "5,50"
+    },
+    {
+     "nome": {
+      "it": "FUMÈ"
+     },
+     "prezzo": "6,00"
+    },
+    {
+     "nome": {
+      "it": "TIROLESE"
+     },
+     "prezzo": "6,00"
+    },
+    {
+     "nome": {
+      "it": "PARMIGIANA"
+     },
+     "prezzo": "6,00"
+    },
+    {
+     "nome": {
+      "it": "SARACENA"
+     },
+     "prezzo": "6,00"
+    },
+    {
+     "nome": {
+      "it": "CAPRESE"
+     },
+     "prezzo": "6,00"
+    },
+    {
+     "nome": {
+      "it": "CALZONE"
+     },
+     "prezzo": "4,50"
+    },
+    {
+     "nome": {
+      "it": "CALZONE FARCITO"
+     },
+     "prezzo": "5,50"
+    }
+   ]
+  },
+  {
+   "nome": {
+    "it": "PIZZE SPECIALI"
+   },
+   "voci": [
+    {
+     "nome": {
+      "it": "FRIARIELLI"
+     },
+     "prezzo": "5,50"
+    },
+    {
+     "nome": {
+      "it": "SALSICCIA&FRIARIELLI"
+     },
+     "prezzo": "6,00"
+    },
+    {
+     "nome": {
+      "it": "FRUTTI DI MARE"
+     },
+     "prezzo": "6,00"
+    },
+    {
+     "nome": {
+      "it": "TARTUFATA"
+     },
+     "prezzo": "6,50"
+    },
+    {
+     "nome": {
+      "it": "MEDITERRANEA"
+     },
+     "prezzo": "6,50"
+    },
+    {
+     "nome": {
+      "it": "GOLOSA"
+     },
+     "prezzo": "6,50"
+    },
+    {
+     "nome": {
+      "it": "BISMARCK"
+     },
+     "prezzo": "6,50"
+    },
+    {
+     "nome": {
+      "it": "ESAGERATA"
+     },
+     "prezzo": "7,00"
+    },
+    {
+     "nome": {
+      "it": "MARI&MONTI"
+     },
+     "prezzo": "7,00"
+    },
+    {
+     "nome": {
+      "it": "MADE IN SUD"
+     },
+     "prezzo": "7,50"
+    }
+   ]
+  },
+  {
+   "nome": {
+    "it": "PIZZE 1/2 METRO"
+   },
+   "voci": [
+    {
+     "nome": {
+      "it": "MARGHERITA"
+     },
+     "prezzo": "13,00"
+    },
+    {
+     "nome": {
+      "it": "FARCITE CLASSICHE"
+     },
+     "prezzo": "18,00"
+    },
+    {
+     "nome": {
+      "it": "FARCITE SPECIALI"
+     },
+     "prezzo": "20,00"
+    }
+   ]
+  },
+  {
+   "nome": {
+    "it": "PANINI DI PIZZA"
+   },
+   "voci": [
+    {
+     "nome": {
+      "it": "DIAVOLINO"
+     },
+     "prezzo": "4,50"
+    },
+    {
+     "nome": {
+      "it": "VALDOSTANO"
+     },
+     "prezzo": "4,50"
+    },
+    {
+     "nome": {
+      "it": "STRACCHINELLO"
+     },
+     "prezzo": "5,50"
+    },
+    {
+     "nome": {
+      "it": "VESUVIANO"
+     },
+     "prezzo": "5,50"
+    },
+    {
+     "nome": {
+      "it": "EMILIANO"
+     },
+     "prezzo": "5,50"
+    },
+    {
+     "nome": {
+      "it": "AMERICANO"
+     },
+     "prezzo": "5,50"
+    },
+    {
+     "nome": {
+      "it": "VEGETARIANO"
+     },
+     "prezzo": "5,50"
+    },
+    {
+     "nome": {
+      "it": "PARMIGIANO"
+     },
+     "prezzo": "6,00"
+    },
+    {
+     "nome": {
+      "it": "VALTELLINO"
+     },
+     "prezzo": "6,00"
+    },
+    {
+     "nome": {
+      "it": "SPECIALE"
+     },
+     "prezzo": "6,00"
+    }
+   ]
+  },
+  {
+   "nome": {
+    "it": "SPECIA[?]"
+   },
+   "voci": [
+    {
+     "nome": {
+      "it": "PANZEROTTO PUGLIESE"
+     },
+     "prezzo": "3,80"
+    },
+    {
+     "nome": {
+      "it": "ROLLÒ SICILIANO"
+     },
+     "prezzo": "1,80"
+    },
+    {
+     "nome": {
+      "it": "CROSTINO CLASSICO"
+     },
+     "prezzo": "2,00"
+    },
+    {
+     "nome": {
+      "it": "CROSTINO FARCITO"
+     },
+     "prezzo": "2,50"
+    },
+    {
+     "nome": {
+      "it": "PATATINE FRITTE MEDIE"
+     },
+     "prezzo": "2,00"
+    },
+    {
+     "nome": {
+      "it": "PATATINE FRITTE GRANDI"
+     },
+     "prezzo": "2,50"
+    }
+   ]
+  },
+  {
+   "nome": {
+    "it": "DOLCI piade e panini"
+   },
+   "voci": [
+    {
+     "nome": {
+      "it": "NUTELLA 1"
+     },
+     "prezzo": "3,50"
+    },
+    {
+     "nome": {
+      "it": "NUTELLA 2"
+     },
+     "prezzo": "4,00"
+    },
+    {
+     "nome": {
+      "it": "NUTELLA 3"
+     },
+     "prezzo": "4,00"
+    }
+   ]
+  },
+  {
+   "nome": {
+    "it": "BIBITE"
+   },
+   "voci": [
+    {
+     "nome": {
+      "it": "BIBITE LATTINA 33 CL."
+     },
+     "prezzo": "1,50"
+    },
+    {
+     "nome": {
+      "it": "BOTTIGLIE 1,5 LT."
+     },
+     "prezzo": "3,00"
+    },
+    {
+     "nome": {
+      "it": "ACQUA 1/2 LT"
+     },
+     "prezzo": "1,00"
+    },
+    {
+     "nome": {
+      "it": "BIRRE BOTTIGLIA 33 CL."
+     },
+     "prezzo": "2,50"
+    },
+    {
+     "nome": {
+      "it": "BIRRE BOTTIGLIA 33 CL."
+     },
+     "prezzo": "2,80"
+    },
+    {
+     "nome": {
+      "it": "BIRRE BOTTIGLIA 66 CL."
+     },
+     "prezzo": "3,00"
+    }
+   ]
+  }
+ ]
+}

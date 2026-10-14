@@ -1,0 +1,129 @@
+{
+ "nome": "La Granseola (Lignano)",
+ "sezioni": [
+  {
+   "nome": {
+    "it": "Antipasti"
+   },
+   "voci": [
+    {
+     "nome": {
+      "it": "Antipasto Granseola"
+     },
+     "prezzo": "25,00"
+    },
+    {
+     "nome": {
+      "it": "Polpo scottato su crema di ceci"
+     },
+     "prezzo": "19,00"
+    },
+    {
+     "nome": {
+      "it": "Capesante al gratin"
+     },
+     "prezzo": "15,00"
+    },
+    {
+     "nome": {
+      "it": "Insalata di pesce"
+     },
+     "prezzo": "15,00"
+    },
+    {
+     "nome": {
+      "it": "Prosciutto crudo “San Daniele”"
+     },
+     "prezzo": "13,00"
+    }
+   ]
+  },
+  {
+   "nome": {
+    "it": "Menù Cozze"
+   },
+   "voci": [
+    {
+     "nome": {
+      "it": "SAUTÈ DI COZZE + PATATINE FRITTE"
+     },
+     "prezzo": "18,00"
+    }
+   ]
+  },
+  {
+   "nome": {
+    "it": "Primi Piatti"
+   },
+   "voci": [
+    {
+     "nome": {
+      "it": "Tagliolini alla Granseola"
+     },
+     "prezzo": "19,00"
+    },
+    {
+     "nome": {
+      "it": "Risotto con capesante e verdure di stagione"
+     },
+     "prezzo": "18,00"
+    },
+    {
+     "nome": {
+      "it": "Spaghetti alla Scogliera"
+     },
+     "prezzo": "20,00"
+    },
+    {
+     "nome": {
+      "it": "Spaghetti alle vongole veraci/pevarasse"
+     },
+     "prezzo": "18,00"
+    },
+    {
+     "nome": {
+      "it": "Spaghetti alla carbonara"
+     },
+     "prezzo": "13,00"
+    },
+    {
+     "nome": {
+      "it": "Bucatini all’amatriciana"
+     },
+     "prezzo": "13,00"
+    }
+   ]
+  },
+  {
+   "nome": {
+    "it": "Gnocchi"
+   },
+   "voci": [
+    {
+     "nome": {
+      "it": "Gnocchi ai frutti di mare"
+     },
+     "prezzo": "16,00"
+    },
+    {
+     "nome": {
+      "it": "Gnocchi al salmone"
+     },
+     "prezzo": "15,00"
+    },
+    {
+     "nome": {
+      "it": "Gnocchi alla sorrentina"
+     },
+     "prezzo": "13,00"
+    },
+    {
+     "nome": {
+      "it": "Gnocchi gorgonzola e spinaci"
+     },
+     "prezzo": "13,00"
+    }
+   ]
+  }
+ ]
+}

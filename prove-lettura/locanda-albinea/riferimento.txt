@@ -1,0 +1,29 @@
+FOTO: foto-1.jpg foto-2.jpg
+# ANTIPASTO
+Antipasto La Locanda | 8,00
+# PRIMI PIATTI
+Tortelli verdi | 12,00
+Tortelli di zucca | 12,00
+Tortelli di radicchio | 12,00
+Bigoli alla salamella | 10,00
+Gnocchi di zucca con fonduta alla gorgonzola di bufala | 14,00
+Gnocchi al soffritto | 10,00
+Cappelletti in brodo di cappone | 15,00
+Zuppa di cipolle | 10,00
+# BOLLICINE
+Champagne brut nature Zero | 80,00
+Franciacorta satèn | 45,00
+Trentodoc pas dosé Giulio Larcher | 38,00
+Trentodoc nature | 38,00
+Trentodoc brut rosé | 40,00
+Prosecco extra brut | 18,00
+Spergola metodo classico Le Nebbie | 30,00
+Spergola | 18,00
+Levante 90 | 17,00
+Lusvardi rosé | 18,00
+# BIANCHI FERMI
+Chardonnay Riserva Villanova | 38,00
+Sauvignon | 24,00
+Albana Albarara | 22,00
+Ribolla Gialla Rjalla | 24,00
+Gewürztraminer Selida | 24,00

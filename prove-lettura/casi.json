@@ -1,5 +1,255 @@
 [
-  {"id": "al-chiostro-bistrot", "nome": "Al Chiostro Bistrot", "foto": [{"r2": "private/requests/0d3cd8b3-d296-4de9-8f22-f9d8eec4ebc5/52732ad6-ce5e-4263-8374-97e03d8a1453"}], "riferimento": {"pubblicato": "al-chiostro-bistrot"}},
-  {"id": "la-chincaglieria-gastronomica", "nome": "La Chincaglieria Gastronomica", "foto": [{"r2": "private/requests/6df13726-bc5b-44ce-bdef-3dd0a43bf78a/7de60a8b-f0c8-43ea-9458-8f6182e7cd7f"}, {"r2": "private/requests/6df13726-bc5b-44ce-bdef-3dd0a43bf78a/569067bb-474e-47cb-806d-7dea72942114"}, {"r2": "private/requests/6df13726-bc5b-44ce-bdef-3dd0a43bf78a/4626ef49-ba30-40dd-8e62-574450e3ed8b"}], "riferimento": {"pubblicato": "la-chincaglieria-gastronomica"}},
-  {"id": "osteria-codelli-23", "nome": "Osteria Codelli 23", "provvisorio": true, "foto": [{"r2": "private/requests/2010dea3-e634-452c-829a-95768bdc6d6f/590e9acc-5d4c-4535-9bf3-131ce6c975c2"}, {"r2": "private/requests/2010dea3-e634-452c-829a-95768bdc6d6f/a3f6c23f-95cb-447f-b00a-6aea52d82e71"}], "riferimento": {"bozza": "2010dea3-e634-452c-829a-95768bdc6d6f"}}
+ {
+  "id": "al-chiostro-bistrot",
+  "nome": "Al Chiostro Bistrot",
+  "foto": [
+   {
+    "r2": "private/requests/0d3cd8b3-d296-4de9-8f22-f9d8eec4ebc5/52732ad6-ce5e-4263-8374-97e03d8a1453"
+   }
+  ],
+  "riferimento": {
+   "pubblicato": "al-chiostro-bistrot"
+  }
+ },
+ {
+  "id": "la-chincaglieria-gastronomica",
+  "nome": "La Chincaglieria Gastronomica",
+  "foto": [
+   {
+    "r2": "private/requests/6df13726-bc5b-44ce-bdef-3dd0a43bf78a/7de60a8b-f0c8-43ea-9458-8f6182e7cd7f"
+   },
+   {
+    "r2": "private/requests/6df13726-bc5b-44ce-bdef-3dd0a43bf78a/569067bb-474e-47cb-806d-7dea72942114"
+   },
+   {
+    "r2": "private/requests/6df13726-bc5b-44ce-bdef-3dd0a43bf78a/4626ef49-ba30-40dd-8e62-574450e3ed8b"
+   }
+  ],
+  "riferimento": {
+   "pubblicato": "la-chincaglieria-gastronomica"
+  }
+ },
+ {
+  "id": "osteria-codelli-23",
+  "nome": "Osteria Codelli 23",
+  "provvisorio": true,
+  "foto": [
+   {
+    "r2": "private/requests/2010dea3-e634-452c-829a-95768bdc6d6f/590e9acc-5d4c-4535-9bf3-131ce6c975c2"
+   },
+   {
+    "r2": "private/requests/2010dea3-e634-452c-829a-95768bdc6d6f/a3f6c23f-95cb-447f-b00a-6aea52d82e71"
+   }
+  ],
+  "riferimento": {
+   "bozza": "2010dea3-e634-452c-829a-95768bdc6d6f"
+  }
+ },
+ {
+  "id": "locanda-albinea",
+  "nome": "La Locanda (Albinea)",
+  "foto": [
+   {
+    "file": "locanda-albinea/foto-1.jpg"
+   },
+   {
+    "file": "locanda-albinea/foto-2.jpg"
+   }
+  ],
+  "riferimento": {
+   "file": "locanda-albinea/riferimento.json"
+  }
+ },
+ {
+  "id": "vecchia-locanda-trana",
+  "nome": "La Vecchia Locanda (Trana)",
+  "foto": [
+   {
+    "file": "vecchia-locanda-trana/foto-1.jpg"
+   },
+   {
+    "file": "vecchia-locanda-trana/foto-2.jpg"
+   }
+  ],
+  "riferimento": {
+   "file": "vecchia-locanda-trana/riferimento.json"
+  }
+ },
+ {
+  "id": "arte-della-pizza",
+  "nome": "L'Arte della Pizza (Caronno Pertusella)",
+  "foto": [
+   {
+    "file": "arte-della-pizza/foto-1.jpg"
+   },
+   {
+    "file": "arte-della-pizza/foto-2.jpg"
+   }
+  ],
+  "riferimento": {
+   "file": "arte-della-pizza/riferimento.json"
+  }
+ },
+ {
+  "id": "la-pigna",
+  "nome": "La Pigna (Bardonecchia)",
+  "foto": [
+   {
+    "file": "la-pigna/foto-1.jpg"
+   }
+  ],
+  "riferimento": {
+   "file": "la-pigna/riferimento.json"
+  }
+ },
+ {
+  "id": "pizza-al-volo",
+  "nome": "Pizza al Volo (Cavenago di Brianza)",
+  "foto": [
+   {
+    "file": "pizza-al-volo/foto-1.png"
+   },
+   {
+    "file": "pizza-al-volo/foto-2.png"
+   }
+  ],
+  "riferimento": {
+   "file": "pizza-al-volo/riferimento.json"
+  }
+ },
+ {
+  "id": "made-in-sud",
+  "nome": "Pizzeria Made in Sud (Bologna)",
+  "foto": [
+   {
+    "file": "made-in-sud/foto-1.png"
+   },
+   {
+    "file": "made-in-sud/foto-2.png"
+   }
+  ],
+  "riferimento": {
+   "file": "made-in-sud/riferimento.json"
+  }
+ },
+ {
+  "id": "da-marcello",
+  "nome": "Da Marcello (Genova)",
+  "foto": [
+   {
+    "file": "da-marcello/foto-1.jpg"
+   },
+   {
+    "file": "da-marcello/foto-2.jpg"
+   }
+  ],
+  "riferimento": {
+   "file": "da-marcello/riferimento.json"
+  }
+ },
+ {
+  "id": "al-sabotino",
+  "nome": "Osteria Al Sabotino (Gorizia)",
+  "foto": [
+   {
+    "file": "al-sabotino/foto-1.jpg"
+   }
+  ],
+  "riferimento": {
+   "file": "al-sabotino/riferimento.json"
+  }
+ },
+ {
+  "id": "cardamomo",
+  "nome": "Cardamomo (Grado)",
+  "foto": [
+   {
+    "file": "cardamomo/foto-1.jpg"
+   }
+  ],
+  "riferimento": {
+   "file": "cardamomo/riferimento.json"
+  }
+ },
+ {
+  "id": "da-salvatore",
+  "nome": "Da Salvatore (Lignano)",
+  "foto": [
+   {
+    "file": "da-salvatore/foto-2.jpg"
+   }
+  ],
+  "riferimento": {
+   "file": "da-salvatore/riferimento.json"
+  }
+ },
+ {
+  "id": "alle-volte",
+  "nome": "Osteria Alle Volte (Udine)",
+  "foto": [
+   {
+    "file": "alle-volte/foto-1.jpg"
+   },
+   {
+    "file": "alle-volte/foto-2.jpg"
+   }
+  ],
+  "riferimento": {
+   "file": "alle-volte/riferimento.json"
+  }
+ },
+ {
+  "id": "la-granseola",
+  "nome": "La Granseola (Lignano)",
+  "foto": [
+   {
+    "file": "la-granseola/foto-3.jpg"
+   },
+   {
+    "file": "la-granseola/foto-5.jpg"
+   }
+  ],
+  "riferimento": {
+   "file": "la-granseola/riferimento.json"
+  }
+ },
+ {
+  "id": "marascutti",
+  "nome": "Buffet Marascutti (Trieste)",
+  "foto": [
+   {
+    "file": "marascutti/foto-1.jpg"
+   }
+  ],
+  "riferimento": {
+   "file": "marascutti/riferimento.json"
+  }
+ },
+ {
+  "id": "al-fungo",
+  "nome": "Al Fungo (Gemona)",
+  "foto": [
+   {
+    "file": "al-fungo/foto-1.jpg"
+   }
+  ],
+  "riferimento": {
+   "file": "al-fungo/riferimento.json"
+  }
+ },
+ {
+  "id": "turbo-pizza",
+  "nome": "Turbo Pizza (Rossano Veneto)",
+  "foto": [
+   {
+    "file": "turbo-pizza/foto-1.jpg"
+   },
+   {
+    "file": "turbo-pizza/foto-2.jpg"
+   }
+  ],
+  "riferimento": {
+   "file": "turbo-pizza/riferimento.json"
+  }
+ }
 ]

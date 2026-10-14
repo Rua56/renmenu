@@ -1,0 +1,147 @@
+{
+ "nome": "La Pigna (Bardonecchia)",
+ "sezioni": [
+  {
+   "nome": {
+    "it": "ANTIPASTI"
+   },
+   "voci": [
+    {
+     "nome": {
+      "it": "Prosciutto crudo, melone, burratina, bruschetta di pomodorini"
+     },
+     "prezzo": "14,00"
+    },
+    {
+     "nome": {
+      "it": "Tometta fusa al forno con lardo, patate, miele e cipolle caramellate"
+     },
+     "prezzo": "13,00"
+    },
+    {
+     "nome": {
+      "it": "Carpione di milanese , zucchine e frittata"
+     },
+     "prezzo": "14,00"
+    },
+    {
+     "nome": {
+      "it": "Vitello al punto rosa in salsa tonnata"
+     },
+     "prezzo": "14,00"
+    }
+   ]
+  },
+  {
+   "nome": {
+    "it": "PRIMI"
+   },
+   "voci": [
+    {
+     "nome": {
+      "it": "Polenta concia"
+     },
+     "prezzo": "12,00"
+    },
+    {
+     "nome": {
+      "it": "Lasagne alla bolognese gratinate al forno"
+     },
+     "prezzo": "12,00"
+    },
+    {
+     "nome": {
+      "it": "Zuppa di verza gratinata al forno"
+     },
+     "prezzo": "12,00"
+    },
+    {
+     "nome": {
+      "it": "Agnolotti di burrata al burro e salvia"
+     },
+     "prezzo": "14,00"
+    },
+    {
+     "nome": {
+      "it": "Riminesi con melanzane e ricotta salata"
+     },
+     "prezzo": "13,00"
+    }
+   ]
+  },
+  {
+   "nome": {
+    "it": "SECONDI"
+   },
+   "voci": [
+    {
+     "nome": {
+      "it": "Grigliata mista di carne e verdure"
+     },
+     "prezzo": "20,00"
+    },
+    {
+     "nome": {
+      "it": "Roast beef con rucola e pomodorini"
+     },
+     "prezzo": "14,00"
+    },
+    {
+     "nome": {
+      "it": "Tagliata con rucola e pomodorini"
+     },
+     "prezzo": "18,00"
+    },
+    {
+     "nome": {
+      "it": "Salsiccia in umido con polenta"
+     },
+     "prezzo": "14,00"
+    },
+    {
+     "nome": {
+      "it": "Nuggetts con patate"
+     },
+     "prezzo": "13,00"
+    },
+    {
+     "nome": {
+      "it": "Lombata di Rubia Gallega"
+     },
+     "prezzo": "7,00"
+    },
+    {
+     "nome": {
+      "it": "Lombata di scottona prussiana"
+     },
+     "prezzo": "6,00"
+    }
+   ]
+  },
+  {
+   "nome": {
+    "it": "CONTORNI"
+   },
+   "voci": [
+    {
+     "nome": {
+      "it": "Patatine fritte"
+     },
+     "prezzo": "5,00"
+    },
+    {
+     "nome": {
+      "it": "Zucchine al burro"
+     },
+     "prezzo": "5,00"
+    },
+    {
+     "nome": {
+      "it": "Insalata mista"
+     },
+     "prezzo": "5,00"
+    }
+   ]
+  }
+ ]
+}

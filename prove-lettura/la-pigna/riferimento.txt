@@ -1,0 +1,24 @@
+FOTO: foto-1.jpg
+# ANTIPASTI
+Prosciutto crudo, melone, burratina, bruschetta di pomodorini | 14,00
+Tometta fusa al forno con lardo, patate, miele e cipolle caramellate | 13,00
+Carpione di milanese , zucchine e frittata | 14,00
+Vitello al punto rosa in salsa tonnata | 14,00
+# PRIMI
+Polenta concia | 12,00
+Lasagne alla bolognese gratinate al forno | 12,00
+Zuppa di verza gratinata al forno | 12,00
+Agnolotti di burrata al burro e salvia | 14,00
+Riminesi con melanzane e ricotta salata | 13,00
+# SECONDI
+Grigliata mista di carne e verdure | 20,00
+Roast beef con rucola e pomodorini | 14,00
+Tagliata con rucola e pomodorini | 18,00
+Salsiccia in umido con polenta | 14,00
+Nuggetts con patate | 13,00
+Lombata di Rubia Gallega | 7,00
+Lombata di scottona prussiana | 6,00
+# CONTORNI
+Patatine fritte | 5,00
+Zucchine al burro | 5,00
+Insalata mista | 5,00

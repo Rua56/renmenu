@@ -1,0 +1,139 @@
+{
+ "nome": "Al Fungo (Gemona)",
+ "sezioni": [
+  {
+   "nome": {
+    "it": "LE NOSTRE BIRRE ALLA SPINA"
+   },
+   "voci": [
+    {
+     "nome": {
+      "it": "Birra Kozel Premium Lager 0,30 l"
+     },
+     "prezzo": "3,50"
+    },
+    {
+     "nome": {
+      "it": "Birra Kozel Premium Lager 0,50 l"
+     },
+     "prezzo": "5,00"
+    },
+    {
+     "nome": {
+      "it": "Birra Kozel Lager Dark 0,30 l"
+     },
+     "prezzo": "3,50"
+    },
+    {
+     "nome": {
+      "it": "Birra Kozel Lager Dark 0,50 l"
+     },
+     "prezzo": "5,00"
+    },
+    {
+     "nome": {
+      "it": "Birra Raffo lavorazione grezza 0,20 l"
+     },
+     "prezzo": "3,00"
+    },
+    {
+     "nome": {
+      "it": "Birra Raffo lavorazione grezza 0,50 l"
+     },
+     "prezzo": "5,00"
+    },
+    {
+     "nome": {
+      "it": "Birra Grolsch Weizen 0,30 l"
+     },
+     "prezzo": "3,80"
+    },
+    {
+     "nome": {
+      "it": "Birra Grolsch Weizen 0,50 l"
+     },
+     "prezzo": "6,00"
+    },
+    {
+     "nome": {
+      "it": "Caraffa di birra 1,50 l"
+     },
+     "prezzo": "14,00"
+    }
+   ]
+  },
+  {
+   "nome": {
+    "it": "BEVANDE"
+   },
+   "voci": [
+    {
+     "nome": {
+      "it": "Vino 0,25 l"
+     },
+     "prezzo": "3,80"
+    },
+    {
+     "nome": {
+      "it": "Vino 0,50 l"
+     },
+     "prezzo": "6,00"
+    },
+    {
+     "nome": {
+      "it": "Vino 1 l"
+     },
+     "prezzo": "11,00"
+    },
+    {
+     "nome": {
+      "it": "Birra analcolica bottiglia 0,33 l"
+     },
+     "prezzo": "4,00"
+    },
+    {
+     "nome": {
+      "it": "Bibite alla spina 0,25 l"
+     },
+     "prezzo": "3,20"
+    },
+    {
+     "nome": {
+      "it": "Bibite alla spina 0,40 l"
+     },
+     "prezzo": "4,20"
+    },
+    {
+     "nome": {
+      "it": "Bibite in lattina"
+     },
+     "prezzo": "3,00"
+    },
+    {
+     "nome": {
+      "it": "Succhi di frutta"
+     },
+     "prezzo": "3,50"
+    },
+    {
+     "nome": {
+      "it": "Acqua microfiltrata da 0,75 l"
+     },
+     "prezzo": "2,50"
+    },
+    {
+     "nome": {
+      "it": "Acqua Alba da 0,50 l"
+     },
+     "prezzo": "2,80"
+    },
+    {
+     "nome": {
+      "it": "Acqua S. pellegrino / Panna da 0,75 l"
+     },
+     "prezzo": "3,80"
+    }
+   ]
+  }
+ ]
+}

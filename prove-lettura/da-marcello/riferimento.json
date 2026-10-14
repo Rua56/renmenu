@@ -1,0 +1,323 @@
+{
+ "nome": "Da Marcello (Genova)",
+ "sezioni": [
+  {
+   "nome": {
+    "it": "ANTIPASTI"
+   },
+   "voci": [
+    {
+     "nome": {
+      "it": "Misto mare \"Casa Nostra\""
+     },
+     "prezzo": "12,00"
+    },
+    {
+     "nome": {
+      "it": "Carpaccio di polpo con pomodoro fresco e olive taggiasche"
+     },
+     "prezzo": "15,00"
+    },
+    {
+     "nome": {
+      "it": "Battuta di carne al coltello con stracciatella e granella di pistacchio"
+     },
+     "prezzo": "15,00"
+    },
+    {
+     "nome": {
+      "it": "Misto di terra"
+     },
+     "prezzo": "10,00"
+    }
+   ]
+  },
+  {
+   "nome": {
+    "it": "PRIMI"
+   },
+   "voci": [
+    {
+     "nome": {
+      "it": "Spaghetti allo scoglio"
+     },
+     "prezzo": "9,00"
+    },
+    {
+     "nome": {
+      "it": "Penne con scampi"
+     },
+     "prezzo": "9,00"
+    },
+    {
+     "nome": {
+      "it": "Ravioli di branzino con frutti di mare"
+     },
+     "prezzo": "10,00"
+    },
+    {
+     "nome": {
+      "it": "Trofiette al nero di seppia con salmone fumé e gamberi"
+     },
+     "prezzo": "10,00"
+    },
+    {
+     "nome": {
+      "it": "Gnocchi con seppie e porcini o carciofi"
+     },
+     "prezzo": "10,00"
+    },
+    {
+     "nome": {
+      "it": "Risotto per minimo 2 persone: ai frutti di mare"
+     },
+     "prezzo": "10,00"
+    },
+    {
+     "nome": {
+      "it": "Risotto per minimo 2 persone: al nero di seppia"
+     },
+     "prezzo": "10,00"
+    },
+    {
+     "nome": {
+      "it": "Ravioli di borragine: al ragù"
+     },
+     "prezzo": "8,00"
+    },
+    {
+     "nome": {
+      "it": "Ravioli di borragine: ai funghi porcini o carciofi"
+     },
+     "prezzo": "10,00"
+    },
+    {
+     "nome": {
+      "it": "Gnocchi al pesto"
+     },
+     "prezzo": "9,00"
+    }
+   ]
+  },
+  {
+   "nome": {
+    "it": "SECONDI"
+   },
+   "voci": [
+    {
+     "nome": {
+      "it": "Fritto misto Special"
+     },
+     "prezzo": "13,00"
+    },
+    {
+     "nome": {
+      "it": "Fritto misto"
+     },
+     "prezzo": "13,00"
+    },
+    {
+     "nome": {
+      "it": "Totani fritti"
+     },
+     "prezzo": "13,00"
+    },
+    {
+     "nome": {
+      "it": "Grigliata di gamberoni e scampi"
+     },
+     "prezzo": "18,00"
+    },
+    {
+     "nome": {
+      "it": "Grigliata mista di gamberoni, scampi e spada"
+     },
+     "prezzo": "16,00"
+    },
+    {
+     "nome": {
+      "it": "Tagliata di tonno con rucola"
+     },
+     "prezzo": "13,00"
+    },
+    {
+     "nome": {
+      "it": "Tonno al sesamo con rucola"
+     },
+     "prezzo": "13,00"
+    },
+    {
+     "nome": {
+      "it": "Pesce spada: alla piastra"
+     },
+     "prezzo": "12,00"
+    },
+    {
+     "nome": {
+      "it": "Pesce spada: alla Messinese"
+     },
+     "prezzo": "12,00"
+    },
+    {
+     "nome": {
+      "it": "Orate o Branzini: olio e limone"
+     },
+     "prezzo": "25,00"
+    },
+    {
+     "nome": {
+      "it": "Orate o Branzini: Ligure"
+     },
+     "prezzo": "30,00"
+    },
+    {
+     "nome": {
+      "it": "Orate o Branzini: con porcini o carciofi e patate"
+     },
+     "prezzo": "30,00"
+    },
+    {
+     "nome": {
+      "it": "Gamberi alla Marcello"
+     },
+     "prezzo": "12,00"
+    },
+    {
+     "nome": {
+      "it": "Tagliata di scamone con rucola"
+     },
+     "prezzo": "15,00"
+    },
+    {
+     "nome": {
+      "it": "Milanese con contorno"
+     },
+     "prezzo": "10,00"
+    }
+   ]
+  },
+  {
+   "nome": {
+    "it": "CONTORNI"
+   },
+   "voci": [
+    {
+     "nome": {
+      "it": "Insalata mista"
+     },
+     "prezzo": "4,00"
+    },
+    {
+     "nome": {
+      "it": "Patate fritte"
+     },
+     "prezzo": "4,00"
+    },
+    {
+     "nome": {
+      "it": "Melanzane alla griglia"
+     },
+     "prezzo": "4,00"
+    }
+   ]
+  },
+  {
+   "nome": {
+    "it": "DOLCI"
+   },
+   "voci": [
+    {
+     "nome": {
+      "it": "Tiramisù della casa"
+     },
+     "prezzo": "5,00"
+    },
+    {
+     "nome": {
+      "it": "Tiramisù al pistacchio"
+     },
+     "prezzo": "6,00"
+    },
+    {
+     "nome": {
+      "it": "Crema catalana"
+     },
+     "prezzo": "5,00"
+    },
+    {
+     "nome": {
+      "it": "Panna cotta"
+     },
+     "prezzo": "5,00"
+    },
+    {
+     "nome": {
+      "it": "Torta di Mele tiepida con gelato"
+     },
+     "prezzo": "5,00"
+    },
+    {
+     "nome": {
+      "it": "Torta caprese al cioccolato"
+     },
+     "prezzo": "5,00"
+    },
+    {
+     "nome": {
+      "it": "Crostata con cioccolato bianco, ricotta e granella di nocciole"
+     },
+     "prezzo": "5,00"
+    },
+    {
+     "nome": {
+      "it": "Affogati vari"
+     },
+     "prezzo": "5,00"
+    },
+    {
+     "nome": {
+      "it": "Tartufo nero o bianco"
+     },
+     "prezzo": "5,00"
+    },
+    {
+     "nome": {
+      "it": "Gelato al cocco"
+     },
+     "prezzo": "5,00"
+    },
+    {
+     "nome": {
+      "it": "Sorbetto al limone o altro gusto"
+     },
+     "prezzo": "3,50"
+    }
+   ]
+  },
+  {
+   "nome": {
+    "it": "Piatti"
+   },
+   "voci": [
+    {
+     "nome": {
+      "it": "stoccafisso accomodato"
+     },
+     "prezzo": "9,00"
+    },
+    {
+     "nome": {
+      "it": "paella solo pesce"
+     },
+     "prezzo": "12,00"
+    },
+    {
+     "nome": {
+      "it": "paella mista"
+     },
+     "prezzo": "15,00"
+    }
+   ]
+  }
+ ]
+}

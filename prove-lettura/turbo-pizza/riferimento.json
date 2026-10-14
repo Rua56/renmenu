@@ -1,0 +1,1928 @@
+{
+ "nome": "Turbo Pizza (Rossano Veneto)",
+ "sezioni": [
+  {
+   "nome": {
+    "it": "LE BUFALINE"
+   },
+   "voci": [
+    {
+     "nome": {
+      "it": "ZIA GIADA"
+     },
+     "prezzi": [
+      {
+       "etichetta": {
+        "it": "Prezzo 1"
+       },
+       "prezzo": "11,50"
+      },
+      {
+       "etichetta": {
+        "it": "Prezzo 2"
+       },
+       "prezzo": "13,50"
+      }
+     ]
+    },
+    {
+     "nome": {
+      "it": "MEDITERRANEA"
+     },
+     "prezzi": [
+      {
+       "etichetta": {
+        "it": "Prezzo 1"
+       },
+       "prezzo": "11,00"
+      },
+      {
+       "etichetta": {
+        "it": "Prezzo 2"
+       },
+       "prezzo": "13,00"
+      }
+     ]
+    },
+    {
+     "nome": {
+      "it": "GENOVESE"
+     },
+     "prezzi": [
+      {
+       "etichetta": {
+        "it": "Prezzo 1"
+       },
+       "prezzo": "8,70"
+      },
+      {
+       "etichetta": {
+        "it": "Prezzo 2"
+       },
+       "prezzo": "10,70"
+      }
+     ]
+    },
+    {
+     "nome": {
+      "it": "SAPORITA"
+     },
+     "prezzi": [
+      {
+       "etichetta": {
+        "it": "Prezzo 1"
+       },
+       "prezzo": "12,50"
+      },
+      {
+       "etichetta": {
+        "it": "Prezzo 2"
+       },
+       "prezzo": "14,50"
+      }
+     ]
+    },
+    {
+     "nome": {
+      "it": "BUFALA"
+     },
+     "prezzi": [
+      {
+       "etichetta": {
+        "it": "Prezzo 1"
+       },
+       "prezzo": "9,20"
+      },
+      {
+       "etichetta": {
+        "it": "Prezzo 2"
+       },
+       "prezzo": "11,20"
+      }
+     ]
+    },
+    {
+     "nome": {
+      "it": "MAREMMA"
+     },
+     "prezzi": [
+      {
+       "etichetta": {
+        "it": "Prezzo 1"
+       },
+       "prezzo": "10,50"
+      },
+      {
+       "etichetta": {
+        "it": "Prezzo 2"
+       },
+       "prezzo": "12,50"
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "nome": {
+    "it": "PIZZE BIANCHE"
+   },
+   "voci": [
+    {
+     "nome": {
+      "it": "NOCCIOLOSA"
+     },
+     "prezzi": [
+      {
+       "etichetta": {
+        "it": "Prezzo 1"
+       },
+       "prezzo": "9,70"
+      },
+      {
+       "etichetta": {
+        "it": "Prezzo 2"
+       },
+       "prezzo": "11,70"
+      }
+     ]
+    },
+    {
+     "nome": {
+      "it": "MARINELLA"
+     },
+     "prezzi": [
+      {
+       "etichetta": {
+        "it": "Prezzo 1"
+       },
+       "prezzo": "10,00"
+      },
+      {
+       "etichetta": {
+        "it": "Prezzo 2"
+       },
+       "prezzo": "12,00"
+      }
+     ]
+    },
+    {
+     "nome": {
+      "it": "PIEMONTESE"
+     },
+     "prezzi": [
+      {
+       "etichetta": {
+        "it": "Prezzo 1"
+       },
+       "prezzo": "13,70"
+      },
+      {
+       "etichetta": {
+        "it": "Prezzo 2"
+       },
+       "prezzo": "15,70"
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "nome": {
+    "it": "CALZONI"
+   },
+   "voci": [
+    {
+     "nome": {
+      "it": "CALZONE AI FORMAGGI"
+     },
+     "prezzi": [
+      {
+       "etichetta": {
+        "it": "Prezzo 1"
+       },
+       "prezzo": "8,70"
+      },
+      {
+       "etichetta": {
+        "it": "Prezzo 2"
+       },
+       "prezzo": "10,70"
+      }
+     ]
+    },
+    {
+     "nome": {
+      "it": "CALZONE AI FUNGHI"
+     },
+     "prezzi": [
+      {
+       "etichetta": {
+        "it": "Prezzo 1"
+       },
+       "prezzo": "7,50"
+      },
+      {
+       "etichetta": {
+        "it": "Prezzo 2"
+       },
+       "prezzo": "9,50"
+      }
+     ]
+    },
+    {
+     "nome": {
+      "it": "CALZONE AL PROSCIUTTO"
+     },
+     "prezzi": [
+      {
+       "etichetta": {
+        "it": "Prezzo 1"
+       },
+       "prezzo": "7,50"
+      },
+      {
+       "etichetta": {
+        "it": "Prezzo 2"
+       },
+       "prezzo": "9,50"
+      }
+     ]
+    },
+    {
+     "nome": {
+      "it": "CALZONE ALLA PARIGINA"
+     },
+     "prezzi": [
+      {
+       "etichetta": {
+        "it": "Prezzo 1"
+       },
+       "prezzo": "8,50"
+      },
+      {
+       "etichetta": {
+        "it": "Prezzo 2"
+       },
+       "prezzo": "10,50"
+      }
+     ]
+    },
+    {
+     "nome": {
+      "it": "CALZONE ALLA RICOTTA"
+     },
+     "prezzi": [
+      {
+       "etichetta": {
+        "it": "Prezzo 1"
+       },
+       "prezzo": "8,00"
+      },
+      {
+       "etichetta": {
+        "it": "Prezzo 2"
+       },
+       "prezzo": "10,00"
+      }
+     ]
+    },
+    {
+     "nome": {
+      "it": "CALZONE ALLA ZINGARA"
+     },
+     "prezzi": [
+      {
+       "etichetta": {
+        "it": "Prezzo 1"
+       },
+       "prezzo": "9,00"
+      },
+      {
+       "etichetta": {
+        "it": "Prezzo 2"
+       },
+       "prezzo": "11,00"
+      }
+     ]
+    },
+    {
+     "nome": {
+      "it": "CALZONE CAPRICCIOSO"
+     },
+     "prezzi": [
+      {
+       "etichetta": {
+        "it": "Prezzo 1"
+       },
+       "prezzo": "9,00"
+      },
+      {
+       "etichetta": {
+        "it": "Prezzo 2"
+       },
+       "prezzo": "11,00"
+      }
+     ]
+    },
+    {
+     "nome": {
+      "it": "CALZONE MISTO BOSCO"
+     },
+     "prezzi": [
+      {
+       "etichetta": {
+        "it": "Prezzo 1"
+       },
+       "prezzo": "8,20"
+      },
+      {
+       "etichetta": {
+        "it": "Prezzo 2"
+       },
+       "prezzo": "10,20"
+      }
+     ]
+    },
+    {
+     "nome": {
+      "it": "CALZONE NAPOLI"
+     },
+     "prezzi": [
+      {
+       "etichetta": {
+        "it": "Prezzo 1"
+       },
+       "prezzo": "9,00"
+      },
+      {
+       "etichetta": {
+        "it": "Prezzo 2"
+       },
+       "prezzo": "11,00"
+      }
+     ]
+    },
+    {
+     "nome": {
+      "it": "CALZONE PROSCIUTTO E FUNGHI"
+     },
+     "prezzi": [
+      {
+       "etichetta": {
+        "it": "Prezzo 1"
+       },
+       "prezzo": "8,00"
+      },
+      {
+       "etichetta": {
+        "it": "Prezzo 2"
+       },
+       "prezzo": "10,00"
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "nome": {
+    "it": "CROSTINI"
+   },
+   "voci": [
+    {
+     "nome": {
+      "it": "CAPRICCIOSO"
+     },
+     "prezzo": "7,50"
+    },
+    {
+     "nome": {
+      "it": "CLASSICO"
+     },
+     "prezzo": "6,50"
+    },
+    {
+     "nome": {
+      "it": "NAPOLI"
+     },
+     "prezzo": "7,50"
+    },
+    {
+     "nome": {
+      "it": "PARIGINO"
+     },
+     "prezzo": "7,50"
+    },
+    {
+     "nome": {
+      "it": "ZINGARO"
+     },
+     "prezzo": "7,50"
+    }
+   ]
+  },
+  {
+   "nome": {
+    "it": "PATATINE FRITTE*"
+   },
+   "voci": [
+    {
+     "nome": {
+      "it": "VASCHETTA NORMALE"
+     },
+     "prezzo": "2,50"
+    },
+    {
+     "nome": {
+      "it": "VASCHETTA GRANDE"
+     },
+     "prezzo": "3,50"
+    }
+   ]
+  },
+  {
+   "nome": {
+    "it": "PEPITE DI POLLO*"
+   },
+   "voci": [
+    {
+     "nome": {
+      "it": "VASCHETTA 12 PZ."
+     },
+     "prezzo": "5,00"
+    }
+   ]
+  },
+  {
+   "nome": {
+    "it": "LE CLASSICHE"
+   },
+   "voci": [
+    {
+     "nome": {
+      "it": "ASPARAGI"
+     },
+     "prezzi": [
+      {
+       "etichetta": {
+        "it": "Prezzo 1"
+       },
+       "prezzo": "8,50"
+      },
+      {
+       "etichetta": {
+        "it": "Prezzo 2"
+       },
+       "prezzo": "10,50"
+      }
+     ]
+    },
+    {
+     "nome": {
+      "it": "CAPRICCIOSA"
+     },
+     "prezzi": [
+      {
+       "etichetta": {
+        "it": "Prezzo 1"
+       },
+       "prezzo": "9,00"
+      },
+      {
+       "etichetta": {
+        "it": "Prezzo 2"
+       },
+       "prezzo": "11,00"
+      }
+     ]
+    },
+    {
+     "nome": {
+      "it": "DIAVOLA"
+     },
+     "prezzi": [
+      {
+       "etichetta": {
+        "it": "Prezzo 1"
+       },
+       "prezzo": "7,50"
+      },
+      {
+       "etichetta": {
+        "it": "Prezzo 2"
+       },
+       "prezzo": "9,50"
+      }
+     ]
+    },
+    {
+     "nome": {
+      "it": "FUNGHI"
+     },
+     "prezzi": [
+      {
+       "etichetta": {
+        "it": "Prezzo 1"
+       },
+       "prezzo": "7,50"
+      },
+      {
+       "etichetta": {
+        "it": "Prezzo 2"
+       },
+       "prezzo": "9,50"
+      }
+     ]
+    },
+    {
+     "nome": {
+      "it": "GORGONZOLA"
+     },
+     "prezzi": [
+      {
+       "etichetta": {
+        "it": "Prezzo 1"
+       },
+       "prezzo": "8,00"
+      },
+      {
+       "etichetta": {
+        "it": "Prezzo 2"
+       },
+       "prezzo": "10,00"
+      }
+     ]
+    },
+    {
+     "nome": {
+      "it": "INGLESINA"
+     },
+     "prezzi": [
+      {
+       "etichetta": {
+        "it": "Prezzo 1"
+       },
+       "prezzo": "8,70"
+      },
+      {
+       "etichetta": {
+        "it": "Prezzo 2"
+       },
+       "prezzo": "10,70"
+      }
+     ]
+    },
+    {
+     "nome": {
+      "it": "MARGHERITA"
+     },
+     "prezzi": [
+      {
+       "etichetta": {
+        "it": "Prezzo 1"
+       },
+       "prezzo": "6,50"
+      },
+      {
+       "etichetta": {
+        "it": "Prezzo 2"
+       },
+       "prezzo": "8,50"
+      }
+     ]
+    },
+    {
+     "nome": {
+      "it": "MARINARA"
+     },
+     "prezzi": [
+      {
+       "etichetta": {
+        "it": "Prezzo 1"
+       },
+       "prezzo": "6,00"
+      },
+      {
+       "etichetta": {
+        "it": "Prezzo 2"
+       },
+       "prezzo": "8,00"
+      }
+     ]
+    },
+    {
+     "nome": {
+      "it": "PORCINI"
+     },
+     "prezzi": [
+      {
+       "etichetta": {
+        "it": "Prezzo 1"
+       },
+       "prezzo": "8,20"
+      },
+      {
+       "etichetta": {
+        "it": "Prezzo 2"
+       },
+       "prezzo": "10,20"
+      }
+     ]
+    },
+    {
+     "nome": {
+      "it": "PROSCIUTTO"
+     },
+     "prezzi": [
+      {
+       "etichetta": {
+        "it": "Prezzo 1"
+       },
+       "prezzo": "7,50"
+      },
+      {
+       "etichetta": {
+        "it": "Prezzo 2"
+       },
+       "prezzo": "9,50"
+      }
+     ]
+    },
+    {
+     "nome": {
+      "it": "PROSCIUTTO E FUNGHI"
+     },
+     "prezzi": [
+      {
+       "etichetta": {
+        "it": "Prezzo 1"
+       },
+       "prezzo": "8,00"
+      },
+      {
+       "etichetta": {
+        "it": "Prezzo 2"
+       },
+       "prezzo": "10,00"
+      }
+     ]
+    },
+    {
+     "nome": {
+      "it": "PUGLIESE"
+     },
+     "prezzi": [
+      {
+       "etichetta": {
+        "it": "Prezzo 1"
+       },
+       "prezzo": "7,50"
+      },
+      {
+       "etichetta": {
+        "it": "Prezzo 2"
+       },
+       "prezzo": "9,50"
+      }
+     ]
+    },
+    {
+     "nome": {
+      "it": "4 FORMAGGI"
+     },
+     "prezzi": [
+      {
+       "etichetta": {
+        "it": "Prezzo 1"
+       },
+       "prezzo": "9,00"
+      },
+      {
+       "etichetta": {
+        "it": "Prezzo 2"
+       },
+       "prezzo": "11,00"
+      }
+     ]
+    },
+    {
+     "nome": {
+      "it": "4 STAGIONI"
+     },
+     "prezzi": [
+      {
+       "etichetta": {
+        "it": "Prezzo 1"
+       },
+       "prezzo": "9,00"
+      },
+      {
+       "etichetta": {
+        "it": "Prezzo 2"
+       },
+       "prezzo": "11,00"
+      }
+     ]
+    },
+    {
+     "nome": {
+      "it": "RADICCHIO"
+     },
+     "prezzi": [
+      {
+       "etichetta": {
+        "it": "Prezzo 1"
+       },
+       "prezzo": "7,50"
+      },
+      {
+       "etichetta": {
+        "it": "Prezzo 2"
+       },
+       "prezzo": "9,50"
+      }
+     ]
+    },
+    {
+     "nome": {
+      "it": "ROMANA"
+     },
+     "prezzi": [
+      {
+       "etichetta": {
+        "it": "Prezzo 1"
+       },
+       "prezzo": "8,00"
+      },
+      {
+       "etichetta": {
+        "it": "Prezzo 2"
+       },
+       "prezzo": "10,00"
+      }
+     ]
+    },
+    {
+     "nome": {
+      "it": "RUCOLA E GRANA"
+     },
+     "prezzi": [
+      {
+       "etichetta": {
+        "it": "Prezzo 1"
+       },
+       "prezzo": "9,00"
+      },
+      {
+       "etichetta": {
+        "it": "Prezzo 2"
+       },
+       "prezzo": "11,00"
+      }
+     ]
+    },
+    {
+     "nome": {
+      "it": "TIROLESE"
+     },
+     "prezzi": [
+      {
+       "etichetta": {
+        "it": "Prezzo 1"
+       },
+       "prezzo": "8,70"
+      },
+      {
+       "etichetta": {
+        "it": "Prezzo 2"
+       },
+       "prezzo": "10,70"
+      }
+     ]
+    },
+    {
+     "nome": {
+      "it": "TONNO"
+     },
+     "prezzi": [
+      {
+       "etichetta": {
+        "it": "Prezzo 1"
+       },
+       "prezzo": "8,50"
+      },
+      {
+       "etichetta": {
+        "it": "Prezzo 2"
+       },
+       "prezzo": "10,50"
+      }
+     ]
+    },
+    {
+     "nome": {
+      "it": "TONNO E CIPOLLA"
+     },
+     "prezzi": [
+      {
+       "etichetta": {
+        "it": "Prezzo 1"
+       },
+       "prezzo": "9,50"
+      },
+      {
+       "etichetta": {
+        "it": "Prezzo 2"
+       },
+       "prezzo": "11,50"
+      }
+     ]
+    },
+    {
+     "nome": {
+      "it": "TURBO PIZZA"
+     },
+     "prezzi": [
+      {
+       "etichetta": {
+        "it": "Prezzo 1"
+       },
+       "prezzo": "10,80"
+      },
+      {
+       "etichetta": {
+        "it": "Prezzo 2"
+       },
+       "prezzo": "12,80"
+      }
+     ]
+    },
+    {
+     "nome": {
+      "it": "VERDURE"
+     },
+     "prezzi": [
+      {
+       "etichetta": {
+        "it": "Prezzo 1"
+       },
+       "prezzo": "9,70"
+      },
+      {
+       "etichetta": {
+        "it": "Prezzo 2"
+       },
+       "prezzo": "11,70"
+      }
+     ]
+    },
+    {
+     "nome": {
+      "it": "VIENNESE"
+     },
+     "prezzi": [
+      {
+       "etichetta": {
+        "it": "Prezzo 1"
+       },
+       "prezzo": "7,50"
+      },
+      {
+       "etichetta": {
+        "it": "Prezzo 2"
+       },
+       "prezzo": "9,50"
+      }
+     ]
+    },
+    {
+     "nome": {
+      "it": "ZINGARA"
+     },
+     "prezzi": [
+      {
+       "etichetta": {
+        "it": "Prezzo 1"
+       },
+       "prezzo": "9,00"
+      },
+      {
+       "etichetta": {
+        "it": "Prezzo 2"
+       },
+       "prezzo": "11,00"
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "nome": {
+    "it": "LE DELIZIE"
+   },
+   "voci": [
+    {
+     "nome": {
+      "it": "BRESAOLA RUCOLA E GRANA"
+     },
+     "prezzi": [
+      {
+       "etichetta": {
+        "it": "Prezzo 1"
+       },
+       "prezzo": "11,00"
+      },
+      {
+       "etichetta": {
+        "it": "Prezzo 2"
+       },
+       "prezzo": "13,00"
+      }
+     ]
+    },
+    {
+     "nome": {
+      "it": "CONTADINA"
+     },
+     "prezzi": [
+      {
+       "etichetta": {
+        "it": "Prezzo 1"
+       },
+       "prezzo": "10,80"
+      },
+      {
+       "etichetta": {
+        "it": "Prezzo 2"
+       },
+       "prezzo": "12,80"
+      }
+     ]
+    },
+    {
+     "nome": {
+      "it": "CIME DI RAPA"
+     },
+     "prezzi": [
+      {
+       "etichetta": {
+        "it": "Prezzo 1"
+       },
+       "prezzo": "9,50"
+      },
+      {
+       "etichetta": {
+        "it": "Prezzo 2"
+       },
+       "prezzo": "11,50"
+      }
+     ]
+    },
+    {
+     "nome": {
+      "it": "4 FORMAGGI E ASPARAGI"
+     },
+     "prezzi": [
+      {
+       "etichetta": {
+        "it": "Prezzo 1"
+       },
+       "prezzo": "9,70"
+      },
+      {
+       "etichetta": {
+        "it": "Prezzo 2"
+       },
+       "prezzo": "11,70"
+      }
+     ]
+    },
+    {
+     "nome": {
+      "it": "GAMBERETTI"
+     },
+     "prezzi": [
+      {
+       "etichetta": {
+        "it": "Prezzo 1"
+       },
+       "prezzo": "9,20"
+      },
+      {
+       "etichetta": {
+        "it": "Prezzo 2"
+       },
+       "prezzo": "11,20"
+      }
+     ]
+    },
+    {
+     "nome": {
+      "it": "GORGONZOLA E SPECK"
+     },
+     "prezzi": [
+      {
+       "etichetta": {
+        "it": "Prezzo 1"
+       },
+       "prezzo": "9,70"
+      },
+      {
+       "etichetta": {
+        "it": "Prezzo 2"
+       },
+       "prezzo": "11,70"
+      }
+     ]
+    },
+    {
+     "nome": {
+      "it": "MELANZANE PORCINI E CRUDO"
+     },
+     "prezzi": [
+      {
+       "etichetta": {
+        "it": "Prezzo 1"
+       },
+       "prezzo": "9,70"
+      },
+      {
+       "etichetta": {
+        "it": "Prezzo 2"
+       },
+       "prezzo": "11,70"
+      }
+     ]
+    },
+    {
+     "nome": {
+      "it": "MISTO BOSCO"
+     },
+     "prezzi": [
+      {
+       "etichetta": {
+        "it": "Prezzo 1"
+       },
+       "prezzo": "8,20"
+      },
+      {
+       "etichetta": {
+        "it": "Prezzo 2"
+       },
+       "prezzo": "10,20"
+      }
+     ]
+    },
+    {
+     "nome": {
+      "it": "MISTO BOSCO E PROVOLA"
+     },
+     "prezzi": [
+      {
+       "etichetta": {
+        "it": "Prezzo 1"
+       },
+       "prezzo": "9,70"
+      },
+      {
+       "etichetta": {
+        "it": "Prezzo 2"
+       },
+       "prezzo": "11,70"
+      }
+     ]
+    },
+    {
+     "nome": {
+      "it": "MISTO BOSCO E SPECK"
+     },
+     "prezzi": [
+      {
+       "etichetta": {
+        "it": "Prezzo 1"
+       },
+       "prezzo": "9,70"
+      },
+      {
+       "etichetta": {
+        "it": "Prezzo 2"
+       },
+       "prezzo": "11,70"
+      }
+     ]
+    },
+    {
+     "nome": {
+      "it": "NICK"
+     },
+     "prezzi": [
+      {
+       "etichetta": {
+        "it": "Prezzo 1"
+       },
+       "prezzo": "9,70"
+      },
+      {
+       "etichetta": {
+        "it": "Prezzo 2"
+       },
+       "prezzo": "11,70"
+      }
+     ]
+    },
+    {
+     "nome": {
+      "it": "PARMIGIANA"
+     },
+     "prezzi": [
+      {
+       "etichetta": {
+        "it": "Prezzo 1"
+       },
+       "prezzo": "8,70"
+      },
+      {
+       "etichetta": {
+        "it": "Prezzo 2"
+       },
+       "prezzo": "10,70"
+      }
+     ]
+    },
+    {
+     "nome": {
+      "it": "PORCINI CRUDO E GRANA"
+     },
+     "prezzi": [
+      {
+       "etichetta": {
+        "it": "Prezzo 1"
+       },
+       "prezzo": "9,70"
+      },
+      {
+       "etichetta": {
+        "it": "Prezzo 2"
+       },
+       "prezzo": "11,70"
+      }
+     ]
+    },
+    {
+     "nome": {
+      "it": "PORCINI E SALSICCIA"
+     },
+     "prezzi": [
+      {
+       "etichetta": {
+        "it": "Prezzo 1"
+       },
+       "prezzo": "8,70"
+      },
+      {
+       "etichetta": {
+        "it": "Prezzo 2"
+       },
+       "prezzo": "10,70"
+      }
+     ]
+    },
+    {
+     "nome": {
+      "it": "PROVOLA E PANCETTA"
+     },
+     "prezzi": [
+      {
+       "etichetta": {
+        "it": "Prezzo 1"
+       },
+       "prezzo": "8,70"
+      },
+      {
+       "etichetta": {
+        "it": "Prezzo 2"
+       },
+       "prezzo": "10,70"
+      }
+     ]
+    },
+    {
+     "nome": {
+      "it": "PROVOLA E SPECK"
+     },
+     "prezzi": [
+      {
+       "etichetta": {
+        "it": "Prezzo 1"
+       },
+       "prezzo": "9,70"
+      },
+      {
+       "etichetta": {
+        "it": "Prezzo 2"
+       },
+       "prezzo": "11,70"
+      }
+     ]
+    },
+    {
+     "nome": {
+      "it": "SALMONE"
+     },
+     "prezzi": [
+      {
+       "etichetta": {
+        "it": "Prezzo 1"
+       },
+       "prezzo": "9,20"
+      },
+      {
+       "etichetta": {
+        "it": "Prezzo 2"
+       },
+       "prezzo": "11,20"
+      }
+     ]
+    },
+    {
+     "nome": {
+      "it": "SFILACCI"
+     },
+     "prezzi": [
+      {
+       "etichetta": {
+        "it": "Prezzo 1"
+       },
+       "prezzo": "8,70"
+      },
+      {
+       "etichetta": {
+        "it": "Prezzo 2"
+       },
+       "prezzo": "10,70"
+      }
+     ]
+    },
+    {
+     "nome": {
+      "it": "SPINACI E RICOTTA"
+     },
+     "prezzi": [
+      {
+       "etichetta": {
+        "it": "Prezzo 1"
+       },
+       "prezzo": "8,70"
+      },
+      {
+       "etichetta": {
+        "it": "Prezzo 2"
+       },
+       "prezzo": "10,70"
+      }
+     ]
+    },
+    {
+     "nome": {
+      "it": "UFO"
+     },
+     "prezzi": [
+      {
+       "etichetta": {
+        "it": "Prezzo 1"
+       },
+       "prezzo": "9,00"
+      },
+      {
+       "etichetta": {
+        "it": "Prezzo 2"
+       },
+       "prezzo": "11,00"
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "nome": {
+    "it": "LE TURBO PIZZE"
+   },
+   "voci": [
+    {
+     "nome": {
+      "it": "ARLECCHINO"
+     },
+     "prezzi": [
+      {
+       "etichetta": {
+        "it": "Prezzo 1"
+       },
+       "prezzo": "9,70"
+      },
+      {
+       "etichetta": {
+        "it": "Prezzo 2"
+       },
+       "prezzo": "11,70"
+      }
+     ]
+    },
+    {
+     "nome": {
+      "it": "BAVARESE"
+     },
+     "prezzi": [
+      {
+       "etichetta": {
+        "it": "Prezzo 1"
+       },
+       "prezzo": "9,70"
+      },
+      {
+       "etichetta": {
+        "it": "Prezzo 2"
+       },
+       "prezzo": "11,70"
+      }
+     ]
+    },
+    {
+     "nome": {
+      "it": "BIP BIP"
+     },
+     "prezzi": [
+      {
+       "etichetta": {
+        "it": "Prezzo 1"
+       },
+       "prezzo": "8,70"
+      },
+      {
+       "etichetta": {
+        "it": "Prezzo 2"
+       },
+       "prezzo": "10,70"
+      }
+     ]
+    },
+    {
+     "nome": {
+      "it": "BOH"
+     },
+     "prezzi": [
+      {
+       "etichetta": {
+        "it": "Prezzo 1"
+       },
+       "prezzo": "10,00"
+      },
+      {
+       "etichetta": {
+        "it": "Prezzo 2"
+       },
+       "prezzo": "12,00"
+      }
+     ]
+    },
+    {
+     "nome": {
+      "it": "BRASILIANA + CAPASANTA"
+     },
+     "prezzi": [
+      {
+       "etichetta": {
+        "it": "Prezzo 1"
+       },
+       "prezzo": "11,00"
+      },
+      {
+       "etichetta": {
+        "it": "Prezzo 2"
+       },
+       "prezzo": "13,00"
+      }
+     ]
+    },
+    {
+     "nome": {
+      "it": "CAPRESE"
+     },
+     "prezzi": [
+      {
+       "etichetta": {
+        "it": "Prezzo 1"
+       },
+       "prezzo": "7,70"
+      },
+      {
+       "etichetta": {
+        "it": "Prezzo 2"
+       },
+       "prezzo": "9,70"
+      }
+     ]
+    },
+    {
+     "nome": {
+      "it": "CARBONARA"
+     },
+     "prezzi": [
+      {
+       "etichetta": {
+        "it": "Prezzo 1"
+       },
+       "prezzo": "9,70"
+      },
+      {
+       "etichetta": {
+        "it": "Prezzo 2"
+       },
+       "prezzo": "11,70"
+      }
+     ]
+    },
+    {
+     "nome": {
+      "it": "CASARECCIA"
+     },
+     "prezzi": [
+      {
+       "etichetta": {
+        "it": "Prezzo 1"
+       },
+       "prezzo": "9,70"
+      },
+      {
+       "etichetta": {
+        "it": "Prezzo 2"
+       },
+       "prezzo": "11,70"
+      }
+     ]
+    },
+    {
+     "nome": {
+      "it": "DELICATA"
+     },
+     "prezzi": [
+      {
+       "etichetta": {
+        "it": "Prezzo 1"
+       },
+       "prezzo": "9,70"
+      },
+      {
+       "etichetta": {
+        "it": "Prezzo 2"
+       },
+       "prezzo": "11,70"
+      }
+     ]
+    },
+    {
+     "nome": {
+      "it": "DELIZIA"
+     },
+     "prezzi": [
+      {
+       "etichetta": {
+        "it": "Prezzo 1"
+       },
+       "prezzo": "9,70"
+      },
+      {
+       "etichetta": {
+        "it": "Prezzo 2"
+       },
+       "prezzo": "11,70"
+      }
+     ]
+    },
+    {
+     "nome": {
+      "it": "ESTIVA"
+     },
+     "prezzi": [
+      {
+       "etichetta": {
+        "it": "Prezzo 1"
+       },
+       "prezzo": "9,70"
+      },
+      {
+       "etichetta": {
+        "it": "Prezzo 2"
+       },
+       "prezzo": "11,70"
+      }
+     ]
+    },
+    {
+     "nome": {
+      "it": "FURIA"
+     },
+     "prezzi": [
+      {
+       "etichetta": {
+        "it": "Prezzo 1"
+       },
+       "prezzo": "9,70"
+      },
+      {
+       "etichetta": {
+        "it": "Prezzo 2"
+       },
+       "prezzo": "11,70"
+      }
+     ]
+    },
+    {
+     "nome": {
+      "it": "GHIOTTONA"
+     },
+     "prezzi": [
+      {
+       "etichetta": {
+        "it": "Prezzo 1"
+       },
+       "prezzo": "9,70"
+      },
+      {
+       "etichetta": {
+        "it": "Prezzo 2"
+       },
+       "prezzo": "11,70"
+      }
+     ]
+    },
+    {
+     "nome": {
+      "it": "GIARDINELLO"
+     },
+     "prezzi": [
+      {
+       "etichetta": {
+        "it": "Prezzo 1"
+       },
+       "prezzo": "9,70"
+      },
+      {
+       "etichetta": {
+        "it": "Prezzo 2"
+       },
+       "prezzo": "11,70"
+      }
+     ]
+    },
+    {
+     "nome": {
+      "it": "GUSTOSA"
+     },
+     "prezzi": [
+      {
+       "etichetta": {
+        "it": "Prezzo 1"
+       },
+       "prezzo": "9,70"
+      },
+      {
+       "etichetta": {
+        "it": "Prezzo 2"
+       },
+       "prezzo": "11,70"
+      }
+     ]
+    },
+    {
+     "nome": {
+      "it": "LARDO"
+     },
+     "prezzi": [
+      {
+       "etichetta": {
+        "it": "Prezzo 1"
+       },
+       "prezzo": "8,70"
+      },
+      {
+       "etichetta": {
+        "it": "Prezzo 2"
+       },
+       "prezzo": "10,70"
+      }
+     ]
+    },
+    {
+     "nome": {
+      "it": "MAIALINA"
+     },
+     "prezzi": [
+      {
+       "etichetta": {
+        "it": "Prezzo 1"
+       },
+       "prezzo": "9,70"
+      },
+      {
+       "etichetta": {
+        "it": "Prezzo 2"
+       },
+       "prezzo": "11,70"
+      }
+     ]
+    },
+    {
+     "nome": {
+      "it": "NOVITA'"
+     },
+     "prezzi": [
+      {
+       "etichetta": {
+        "it": "Prezzo 1"
+       },
+       "prezzo": "9,70"
+      },
+      {
+       "etichetta": {
+        "it": "Prezzo 2"
+       },
+       "prezzo": "11,70"
+      }
+     ]
+    },
+    {
+     "nome": {
+      "it": "PANNA SPECK"
+     },
+     "prezzi": [
+      {
+       "etichetta": {
+        "it": "Prezzo 1"
+       },
+       "prezzo": "9,70"
+      },
+      {
+       "etichetta": {
+        "it": "Prezzo 2"
+       },
+       "prezzo": "11,70"
+      }
+     ]
+    },
+    {
+     "nome": {
+      "it": "PATATOSA"
+     },
+     "prezzi": [
+      {
+       "etichetta": {
+        "it": "Prezzo 1"
+       },
+       "prezzo": "8,30"
+      },
+      {
+       "etichetta": {
+        "it": "Prezzo 2"
+       },
+       "prezzo": "10,30"
+      }
+     ]
+    },
+    {
+     "nome": {
+      "it": "PATAFORNO"
+     },
+     "prezzi": [
+      {
+       "etichetta": {
+        "it": "Prezzo 1"
+       },
+       "prezzo": "8,30"
+      },
+      {
+       "etichetta": {
+        "it": "Prezzo 2"
+       },
+       "prezzo": "10,30"
+      }
+     ]
+    },
+    {
+     "nome": {
+      "it": "PHILADELPHIA"
+     },
+     "prezzi": [
+      {
+       "etichetta": {
+        "it": "Prezzo 1"
+       },
+       "prezzo": "9,70"
+      },
+      {
+       "etichetta": {
+        "it": "Prezzo 2"
+       },
+       "prezzo": "11,70"
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "nome": {
+    "it": "LE TURBO PIZZE"
+   },
+   "voci": [
+    {
+     "nome": {
+      "it": "PRIMAVERA"
+     },
+     "prezzi": [
+      {
+       "etichetta": {
+        "it": "Prezzo 1"
+       },
+       "prezzo": "10,00"
+      },
+      {
+       "etichetta": {
+        "it": "Prezzo 2"
+       },
+       "prezzo": "12,00"
+      }
+     ]
+    },
+    {
+     "nome": {
+      "it": "RED NIGHT"
+     },
+     "prezzi": [
+      {
+       "etichetta": {
+        "it": "Prezzo 1"
+       },
+       "prezzo": "9,70"
+      },
+      {
+       "etichetta": {
+        "it": "Prezzo 2"
+       },
+       "prezzo": "11,70"
+      }
+     ]
+    },
+    {
+     "nome": {
+      "it": "SILVER"
+     },
+     "prezzi": [
+      {
+       "etichetta": {
+        "it": "Prezzo 1"
+       },
+       "prezzo": "9,70"
+      },
+      {
+       "etichetta": {
+        "it": "Prezzo 2"
+       },
+       "prezzo": "11,70"
+      }
+     ]
+    },
+    {
+     "nome": {
+      "it": "TREVISANA"
+     },
+     "prezzi": [
+      {
+       "etichetta": {
+        "it": "Prezzo 1"
+       },
+       "prezzo": "11,00"
+      },
+      {
+       "etichetta": {
+        "it": "Prezzo 2"
+       },
+       "prezzo": "13,00"
+      }
+     ]
+    },
+    {
+     "nome": {
+      "it": "WHITE NIGHT"
+     },
+     "prezzi": [
+      {
+       "etichetta": {
+        "it": "Prezzo 1"
+       },
+       "prezzo": "9,70"
+      },
+      {
+       "etichetta": {
+        "it": "Prezzo 2"
+       },
+       "prezzo": "11,70"
+      }
+     ]
+    },
+    {
+     "nome": {
+      "it": "ZIA ALICE"
+     },
+     "prezzi": [
+      {
+       "etichetta": {
+        "it": "Prezzo 1"
+       },
+       "prezzo": "12,00"
+      },
+      {
+       "etichetta": {
+        "it": "Prezzo 2"
+       },
+       "prezzo": "14,00"
+      }
+     ]
+    },
+    {
+     "nome": {
+      "it": "ZIA ANNA"
+     },
+     "prezzi": [
+      {
+       "etichetta": {
+        "it": "Prezzo 1"
+       },
+       "prezzo": "12,00"
+      },
+      {
+       "etichetta": {
+        "it": "Prezzo 2"
+       },
+       "prezzo": "14,00"
+      }
+     ]
+    },
+    {
+     "nome": {
+      "it": "ZIA GINA"
+     },
+     "prezzi": [
+      {
+       "etichetta": {
+        "it": "Prezzo 1"
+       },
+       "prezzo": "9,70"
+      },
+      {
+       "etichetta": {
+        "it": "Prezzo 2"
+       },
+       "prezzo": "11,70"
+      }
+     ]
+    },
+    {
+     "nome": {
+      "it": "ZIO FLAVIO"
+     },
+     "prezzi": [
+      {
+       "etichetta": {
+        "it": "Prezzo 1"
+       },
+       "prezzo": "9,70"
+      },
+      {
+       "etichetta": {
+        "it": "Prezzo 2"
+       },
+       "prezzo": "11,70"
+      }
+     ]
+    },
+    {
+     "nome": {
+      "it": "ZIO MARIO"
+     },
+     "prezzi": [
+      {
+       "etichetta": {
+        "it": "Prezzo 1"
+       },
+       "prezzo": "9,70"
+      },
+      {
+       "etichetta": {
+        "it": "Prezzo 2"
+       },
+       "prezzo": "11,70"
+      }
+     ]
+    }
+   ]
+  }
+ ]
+}

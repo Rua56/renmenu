@@ -1,0 +1,23 @@
+FOTO: foto-1.jpg
+# LE NOSTRE BIRRE ALLA SPINA
+Birra Kozel Premium Lager 0,30 l | 3,50
+Birra Kozel Premium Lager 0,50 l | 5,00
+Birra Kozel Lager Dark 0,30 l | 3,50
+Birra Kozel Lager Dark 0,50 l | 5,00
+Birra Raffo lavorazione grezza 0,20 l | 3,00
+Birra Raffo lavorazione grezza 0,50 l | 5,00
+Birra Grolsch Weizen 0,30 l | 3,80
+Birra Grolsch Weizen 0,50 l | 6,00
+Caraffa di birra 1,50 l | 14,00
+# BEVANDE
+Vino 0,25 l | 3,80
+Vino 0,50 l | 6,00
+Vino 1 l | 11,00
+Birra analcolica bottiglia 0,33 l | 4,00
+Bibite alla spina 0,25 l | 3,20
+Bibite alla spina 0,40 l | 4,20
+Bibite in lattina | 3,00
+Succhi di frutta | 3,50
+Acqua microfiltrata da 0,75 l | 2,50
+Acqua Alba da 0,50 l | 2,80
+Acqua S. pellegrino / Panna da 0,75 l | 3,80

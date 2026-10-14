@@ -1,0 +1,239 @@
+{
+ "nome": "Buffet Marascutti (Trieste)",
+ "sezioni": [
+  {
+   "nome": {
+    "it": "Antipasti"
+   },
+   "voci": [
+    {
+     "nome": {
+      "it": "Prosciutto cotto triestino etto/hecto"
+     },
+     "prezzo": "9,00"
+    },
+    {
+     "nome": {
+      "it": "Prosciutto crudo di Sauris etto/hecto"
+     },
+     "prezzo": "12,00"
+    },
+    {
+     "nome": {
+      "it": "Kajmak Formaggio fresco"
+     },
+     "prezzo": "12,00"
+    },
+    {
+     "nome": {
+      "it": "Tagliere di prosciutto cotto triestino, prosciutto crudo di Sauris e formaggi"
+     },
+     "prezzo": "20,00"
+    }
+   ]
+  },
+  {
+   "nome": {
+    "it": "Primi piatti"
+   },
+   "voci": [
+    {
+     "nome": {
+      "it": "Gnocchi di patate con gulasch"
+     },
+     "prezzo": "15,00"
+    },
+    {
+     "nome": {
+      "it": "Gnocchi di patate con ragù"
+     },
+     "prezzo": "15,00"
+    },
+    {
+     "nome": {
+      "it": "Gnocchi di pane al gulash"
+     },
+     "prezzo": "16,00"
+    },
+    {
+     "nome": {
+      "it": "Gnocchi di pane al ragù"
+     },
+     "prezzo": "16,00"
+    },
+    {
+     "nome": {
+      "it": "Jota"
+     },
+     "prezzo": "12,00"
+    },
+    {
+     "nome": {
+      "it": "Pappardelle fatte in casa con selvaggina"
+     },
+     "prezzo": "16,00"
+    },
+    {
+     "nome": {
+      "it": "Baccalà in umido con polenta"
+     },
+     "prezzo": "19,00"
+    },
+    {
+     "nome": {
+      "it": "Fusi con sugo di gallina all’istriana"
+     },
+     "prezzo": "16,00"
+    },
+    {
+     "nome": {
+      "it": "Gnocchi con selvaggina"
+     },
+     "prezzo": "16,00"
+    }
+   ]
+  },
+  {
+   "nome": {
+    "it": "Secondi piatti"
+   },
+   "voci": [
+    {
+     "nome": {
+      "it": "Wiener Schnitzel (di vitello)"
+     },
+     "prezzo": "18,00"
+    },
+    {
+     "nome": {
+      "it": "Tagliata di manzo con rucola e pomodorini"
+     },
+     "prezzo": "24,00"
+    },
+    {
+     "nome": {
+      "it": "Tagliata di manzo con rucola e grana"
+     },
+     "prezzo": "24,00"
+    }
+   ]
+  },
+  {
+   "nome": {
+    "it": "Secondi piatti"
+   },
+   "voci": [
+    {
+     "nome": {
+      "it": "Arrosto di maiale con patate in tecia"
+     },
+     "prezzo": "16,00"
+    },
+    {
+     "nome": {
+      "it": "Ljubljanska con contorno"
+     },
+     "prezzo": "25,00"
+    },
+    {
+     "nome": {
+      "it": "Giulianska con contorno"
+     },
+     "prezzo": "26,00"
+    },
+    {
+     "nome": {
+      "it": "Stinco di maiale con patate in tecia"
+     },
+     "prezzo": "35,00"
+    }
+   ]
+  },
+  {
+   "nome": {
+    "it": "Bolliti di Maiale"
+   },
+   "voci": [
+    {
+     "nome": {
+      "it": "Porcina"
+     },
+     "prezzo": "8,00"
+    },
+    {
+     "nome": {
+      "it": "Vienna"
+     },
+     "prezzo": "8,00"
+    },
+    {
+     "nome": {
+      "it": "Musetto"
+     },
+     "prezzo": "8,00"
+    },
+    {
+     "nome": {
+      "it": "Coppa affumicata"
+     },
+     "prezzo": "8,00"
+    },
+    {
+     "nome": {
+      "it": "Pancetta cotta"
+     },
+     "prezzo": "8,00"
+    },
+    {
+     "nome": {
+      "it": "Kranjska klobasa (cragno)"
+     },
+     "prezzo": "10,00"
+    },
+    {
+     "nome": {
+      "it": "Bollito misto con contorno"
+     },
+     "prezzo": "22,00"
+    },
+    {
+     "nome": {
+      "it": "Piatto marascutti (per 2 persone)"
+     },
+     "prezzo": "35,00"
+    }
+   ]
+  },
+  {
+   "nome": {
+    "it": "Contorni"
+   },
+   "voci": [
+    {
+     "nome": {
+      "it": "Patate in tecia"
+     },
+     "prezzo": "6,00"
+    },
+    {
+     "nome": {
+      "it": "Patate fritte"
+     },
+     "prezzo": "6,00"
+    },
+    {
+     "nome": {
+      "it": "Insalata mista"
+     },
+     "prezzo": "6,00"
+    },
+    {
+     "nome": {
+      "it": "Crauti"
+     },
+     "prezzo": "6,00"
+    }
+   ]
+  }
+ ]
+}

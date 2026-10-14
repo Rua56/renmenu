@@ -1,0 +1,53 @@
+FOTO: foto-1.jpg foto-2.jpg
+# ANTIPASTI
+Misto mare "Casa Nostra" | 12,00
+Carpaccio di polpo con pomodoro fresco e olive taggiasche | 15,00
+Battuta di carne al coltello con stracciatella e granella di pistacchio | 15,00
+Misto di terra | 10,00
+# PRIMI
+Spaghetti allo scoglio | 9,00
+Penne con scampi | 9,00
+Ravioli di branzino con frutti di mare | 10,00
+Trofiette al nero di seppia con salmone fumé e gamberi | 10,00
+Gnocchi con seppie e porcini o carciofi | 10,00
+Risotto per minimo 2 persone: ai frutti di mare | 10,00
+Risotto per minimo 2 persone: al nero di seppia | 10,00
+Ravioli di borragine: al ragù | 8,00
+Ravioli di borragine: ai funghi porcini o carciofi | 10,00
+Gnocchi al pesto | 9,00
+# SECONDI
+Fritto misto Special | 13,00
+Fritto misto | 13,00
+Totani fritti | 13,00
+Grigliata di gamberoni e scampi | 18,00
+Grigliata mista di gamberoni, scampi e spada | 16,00
+Tagliata di tonno con rucola | 13,00
+Tonno al sesamo con rucola | 13,00
+Pesce spada: alla piastra | 12,00
+Pesce spada: alla Messinese | 12,00
+Orate o Branzini: olio e limone | 25,00
+Orate o Branzini: Ligure | 30,00
+Orate o Branzini: con porcini o carciofi e patate | 30,00
+Gamberi alla Marcello | 12,00
+Tagliata di scamone con rucola | 15,00
+Milanese con contorno | 10,00
+# CONTORNI
+Insalata mista | 4,00
+Patate fritte | 4,00
+Melanzane alla griglia | 4,00
+# DOLCI
+Tiramisù della casa | 5,00
+Tiramisù al pistacchio | 6,00
+Crema catalana | 5,00
+Panna cotta | 5,00
+Torta di Mele tiepida con gelato | 5,00
+Torta caprese al cioccolato | 5,00
+Crostata con cioccolato bianco, ricotta e granella di nocciole | 5,00
+Affogati vari | 5,00
+Tartufo nero o bianco | 5,00
+Gelato al cocco | 5,00
+Sorbetto al limone o altro gusto | 3,50
+# Piatti
+stoccafisso accomodato | 9,00
+paella solo pesce | 12,00
+paella mista | 15,00

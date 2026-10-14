@@ -1,0 +1,973 @@
+{
+ "nome": "L'Arte della Pizza (Caronno Pertusella)",
+ "sezioni": [
+  {
+   "nome": {
+    "it": "Le Nostre Pizze"
+   },
+   "voci": [
+    {
+     "nome": {
+      "it": "FOCACCIA"
+     },
+     "prezzi": [
+      {
+       "etichetta": {
+        "it": "Prezzo 1"
+       },
+       "prezzo": "3,50"
+      },
+      {
+       "etichetta": {
+        "it": "Prezzo 2"
+       },
+       "prezzo": "6,00"
+      },
+      {
+       "etichetta": {
+        "it": "Prezzo 3"
+       },
+       "prezzo": "9,00"
+      },
+      {
+       "etichetta": {
+        "it": "Prezzo 4"
+       },
+       "prezzo": "12,00"
+      }
+     ]
+    },
+    {
+     "nome": {
+      "it": "MARINARA"
+     },
+     "prezzi": [
+      {
+       "etichetta": {
+        "it": "Prezzo 1"
+       },
+       "prezzo": "4,00"
+      },
+      {
+       "etichetta": {
+        "it": "Prezzo 2"
+       },
+       "prezzo": "7,50"
+      },
+      {
+       "etichetta": {
+        "it": "Prezzo 3"
+       },
+       "prezzo": "10,50"
+      },
+      {
+       "etichetta": {
+        "it": "Prezzo 4"
+       },
+       "prezzo": "14,00"
+      }
+     ]
+    },
+    {
+     "nome": {
+      "it": "BIANCANEVE"
+     },
+     "prezzi": [
+      {
+       "etichetta": {
+        "it": "Prezzo 1"
+       },
+       "prezzo": "4,00"
+      },
+      {
+       "etichetta": {
+        "it": "Prezzo 2"
+       },
+       "prezzo": "7,50"
+      },
+      {
+       "etichetta": {
+        "it": "Prezzo 3"
+       },
+       "prezzo": "10,50"
+      },
+      {
+       "etichetta": {
+        "it": "Prezzo 4"
+       },
+       "prezzo": "14,00"
+      }
+     ]
+    },
+    {
+     "nome": {
+      "it": "MARGHERITA"
+     },
+     "prezzi": [
+      {
+       "etichetta": {
+        "it": "Prezzo 1"
+       },
+       "prezzo": "4,50"
+      },
+      {
+       "etichetta": {
+        "it": "Prezzo 2"
+       },
+       "prezzo": "8,50"
+      },
+      {
+       "etichetta": {
+        "it": "Prezzo 3"
+       },
+       "prezzo": "12,00"
+      },
+      {
+       "etichetta": {
+        "it": "Prezzo 4"
+       },
+       "prezzo": "16,00"
+      }
+     ]
+    },
+    {
+     "nome": {
+      "it": "PANCETTA"
+     },
+     "prezzi": [
+      {
+       "etichetta": {
+        "it": "Prezzo 1"
+       },
+       "prezzo": "5,00"
+      },
+      {
+       "etichetta": {
+        "it": "Prezzo 2"
+       },
+       "prezzo": "9,50"
+      },
+      {
+       "etichetta": {
+        "it": "Prezzo 3"
+       },
+       "prezzo": "13,50"
+      },
+      {
+       "etichetta": {
+        "it": "Prezzo 4"
+       },
+       "prezzo": "18,00"
+      }
+     ]
+    },
+    {
+     "nome": {
+      "it": "NAPOLI"
+     },
+     "prezzi": [
+      {
+       "etichetta": {
+        "it": "Prezzo 1"
+       },
+       "prezzo": "5,00"
+      },
+      {
+       "etichetta": {
+        "it": "Prezzo 2"
+       },
+       "prezzo": "9,50"
+      },
+      {
+       "etichetta": {
+        "it": "Prezzo 3"
+       },
+       "prezzo": "13,50"
+      },
+      {
+       "etichetta": {
+        "it": "Prezzo 4"
+       },
+       "prezzo": "18,00"
+      }
+     ]
+    },
+    {
+     "nome": {
+      "it": "SICILIANA"
+     },
+     "prezzi": [
+      {
+       "etichetta": {
+        "it": "Prezzo 1"
+       },
+       "prezzo": "5,50"
+      },
+      {
+       "etichetta": {
+        "it": "Prezzo 2"
+       },
+       "prezzo": "10,50"
+      },
+      {
+       "etichetta": {
+        "it": "Prezzo 3"
+       },
+       "prezzo": "15,00"
+      },
+      {
+       "etichetta": {
+        "it": "Prezzo 4"
+       },
+       "prezzo": "20,00"
+      }
+     ]
+    },
+    {
+     "nome": {
+      "it": "4 STAGIONI"
+     },
+     "prezzi": [
+      {
+       "etichetta": {
+        "it": "Prezzo 1"
+       },
+       "prezzo": "5,50"
+      },
+      {
+       "etichetta": {
+        "it": "Prezzo 2"
+       },
+       "prezzo": "10,50"
+      },
+      {
+       "etichetta": {
+        "it": "Prezzo 3"
+       },
+       "prezzo": "15,00"
+      },
+      {
+       "etichetta": {
+        "it": "Prezzo 4"
+       },
+       "prezzo": "20,00"
+      }
+     ]
+    },
+    {
+     "nome": {
+      "it": "AMATRICIANA"
+     },
+     "prezzi": [
+      {
+       "etichetta": {
+        "it": "Prezzo 1"
+       },
+       "prezzo": "5,50"
+      },
+      {
+       "etichetta": {
+        "it": "Prezzo 2"
+       },
+       "prezzo": "10,50"
+      },
+      {
+       "etichetta": {
+        "it": "Prezzo 3"
+       },
+       "prezzo": "15,00"
+      },
+      {
+       "etichetta": {
+        "it": "Prezzo 4"
+       },
+       "prezzo": "20,00"
+      }
+     ]
+    },
+    {
+     "nome": {
+      "it": "PUGLIESE"
+     },
+     "prezzi": [
+      {
+       "etichetta": {
+        "it": "Prezzo 1"
+       },
+       "prezzo": "5,50"
+      },
+      {
+       "etichetta": {
+        "it": "Prezzo 2"
+       },
+       "prezzo": "10,50"
+      },
+      {
+       "etichetta": {
+        "it": "Prezzo 3"
+       },
+       "prezzo": "15,00"
+      },
+      {
+       "etichetta": {
+        "it": "Prezzo 4"
+       },
+       "prezzo": "20,00"
+      }
+     ]
+    },
+    {
+     "nome": {
+      "it": "4 FORMAGGI"
+     },
+     "prezzi": [
+      {
+       "etichetta": {
+        "it": "Prezzo 1"
+       },
+       "prezzo": "5,50"
+      },
+      {
+       "etichetta": {
+        "it": "Prezzo 2"
+       },
+       "prezzo": "10,50"
+      },
+      {
+       "etichetta": {
+        "it": "Prezzo 3"
+       },
+       "prezzo": "15,00"
+      },
+      {
+       "etichetta": {
+        "it": "Prezzo 4"
+       },
+       "prezzo": "20,00"
+      }
+     ]
+    },
+    {
+     "nome": {
+      "it": "BUFALOTTA"
+     },
+     "prezzi": [
+      {
+       "etichetta": {
+        "it": "Prezzo 1"
+       },
+       "prezzo": "6,00"
+      },
+      {
+       "etichetta": {
+        "it": "Prezzo 2"
+       },
+       "prezzo": "11,50"
+      },
+      {
+       "etichetta": {
+        "it": "Prezzo 3"
+       },
+       "prezzo": "16,50"
+      },
+      {
+       "etichetta": {
+        "it": "Prezzo 4"
+       },
+       "prezzo": "22,50"
+      }
+     ]
+    },
+    {
+     "nome": {
+      "it": "PARMA"
+     },
+     "prezzi": [
+      {
+       "etichetta": {
+        "it": "Prezzo 1"
+       },
+       "prezzo": "6,00"
+      },
+      {
+       "etichetta": {
+        "it": "Prezzo 2"
+       },
+       "prezzo": "11,50"
+      },
+      {
+       "etichetta": {
+        "it": "Prezzo 3"
+       },
+       "prezzo": "16,50"
+      },
+      {
+       "etichetta": {
+        "it": "Prezzo 4"
+       },
+       "prezzo": "22,50"
+      }
+     ]
+    },
+    {
+     "nome": {
+      "it": "AMERICANA"
+     },
+     "prezzi": [
+      {
+       "etichetta": {
+        "it": "Prezzo 1"
+       },
+       "prezzo": "6,00"
+      },
+      {
+       "etichetta": {
+        "it": "Prezzo 2"
+       },
+       "prezzo": "11,50"
+      },
+      {
+       "etichetta": {
+        "it": "Prezzo 3"
+       },
+       "prezzo": "16,50"
+      },
+      {
+       "etichetta": {
+        "it": "Prezzo 4"
+       },
+       "prezzo": "22,50"
+      }
+     ]
+    },
+    {
+     "nome": {
+      "it": "DIAVOLA"
+     },
+     "prezzi": [
+      {
+       "etichetta": {
+        "it": "Prezzo 1"
+       },
+       "prezzo": "6,00"
+      },
+      {
+       "etichetta": {
+        "it": "Prezzo 2"
+       },
+       "prezzo": "11,50"
+      },
+      {
+       "etichetta": {
+        "it": "Prezzo 3"
+       },
+       "prezzo": "16,50"
+      },
+      {
+       "etichetta": {
+        "it": "Prezzo 4"
+       },
+       "prezzo": "22,50"
+      }
+     ]
+    },
+    {
+     "nome": {
+      "it": "BOSCAIOLA"
+     },
+     "prezzi": [
+      {
+       "etichetta": {
+        "it": "Prezzo 1"
+       },
+       "prezzo": "6,50"
+      },
+      {
+       "etichetta": {
+        "it": "Prezzo 2"
+       },
+       "prezzo": "12,50"
+      },
+      {
+       "etichetta": {
+        "it": "Prezzo 3"
+       },
+       "prezzo": "18,00"
+      },
+      {
+       "etichetta": {
+        "it": "Prezzo 4"
+       },
+       "prezzo": "25,00"
+      }
+     ]
+    },
+    {
+     "nome": {
+      "it": "BELLA NAPOLI"
+     },
+     "prezzi": [
+      {
+       "etichetta": {
+        "it": "Prezzo 1"
+       },
+       "prezzo": "6,50"
+      },
+      {
+       "etichetta": {
+        "it": "Prezzo 2"
+       },
+       "prezzo": "12,50"
+      },
+      {
+       "etichetta": {
+        "it": "Prezzo 3"
+       },
+       "prezzo": "18,00"
+      },
+      {
+       "etichetta": {
+        "it": "Prezzo 4"
+       },
+       "prezzo": "25,00"
+      }
+     ]
+    },
+    {
+     "nome": {
+      "it": "TONNO E CIPOLLA"
+     },
+     "prezzi": [
+      {
+       "etichetta": {
+        "it": "Prezzo 1"
+       },
+       "prezzo": "6,50"
+      },
+      {
+       "etichetta": {
+        "it": "Prezzo 2"
+       },
+       "prezzo": "12,50"
+      },
+      {
+       "etichetta": {
+        "it": "Prezzo 3"
+       },
+       "prezzo": "18,00"
+      },
+      {
+       "etichetta": {
+        "it": "Prezzo 4"
+       },
+       "prezzo": "25,00"
+      }
+     ]
+    },
+    {
+     "nome": {
+      "it": "MESSICANA"
+     },
+     "prezzi": [
+      {
+       "etichetta": {
+        "it": "Prezzo 1"
+       },
+       "prezzo": "6,50"
+      },
+      {
+       "etichetta": {
+        "it": "Prezzo 2"
+       },
+       "prezzo": "12,50"
+      },
+      {
+       "etichetta": {
+        "it": "Prezzo 3"
+       },
+       "prezzo": "18,00"
+      },
+      {
+       "etichetta": {
+        "it": "Prezzo 4"
+       },
+       "prezzo": "25,00"
+      }
+     ]
+    },
+    {
+     "nome": {
+      "it": "CAPRICCIOSA"
+     },
+     "prezzi": [
+      {
+       "etichetta": {
+        "it": "Prezzo 1"
+       },
+       "prezzo": "6,50"
+      },
+      {
+       "etichetta": {
+        "it": "Prezzo 2"
+       },
+       "prezzo": "12,50"
+      },
+      {
+       "etichetta": {
+        "it": "Prezzo 3"
+       },
+       "prezzo": "18,00"
+      },
+      {
+       "etichetta": {
+        "it": "Prezzo 4"
+       },
+       "prezzo": "25,00"
+      }
+     ]
+    },
+    {
+     "nome": {
+      "it": "BISMARK"
+     },
+     "prezzi": [
+      {
+       "etichetta": {
+        "it": "Prezzo 1"
+       },
+       "prezzo": "6,50"
+      },
+      {
+       "etichetta": {
+        "it": "Prezzo 2"
+       },
+       "prezzo": "13,00"
+      },
+      {
+       "etichetta": {
+        "it": "Prezzo 3"
+       },
+       "prezzo": "18,50"
+      },
+      {
+       "etichetta": {
+        "it": "Prezzo 4"
+       },
+       "prezzo": "26,00"
+      }
+     ]
+    },
+    {
+     "nome": {
+      "it": "ORTOLANA"
+     },
+     "prezzi": [
+      {
+       "etichetta": {
+        "it": "Prezzo 1"
+       },
+       "prezzo": "7,00"
+      },
+      {
+       "etichetta": {
+        "it": "Prezzo 2"
+       },
+       "prezzo": "13,50"
+      },
+      {
+       "etichetta": {
+        "it": "Prezzo 3"
+       },
+       "prezzo": "19,50"
+      },
+      {
+       "etichetta": {
+        "it": "Prezzo 4"
+       },
+       "prezzo": "26,00"
+      }
+     ]
+    },
+    {
+     "nome": {
+      "it": "PIEMONTESE"
+     },
+     "prezzi": [
+      {
+       "etichetta": {
+        "it": "Prezzo 1"
+       },
+       "prezzo": "7,00"
+      },
+      {
+       "etichetta": {
+        "it": "Prezzo 2"
+       },
+       "prezzo": "13,50"
+      },
+      {
+       "etichetta": {
+        "it": "Prezzo 3"
+       },
+       "prezzo": "19,50"
+      },
+      {
+       "etichetta": {
+        "it": "Prezzo 4"
+       },
+       "prezzo": "26,00"
+      }
+     ]
+    },
+    {
+     "nome": {
+      "it": "ROMANA"
+     },
+     "prezzi": [
+      {
+       "etichetta": {
+        "it": "Prezzo 1"
+       },
+       "prezzo": "7,00"
+      },
+      {
+       "etichetta": {
+        "it": "Prezzo 2"
+       },
+       "prezzo": "13,50"
+      },
+      {
+       "etichetta": {
+        "it": "Prezzo 3"
+       },
+       "prezzo": "19,50"
+      },
+      {
+       "etichetta": {
+        "it": "Prezzo 4"
+       },
+       "prezzo": "26,00"
+      }
+     ]
+    },
+    {
+     "nome": {
+      "it": "TIROLESE"
+     },
+     "prezzi": [
+      {
+       "etichetta": {
+        "it": "Prezzo 1"
+       },
+       "prezzo": "7,00"
+      },
+      {
+       "etichetta": {
+        "it": "Prezzo 2"
+       },
+       "prezzo": "13,50"
+      },
+      {
+       "etichetta": {
+        "it": "Prezzo 3"
+       },
+       "prezzo": "19,50"
+      },
+      {
+       "etichetta": {
+        "it": "Prezzo 4"
+       },
+       "prezzo": "26,00"
+      }
+     ]
+    },
+    {
+     "nome": {
+      "it": "PRIMAVERA"
+     },
+     "prezzi": [
+      {
+       "etichetta": {
+        "it": "Prezzo 1"
+       },
+       "prezzo": "7,50"
+      },
+      {
+       "etichetta": {
+        "it": "Prezzo 2"
+       },
+       "prezzo": "14,50"
+      },
+      {
+       "etichetta": {
+        "it": "Prezzo 3"
+       },
+       "prezzo": "21,00"
+      },
+      {
+       "etichetta": {
+        "it": "Prezzo 4"
+       },
+       "prezzo": "28,00"
+      }
+     ]
+    },
+    {
+     "nome": {
+      "it": "MEDITERRANEA"
+     },
+     "prezzi": [
+      {
+       "etichetta": {
+        "it": "Prezzo 1"
+       },
+       "prezzo": "7,50"
+      },
+      {
+       "etichetta": {
+        "it": "Prezzo 2"
+       },
+       "prezzo": "14,50"
+      },
+      {
+       "etichetta": {
+        "it": "Prezzo 3"
+       },
+       "prezzo": "21,00"
+      },
+      {
+       "etichetta": {
+        "it": "Prezzo 4"
+       },
+       "prezzo": "28,00"
+      }
+     ]
+    },
+    {
+     "nome": {
+      "it": "REALE"
+     },
+     "prezzi": [
+      {
+       "etichetta": {
+        "it": "Prezzo 1"
+       },
+       "prezzo": "7,50"
+      },
+      {
+       "etichetta": {
+        "it": "Prezzo 2"
+       },
+       "prezzo": "14,50"
+      },
+      {
+       "etichetta": {
+        "it": "Prezzo 3"
+       },
+       "prezzo": "21,00"
+      },
+      {
+       "etichetta": {
+        "it": "Prezzo 4"
+       },
+       "prezzo": "28,00"
+      }
+     ]
+    },
+    {
+     "nome": {
+      "it": "LEGGERA"
+     },
+     "prezzi": [
+      {
+       "etichetta": {
+        "it": "Prezzo 1"
+       },
+       "prezzo": "7,50"
+      },
+      {
+       "etichetta": {
+        "it": "Prezzo 2"
+       },
+       "prezzo": "14,50"
+      },
+      {
+       "etichetta": {
+        "it": "Prezzo 3"
+       },
+       "prezzo": "21,00"
+      },
+      {
+       "etichetta": {
+        "it": "Prezzo 4"
+       },
+       "prezzo": "28,00"
+      }
+     ]
+    },
+    {
+     "nome": {
+      "it": "LIGURE"
+     },
+     "prezzi": [
+      {
+       "etichetta": {
+        "it": "Prezzo 1"
+       },
+       "prezzo": "8,00"
+      },
+      {
+       "etichetta": {
+        "it": "Prezzo 2"
+       },
+       "prezzo": "15,50"
+      },
+      {
+       "etichetta": {
+        "it": "Prezzo 3"
+       },
+       "prezzo": "22,40"
+      },
+      {
+       "etichetta": {
+        "it": "Prezzo 4"
+       },
+       "prezzo": "30,00"
+      }
+     ]
+    },
+    {
+     "nome": {
+      "it": "LA VERACE"
+     },
+     "prezzi": [
+      {
+       "etichetta": {
+        "it": "Prezzo 1"
+       },
+       "prezzo": "8,00"
+      },
+      {
+       "etichetta": {
+        "it": "Prezzo 2"
+       },
+       "prezzo": "15,50"
+      },
+      {
+       "etichetta": {
+        "it": "Prezzo 3"
+       },
+       "prezzo": "22,40"
+      },
+      {
+       "etichetta": {
+        "it": "Prezzo 4"
+       },
+       "prezzo": "30,00"
+      }
+     ]
+    }
+   ]
+  }
+ ]
+}

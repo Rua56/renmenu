@@ -1,0 +1,3 @@
+SKIP foto-1.png: promo banner, not a menu; only price is a supplement "MENU' PIZZA con patatine e bibita 33 + € 2,50"
+SKIP foto-2.png: promo banner, not a menu; only price is a supplement "MENU' PIZZA con patatine e birra 33 + € 2,80"
+FOTO:
