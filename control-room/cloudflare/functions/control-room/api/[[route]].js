@@ -7,6 +7,7 @@ import { linkMailFiles, receiveMailFiles } from '../../_lib/mail-files.js';
 import { deletionPlan, deletionStatements } from '../../_lib/delete-request.js';
 import { MEDIA_KINDS, PUBLIC_EXT, applyMedia, classifyPhoto, isMenuPhotoKind, parseLabel, proposeTargets, publicImageOk, reapplyConfirmed, removeMedia, resolveTarget, targetLabel } from '../../_lib/media.js';
 import { speak, transcribe } from '../../_lib/voice.js';
+import { ensureLiveAgent, liveSignedUrl } from '../../_lib/phone.js';
 import { OWNER_REVIEW } from '../../_lib/missions.js';
 import { readCurrentMenu } from '../../_lib/github-live.js';
 import { isSameOriginWrite, verifyOwner } from '../../_lib/auth.js';
@@ -461,6 +462,30 @@ export async function jarvisVoice(env, input = {}) {
   const audio = settings.provider && settings.apiKey ? await speak(settings, text) : null;
   if (!audio?.length) return new Response(null, { status: 204 });
   return new Response(audio, { headers: { 'Content-Type': 'audio/mpeg', 'Cache-Control': 'private, no-store' } });
+}
+// Dialogo dal vivo con Jarvis (agente ElevenLabs): la pagina riceve un indirizzo firmato e la situazione
+// di partenza; la chiave ElevenLabs resta qui. Consuma minuti: parte solo dal tocco «Dal vivo».
+export async function jarvisLive(env, { fetchImpl = (...args) => globalThis.fetch(...args) } = {}) {
+  const db = env.DB;
+  const provider = await missions.setting(db, 'voice_provider');
+  const apiKey = await readSealedSetting(env, missions.setting, missions.putSetting, db, 'voice_api_key');
+  assert(provider === 'elevenlabs' && apiKey, 'Per il dialogo dal vivo serve la voce di ElevenLabs: impostala in Sistema → Notifiche.', 409);
+  const voiceId = await missions.setting(db, 'voice_id');
+  let agentId = await missions.setting(db, 'cr_live_agent_id');
+  let url;
+  try {
+    agentId = await ensureLiveAgent(fetchImpl, apiKey, { agentId, voiceId });
+    url = await liveSignedUrl(fetchImpl, apiKey, agentId);
+  } catch (error) {
+    if (error?.status === 401) throw Object.assign(new Error('ElevenLabs rifiuta la chiave: serve il permesso «Conversational AI» (Agents).'), { status: 409 });
+    // Agente cancellato da ElevenLabs: se ne crea uno nuovo, una volta.
+    if (!agentId || ![404, 422].includes(error?.status)) throw Object.assign(new Error(`Il dialogo dal vivo non parte: ${String(error?.message || 'errore').slice(0, 200)}`), { status: 502 });
+    agentId = await ensureLiveAgent(fetchImpl, apiKey, { voiceId });
+    url = await liveSignedUrl(fetchImpl, apiKey, agentId);
+  }
+  await missions.putSetting(db, 'cr_live_agent_id', agentId);
+  const situation = await missions.statusText(db).catch(() => '');
+  return { url, situation: String(situation || 'Nessuna novità.').slice(0, 3000) };
 }
 async function missionRows(db) {
   try { return await rows(db, 'SELECT id,request_id AS requestId,draft_id AS draftId,status,note,rounds,step_started_at AS stepStartedAt,updated_at AS updatedAt FROM jarvis_missions ORDER BY updated_at DESC LIMIT 200'); }
@@ -1716,6 +1741,7 @@ export async function onRequest(context) {
         assert(bytes.length <= 2_500_000, 'Frase troppo lunga: massimo una ventina di secondi.', 413);
         return answer(await jarvisHear(context.env, bytes));
       }
+      if (segments.join('/') === 'jarvis/live') return answer(await jarvisLive(context.env));
       if (segments[0] === 'jarvis' && ['ask', 'voice'].includes(segments[1]) && segments.length === 2) {
         assert(request.headers.get('content-type')?.startsWith('application/json'), 'Serve application/json.', 415);
         assert(Number(request.headers.get('content-length') || 0) <= 20_000, 'Messaggio troppo lungo.');

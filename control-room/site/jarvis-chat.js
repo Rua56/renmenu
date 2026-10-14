@@ -1,9 +1,11 @@
 /* «Parla con Jarvis» nella Control Room: conversazione scritta e a voce con lo stesso Jarvis di Telegram.
  * Microfono: l'orecchio di Jarvis (jarvis-ear.js, trascrizione Whisper gratis), acceso solo quando lo tocchi o in «mani libere».
  * Risposte: voce del browser (gratis) oppure la voce vera di Jarvis (ElevenLabs, consuma crediti) se la
- * accendi qui. Pubblicare, cancellare e scrivere ai locali restano tocchi espliciti sui pulsanti di Jarvis. */
-import { askJarvis, isDemoMode, jarvisVoiceAudio, transcribeVoice } from './api.js';
+ * accendi qui. «Dialogo dal vivo» parla con l'agente ElevenLabs senza pause, come al telefono (consuma
+ * minuti, parte solo dal tocco). Pubblicare, cancellare e scrivere ai locali restano tocchi espliciti sui pulsanti di Jarvis. */
+import { askJarvis, isDemoMode, jarvisLiveSession, jarvisVoiceAudio, transcribeVoice } from './api.js';
 import { earAvailable, hear, stopHearing, unlockEar } from './jarvis-ear.js';
+import { liveAvailable, startLive } from './jarvis-live.js';
 
 const Recognition = globalThis.SpeechRecognition || globalThis.webkitSpeechRecognition;
 const Synth = globalThis.speechSynthesis;
@@ -40,16 +42,19 @@ let showHandler = null; // «mostrami …»: la home apre l'elenco (vedi jarvis-
 let recognition = null;
 let player = null;
 let phase = 'idle'; // idle | listening | thinking | speaking
+let live = null; // dialogo dal vivo in corso (jarvis-live.js)
 
+let lastNote = '';
 function setPhase(next, note = '') {
   phase = next;
   if (!sheet) return;
   sheet.dataset.phase = next;
   const status = sheet.querySelector('#chat-status');
   const labels = { idle: handsFree ? 'Mani libere: tocca il microfono per cominciare' : 'Tocca il microfono e parla, oppure scrivi', listening: 'Ti ascolto…', thinking: 'Jarvis sta pensando…', speaking: handsFree ? 'Jarvis risponde… poi ti riascolto' : 'Jarvis risponde…' };
-  if (status) status.textContent = note || labels[next];
+  lastNote = note || labels[next];
+  if (status) status.textContent = lastNote;
   const mic = sheet.querySelector('[data-chat="mic"]');
-  if (mic) { mic.setAttribute('aria-pressed', String(next === 'listening')); mic.setAttribute('aria-label', next === 'listening' ? 'Smetti di ascoltare' : next === 'speaking' ? 'Interrompi e parla' : 'Parla con Jarvis'); }
+  if (mic) { mic.setAttribute('aria-pressed', String(next === 'listening' || Boolean(live))); mic.setAttribute('aria-label', live ? 'Termina il dialogo dal vivo' : next === 'listening' ? 'Smetti di ascoltare' : next === 'speaking' ? 'Interrompi e parla' : 'Parla con Jarvis'); }
 }
 
 function bubble(entry) {
@@ -82,13 +87,15 @@ function render() {
       <button class="chat-send" type="submit" aria-label="Invia">${SEND}</button>
       <button class="chat-mic" type="button" data-chat="mic" aria-pressed="false" aria-label="Parla con Jarvis">${MIC}</button>
     </form>
+    ${liveAvailable && !isDemoMode ? `<button class="chat-live" type="button" data-chat="live" aria-pressed="${live ? 'true' : 'false'}" ${voiceReady || live ? '' : 'disabled'}><strong>${live ? 'Termina il dialogo dal vivo' : 'Dialogo dal vivo'}</strong><small>${voiceReady ? 'Jarvis ti risponde subito e puoi interromperlo. ElevenLabs: consuma minuti; si chiude dopo 10 minuti o se lasci la pagina' : 'serve la voce ElevenLabs in Sistema → Notifiche'}</small></button>` : ''}
     <div class="chat-opts">
       <label class="chat-toggle"><input type="checkbox" data-chat="handsfree" ${handsFree ? 'checked' : ''}><span>Mani libere<small>dopo ogni risposta riascolta da solo; «basta» per finire</small></span></label>
       <label class="chat-toggle"><input type="checkbox" data-chat="voice" ${jarvisVoice ? 'checked' : ''} ${voiceReady ? '' : 'disabled'}><span>Voce di Jarvis<small>${voiceReady ? 'ElevenLabs: consuma i tuoi crediti' : 'da configurare in Sistema → Notifiche'}; spenta usa la voce del telefono, gratis</small></span></label>
     </div>
     ${telegramBot && !isDemoMode ? `<a class="chat-tg" href="https://t.me/${escapeHtml(telegramBot)}" target="_blank" rel="noopener">Apri Telegram</a>` : ''}`;
   renderLog();
-  setPhase(phase === 'thinking' ? 'thinking' : 'idle');
+  if (live) setPhase(phase, lastNote);
+  else setPhase(phase === 'thinking' ? 'thinking' : 'idle');
 }
 
 function push(entry) { history.push(entry); history = history.slice(-40); saveHistory(history); renderLog(); }
@@ -224,6 +231,64 @@ function listenWithBrowser() {
 }
 function syncToggles() { const box = sheet?.querySelector('[data-chat="handsfree"]'); if (box) box.checked = handsFree; }
 
+// ——— dialogo dal vivo ———
+function liveButton() {
+  const button = sheet?.querySelector('[data-chat="live"]');
+  if (!button) return;
+  button.setAttribute('aria-pressed', String(Boolean(live)));
+  const label = button.querySelector('strong');
+  if (label) label.textContent = live ? 'Termina il dialogo dal vivo' : 'Dialogo dal vivo';
+  button.disabled = !voiceReady && !live;
+}
+function startLiveDialog() {
+  if (live || busy) return;
+  handsFree = false; syncToggles();
+  stopListening(); stopSpeaking();
+  const LIVE_NOTES = { connecting: 'Collego Jarvis dal vivo…', listening: 'Dal vivo: parla pure', speaking: 'Jarvis parla… interrompilo quando vuoi' };
+  live = startLive({
+    session: jarvisLiveSession,
+    onLevel: (level) => sheet?.style.setProperty('--lvl', level.toFixed(2)),
+    onUser: (text) => push({ role: 'user', text }),
+    onAgent: (text) => push({ role: 'jarvis', kind: 'text', text }),
+    onState: (state, note) => {
+      if (state === 'ended') {
+        live = null;
+        delete document.body.dataset.live;
+        liveButton();
+        setPhase('idle', note || 'Dialogo finito.');
+        return;
+      }
+      setPhase(state === 'connecting' ? 'thinking' : state, LIVE_NOTES[state]);
+    },
+    onTool: liveTool
+  });
+  document.body.dataset.live = '1';
+  liveButton();
+}
+function stopLiveDialog() { live?.stop(); }
+// Strumenti dell'agente dal vivo: il Jarvis vero (stesse risposte e pulsanti di Telegram), gli elenchi a schermo, la chiusura.
+async function liveTool(name, params) {
+  if (name === 'chiedi_a_jarvis') {
+    const text = String(params.richiesta || '').trim().slice(0, 1000);
+    if (!text) return 'Manca la richiesta.';
+    const result = await askJarvis({ text });
+    const replies = Array.isArray(result?.messages) ? result.messages : [];
+    for (const m of replies) push({ role: 'jarvis', kind: m.kind || 'text', text: m.text || '', buttons: m.buttons || [], src: m.src || '', name: m.name || '' });
+    const buttons = replies.flatMap((m) => (m.buttons || []).map(([label]) => label));
+    const said = replies.map((m) => m.say || (m.kind === 'image' ? 'Immagine mostrata a schermo.' : m.kind === 'file' ? 'File pronto a schermo.' : '')).filter(Boolean).join(' ');
+    return `${said || 'Fatto.'}${buttons.length ? ` Pulsanti a schermo per Riccardo: ${buttons.join(', ')}.` : ''}`;
+  }
+  if (name === 'mostra') {
+    const shown = showHandler?.(String(params.cosa || ''));
+    if (!shown) return 'Questo elenco non so aprirlo a schermo: chiedilo con chiedi_a_jarvis.';
+    push({ role: 'jarvis', kind: 'text', text: shown.say });
+    sheet.hidden = true; // l'elenco è sulla home; il dialogo continua, la barra in basso riapre la conversazione
+    return `${shown.say} L'elenco è aperto a schermo.`;
+  }
+  if (name === 'chiudi') { setTimeout(stopLiveDialog, 2500); return 'Chiudo.'; }
+  return 'Strumento sconosciuto.';
+}
+
 // ——— conversazione ———
 async function send(text, { spoken = false } = {}) {
   const clean = String(text || '').trim();
@@ -242,6 +307,7 @@ async function send(text, { spoken = false } = {}) {
     push({ role: 'jarvis', kind: 'text', text: shown.say });
     handsFree = false; stopListening();
     sheet.hidden = true;
+    if (live) { live.context(`A schermo: ${shown.say}`); return; }
     await say(shown.say, { always: true });
     setPhase('idle');
     return;
@@ -256,13 +322,16 @@ async function press(data, trigger) {
   await exchange({ press: data });
 }
 async function exchange(payload) {
-  busy = true; setPhase('thinking');
+  busy = true;
+  if (!live) setPhase('thinking');
   try {
     const result = await askJarvis(payload);
     const replies = Array.isArray(result?.messages) ? result.messages : [];
     for (const m of replies) push({ role: 'jarvis', kind: m.kind || 'text', text: m.text || '', buttons: m.buttons || [], src: m.src || '', name: m.name || '' });
     busy = false;
     const words = replies.map((m) => m.say).filter(Boolean).join(' ').slice(0, 900);
+    // Dal vivo parla l'agente: gli si dice cosa è successo a schermo, senza interromperlo.
+    if (live) { live.context(`Riccardo ha usato lo schermo (${payload.press ? 'pulsante' : `scritto: «${payload.text}»`}). Jarvis ha risposto: ${words || 'fatto'}`); return; }
     await say(words);
     // Un attimo prima di riaprire il microfono: il telefono torna dall'altoparlante alla registrazione
     // e la coda della voce di Jarvis non finisce nella frase successiva.
@@ -275,7 +344,7 @@ async function exchange(payload) {
   } catch (error) {
     busy = false;
     push({ role: 'jarvis', kind: 'note', text: error?.message || 'Jarvis non risponde: riprova tra poco.' });
-    setPhase('idle');
+    if (!live) setPhase('idle');
   }
 }
 
@@ -289,7 +358,9 @@ function onClick(event) {
     else send(text);
     return;
   }
+  if (event.target.closest('[data-chat="live"]')) { if (live) stopLiveDialog(); else startLiveDialog(); return; }
   if (event.target.closest('[data-chat="mic"]')) {
+    if (live) { stopLiveDialog(); return; }
     if (busy) return;
     unlockEar();
     // Mentre ascolta, il tocco vuol dire «ho finito»: manda subito quello che ha sentito.
@@ -301,6 +372,7 @@ function onClick(event) {
 function onChange(event) {
   const box = event.target.closest('[data-chat]');
   if (!box) return;
+  if (box.dataset.chat === 'handsfree' && live) { box.checked = false; return; }
   if (box.dataset.chat === 'handsfree') { handsFree = box.checked; quietTurns = 0; if (handsFree) unlockEar(); if (handsFree && phase === 'idle' && !busy) listen(); else if (!handsFree) setPhase(phase); }
   if (box.dataset.chat === 'voice') { jarvisVoice = box.checked; local.set(VOICE_KEY, jarvisVoice ? 'si' : 'no'); }
 }
@@ -322,9 +394,11 @@ export function openChat(element, { voice = false, bot = '', listenNow = false, 
   voiceReady = Boolean(voice); telegramBot = bot || '';
   render();
   sheet.hidden = false;
+  if (live) return;
   if (listenNow) listen(); else sheet.querySelector('input[name="text"]')?.focus();
 }
 export function closeChat() {
+  stopLiveDialog();
   handsFree = false;
   stopListening(); stopSpeaking();
   phase = 'idle';
