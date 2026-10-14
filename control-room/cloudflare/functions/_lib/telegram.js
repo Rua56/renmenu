@@ -48,6 +48,13 @@ export const COMMANDS = [
   ['provaemail', 'Email di prova da renmenu.com', '📧 Email di prova']
 ];
 export const COMMANDS_VERSION = '1';
+// Pulsante fisso «☰ Menu» sotto il campo di scrittura (tastiera di risposta persistente): toccarlo manda MENU_BUTTON.
+export const MENU_BUTTON = '☰ Menu';
+export const KEYBOARD_VERSION = '1';
+export const sendMenuKeyboard = (env, chatId, text, fetchImpl) => call(env, 'sendMessage', {
+  chat_id: chatId, text: String(text).slice(0, 3900), disable_notification: true,
+  reply_markup: { keyboard: [[{ text: MENU_BUTTON }]], resize_keyboard: true, is_persistent: true }
+}, fetchImpl);
 export const setMyCommands = (env, fetchImpl) => call(env, 'setMyCommands', { commands: COMMANDS.map(([command, description]) => ({ command, description })) }, fetchImpl);
 export const getMe = (env, fetchImpl) => call(env, 'getMe', {}, fetchImpl);
 export const setWebhook = (env, secret, fetchImpl) => call(env, 'setWebhook', {

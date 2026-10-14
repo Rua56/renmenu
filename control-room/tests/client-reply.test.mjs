@@ -200,5 +200,13 @@ test('Menu dei comandi: «/menu» mostra un pulsante per comando, il tocco lo es
     await missions.telegramUpdate(db, env, { message: { chat: { id: 42, type: 'private' }, text: '/sconosciuto' } });
     assert.match(calls.filter((c) => c.method === 'sendMessage').at(-1).body.text, /Tocca un comando qui sotto/);
     assert.equal(calls.filter((c) => c.method === 'setMyCommands').length, 1);
+    // Pulsante fisso «☰ Menu»: messo una volta sola, e toccarlo apre i comandi.
+    const keyboards = calls.filter((c) => c.body.reply_markup?.keyboard);
+    assert.equal(keyboards.length, 1);
+    assert.equal(keyboards[0].body.reply_markup.keyboard[0][0].text, '☰ Menu');
+    assert.ok(keyboards[0].body.reply_markup.is_persistent);
+    await missions.telegramUpdate(db, env, { message: { chat: { id: 42, type: 'private' }, text: '☰ Menu' } });
+    assert.match(calls.filter((c) => c.method === 'sendMessage').at(-1).body.text, /Ecco i comandi/);
+    assert.equal(calls.filter((c) => c.body.reply_markup?.keyboard).length, 1);
   } finally { globalThis.fetch = previous; }
 });

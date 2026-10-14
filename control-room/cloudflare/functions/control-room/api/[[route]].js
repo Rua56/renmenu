@@ -438,7 +438,7 @@ export async function jarvisAsk(env, input = {}) {
   try { offered = JSON.parse(await missions.setting(db, 'cr_buttons') || '[]'); } catch { offered = []; }
   if (press) assert(Array.isArray(offered) && offered.includes(press), 'Questo pulsante non è più valido: chiedi di nuovo a Jarvis.', 409);
   const capture = telegramCapture((...args) => globalThis.fetch(...args));
-  const talk = createMissions({ ...missionDeps, fetchImpl: capture.fetchImpl });
+  const talk = createMissions({ ...missionDeps, fetchImpl: capture.fetchImpl, captured: true });
   // Senza token Telegram Jarvis non «manda» nulla: un token finto basta, tanto le chiamate restano qui.
   const tgEnv = telegramReady(env) ? env : Object.assign(Object.create(env), { TELEGRAM_BOT_TOKEN: FAKE_TG_TOKEN });
   await talk.telegramUpdate(db, tgEnv, press
