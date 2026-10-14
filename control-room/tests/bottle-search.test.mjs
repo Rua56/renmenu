@@ -29,6 +29,12 @@ test('immagini candidate: og:image e immagini che nominano il vino, mai loghi o 
   assert.deepEqual(list, ['https://www.primosic.com/media/ribolla-gialla-bottiglia.png', 'https://cdn.primosic.com/wp/ribolla-gialla-riserva.jpg?w=800']);
 });
 
+test('un «%» non valido nell’indirizzo di un’immagine (siti veri) non fa cadere la ricerca', () => {
+  const html = '<img src="/foto/ribolla-gialla-100%-collio.jpg" alt="Ribolla Gialla"><img src="/foto/%E0%A4%A.jpg" alt="Ribolla Gialla bottiglia">';
+  const list = imageCandidates(html, 'https://www.primosic.com/vini/ribolla', 'Ribolla Gialla — Primosic');
+  assert.equal(list.length, 2);
+});
+
 test('fonte salvata e riletta', () => {
   const [slot] = winesWithoutPhoto(menu);
   assert.deepEqual(parseSourceNote(sourceNote(slot, 'https://a.it/p', 'https://a.it/i.jpg')), { page: 'https://a.it/p', image: 'https://a.it/i.jpg', wine: 'Ribolla Gialla — Primosic' });

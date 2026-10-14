@@ -1239,7 +1239,10 @@ async function action(db, type, input, env = {}) {
     const df = slotFrequencies(menuSlots(menu));
     const outcomes = [];
     for (const slot of round) {
-      const res = await findBottle(gemini, slot, df, { classify: (bytes, mime) => classifyPhoto(env.AI, bytes, mime) });
+      // Un sito che risponde in modo strano non deve fermare la ricerca degli altri vini.
+      let res;
+      try { res = await findBottle(gemini, slot, df, { classify: (bytes, mime) => classifyPhoto(env.AI, bytes, mime) }); }
+      catch (error) { res = { reason: `ricerca non riuscita (${String(error?.message || 'errore').slice(0, 80)})` }; }
       if (!res.found) { outcomes.push({ name: slot.name, found: false, reason: res.reason }); continue; }
       const f = res.found, materialId = uid(), key = `private/requests/${draft.request_id}/${materialId}`, stamp = now();
       const host = new URL(f.page).hostname.replace(/^www\./, '');
