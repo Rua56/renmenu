@@ -173,11 +173,11 @@ html[data-jarvis="thinking"] .reactor-main .arc { animation-duration: 1.8s; }
 .sheet[hidden] { display: none; }
 .sheet-head { display: flex; align-items: center; justify-content: space-between; padding-bottom: 10px; }
 .sheet-head button { min-height: 44px; padding: 0 6px; border: 0; background: transparent; color: var(--teal); font: 700 16px var(--sans); cursor: pointer; }
-.sheet .log { display: flex; flex: 1; flex-direction: column; gap: 10px; overflow: auto; padding: 6px 0; }
+:is(.sheet, .jarvis-talk) .log { display: flex; flex: 1; flex-direction: column; gap: 10px; overflow: auto; padding: 6px 0; }
 .msg { max-width: 88%; padding: 11px 14px; border-radius: 18px; font-size: 15px; }
 .msg.j { border: 1px solid var(--line); border-top-left-radius: 6px; background: var(--c2); }
-.sheet .quick { display: flex; flex-wrap: wrap; gap: 8px; padding: 8px 0; }
-.sheet .quick button { min-height: 40px; padding: 9px 14px; border: 1px solid var(--line-strong); border-radius: 99px; background: var(--c3); color: var(--ink); font: 600 13.5px var(--sans); cursor: pointer; }
+:is(.sheet, .jarvis-talk) .quick { display: flex; flex-wrap: wrap; gap: 8px; padding: 8px 0; }
+:is(.sheet, .jarvis-talk) .quick button { min-height: 40px; padding: 9px 14px; border: 1px solid var(--line-strong); border-radius: 99px; background: var(--c3); color: var(--ink); font: 600 13.5px var(--sans); cursor: pointer; }
 .sheet .cta { display: grid; place-items: center; min-height: 58px; margin-top: 10px; border-radius: 16px; background: var(--am); color: #1a1000; font-weight: 800; font-size: 17px; text-decoration: none; }
 @media (prefers-reduced-motion: reduce) { .reactor span, .reactor .core { animation: none !important; } }
 .steps li { display: block; }
@@ -207,7 +207,7 @@ html[data-jarvis="thinking"] .reactor-main .arc { animation-duration: 1.8s; }
 .chat-btns { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 10px; }
 .chat-btns button { min-height: 40px; padding: 8px 14px; border: 1px solid var(--teal); border-radius: 12px; background: transparent; color: var(--teal); font: 700 14px var(--sans); cursor: pointer; }
 .chat-btns button:hover { background: var(--teal); color: #04141c; }
-.sheet .chat-quick { flex-wrap: nowrap; overflow-x: auto; scrollbar-width: none; }
+:is(.sheet, .jarvis-talk) .chat-quick { flex-wrap: nowrap; overflow-x: auto; scrollbar-width: none; }
 .chat-quick button { flex: none; }
 .chat-bar { display: flex; align-items: center; gap: 8px; min-height: 58px; padding: 6px; border: 1px solid var(--line-strong); border-radius: 99px; background: var(--c3); }
 .chat-bar input { flex: 1; min-width: 0; height: 44px; padding: 0 12px; border: 0; background: transparent; color: var(--ink); font: 500 16px var(--sans); outline: none; }
@@ -372,3 +372,18 @@ html[data-jarvis="speaking"] .reactor .r3 { border-color: rgba(255, 255, 255, .5
 .rev-tab-button .nav-hint { position: static; }
 .rev-count { min-width: 20px; padding: 1px 6px; border-radius: 99px; background: var(--c1); color: var(--muted); font: 600 11.5px var(--mono); text-align: center; }
 .rev-tab[hidden] { display: none; }
+
+/* La home è la conversazione con Jarvis: messaggi in pagina, barra per scrivere sopra le schede in basso. */
+.jarvis-talk { display: flex; flex-direction: column; width: min(100%, 720px); margin: 0 auto; }
+.jarvis-talk[hidden] { display: none; }
+.jarvis-talk .log { overflow: visible; padding: 4px 0 8px; }
+.jarvis-talk .chat-status { margin: 4px 0 0; color: var(--muted); font: 500 12px var(--mono); letter-spacing: .04em; text-align: center; }
+.jarvis-talk .chat-quick { padding: 6px 0 8px; }
+.jarvis-talk .chat-bar { position: sticky; z-index: 41; bottom: calc(84px + env(safe-area-inset-bottom)); box-shadow: 0 8px 30px rgba(0, 0, 0, .45); }
+.jarvis-talk .chat-more { margin-top: 10px; color: var(--muted); font-size: 13.5px; }
+.jarvis-talk .chat-more summary { min-height: 40px; padding: 10px 2px; cursor: pointer; }
+.bottom-nav.on-home .ask { display: none; }
+.jarvis-talk .msg.j strong { color: var(--ink); }
+.jarvis-talk .msg { scroll-margin-bottom: 170px; }
+.chat-bar input:focus, .chat-bar input:focus-visible { outline: 0; box-shadow: none; }
+.chat-bar:focus-within { border-color: var(--teal); }

@@ -10,7 +10,7 @@ import { liveAvailable, startLive } from './jarvis-live.js';
 const Recognition = globalThis.SpeechRecognition || globalThis.webkitSpeechRecognition;
 const Synth = globalThis.speechSynthesis;
 const STOP_WORDS = /^(?:ok\s+)?(?:basta|stop|fine|chiudi|grazie(?:\s+jarvis)?(?:,?\s+(?:basta|a dopo|ciao))?|a dopo|ciao jarvis)[.!]?$/i;
-const SUGGESTIONS = ['Com’è la situazione?', 'Mostrami le pratiche aperte', 'Quali locali sono registrati?', 'Modifiche di questa settimana', 'Mostrami l’anteprima di …', 'Nella bozza di … metti … a … euro'];
+const SUGGESTIONS = ['Com’è la situazione?', 'Nel menu di … metti … a … euro', 'Crea una nuova pratica per …', 'Pubblica il menu di …', 'Mostrami l’anteprima di …', 'Elimina la pratica di …', 'Mostrami le pratiche aperte'];
 const HISTORY_KEY = 'jarvis-chat';
 const VOICE_KEY = 'jarvis-chat-voice';
 
@@ -45,6 +45,9 @@ let recognition = null;
 let player = null;
 let phase = 'idle'; // idle | listening | thinking | speaking
 let live = null; // dialogo dal vivo in corso (jarvis-live.js)
+let inline = false; // conversazione dentro la home (non un foglio che si chiude)
+let introHtml = null; // la home mette in cima alla conversazione le decisioni che aspettano Riccardo
+const bound = new WeakSet();
 
 let lastNote = '';
 // Il reattore (home e foglio della chat) segue Jarvis: html[data-jarvis] e i livelli di voce --jv-lvl / --jv-out.
@@ -82,17 +85,21 @@ function bubble(entry) {
   return `<div class="msg j${entry.kind === 'note' ? ' note' : ''}">${body}${media}${buttons}</div>`;
 }
 
-function renderLog() {
+function renderLog(follow = true) {
   const log = sheet?.querySelector('#chat-log');
   if (!log) return;
-  const intro = `<div class="msg j"><div class="chat-text">${isDemoMode ? 'Demo: qui le risposte sono finte e non parte nulla.' : 'Sono qui, Riccardo. Parlami o scrivimi come su Telegram: capisco le stesse cose e pubblicare resta sempre un tuo tocco.'}</div></div>`;
+  const intro = introHtml?.() || `<div class="msg j"><div class="chat-text">${isDemoMode ? 'Demo: qui le risposte sono finte e non parte nulla.' : 'Sono qui, Riccardo. Parlami o scrivimi come su Telegram: capisco le stesse cose e pubblicare resta sempre un tuo tocco.'}</div></div>`;
   log.innerHTML = intro + history.map(bubble).join('');
   log.scrollTop = log.scrollHeight;
+  if (inline && follow && history.length) log.lastElementChild?.scrollIntoView({ block: 'nearest' });
 }
+/** La home ha nuovi dati: ridisegna solo i messaggi (quello che stai scrivendo resta). */
+export function refreshChat() { if (sheet && !sheet.hidden) renderLog(false); }
 
 function render() {
-  sheet.innerHTML = `<div class="sheet-head"><strong>Parla con Jarvis</strong><button type="button" data-action="ask-close">Chiudi</button></div>
-    <div class="chat-core reactor" aria-hidden="true"><span class="r1"></span><span class="r2"></span><span class="r3"></span><span class="core"></span></div>
+  const head = inline ? '' : `<div class="sheet-head"><strong>Parla con Jarvis</strong><button type="button" data-action="ask-close">Chiudi</button></div>
+    <div class="chat-core reactor" aria-hidden="true"><span class="r1"></span><span class="r2"></span><span class="r3"></span><span class="core"></span></div>`;
+  sheet.innerHTML = `${head}
     <p class="chat-status" id="chat-status" role="status"></p>
     <div class="log" id="chat-log" aria-live="polite"></div>
     <div class="quick chat-quick">${SUGGESTIONS.map((s) => `<button type="button" data-chat-suggest="${escapeHtml(s)}">${escapeHtml(s)}</button>`).join('')}</div>
@@ -101,13 +108,13 @@ function render() {
       <button class="chat-send" type="submit" aria-label="Invia">${SEND}</button>
       <button class="chat-mic" type="button" data-chat="mic" aria-pressed="false" aria-label="Parla con Jarvis">${MIC}</button>
     </form>
-    ${liveAvailable && !isDemoMode ? `<button class="chat-live" type="button" data-chat="live" aria-pressed="${live ? 'true' : 'false'}" ${voiceReady || live ? '' : 'disabled'}><strong>${live ? 'Termina il dialogo dal vivo' : 'Dialogo dal vivo'}</strong><small>${voiceReady ? 'Jarvis ti risponde subito e puoi interromperlo. ElevenLabs: consuma minuti; si chiude dopo 10 minuti o se lasci la pagina' : 'serve la voce ElevenLabs in Sistema → Notifiche'}</small></button>` : ''}
+    ${inline ? '<details class="chat-more"><summary>Voce e opzioni</summary>' : ''}${liveAvailable && !isDemoMode ? `<button class="chat-live" type="button" data-chat="live" aria-pressed="${live ? 'true' : 'false'}" ${voiceReady || live ? '' : 'disabled'}><strong>${live ? 'Termina il dialogo dal vivo' : 'Dialogo dal vivo'}</strong><small>${voiceReady ? 'Jarvis ti risponde subito e puoi interromperlo. ElevenLabs: consuma minuti; si chiude dopo 10 minuti o se lasci la pagina' : 'serve la voce ElevenLabs in Strumenti → Collegamenti e voce di Jarvis'}</small></button>` : ''}
     <div class="chat-opts">
       <label class="chat-toggle"><input type="checkbox" data-chat="handsfree" ${handsFree ? 'checked' : ''}><span>Mani libere<small>dopo ogni risposta riascolta da solo; «basta» per finire</small></span></label>
-      <label class="chat-toggle"><input type="checkbox" data-chat="voice" ${jarvisVoice ? 'checked' : ''} ${voiceReady ? '' : 'disabled'}><span>Voce di Jarvis<small>${voiceReady ? 'ElevenLabs: consuma i tuoi crediti' : 'da configurare in Sistema → Notifiche'}; spenta usa la voce del telefono, gratis</small></span></label>
+      <label class="chat-toggle"><input type="checkbox" data-chat="voice" ${jarvisVoice ? 'checked' : ''} ${voiceReady ? '' : 'disabled'}><span>Voce di Jarvis<small>${voiceReady ? 'ElevenLabs: consuma i tuoi crediti' : 'da configurare in Strumenti → Collegamenti e voce di Jarvis'}; spenta usa la voce del telefono, gratis</small></span></label>
     </div>
-    ${telegramBot && !isDemoMode ? `<a class="chat-tg" href="https://t.me/${escapeHtml(telegramBot)}" target="_blank" rel="noopener">Apri Telegram</a>` : ''}`;
-  renderLog();
+    ${telegramBot && !isDemoMode ? `<a class="chat-tg" href="https://t.me/${escapeHtml(telegramBot)}" target="_blank" rel="noopener">Apri Telegram</a>` : ''}${inline ? '</details>' : ''}`;
+  renderLog(!inline);
   if (live) setPhase(phase, lastNote);
   else setPhase(phase === 'thinking' ? 'thinking' : 'idle');
 }
@@ -141,7 +148,7 @@ function browserSay(text) {
 }
 /** Jarvis parla fuori dalla conversazione (saluto all'apertura): voce del telefono, gratis, e il reattore segue. */
 export async function announce(text) {
-  if (!text || phase !== 'idle' || (sheet && !sheet.hidden)) return;
+  if (!text || phase !== 'idle' || (sheet && !sheet.hidden && !inline)) return;
   setPhase('speaking');
   await browserSay(text);
   if (phase === 'speaking') setPhase('idle');
@@ -306,7 +313,7 @@ async function liveTool(name, params) {
     const shown = showHandler?.(String(params.cosa || ''));
     if (!shown) return 'Questo elenco non so aprirlo a schermo: chiedilo con chiedi_a_jarvis.';
     push({ role: 'jarvis', kind: 'text', text: shown.say });
-    sheet.hidden = true; // l'elenco è sulla home; il dialogo continua, la barra in basso riapre la conversazione
+    if (!inline) sheet.hidden = true; // l'elenco è sulla home; il dialogo continua, la barra in basso riapre la conversazione
     return `${shown.say} L'elenco è aperto a schermo.`;
   }
   if (name === 'chiudi') { setTimeout(stopLiveDialog, 2500); return 'Chiudo.'; }
@@ -332,7 +339,7 @@ async function send(text, { spoken = false } = {}) {
   if (shown) {
     push({ role: 'jarvis', kind: 'text', text: shown.say });
     handsFree = false; stopListening();
-    sheet.hidden = true;
+    if (!inline) sheet.hidden = true;
     if (live) { live.context(`A schermo: ${shown.say}`); return; }
     await say(shown.say, { always: true });
     setPhase('idle');
@@ -410,13 +417,18 @@ function onSubmit(event) {
 }
 
 /** Apre la conversazione. voice: true se la voce di Jarvis è configurata; listen: parte subito in ascolto. */
-export function openChat(element, { voice = false, bot = '', listenNow = false, onShow = null, onClose = null, wake = false, firstText = '' } = {}) {
+export function openChat(element, { voice = false, bot = '', listenNow = false, onShow = null, onClose = null, wake = false, firstText = '', inline: embedded = false, intro = null, focus = true } = {}) {
   showHandler = onShow; closeHandler = onClose; woken = Boolean(wake);
-  if (sheet !== element) {
-    sheet = element;
-    sheet.addEventListener('click', onClick);
-    sheet.addEventListener('change', onChange);
-    sheet.addEventListener('submit', onSubmit);
+  // Passando dalla home al foglio (o viceversa) il vecchio contenitore si svuota: una sola conversazione a schermo.
+  if (sheet && sheet !== element && !inline) sheet.hidden = true;
+  if (sheet && sheet !== element) sheet.innerHTML = '';
+  inline = Boolean(embedded); introHtml = intro;
+  sheet = element;
+  if (!bound.has(element)) {
+    bound.add(element);
+    element.addEventListener('click', onClick);
+    element.addEventListener('change', onChange);
+    element.addEventListener('submit', onSubmit);
   }
   voiceReady = Boolean(voice); telegramBot = bot || '';
   render();
@@ -425,15 +437,17 @@ export function openChat(element, { voice = false, bot = '', listenNow = false, 
   // Svegliato a voce o dal nucleo: conversazione a mani libere, finché Riccardo non dice «basta».
   if (wake) { handsFree = true; quietTurns = 0; syncToggles(); unlockEar(); }
   if (firstText) { send(firstText, { spoken: true }); return; }
-  if (listenNow) listen(); else sheet.querySelector('input[name="text"]')?.focus();
+  if (listenNow) listen(); else if (focus) sheet.querySelector('input[name="text"]')?.focus({ preventScroll: inline });
 }
+/** La conversazione è aperta dentro questo contenitore? */
+export const chatIn = (element) => sheet === element && !sheet.hidden;
 export function closeChat() {
   stopLiveDialog();
   handsFree = false;
   stopListening(); stopSpeaking();
   setPhase('idle');
   const wasOpen = sheet && !sheet.hidden;
-  if (sheet) sheet.hidden = true;
+  if (sheet && !inline) sheet.hidden = true;
   woken = false;
   if (wasOpen) closeHandler?.();
 }

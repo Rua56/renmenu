@@ -5,7 +5,7 @@ import { PLAN_RULES, REQUEST_CATEGORIES, categoryByCode, draftBlocker, planIssue
 import { provisionalQrSvg, provisionalTarget } from './provisional-qr.js';
 import { mountPdfPreview } from './pdf-preview.js';
 import { extractPdfText } from './material-extract.js';
-import { announce, closeChat, openChat } from './jarvis-chat.js';
+import { announce, chatIn, closeChat, openChat, refreshChat } from './jarvis-chat.js';
 import { logLines, markFresh } from './jarvis-log.js';
 import { play, setSounds, soundsAvailable, soundsOn } from './jarvis-sound.js';
 import { greetOnce, greetingFor, lastVisit, markVisit } from './jarvis-greet.js';
@@ -18,7 +18,7 @@ import { resetDemoState } from './demo-store.js';
 
 // Navigazione semplice: prima le cose di tutti i giorni, poi gli strumenti, poi il sistema.
 const navItems = [
-  ['command', '◉', 'Oggi', 'Principale'], ['locali', '◆', 'Locali', 'Principale'], ['sistema', '☰', 'Sistema', 'Principale'],
+  ['command', '◉', 'Jarvis', 'Principale'], ['locali', '◆', 'Locali', 'Principale'], ['sistema', '☰', 'Strumenti', 'Principale'],
   ['revisione', '✓', 'Revisione', 'Strumenti'], ['richieste', '✉', 'Richieste', 'Strumenti'], ['approvazioni', '★', 'Approvazioni', 'Strumenti'], ['builder', '✎', 'Builder', 'Strumenti'],
   ['materiali', '▤', 'Materiali', 'Strumenti'], ['anteprima', '▢', 'Anteprima', 'Strumenti'], ['notifiche', '◔', 'Notifiche', 'Sistema'], ['registro', '≡', 'Registro', 'Sistema'], ['voce', '◖', 'Voce (browser)', 'Sistema'],
   ['clienti', '◆', 'Schede cliente', 'Nascoste'], ['locale', '◆', 'Locale', 'Nascoste'], ['pratica', '◉', 'Pratica', 'Nascoste'], ['pratiche', '◉', 'Tutte le pratiche', 'Nascoste'], ['modifica', '✎', 'Modifica a mano', 'Nascoste']
@@ -314,6 +314,7 @@ function renderNavigation() {
   const tab = activeTab();
   const link = ([id, , label]) => `<a class="nav-link" href="#${id}" aria-current="${tab === id ? 'page' : 'false'}">${TAB_ICONS[id]}<span>${label}</span>${hint(id)}</a>`;
   primaryNav.innerHTML = '';
+  bottomNav.classList.toggle('on-home', activeView === 'command');
   bottomNav.innerHTML = `<button class="ask" type="button" data-action="ask-open" aria-label="Scrivi o parla a Jarvis"><span>Scrivi o parla a Jarvis…</span><b data-action="ask-voice" aria-hidden="true"><svg viewBox="0 0 24 24"><rect x="9" y="3" width="6" height="11" rx="3" fill="none" stroke="currentColor" stroke-width="1.8"/><path d="M5.5 11.5a6.5 6.5 0 0 0 13 0M12 18v3" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></svg></b></button><div class="tabs">${navItems.filter(([id]) => MAIN_TABS.includes(id)).map(link).join('')}</div>`;
 }
 function renderUnavailable() {
@@ -1021,12 +1022,6 @@ let display = null;
 function showData() {
   return { pratiche: state.requests.map(praticaInfo), clients: state.clients, audit: state.audit || [], now: Date.now() };
 }
-function adessoBlock(all) {
-  const decide = all.filter((info) => info.group === 'decidere');
-  if (!decide.length) return '<section class="oggi-block hud-adesso"><p class="eyebrow">ADESSO</p><p class="oggi-calm">Niente aspetta una tua decisione. Chiedimi pure di mostrarti pratiche, locali o menu.</p></section>';
-  const more = decide.length > 1 ? `<button class="hud-more" type="button" data-action="show" data-show="pratiche da decidere">Altre ${decide.length - 1} da decidere →</button>` : '';
-  return `<section class="oggi-block hud-adesso"><p class="eyebrow">ADESSO</p><div class="oggi-cards">${praticaCard(decide[0])}</div>${more}</section>`;
-}
 const READOUTS = [['pratiche aperte', 'Aperte', (all) => all.filter((i) => i.group !== 'chiuse').length], ['pratiche chiuse', 'Chiuse', (all) => all.filter((i) => i.group === 'chiuse').length], ['locali registrati', 'Locali', () => state.clients.length], ['menu online', 'Menu online', () => state.clients.filter((c) => c.menuId).length]];
 function hudReadouts(all) {
   return `<nav class="hud-readouts" aria-label="Mostra elenchi">${READOUTS.map(([phrase, label, n]) => `<button type="button" class="hud-readout${display === phrase ? ' on' : ''}" data-action="show" data-show="${phrase}" aria-pressed="${display === phrase}"><strong>${n(all)}</strong><span>${label}</span></button>`).join('')}</nav>`;
@@ -1099,8 +1094,34 @@ function logBlock() {
   return `<section class="hud-log" aria-label="Registro dal vivo"><div class="hud-log-head"><p class="eyebrow">REGISTRO · DAL VIVO</p><button class="hud-more" type="button" data-route="registro">Tutto →</button></div><ol class="hud-log-lines" aria-live="polite">${lines.map(line).join('')}</ol><p class="hud-log-cursor" aria-hidden="true">&gt; in ascolto<i>▌</i></p></section>`;
 }
 function renderCommand() {
+  return `<div class="view-wrap jarvis-home">${jarvisHero()}${demoNotice()}${hudDisplay()}</div>`;
+}
+// La home è la conversazione con Jarvis (stesso cervello di Telegram): in cima, come suoi messaggi, quello che
+// aspetta una tua decisione e quello che propone; sotto, la chat. Numeri, registro e impostazioni sono in Strumenti.
+const homeTalk = $('#jarvis-talk');
+function homeIntro() {
   const all = allPratiche();
-  return `<div class="view-wrap jarvis-home">${jarvisHero()}${demoNotice()}${adessoBlock(all)}${proposeBlock()}${hudReadouts(all)}${display === 'numeri della settimana' ? '' : '<button class="hud-more" type="button" data-action="show" data-show="numeri della settimana">Grafici della settimana →</button>'}${hudDisplay()}${logBlock()}${jarvisPanel()}</div>`;
+  const decide = all.filter((info) => info.group === 'decidere');
+  const msg = (html, buttons = '') => `<div class="msg j"><div class="chat-text">${html}</div>${buttons ? `<div class="chat-btns">${buttons}</div>` : ''}</div>`;
+  const open = (info, label = 'Apri la pratica') => `<button type="button" data-select-request="${escapeHtml(info.request.id)}" data-route="pratica">${label}</button>`;
+  const out = [msg(isDemoMode
+    ? 'Demo: qui le risposte sono finte e non parte nulla.'
+    : 'Dimmi cosa fare, a parole o a voce: «nel menu del Tralcio il frico costa 14», «crea una pratica per …», «pubblica il menu di …», «elimina la pratica di …». Pubblicare e scrivere ai clienti resta sempre un tuo SÌ.')];
+  decide.slice(0, 3).forEach((info) => {
+    const detail = info.mission?.note || info.request.nextStep || '';
+    out.push(msg(`<strong>${escapeHtml(info.client?.name || info.request.subject)}</strong>: ${escapeHtml(info.headline)}${detail ? `. ${escapeHtml(detail)}` : ''}`, open(info)));
+  });
+  if (decide.length > 3) out.push(msg(`Altre ${decide.length - 3} pratiche aspettano una tua decisione.`, '<button type="button" data-action="show" data-show="pratiche da decidere">Mostramele</button>'));
+  (Array.isArray(state?.initiatives) ? state.initiatives.slice(0, 2) : []).forEach((item) => {
+    const go = item.requestId ? `<button type="button" data-select-request="${escapeHtml(item.requestId)}" data-route="pratica">Apri</button>` : item.clientId ? `<button type="button" data-select-client="${escapeHtml(item.clientId)}" data-route="locale">Apri</button>` : '';
+    out.push(msg(`Ti propongo: ${item.venue ? `<strong>${escapeHtml(item.venue)}</strong>, ` : ''}${escapeHtml(item.text)}`, go));
+  });
+  return out.join('');
+}
+function mountHome({ listenNow = false, wake = false, firstText = '', focus = false } = {}) {
+  const fresh = !chatIn(homeTalk);
+  if (!fresh && !listenNow && !wake && !firstText && !focus) { refreshChat(); return; }
+  openChat(homeTalk, { inline: true, intro: homeIntro, voice: Boolean(state?.voice?.provider && state?.voice?.hasKey), bot: state?.telegram?.bot || '', listenNow, wake, firstText, focus, onShow: showOnHome, onClose: listenForWake });
 }
 function renderPratiche() {
   const all = allPratiche();
@@ -1109,7 +1130,7 @@ function renderPratiche() {
   const list = all.filter((info) => info.group === praticheFilter);
   const seg = [['decidere', 'Da decidere'], ['corso', 'In corso'], ['chiuse', 'Chiuse']].map(([key, label]) => `<button type="button" class="${praticheFilter === key ? 'on' : ''}" data-action="pratiche-filtro" data-filtro="${key}" aria-pressed="${praticheFilter === key}">${label}<b>${counts[key]}</b></button>`).join('');
   const archived = archivedCount();
-  return `<div class="view-wrap"><button class="back-bar" type="button" data-route="command">← Oggi</button>${header('PRATICHE', 'Tutte le pratiche', 'Un elenco solo, diviso per quello che serve da te.')}<div class="seg" role="group" aria-label="Filtro pratiche">${seg}</div><div class="oggi-cards">${list.length ? list.map(praticaCard).join('') : empty('Nessuna pratica in questo elenco.')}</div>${praticheFilter === 'chiuse' && archived ? `<p class="muted small spaced-top-small">${archived} pratiche archiviate: si vedono in Sistema, Richieste.</p>` : ''}</div>`;
+  return `<div class="view-wrap"><button class="back-bar" type="button" data-route="command">← Jarvis</button>${header('PRATICHE', 'Tutte le pratiche', 'Un elenco solo, diviso per quello che serve da te.')}<div class="seg" role="group" aria-label="Filtro pratiche">${seg}</div><div class="oggi-cards">${list.length ? list.map(praticaCard).join('') : empty('Nessuna pratica in questo elenco.')}</div>${praticheFilter === 'chiuse' && archived ? `<p class="muted small spaced-top-small">${archived} pratiche archiviate: si vedono in Strumenti, Richieste.</p>` : ''}</div>`;
 }
 const PRATICA_STEPS = ['Richiesta', 'Bozza', 'Controllo', 'Il tuo SÌ', 'Online'];
 function stepsBar(now) {
@@ -1159,7 +1180,7 @@ function pianoPanel(request) {
 }
 function renderPratica() {
   const request = requestById();
-  if (!request) return `<div class="view-wrap">${header('PRATICA', 'Nessuna pratica', 'Scegli una pratica da Oggi.')}<button class="button" type="button" data-route="command">Torna a Oggi</button></div>`;
+  if (!request) return `<div class="view-wrap">${header('PRATICA', 'Nessuna pratica', 'Chiedila a Jarvis o sceglila in Strumenti.')}<button class="button" type="button" data-route="command">Torna a Jarvis</button></div>`;
   const info = praticaInfo(request);
   const { draft, mission, client } = info;
   const editable = draft && ['bozza', 'revisione', 'pronta_pr'].includes(draft.status);
@@ -1173,7 +1194,7 @@ function renderPratica() {
     next = `${sourceExtrasPanel(draft)}${panel || `<section class="panel spaced-top-small"><p class="eyebrow">PROSSIMO PASSO</p><p>Controlla la bozza e prosegui dall’area Approvazioni.</p><div class="button-row spaced-top-small"><button class="button" type="button" data-route="approvazioni">Apri Approvazioni</button></div></section>`}`;
   }
   const tone = info.tone === 'hot' ? 'hot' : info.tone === 'alert' ? 'alert' : '';
-  return `<div class="view-wrap pratica"><button class="back-bar" type="button" data-route="command">← Oggi</button>
+  return `<div class="view-wrap pratica"><button class="back-bar" type="button" data-route="command">← Jarvis</button>
     <header class="pratica-head ${tone}"><p class="eyebrow">${escapeHtml(client?.name || 'Pratica')} · ${escapeHtml(requestTypeLabel(request))}</p><h1>${escapeHtml(request.subject)}</h1><p class="oggi-tag inline">${escapeHtml(info.headline)}</p>${mission?.note && !closed ? `<p class="muted small">${escapeHtml(mission.note)}</p>` : request.nextStep ? `<p class="muted small">${escapeHtml(request.nextStep)}</p>` : ''}</header>
     ${stepsBar(info.step)}${demoNotice()}${cambiaBlock(draft, request)}
     ${next}
@@ -1214,8 +1235,11 @@ function renderSistema() {
     ['clienti', 'Schede cliente complete', 'Anagrafiche, contatti, piano, note', 0], ['materiali', 'Materiali', 'File, foto e PDF ricevuti', 0], ['anteprima', 'Anteprima', 'Come appare il menu sul telefono', 0],
     ['notifiche', 'Notifiche', 'Avvisi di Jarvis ed email al proprietario', navCount('notifiche')], ['registro', 'Registro', 'Tutto quello che è successo, con data', 0], ['voce', 'Voce (browser)', 'Prova del microfono', 0]
   ];
-  return `<div class="view-wrap">${header('SISTEMA', 'Sistema', 'Gli strumenti completi di prima, sempre a portata. Per il lavoro di ogni giorno basta Oggi.')}
+  const all = allPratiche();
+  return `<div class="view-wrap">${header('STRUMENTI', 'Strumenti', 'Le schermate complete, quando ti servono. Per il lavoro di ogni giorno basta parlare con Jarvis.')}
     <button class="find-bar" type="button" data-action="find-open"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="10.5" cy="10.5" r="6" fill="none" stroke="currentColor" stroke-width="1.8"/><path d="M15 15l5 5" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></svg><span>Cosa vuoi fare? <small>anteprima, foto, schede vini, QR…</small></span></button>
+    ${hudReadouts(all)}<button class="hud-more" type="button" data-action="show" data-show="numeri della settimana">Grafici della settimana →</button>${proposeBlock()}${logBlock()}${jarvisPanel()}
+    <p class="lab">SCHERMATE</p>
     <div class="sys-list">${tools.map(([route, label, note, n]) => `<button class="sys-row" type="button" data-route="${route}"><span><strong>${label}</strong><small>${note}</small></span>${n ? `<b class="nav-hint">${n}</b>` : ''}<i aria-hidden="true">›</i></button>`).join('')}</div>
     <details class="details-more"><summary>Tutti i numeri e i dettagli</summary>${commandDetails()}</details></div>`;
 }
@@ -1391,6 +1415,8 @@ function renderLocale() {
 const askSheet = $('#ask-sheet');
 function openAsk(listenNow = false, { wake = false, firstText = '' } = {}) {
   pauseWake();
+  // Sulla home la conversazione è già lì: si usa quella, senza aprire un foglio sopra.
+  if (activeView === 'command' && !homeTalk.hidden) { mountHome({ listenNow, wake, firstText, focus: !listenNow }); return; }
   openChat(askSheet, { voice: Boolean(state?.voice?.provider && state?.voice?.hasKey), bot: state?.telegram?.bot || '', listenNow, onShow: showOnHome, onClose: listenForWake, wake, firstText });
 }
 function closeAsk() { closeChat(); }
@@ -1489,6 +1515,8 @@ function renderView() {
     view.classList.remove('view-enter'); void view.offsetWidth; view.classList.add('view-enter');
   }
   shownView = activeView;
+  homeTalk.hidden = activeView !== 'command';
+  if (activeView === 'command') mountHome();
   if (pendingFind) revealFound();
   document.title = `${navItems.find(([id]) => id === activeView)?.[2] || 'Control Room'} · RenMenu`;
 }
