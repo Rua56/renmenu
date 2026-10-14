@@ -95,6 +95,15 @@
     es: { scopri: 'Descubrir', somm: 'Ficha del sumiller', chiudi: 'Cerrar', storia: 'Nuestra historia', leggi: 'Leer nuestra historia', foto: 'Foto', profilo: { aromi: 'Aromas', struttura: 'Estructura', acidita: 'Acidez', dolcezza: 'Dulzor', corpo: 'Cuerpo' }, campi: { cantina: 'Bodega', territorio: 'Territorio', vitigno: 'Uva', annata: 'Añada', gradazione: 'Graduación', temperatura: 'Servir a', affinamento: 'Crianza', colore: 'Color', profumo: 'Nariz', gusto: 'Boca', abbinamenti: 'Maridajes' } },
     sl: { scopri: 'Odkrij', somm: 'Sommelierjev opis', chiudi: 'Zapri', storia: 'Naša zgodba', leggi: 'Preberi našo zgodbo', foto: 'Foto', profilo: { aromi: 'Arome', struttura: 'Struktura', acidita: 'Kislost', dolcezza: 'Sladkost', corpo: 'Telo' }, campi: { cantina: 'Klet', territorio: 'Okoliš', vitigno: 'Sorta', annata: 'Letnik', gradazione: 'Alkohol', temperatura: 'Postrezi pri', affinamento: 'Zorenje', colore: 'Barva', profumo: 'Vonj', gusto: 'Okus', abbinamenti: 'Kombinacije' } }
   };
+  // Abbinamenti tra le voci, preferiti del cliente, termometro e profumi della scheda.
+  const T3 = {
+    it: { abbina: 'Si abbina con', abbinaVino: 'Da bere con questo piatto', preferito: 'Aggiungi alla tua selezione', tolto: 'Togli dalla tua selezione', selezione: 'La tua selezione', selVuota: 'Tocca il cuore su un piatto o un vino per ricordartelo al momento di ordinare.', selNota: 'Mostrala al personale quando ordini.', svuota: 'Svuota', note: 'Note' },
+    en: { abbina: 'Pairs with', abbinaVino: 'To drink with this dish', preferito: 'Add to your selection', tolto: 'Remove from your selection', selezione: 'Your selection', selVuota: 'Tap the heart on a dish or a wine to remember it when you order.', selNota: 'Show it to the staff when you order.', svuota: 'Clear', note: 'Notes' },
+    de: { abbina: 'Passt zu', abbinaVino: 'Dazu trinken', preferito: 'Zu deiner Auswahl hinzufügen', tolto: 'Aus deiner Auswahl entfernen', selezione: 'Deine Auswahl', selVuota: 'Tippe auf das Herz bei einem Gericht oder Wein, um es dir für die Bestellung zu merken.', selNota: 'Zeig sie beim Bestellen dem Personal.', svuota: 'Leeren', note: 'Noten' },
+    fr: { abbina: 'S’accorde avec', abbinaVino: 'À boire avec ce plat', preferito: 'Ajouter à votre sélection', tolto: 'Retirer de votre sélection', selezione: 'Votre sélection', selVuota: 'Touchez le cœur d’un plat ou d’un vin pour vous en souvenir au moment de commander.', selNota: 'Montrez-la au personnel en commandant.', svuota: 'Vider', note: 'Notes' },
+    es: { abbina: 'Marida con', abbinaVino: 'Para beber con este plato', preferito: 'Añadir a tu selección', tolto: 'Quitar de tu selección', selezione: 'Tu selección', selVuota: 'Toca el corazón de un plato o un vino para recordarlo al pedir.', selNota: 'Enséñala al personal al pedir.', svuota: 'Vaciar', note: 'Notas' },
+    sl: { abbina: 'Se poda k', abbinaVino: 'Za pitje ob tej jedi', preferito: 'Dodaj v svoj izbor', tolto: 'Odstrani iz svojega izbora', selezione: 'Tvoj izbor', selVuota: 'Tapni srce pri jedi ali vinu, da si ga zapomniš za naročilo.', selNota: 'Pokaži ga osebju ob naročilu.', svuota: 'Izprazni', note: 'Note' }
+  };
   const PROFILO = ['aromi', 'struttura', 'acidita', 'dolcezza', 'corpo'];
   const TESSERE = ['temperatura', 'abbinamenti', 'colore', 'profumo', 'gusto', 'territorio', 'vitigno', 'affinamento', 'gradazione', 'annata'];
   // Foto Premium pubblicate con il menu (menus/media/<sha256>.<ext>): il sito non dipende dallo staging di Jarvis.
@@ -112,6 +121,80 @@
   const DRINK = /\bvin[io]?\b|vini|wine|wein|bollicin|spumant|prosecco|champagne|franciacorta|cantina|calice|bottigli|mescita|cocktail|aperitiv|spritz|birr|beer|bier|bevand|bibit|drink|getränk|amari\b|distillat|grapp|liquor/i;
   const WINE = /\bvin[io]?\b|vini|wine|wein|bollicin|spumant|prosecco|champagne|franciacorta|cantina|calice|bottigli|mescita/i;
 
+  // ── Abbinamenti: il testo «abbinamenti» della scheda di un vino nomina piatti che sono nel menu ──
+  // Solo corrispondenze sicure: il nome intero del piatto, oppure la sua prima parola distintiva
+  // («Frico», «Salmone») quando nessun altro piatto la usa. Niente abbinamenti inventati.
+  const fold = (s) => String(s || '').toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g, '').replace(/[^a-z0-9]+/g, ' ').trim();
+  const VUOTE = new Set(['con', 'alla', 'alle', 'allo', 'agli', 'della', 'delle', 'dello', 'degli', 'nostro', 'nostra', 'casa', 'fatto', 'fatta', 'salsa', 'crema', 'misto', 'mista', 'piatto', 'tagliere', 'servito', 'servita', 'with', 'house']);
+  const parole = (s) => fold(s).split(' ').filter((w) => w.length >= 4 && !VUOTE.has(w) && !/^\d+$/.test(w));
+  const allText = (v) => (v == null ? '' : typeof v === 'string' ? v : Object.values(v).filter((x) => typeof x === 'string').join(' \n '));
+  const hasWord = (text, w) => new RegExp(`(?:^| )${w.slice(0, Math.max(4, w.length - 1))}[a-z]{0,2}(?: |$)`).test(text);
+  /**
+   * items: [{ key, nome, vino, abbinamenti }] (nome e abbinamenti come nel menu, anche multilingua).
+   * Restituisce Map key → [key, …] in entrambe le direzioni (vino → piatti, piatto → vini), massimo 4.
+   */
+  function pairings(items) {
+    const piatti = items.filter((x) => !x.vino).map((x) => ({ ...x, full: fold(allText(x.nome).split('\n')[0]), testa: parole(allText(x.nome).split('\n')[0])[0] }));
+    const df = new Map();
+    for (const p of piatti) for (const w of new Set(parole(allText(p.nome).split('\n')[0]))) df.set(w, (df.get(w) || 0) + 1);
+    const out = new Map();
+    const add = (a, b) => { const l = out.get(a) || []; if (!l.includes(b) && l.length < 4) l.push(b); out.set(a, l); };
+    for (const vino of items.filter((x) => x.vino && x.abbinamenti)) {
+      const testo = ` ${fold(allText(vino.abbinamenti))} `;
+      for (const p of piatti) {
+        const ok = (p.full.length >= 6 && testo.includes(` ${p.full} `)) || (p.testa && p.testa.length >= 5 && df.get(p.testa) === 1 && hasWord(testo, p.testa));
+        if (ok) { add(vino.key, p.key); add(p.key, vino.key); }
+      }
+    }
+    return out;
+  }
+  /** «8-10 °C» → { min: 8, max: 10, media: 9 }; null se la temperatura non è scritta in gradi. */
+  function servingTemp(text) {
+    const m = /(\d{1,2})(?:[,.]\d)?\s*(?:°\s*c?\s*)?(?:[-–]|a)\s*(\d{1,2})(?:[,.]\d)?\s*°|(\d{1,2})(?:[,.]\d)?\s*°/i.exec(String(text || ''));
+    if (!m) return null;
+    const min = Number(m[1] ?? m[3]), max = Number(m[2] ?? m[3]);
+    if (!(min >= 2 && max <= 24 && min <= max)) return null;
+    return { min, max, media: (min + max) / 2 };
+  }
+  /** Parole del profumo («Agrumi, lampone e ribes») per l'animazione della scheda: al massimo 6. */
+  const aromi = (text) => String(text || '').split(/[,;·]|\s+e\s+|\s+and\s+|\s+und\s+/).map((x) => x.trim().replace(/^(?:note di|sentori di|notes of|hints of)\s+/i, '').trim()).filter((x) => x && x.length <= 24).slice(0, 6);
+
+  // Bottiglie su fondo bianco: lo sfondo diventa trasparente (riempimento dai bordi, come nel menu di
+  // Al Bakaro) così la bottiglia «galleggia» sulla scheda. Solo se i bordi sono quasi tutti bianchi.
+  const scontornate = new Map();
+  function scontorna(img) {
+    if (img.dataset.pmCut) return;
+    img.dataset.pmCut = '1';
+    const src = img.currentSrc || img.src;
+    if (scontornate.has(src)) { const r = scontornate.get(src); if (r) img.src = r; return; }
+    try {
+      const scale = Math.min(1, 640 / Math.max(img.naturalWidth, img.naturalHeight));
+      const w = Math.max(1, Math.round(img.naturalWidth * scale)), h = Math.max(1, Math.round(img.naturalHeight * scale));
+      const cv = document.createElement('canvas'); cv.width = w; cv.height = h;
+      const ctx = cv.getContext('2d', { willReadFrequently: true });
+      ctx.drawImage(img, 0, 0, w, h);
+      const data = ctx.getImageData(0, 0, w, h), px = data.data;
+      const chiaro = (i) => px[i + 3] > 0 && px[i] > 232 && px[i + 1] > 232 && px[i + 2] > 232;
+      let bordo = 0, bianchi = 0, trasparenti = 0;
+      const giro = [];
+      for (let x = 0; x < w; x++) giro.push(x, (h - 1) * w + x);
+      for (let y = 1; y < h - 1; y++) giro.push(y * w, y * w + w - 1);
+      for (const p of giro) { bordo++; if (px[p * 4 + 3] < 20) trasparenti++; else if (chiaro(p * 4)) bianchi++; }
+      if (trasparenti / bordo > 0.5 || bianchi / bordo < 0.85) { scontornate.set(src, null); return; }
+      const visto = new Uint8Array(w * h), coda = giro.filter((p) => chiaro(p * 4));
+      coda.forEach((p) => { visto[p] = 1; });
+      while (coda.length) {
+        const p = coda.pop(), x = p % w, y = (p - x) / w;
+        px[p * 4 + 3] = 0;
+        for (const q of [x > 0 ? p - 1 : -1, x < w - 1 ? p + 1 : -1, y > 0 ? p - w : -1, y < h - 1 ? p + w : -1]) if (q >= 0 && !visto[q] && chiaro(q * 4)) { visto[q] = 1; coda.push(q); }
+      }
+      ctx.putImageData(data, 0, 0);
+      const out = cv.toDataURL('image/png');
+      scontornate.set(src, out);
+      img.src = out;
+    } catch { scontornate.set(src, null); /* immagine di un altro sito: resta com'è */ }
+  }
+
   /** Città dall'indirizzo: «Via Rastello 12, 34170 Gorizia (GO)» → Gorizia. */
   function cityOf(address) {
     const parts = String(address || '').split(',').map((p) => p.replace(/\((?:[A-Z]{2}|esempio)\)/gi, '').replace(/\b\d{5}\b/g, '').trim()).filter(Boolean);
@@ -126,7 +209,7 @@
     let lang = langs.includes(startLang) ? startLang : langs[0] || 'it';
     const esc = (s) => String(s ?? '').replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
     const t = (v) => (v == null ? '' : typeof v === 'string' ? v : (v[lang] || v.it || Object.values(v)[0] || ''));
-    const S = () => ({ ...(T[lang] || T.it), ...(T2[lang] || T2.it) });
+    const S = () => ({ ...(T[lang] || T.it), ...(T2[lang] || T2.it), ...(T3[lang] || T3.it) });
 
     // Caratteri e colori
     const font = CARATTERI[style.caratteri];
@@ -150,7 +233,6 @@
     const logo = safeImg(premium.logo), cover = safeImg(premium.copertina);
     const galleria = (Array.isArray(premium.galleria) ? premium.galleria : []).map((g) => (typeof g === 'string' ? { src: g } : g || {})).map((g) => ({ src: safeImg(g.src), alt: g.alt })).filter((g) => g.src).slice(0, 8);
     const firma = String(premium.firma || '').trim().slice(0, 80);
-    let schede = [];
     const tel = menu.telefono ? String(menu.telefono).replace(/\s/g, '') : '';
     const ig = menu.instagram ? String(menu.instagram).replace(/^@/, '') : '';
     const fbRaw = menu.facebook ? String(menu.facebook).trim() : '';
@@ -183,36 +265,56 @@
     }
     const sch = (v) => (v.scheda && typeof v.scheda === 'object' ? v.scheda : {});
     const haScheda = (v) => PROFILO.some((k) => Number.isFinite(sch(v).profilo?.[k])) || TESSERE.some((k) => t(sch(v)[k])) || !!t(sch(v).nota);
+    // Tutte le voci (anche dell'altra carta), con una chiave stabile «sezione:voce».
+    const tutte = [];
+    sezioni.forEach((x) => { if (x.s.tipo !== 'degustazione') (x.s.voci || []).forEach((v, vi) => tutte.push({ key: `${x.i}:${vi}`, v, vino: x.vino, bere: x.bere })); });
+    const perKey = new Map(tutte.map((x) => [x.key, x])), keyOf = new Map(tutte.map((x) => [x.v, x.key]));
+    const abbinati = pairings(tutte.filter((x) => x.vino || !x.bere).map((x) => ({ key: x.key, nome: x.v.nome, vino: x.vino, abbinamenti: x.vino ? sch(x.v).abbinamenti : null })));
+    // Preferiti del cliente: restano solo su questo telefono.
+    const selKey = `pm-sel-${menu.id || nome}`;
+    let sel = [];
+    try { sel = JSON.parse(localStorage.getItem(selKey) || '[]').filter((k) => perKey.has(k)); } catch { sel = []; }
+    const salvaSel = () => { try { localStorage.setItem(selKey, JSON.stringify(sel)); } catch { /* navigazione privata */ } };
+    const vibra = (ms) => { try { navigator.vibrate?.(ms); } catch { /* non supportato */ } };
+    const prezzoBreve = (v) => (v.prezzo ? price(v.prezzo) : (v.prezzi || []).map((p) => `${esc(t(p.etichetta))} ${price(p.prezzo)}`).join(' · '));
+    const cuore = (key) => `<button type="button" class="pm-cuore" data-fav="${key}" aria-pressed="${sel.includes(key)}" aria-label="${esc(sel.includes(key) ? S().tolto : S().preferito)}"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 20s-7-4.4-7-10a4 4 0 0 1 7-2.6A4 4 0 0 1 19 10c0 5.6-7 10-7 10Z"/></svg></button>`;
     function pills(v) {
       return Array.isArray(v.prezzi) && v.prezzi.length ? `<div class="pm-pills">${v.prezzi.map((p) => `<span class="pm-pill"><small>${esc(t(p.etichetta))}</small>${price(p.prezzo)}</span>`).join('')}</div>` : '';
     }
     function voce(v, vino) {
       const varianti = pills(v);
       const p = !varianti && v.prezzo ? `<span class="pm-pill pm-pill--solo">${price(v.prezzo)}${v.unita ? `<small>${esc(t(v.unita))}</small>` : ''}</span>` : '';
-      const foto = safeImg(v.foto), scheda = haScheda(v);
-      const apri = !!(foto || scheda);
-      const k = apri ? schede.push({ v, vino }) - 1 : -1;
+      const foto = safeImg(v.foto), scheda = haScheda(v), k = keyOf.get(v);
+      const apri = !!(foto || scheda || abbinati.has(k));
       const terr = t(sch(v).territorio), cantina = t(sch(v).cantina);
       const badge = vino && (terr || cantina) ? `<p class="pm-card__orig">${terr ? `<span class="pm-badge">${esc(terr)}</span>` : ''}${cantina ? `<span>${esc(cantina)}</span>` : ''}</p>` : '';
       const cta = apri ? `<span class="pm-card__cta">${scheda && vino ? S().somm : S().scopri}<svg viewBox="0 0 24 24" aria-hidden="true"><path d="m9 6 6 6-6 6"/></svg></span>` : '';
       const img = foto ? `<span class="pm-card__img${vino ? ' pm-card__img--bott' : ''}"><img src="${esc(foto)}" alt="" loading="lazy" decoding="async"></span>` : '';
-      return `<article class="pm-card${foto ? ' pm-card--foto' : ''}${apri ? ' pm-card--apri' : ''}"${apri ? ` data-k="${k}" role="button" tabindex="0" aria-haspopup="dialog" aria-label="${esc(t(v.nome))} — ${esc(scheda && vino ? S().somm : S().scopri)}"` : ''}>${img}<div class="pm-card__body">${badge}<div class="pm-card__top"><h3 class="pm-card__nome">${esc(t(v.nome))}</h3>${p}</div>${v.descrizione && t(v.descrizione) ? `<p class="pm-card__desc">${esc(t(v.descrizione))}</p>` : ''}${varianti}${meta(v)}${cta}</div></article>`;
+      return `<article class="pm-card${foto ? ' pm-card--foto' : ''}${apri ? ' pm-card--apri' : ''}"${apri ? ` data-k="${k}" role="button" tabindex="0" aria-haspopup="dialog" aria-label="${esc(t(v.nome))} — ${esc(scheda && vino ? S().somm : S().scopri)}"` : ''}>${img}<div class="pm-card__body">${badge}<div class="pm-card__top"><h3 class="pm-card__nome">${esc(t(v.nome))}</h3>${p}</div>${k ? cuore(k) : ''}${v.descrizione && t(v.descrizione) ? `<p class="pm-card__desc">${esc(t(v.descrizione))}</p>` : ''}${varianti}${meta(v)}${cta}</div></article>`;
     }
     // Pannello dal basso: foto grande, racconto e scheda sommelier.
-    function schedaHtml({ v, vino }) {
+    function schedaHtml({ key, v, vino }) {
       const s = sch(v), foto = safeImg(v.foto);
+      const temp = servingTemp(t(s.temperatura));
+      const profumi = vino && foto ? aromi(t(s.profumo)) : [];
+      const coppie = (abbinati.get(key) || []).map((k) => perKey.get(k)).filter(Boolean);
+      const coppieHtml = coppie.length ? `<p class="pm-sheet__label">${vino ? S().abbina : S().abbinaVino}</p><div class="pm-coppie">${coppie.map((x) => { const f = safeImg(x.v.foto); return `<button type="button" class="pm-coppia" data-apri="${x.key}">${f ? `<span class="pm-coppia__img${x.vino ? ' pm-coppia__img--bott' : ''}"><img src="${esc(f)}" alt="" loading="lazy"></span>` : `<span class="pm-coppia__img pm-coppia__img--icona">${x.vino ? SEZ_ICON.vini : SEZ_ICON.piatto}</span>`}<span><b>${esc(t(x.v.nome))}</b>${prezzoBreve(x.v) ? `<small>${prezzoBreve(x.v)}</small>` : ''}</span><svg viewBox="0 0 24 24" aria-hidden="true"><path d="m9 6 6 6-6 6"/></svg></button>`; }).join('')}</div>` : '';
+      const termometro = temp ? `<span class="pm-termo" style="--t:${Math.round(Math.max(0.08, Math.min(1, (temp.media - 4) / 16)) * 100)}%" aria-hidden="true"><i></i></span>` : '';
       const p = pills(v) || (v.prezzo ? `<div class="pm-pills"><span class="pm-pill pm-pill--solo">${price(v.prezzo)}${v.unita ? `<small>${esc(t(v.unita))}</small>` : ''}</span></div>` : '');
       const testo = t(s.nota) || t(v.descrizione);
       const barre = PROFILO.filter((k) => Number.isFinite(s.profilo?.[k])).map((k) => { const n = Math.max(0, Math.min(100, Math.round(s.profilo[k]))); return `<div class="pm-barra"><span>${S().profilo[k]}</span><i><b style="--w:${n}%"></b></i><em>${n}</em></div>`; }).join('');
-      const tessere = TESSERE.filter((k) => t(s[k])).map((k) => `<div class="pm-tessera${k === 'temperatura' ? ' pm-tessera--temp' : ''}"><span>${S().campi[k]}</span><p>${esc(t(s[k]))}</p></div>`).join('');
-      return `${foto ? `<figure class="pm-sheet__foto${vino ? ' pm-sheet__foto--bott' : ''}"><img src="${esc(foto)}" alt="${esc(t(v.nome))}"></figure>` : ''}
+      const tessere = TESSERE.filter((k) => t(s[k])).map((k) => `<div class="pm-tessera${k === 'temperatura' ? ` pm-tessera--temp${temp ? ' pm-tessera--termo' : ''}` : ''}"><span>${S().campi[k]}</span>${k === 'temperatura' ? termometro : ''}<p>${esc(t(s[k]))}</p></div>`).join('');
+      const nuvola = profumi.length ? `<span class="pm-aromi" aria-hidden="true">${profumi.map((a, n) => `<i style="--a:${Math.round((n / profumi.length) * 360 + 25)}deg;--d:${(0.45 + n * 0.12).toFixed(2)}s">${esc(a)}</i>`).join('')}</span>` : '';
+      return `${foto ? `<figure class="pm-sheet__foto${vino ? ' pm-sheet__foto--bott' : ''}"><img src="${esc(foto)}" alt="${esc(t(v.nome))}">${nuvola}</figure>` : ''}
         <div class="pm-sheet__in">
           ${t(s.territorio) || t(s.cantina) ? `<p class="pm-card__orig">${t(s.territorio) ? `<span class="pm-badge">${esc(t(s.territorio))}</span>` : ''}${t(s.cantina) ? `<span>${esc(t(s.cantina))}</span>` : ''}</p>` : ''}
           <h2 id="pm-sheet-t">${esc(t(v.nome))}</h2>${p}
           ${testo ? `<blockquote class="pm-sheet__quote">${esc(testo)}</blockquote>` : ''}
           ${barre ? `<div class="pm-profilo">${barre}</div>` : ''}
           ${tessere ? `${vino && haScheda(v) ? `<p class="pm-sheet__label">${S().somm}</p>` : ''}<div class="pm-tessere">${tessere}</div>` : ''}
+          ${coppieHtml}
           ${meta(v)}
+          <div class="pm-sheet__azioni">${cuore(key)}</div>
         </div>`;
     }
     function storiaHtml() {
@@ -240,6 +342,48 @@
       grip.addEventListener('touchstart', (e) => { y0 = e.touches[0].clientY; sheet.style.transition = 'none'; }, { passive: true });
       grip.addEventListener('touchmove', (e) => { if (y0 == null) return; const dy = Math.max(0, e.touches[0].clientY - y0); sheet.style.transform = `translateY(${dy}px)`; }, { passive: true });
       grip.addEventListener('touchend', (e) => { const dy = e.changedTouches[0].clientY - (y0 ?? 0); y0 = null; sheet.style.transition = ''; sheet.style.transform = ''; if (dy > 90) closeSheet(); });
+    }
+    function apriVoce(key) {
+      const x = perKey.get(key);
+      if (!x) return;
+      vibra(8);
+      openSheet(schedaHtml(x));
+      scontornaTutte(document.querySelector('.pm-sheet-wrap'));
+    }
+    function selezioneHtml() {
+      const voci = sel.map((k) => perKey.get(k)).filter(Boolean);
+      const riga = (x) => { const f = safeImg(x.v.foto); const prezzo = prezzoBreve(x.v); return `<li><button type="button" class="pm-coppia" data-apri="${x.key}">${f ? `<span class="pm-coppia__img${x.vino ? ' pm-coppia__img--bott' : ''}"><img src="${esc(f)}" alt="" loading="lazy"></span>` : `<span class="pm-coppia__img pm-coppia__img--icona">${x.bere ? SEZ_ICON.vini : SEZ_ICON.piatto}</span>`}<span><b>${esc(t(x.v.nome))}</b>${prezzo ? `<small>${prezzo}</small>` : ''}</span></button>${cuore(x.key)}</li>`; };
+      return `<div class="pm-sheet__in pm-sheet__in--sel"><span class="pm-eyebrow pm-eyebrow--scuro">${esc(nome)}</span><h2 id="pm-sheet-t">${S().selezione}</h2>
+        ${voci.length ? `<p class="pm-sel__nota">${S().selNota}</p><ul class="pm-sel__lista">${voci.map(riga).join('')}</ul><button type="button" class="pm-btn pm-btn--linea pm-sel__svuota" data-svuota>${S().svuota}</button>` : `<p class="pm-sel__nota">${S().selVuota}</p>`}</div>`;
+    }
+    function aggiornaSel() {
+      const btn = body.querySelector('.pm-sel');
+      if (btn) { btn.querySelector('b').textContent = String(sel.length); btn.classList.toggle('show', sel.length > 0); btn.setAttribute('aria-label', `${S().selezione}: ${sel.length}`); }
+      body.querySelectorAll('[data-fav]').forEach((b) => { const on = sel.includes(b.dataset.fav); b.setAttribute('aria-pressed', String(on)); b.setAttribute('aria-label', on ? S().tolto : S().preferito); });
+    }
+    // Un solo ascoltatore per cuori, abbinamenti e selezione (anche dentro il pannello dal basso).
+    body.addEventListener('click', (e) => {
+      const fav = e.target.closest('[data-fav]');
+      if (fav) {
+        e.stopPropagation();
+        const k = fav.dataset.fav, on = !sel.includes(k);
+        sel = on ? [...sel, k] : sel.filter((x) => x !== k);
+        salvaSel(); vibra(on ? [12, 30, 12] : 8);
+        aggiornaSel();
+        if (on) { fav.classList.remove('pop'); void fav.offsetWidth; fav.classList.add('pop'); }
+        const lista = fav.closest('.pm-sel__lista');
+        if (lista && !on) openSheet(selezioneHtml());
+        return;
+      }
+      const a = e.target.closest('[data-apri]');
+      if (a) { apriVoce(a.dataset.apri); return; }
+      if (e.target.closest('.pm-sel')) { openSheet(selezioneHtml()); scontornaTutte(document.querySelector('.pm-sheet-wrap')); return; }
+      if (e.target.closest('[data-svuota]')) { sel = []; salvaSel(); aggiornaSel(); openSheet(selezioneHtml()); }
+    });
+    function scontornaTutte(root) {
+      root?.querySelectorAll('.pm-card__img--bott img, .pm-sheet__foto--bott img, .pm-coppia__img--bott img').forEach((img) => {
+        if (img.complete && img.naturalWidth) scontorna(img); else img.addEventListener('load', () => scontorna(img), { once: true });
+      });
     }
     function closeSheet(now) {
       const wrap = document.querySelector('.pm-sheet-wrap');
@@ -289,7 +433,6 @@
     }
 
     function draw() {
-      schede = [];
       closeSheet(true);
       document.documentElement.lang = lang;
       document.title = `${nome} — ${S().menu}`;
@@ -337,7 +480,8 @@
         </div></section>
       </main>
       <footer class="pm-footer"><span>${esc(nome)}${citta ? ` · ${esc(citta)}` : ''}</span><span>${S().powered} <a href="../index.html">RenMenu</a></span></footer>
-      <button class="pm-su" type="button" aria-label="${S().su}">${ICON.up}</button>`;
+      <button class="pm-su" type="button" aria-label="${S().su}">${ICON.up}</button>
+      <button class="pm-sel" type="button"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 20s-7-4.4-7-10a4 4 0 0 1 7-2.6A4 4 0 0 1 19 10c0 5.6-7 10-7 10Z"/></svg><span>${S().selezione}</span><b>0</b></button>`;
       wire();
     }
 
@@ -352,15 +496,25 @@
       body.querySelectorAll('.pm-nav a').forEach((a) => a.addEventListener('click', (e) => { e.preventDefault(); goTo(document.getElementById(a.getAttribute('href').slice(1))); }));
       body.querySelector('.pm-su').addEventListener('click', () => window.scrollTo({ top: 0, behavior: 'smooth' }));
       body.querySelectorAll('.pm-card--apri').forEach((c) => {
-        const go = () => { const x = schede[Number(c.dataset.k)]; if (x) openSheet(schedaHtml(x)); };
-        c.addEventListener('click', go);
+        const go = () => apriVoce(c.dataset.k);
+        c.addEventListener('click', (e) => { if (!e.target.closest('.pm-cuore')) go(); });
         c.addEventListener('keydown', (e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); go(); } });
       });
       body.querySelector('[data-storia]')?.addEventListener('click', () => openSheet(storiaHtml()));
       if ('IntersectionObserver' in window) {
         const io = new IntersectionObserver((es) => es.forEach((e) => { if (e.isIntersecting) { e.target.classList.add('pm-in'); io.unobserve(e.target); } }), { rootMargin: '0px 0px -6% 0px' });
         body.querySelectorAll('.pm-sezione').forEach((s) => io.observe(s));
+        // Le schede entrano a cascata, nell'ordine in cui compaiono sullo schermo.
+        body.classList.add('pm-anima');
+        const io2 = new IntersectionObserver((es) => {
+          es.filter((e) => e.isIntersecting).sort((a, b) => a.boundingClientRect.top - b.boundingClientRect.top).forEach((e, n) => {
+            e.target.style.setProperty('--d', `${Math.min(n, 8) * 65}ms`); e.target.classList.add('pm-in'); io2.unobserve(e.target);
+          });
+        }, { rootMargin: '0px 0px -4% 0px' });
+        body.querySelectorAll('.pm-card, .pm-sezione__head').forEach((el) => io2.observe(el));
       }
+      aggiornaSel();
+      scontornaTutte(body);
       active = null;
       onScroll();
     }
@@ -369,6 +523,8 @@
       const bar = body.querySelector('.pm-bar');
       if (!bar) return;
       bar.classList.toggle('scrolled', window.scrollY > 120);
+      const tot = document.documentElement.scrollHeight - window.innerHeight;
+      bar.style.setProperty('--pm-letto', tot > 0 ? String(Math.min(1, window.scrollY / tot)) : '0');
       body.querySelector('.pm-su')?.classList.toggle('show', window.scrollY > 700);
       const secs = [...body.querySelectorAll('.pm-sezione')];
       if (!secs.length) return;
@@ -400,5 +556,5 @@
     })();
   }
 
-  window.RenMenuPremium = { render, resolveStyle, contrast, cityOf, DIREZIONI, CARATTERI: Object.keys(CARATTERI) };
+  window.RenMenuPremium = { render, resolveStyle, contrast, cityOf, pairings, servingTemp, aromi, DIREZIONI, CARATTERI: Object.keys(CARATTERI) };
 })();

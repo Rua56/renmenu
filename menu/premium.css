@@ -369,3 +369,84 @@ html.pm-lock, html.pm-lock body { overflow: hidden; }
 .pm-racconto__strip { grid-template-columns: repeat(var(--n, 3), 1fr); }
 .pm-card--foto .pm-card__top { flex-direction: column; gap: 8px; }
 .pm-card--foto .pm-card__top .pm-pill { align-self: flex-start; }
+
+/* ═══ Livello Al Bakaro (v5): schede a cascata, bottiglie scontornate, abbinamenti, selezione, termometro ═══ */
+/* Barra di lettura sotto l'intestazione */
+.pm-bar { --pm-letto: 0; }
+.pm-bar::after { content: ''; position: absolute; left: 0; right: 0; bottom: -1px; height: 2px; background: linear-gradient(90deg, var(--pm-secondario), var(--pm-accento)); transform: scaleX(var(--pm-letto)); transform-origin: left; opacity: .9; pointer-events: none; }
+/* Schede a cascata (solo con movimento consentito; senza JavaScript restano visibili) */
+@media (prefers-reduced-motion: no-preference) {
+  .pm-anima .pm-card, .pm-anima .pm-sezione__head { opacity: 0; transform: translateY(34px) scale(.97); filter: blur(4px); }
+  .pm-anima .pm-card.pm-in, .pm-anima .pm-sezione__head.pm-in { opacity: 1; transform: none; filter: none; transition: opacity .7s cubic-bezier(.2, .8, .2, 1) var(--d, 0ms), transform .95s cubic-bezier(.16, 1, .3, 1) var(--d, 0ms), filter .7s ease var(--d, 0ms); }
+  .pm-anima .pm-card--apri.pm-in:active { transform: scale(.985); transition-delay: 0ms; }
+  .pm-anima .pm-sezione__head.pm-in .pm-medaglia { animation: pm-medaglia 1s cubic-bezier(.2, .8, .2, 1) var(--d, 0ms) both; }
+  @keyframes pm-medaglia { from { transform: rotate(-35deg) scale(.6); opacity: 0; } 60% { transform: rotate(6deg) scale(1.06); opacity: 1; } }
+  .pm-card--apri::before { content: ''; position: absolute; inset: 0; background: linear-gradient(105deg, transparent 40%, color-mix(in oklab, #fff 18%, transparent) 50%, transparent 60%); transform: translateX(-120%); pointer-events: none; }
+  .pm-card--apri.pm-in::before { animation: pm-riflesso 1.6s ease calc(var(--d, 0ms) + .5s) 1 both; }
+  @keyframes pm-riflesso { to { transform: translateX(120%); } }
+}
+/* Bottiglie: niente riquadro, la bottiglia scontornata galleggia con la sua ombra */
+.pm-card__img--bott { border: 0; background: radial-gradient(ellipse 60% 22% at 50% 92%, color-mix(in oklab, var(--pm-testo) 22%, transparent), transparent 70%), radial-gradient(circle at 50% 38%, color-mix(in oklab, var(--pm-accento) 20%, transparent), transparent 68%); overflow: visible; }
+.pm-card__img--bott img { object-fit: contain; filter: drop-shadow(0 10px 10px rgba(0, 0, 0, .35)); transition: transform .5s cubic-bezier(.2, .8, .2, 1); }
+@media (hover: hover) { .pm-card--apri:hover .pm-card__img--bott img { transform: translateY(-4px) rotate(-3deg); } }
+.pm-sheet__foto--bott { overflow: hidden; }
+.pm-sheet__foto--bott img { position: relative; z-index: 1; }
+@media (prefers-reduced-motion: no-preference) {
+  .pm-sheet__foto--bott img { animation: pm-bott-in 1s cubic-bezier(.16, 1, .3, 1) both, pm-bott-float 6s 1s ease-in-out infinite; }
+  @keyframes pm-bott-in { from { opacity: 0; transform: translateY(40px) rotate(-6deg) scale(.92); } }
+  @keyframes pm-bott-float { 50% { transform: translateY(-6px) rotate(1deg); } }
+}
+/* Profumi che escono dal bicchiere */
+.pm-aromi { position: absolute; inset: 0; z-index: 2; pointer-events: none; }
+.pm-aromi i { position: absolute; left: 50%; top: 46%; font: italic 500 .92rem/1 var(--pm-titoli); color: #fff3dc; white-space: nowrap; text-shadow: 0 1px 8px rgba(0, 0, 0, .6); opacity: 0; transform: translate(-50%, -50%); }
+@media (prefers-reduced-motion: no-preference) {
+  .pm-aromi i { animation: pm-aroma 2.8s cubic-bezier(.2, .8, .2, 1) var(--d) forwards; }
+  @keyframes pm-aroma { 20% { opacity: 1; } 75% { opacity: .95; } to { opacity: 0; transform: translate(-50%, -50%) rotate(var(--a)) translateY(-118px) rotate(calc(-1 * var(--a))); } }
+}
+/* Termometro della temperatura di servizio */
+.pm-tessera--termo { display: grid; grid-template-columns: auto 1fr; grid-template-rows: auto auto; column-gap: 12px; align-items: center; }
+.pm-tessera--termo > span:first-child { grid-column: 1 / -1; }
+.pm-termo { width: 12px; height: 40px; border-radius: 10px; border: 1.5px solid var(--pm-filo); position: relative; overflow: hidden; background: color-mix(in oklab, var(--pm-testo) 6%, transparent); margin: 0 0 0 4px !important; }
+.pm-termo i { position: absolute; left: 0; right: 0; bottom: 0; height: var(--t); background: linear-gradient(0deg, #3d7ab8, #7cc0e8); transform-origin: bottom; }
+@media (prefers-reduced-motion: no-preference) { .pm-termo i { animation: pm-termo 1.2s .35s cubic-bezier(.2, .8, .2, 1) both; } @keyframes pm-termo { from { transform: scaleY(0); } } }
+/* Abbinamenti tra voci del menu */
+.pm-coppie { display: grid; gap: 8px; margin: 0 0 18px; }
+.pm-coppia { all: unset; box-sizing: border-box; cursor: pointer; display: grid; grid-template-columns: 48px 1fr 18px; align-items: center; gap: 12px; padding: 8px 12px 8px 8px; border-radius: 16px; border: 1px solid var(--pm-filo); background: var(--pm-scheda); -webkit-tap-highlight-color: transparent; transition: transform .2s ease, border-color .2s ease; width: 100%; }
+.pm-coppia:active { transform: scale(.98); }
+.pm-coppia:focus-visible { outline: 2px solid var(--pm-accento); outline-offset: 2px; }
+@media (hover: hover) { .pm-coppia:hover { border-color: color-mix(in oklab, var(--pm-accento) 55%, transparent); } }
+.pm-coppia b { display: block; font: 500 1.08rem/1.2 var(--pm-titoli); }
+.pm-coppia small { display: block; margin-top: 3px; color: var(--pm-oro); font: 600 .78rem/1.2 var(--pm-corpo); }
+.pm-coppia > svg { width: 18px; height: 18px; fill: none; stroke: var(--pm-oro); stroke-width: 2; }
+.pm-coppia__img { width: 48px; height: 48px; border-radius: 12px; overflow: hidden; display: grid; place-items: center; background: color-mix(in oklab, var(--pm-accento) 12%, transparent); color: var(--pm-oro); }
+.pm-coppia__img img { width: 100%; height: 100%; object-fit: cover; }
+.pm-coppia__img--bott { background: none; height: 56px; }
+.pm-coppia__img--bott img { object-fit: contain; filter: drop-shadow(0 4px 5px rgba(0, 0, 0, .35)); }
+.pm-coppia__img--icona svg { width: 24px; height: 24px; }
+/* Cuore: la selezione del cliente */
+.pm-card { padding-bottom: 16px; }
+.pm-cuore { all: unset; box-sizing: border-box; cursor: pointer; position: absolute; right: 10px; bottom: 10px; z-index: 2; width: 36px; height: 36px; border-radius: 50%; display: grid; place-items: center; color: var(--pm-muted); -webkit-tap-highlight-color: transparent; }
+.pm-cuore svg { width: 20px; height: 20px; fill: none; stroke: currentColor; stroke-width: 1.7; transition: fill .2s ease; }
+.pm-cuore[aria-pressed='true'] { color: var(--pm-accento-forte, var(--pm-accento)); }
+.pm-cuore[aria-pressed='true'] svg { fill: currentColor; }
+.pm-cuore:focus-visible { outline: 2px solid var(--pm-accento); }
+.pm-cuore.pop svg { animation: pm-pop .45s cubic-bezier(.2, 1.6, .4, 1); }
+@keyframes pm-pop { 40% { transform: scale(1.45); } }
+.pm-sheet__azioni { display: flex; justify-content: flex-end; margin-top: 6px; }
+.pm-sheet__azioni .pm-cuore { position: static; border: 1px solid var(--pm-filo); width: 44px; height: 44px; }
+.pm-sel { position: fixed; left: 16px; bottom: calc(16px + env(safe-area-inset-bottom)); z-index: 30; display: inline-flex; align-items: center; gap: 8px; padding: 11px 16px; border-radius: 999px; border: 0; background: var(--pm-accento); color: var(--pm-su-accento, #fff); font: 600 .86rem/1 var(--pm-corpo); box-shadow: 0 12px 28px -10px rgba(0, 0, 0, .55); cursor: pointer; transform: translateY(140%); opacity: 0; transition: transform .45s cubic-bezier(.2, 1.3, .4, 1), opacity .3s ease; }
+.pm-sel.show { transform: none; opacity: 1; }
+.pm-sel svg { width: 18px; height: 18px; fill: currentColor; }
+.pm-sel b { min-width: 22px; height: 22px; padding: 0 6px; border-radius: 11px; display: grid; place-items: center; background: color-mix(in oklab, var(--pm-su-accento, #fff) 22%, transparent); font-size: .78rem; }
+.pm-sel__nota { color: var(--pm-muted); margin: 0 0 16px; }
+.pm-sel__lista { list-style: none; margin: 0 0 18px; padding: 0; display: grid; gap: 8px; }
+.pm-sel__lista li { display: grid; grid-template-columns: 1fr 44px; align-items: center; gap: 6px; }
+.pm-sel__lista .pm-coppia { grid-template-columns: 48px 1fr; }
+.pm-sel__lista .pm-cuore { position: static; }
+.pm-sel__svuota { width: 100%; justify-content: center; }
+@media (prefers-reduced-motion: reduce) { .pm-sel { transition: none; } .pm-cuore.pop svg { animation: none; } }
+.pm-card > .pm-card__body > .pm-cuore, .pm-card .pm-card__body > .pm-cuore { top: 8px; bottom: auto; right: 8px; }
+.pm-card__top { padding-right: 34px; }
+.pm-card--foto .pm-card__top { padding-right: 0; }
+.pm-card--foto .pm-card__orig, .pm-card--foto .pm-card__nome { padding-right: 30px; }
+.pm-coppia__img--bott img { height: 56px; width: auto; max-width: 100%; }
