@@ -24,6 +24,8 @@ import { memoryContext, memoryFor, menuStatements, noteStatement } from './memor
 import { buildDigest, digestText, recordEvent } from './journal.js';
 import { acceptProposals, askForProposals, decideProposal, pastProposals, proposalButtons, proposalsList, proposalText, reflectionDue, saveProposals, weekOf } from './reflection.js';
 import { slugify } from './menu.js';
+import { DIREZIONI } from './premium.js';
+import { enrollPrep } from './autoprep.js';
 import { claudeKey } from './claude.js';
 import { pickButton } from './short-reply.js';
 import { callOutcome, callOwner, ensureAgent, phoneNumber, twilioNumber } from './phone.js';
@@ -247,12 +249,14 @@ export function createMissions(deps) {
   };
 
   // Riccardo attesta la revisione interna con un solo gesto; Jarvis la registra a suo nome.
-  async function attest(db, env, draftId, evidence, actorDb = db) {
+  // creativeEvidence: il SÌ di Riccardo al riepilogo su Telegram vale anche come approvazione creativa Premium.
+  async function attest(db, env, draftId, evidence, actorDb = db, creativeEvidence = '') {
     const draft = await getOne(db, 'SELECT * FROM drafts WHERE id=?', draftId);
     // L'approvazione creativa Premium registrata da Riccardo resta: l'affido non la cancella.
     let saved = {};
     try { saved = JSON.parse(draft.checks_json || '{}') || {}; } catch { saved = {}; }
-    const creative = saved.creativeApproval === true ? { creativeApproval: true, creativeApprovalEvidence: saved.creativeApprovalEvidence } : {};
+    const creative = saved.creativeApproval === true ? { creativeApproval: true, creativeApprovalEvidence: saved.creativeApprovalEvidence }
+      : creativeEvidence ? { creativeApproval: true, creativeApprovalEvidence: creativeEvidence } : {};
     await action(actorDb, 'reviewDraft', {
       id: draft.id, revision: draft.revision,
       checks: { prices: true, allergens: true, languages: true, clientApproval: false },
@@ -277,7 +281,7 @@ export function createMissions(deps) {
     const accept = Array.isArray(p.accept) ? p.accept.map(String).filter(Boolean) : [];
     if (accept.length) { await action(db, 'applySourceExtras', { draftId, revision, accept }, env); draft = await getOne(db, 'SELECT * FROM drafts WHERE id=?', draftId); }
     const day = romeDate();
-    await attest(db, env, draftId, `Bozza controllata da Riccardo e affidata a Jarvis il ${day} («Approva e affida a Jarvis»).`);
+    await attest(db, env, draftId, `Bozza controllata da Riccardo e affidata a Jarvis il ${day} («Approva e affida a Jarvis»).`, db, request.plan === 'premium' && typeof p.creativeEvidence === 'string' ? p.creativeEvidence.slice(0, 400) : '');
     const stamp = now(), id = existing?.id || uid();
     const write = existing
       ? db.prepare("UPDATE jarvis_missions SET draft_id=?,status='affidata',note=NULL,attempts=0,step_started_at=?,reminded_at=NULL,rounds=0,revision=revision+1,updated_at=? WHERE id=?").bind(draftId, stamp, stamp, id)
@@ -1578,7 +1582,10 @@ export function createMissions(deps) {
     if (GENERIC_CLIENT.test(String(request.client_name || '').trim()) && typeof menu?.nome === 'string' && menu.nome.trim()) request.client_name = menu.nome.trim();
     try { saved = JSON.parse(draft.checks_json || '{}') || {}; } catch { saved = {}; }
     const note = 'Riepilogo su Telegram: prezzi, allergeni e lingue controllati da Riccardo.';
-    const probe = { prices: true, allergens: true, languages: true, clientApproval: false, allergenOmissionConfirmed: true, fieldEvidence: { prices: note, allergens: note, languages: note }, ...(saved.creativeApproval === true ? { creativeApproval: true, creativeApprovalEvidence: saved.creativeApprovalEvidence } : {}) };
+    // Premium: il tocco su questo riepilogo approva anche grafica, foto e schede che Riccardo vede nella bozza.
+    const creativeByTap = request.plan === 'premium' && saved.creativeApproval !== true;
+    const probe = { prices: true, allergens: true, languages: true, clientApproval: false, allergenOmissionConfirmed: true, fieldEvidence: { prices: note, allergens: note, languages: note },
+      ...(saved.creativeApproval === true ? { creativeApproval: true, creativeApprovalEvidence: saved.creativeApprovalEvidence } : creativeByTap ? { creativeApproval: true, creativeApprovalEvidence: 'SÌ di Riccardo al riepilogo su Telegram' } : {}) };
     await putSetting(db, 'tg_focus', JSON.stringify({ requestId: request.id, subject: request.subject || request.client_name || '', at: now() })).catch(() => {});
     const { issues, missing } = reviewIssues(menu, probe, request.plan);
     const blockers = issues.filter((issue) => !/checklist contiene conferme/i.test(issue));
@@ -1586,12 +1593,14 @@ export function createMissions(deps) {
     const link = await peekUrl(db, env, draft.id);
     if (blockers.length) return { text: `Non posso ancora affidare «${request.client_name}»: ${blockers.slice(0, 3).join(' ')}\n\nGuarda la bozza: ${link}`, buttons: [['Mostrami la bozza', `peek:${draft.id}`]] };
     const extras = allExtras(request.source_text, menu).filter((entry) => !entry.legend);
-    let english = 0; try { english = JSON.parse(draft.provenance_json || '[]').filter((entry) => String(entry.path).endsWith('.en')).length; } catch {}
+    let english = 0, others = ''; try { const prov = JSON.parse(draft.provenance_json || '[]'); english = prov.filter((entry) => String(entry.path).endsWith('.en')).length;
+      others = Object.entries({ de: 'tedesco', sl: 'sloveno', fr: 'francese', es: 'spagnolo' }).filter(([code]) => (menu.lingue || []).includes(code)).map(([code, name]) => `${name} (${prov.filter((entry) => String(entry.path).endsWith(`.${code}`)).length} testi)`).join(', '); } catch {}
     const lines = [`Riepilogo per affidare «${request.client_name}» (versione ${draft.revision}, ${items} voci).`, '',
       'Con il tuo tocco confermi di aver controllato prezzi, allergeni e lingue:',
       `- Prezzi: ${items - missing.pricesMissing.length} voci su ${items} hanno il prezzo.`,
       `- Allergeni: ${missing.allergensMissing.length ? `${missing.allergensMissing.length} voci non ne indicano: restano senza, non li invento.` : 'tutte le voci li indicano.'}`,
-      `- Lingue: ${english ? `${english} testi in inglese tradotti da me (bozza, da verificare).` : 'nessuna traduzione automatica da verificare.'}`];
+      `- Lingue: ${english ? `${english} testi in inglese tradotti da me (bozza, da verificare).` : 'nessuna traduzione automatica da verificare.'}${others ? ` Altre lingue tradotte da me: ${others}.` : ''}`];
+    if (creativeByTap) lines.push(`- Premium: approvi anche la grafica («${DIREZIONI[menu.premium?.direzione]?.label || 'direzione scelta da me'}»), le foto e le schede che vedi nella bozza.`);
     if (extras.length) lines.push(`- Dati scritti dal locale non ancora nel menu: ${extras.slice(0, 5).map((entry) => (entry.type === 'coperto' ? `coperto € ${entry.value}` : `allergeni di ${entry.name}: ${entry.label}`)).join('; ')}.`);
     lines.push('', `Guarda la bozza: ${link}`, '', request.client_email ? `Poi preparo l'anteprima e la mando a ${request.client_email}.` : 'Il locale non ha email: l’anteprima la approvi tu qui su Telegram.', 'Pubblico solo dopo il tuo SÌ.');
     return { text: lines.join('\n'), buttons: [...(extras.length ? [['Sì, affida e inserisci i dati del locale', `aff:${draft.id}:${draft.revision}:x`], ['Sì, affida senza quei dati', `aff:${draft.id}:${draft.revision}:n`]] : [['Sì, affida a Jarvis', `aff:${draft.id}:${draft.revision}:n`]]), ['Non ancora', 'affno:x']] };
@@ -1603,7 +1612,8 @@ export function createMissions(deps) {
     const request = await getOne(db, 'SELECT r.source_text,r.subject,c.email AS client_email,c.name AS client_name FROM requests r JOIN clients c ON c.id=r.client_id WHERE r.id=?', draft.request_id);
     let accept = [];
     if (mode === 'x') { try { accept = allExtras(request.source_text, JSON.parse((await getOne(db, 'SELECT menu_json FROM drafts WHERE id=?', draftId)).menu_json)).filter((entry) => !entry.legend).map((entry) => entry.id); } catch { accept = []; } }
-    try { await entrust(db, env, { draftId, revision, accept, confirmation: 'AFFIDO A JARVIS' }); }
+    const creativeEvidence = `SÌ di Riccardo su Telegram il ${romeDate()} al riepilogo dell’anteprima (grafica, foto e schede viste nella bozza, versione ${revision}).`;
+    try { await entrust(db, env, { draftId, revision, accept, confirmation: 'AFFIDO A JARVIS', creativeEvidence }); }
     catch (error) { return { text: `Non riesco ad affidarla: ${String(error?.message || 'errore').slice(0, 220)}` }; }
     return { text: `Fatto, Riccardo: «${request.client_name}» è affidata a Jarvis.${request.client_email ? ` Preparo l'anteprima per ${request.client_email} e ti scrivo quando risponde.` : ' Ti mando qui l’anteprima da approvare.'} Pubblico solo con il tuo SÌ.` };
   }
@@ -2219,7 +2229,15 @@ export function createMissions(deps) {
     const request = await getOne(db, 'SELECT id,subject FROM requests WHERE id=?', queued.requestId);
     if (!request || await getOne(db, 'SELECT id FROM drafts WHERE request_id=?', request.id)) return null;
     let text, buttons = null;
-    try { await action(jarvisDb(db), 'generateDraft', { requestId: request.id }, env); text = `Bozza pronta per «${String(request.subject || 'la pratica').slice(0, 60)}»: guardala qui sotto e, se ti va bene, affidamela. Le voci che hai saltato restano da verificare.`; buttons = [['Mostrami la bozza', `peek:${(await getOne(db, 'SELECT id FROM drafts WHERE request_id=?', request.id))?.id}`], ['Affida a Jarvis', `affq:${(await getOne(db, 'SELECT id FROM drafts WHERE request_id=?', request.id))?.id}`]]; }
+    try {
+      await action(jarvisDb(db), 'generateDraft', { requestId: request.id }, env);
+      const draft = await getOne(db, 'SELECT d.id,r.plan FROM drafts d JOIN requests r ON r.id=d.request_id WHERE d.request_id=?', request.id);
+      // Preparazione automatica (lingue, schede, foto), poi una sola domanda: «la mando al locale?».
+      const queued = await enrollPrep({ get: setting, put: putSetting }, db, { draftId: draft?.id, requestId: request.id, plan: draft?.plan }).catch(() => false);
+      text = queued ? `Bozza pronta per «${String(request.subject || 'la pratica').slice(0, 60)}». Ora preparo da solo il resto e poi ti chiedo solo se mandare l’anteprima al locale. Le voci che hai saltato restano da verificare.`
+        : `Bozza pronta per «${String(request.subject || 'la pratica').slice(0, 60)}»: guardala qui sotto e, se ti va bene, affidamela. Le voci che hai saltato restano da verificare.`;
+      buttons = [['Mostrami la bozza', `peek:${draft?.id}`], ...(queued ? [] : [['Affida a Jarvis', `affq:${draft?.id}`]])];
+    }
     catch (error) { text = `Non sono riuscito a preparare la bozza: ${String(error?.message || 'errore').slice(0, 160)}.`; }
     if (chat && telegramReady(env)) await sendTg(db, env, chat, text, buttons, deps.fetchImpl, { stacked: true });
     return { text };
@@ -2238,5 +2256,5 @@ export function createMissions(deps) {
     }
     return out;
   }
-  return { alertOnce, announceExternal, replyTick, phoneTick, proposeReply, statusText, initiatives, initiativeTick, ping, entrust, tick, watchTick, watchRegister, reflect, queueOnlineEmail, checkOnlineMails, makeMenuQr, decide, telegramUpdate, probeIntents, setting, putSetting, briefing, notify, startChecks, answerCheck, draftAfterChecks, translateAfterEdit, undoDraftEdit, draftTarget, voiceEditDraft, editDraftFromClient };
+  return { entrustBrief, runEntrust, alertOnce, announceExternal, replyTick, phoneTick, proposeReply, statusText, initiatives, initiativeTick, ping, entrust, tick, watchTick, watchRegister, reflect, queueOnlineEmail, checkOnlineMails, makeMenuQr, decide, telegramUpdate, probeIntents, setting, putSetting, briefing, notify, startChecks, answerCheck, draftAfterChecks, translateAfterEdit, undoDraftEdit, draftTarget, voiceEditDraft, editDraftFromClient };
 }

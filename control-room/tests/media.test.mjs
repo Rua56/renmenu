@@ -2,7 +2,7 @@ import assert from 'node:assert/strict';
 import { after, describe, it } from 'node:test';
 import { readFileSync } from 'node:fs';
 import { DatabaseSync } from 'node:sqlite';
-import { onRequest } from "../cloudflare/functions/control-room/api/[[route]].js";
+import { autoPrepareTick, onRequest } from "../cloudflare/functions/control-room/api/[[route]].js";
 import { onRequest as publicHook } from "../cloudflare/functions/jarvis-hook/[[route]].js";
 import { applyMedia, parseClassification, proposeTargets, reapplyConfirmed, removeMedia } from "../cloudflare/functions/_lib/media.js";
 import { validateMenu } from "../cloudflare/functions/_lib/menu.js";
@@ -220,6 +220,38 @@ describe('Foto per il menu · flusso nella Control Room', () => {
       assert.equal((await pub(file)).status, 404);
       const audits = await db.prepare("SELECT action FROM audit_events WHERE request_id='r1' ORDER BY created_at").bind().all();
       assert.ok(audits.results.some((a) => a.action === 'media.place'));
+    } finally { db.close(); }
+  });
+
+  it('preparazione automatica: Jarvis mette da solo le foto leggere al loro posto, le grandi restano a Riccardo', async () => {
+    const db = await setup();
+    try {
+      const big = new Uint8Array(1_000_000); big.set([255, 216, 255, 224]);
+      const store = new Map([['private/mail/x/1', JPEG], ['private/mail/x/2', big]]);
+      const ai = { run: async () => ({ response: '{"tipo":"bottiglia","descrizione":"bottiglia di Ribolla Gialla","etichetta":{"nome":"Ribolla Gialla","denominazione":"Collio","annata":"2024","cantina":"Cantina Prova"}}' }) };
+      const env = { BUCKET: bucket(store), AI: ai };
+      assert.equal((await act(db, 'readMaterial', { materialId: 'm1' }, env)).status, 200);
+      await db.prepare("INSERT INTO materials (id,request_id,r2_key,filename,mime,size,source,processing_status,created_at) VALUES ('m2','r1','private/mail/x/2','frico.jpg','image/jpeg',1000000,'email','foto_per_il_menu','2026-10-04')").bind().run();
+      await db.prepare("INSERT INTO media_items (id,request_id,material_id,kind,description,label_json,status,created_at,updated_at) VALUES ('x2','r1','m2','piatto','frico con polenta','{}','proposta','2026-10-04','2026-10-04')").bind().run();
+      // In coda, con lingue, schede e bottiglie già fatte: resta il passo delle foto, poi la domanda.
+      const entry = { requestId: 'r1', plan: 'premium', steps: ['lingue', 'schede', 'bottiglie', 'foto', 'pronta'], done: ['lingue', 'schede', 'bottiglie'], log: [], at: '2026-10-04', tries: 0, rounds: 0 };
+      await db.prepare("INSERT INTO jarvis_settings (key,value,updated_at) VALUES ('auto_prep',?,'x')").bind(JSON.stringify({ d1: entry })).run();
+      const sent = await autoPrepareTick(db, { DB: db, ...accessEnv, ...env, JARVIS_ORIGIN: 'https://stage.example' });
+      assert.equal(sent.length, 1);
+      assert.match(sent[0].text, /foto messe nel menu: 1; 1 da sistemare tu in Revisione/);
+      const draft = await db.prepare("SELECT * FROM drafts WHERE id='d1'").bind().first();
+      const menu = JSON.parse(draft.menu_json);
+      assert.match(menu.sezioni[1].voci[0].foto, /^https:\/\/stage\.example\/jarvis-hook\/media\/[0-9a-f]{64}\.jpg$/);
+      assert.equal(menu.sezioni[0].voci[0].foto, undefined, 'la foto troppo grande non entra da sola');
+      assert.deepEqual(validateMenu(menu).errors, []);
+      const placed = await db.prepare("SELECT status FROM media_items WHERE material_id='m1'").bind().first();
+      assert.equal(placed.status, 'confermata');
+      assert.equal((await db.prepare("SELECT status FROM media_items WHERE id='x2'").bind().first()).status, 'proposta');
+      const file = menu.sezioni[1].voci[0].foto.split('/').pop();
+      const served = await publicHook({ request: new Request(`https://renmenu.pages.dev/jarvis-hook/media/${file}`), env: { DB: db, BUCKET: bucket(store) }, params: {} });
+      assert.equal(served.status, 200, 'l’anteprima la mostra');
+      const audit = await db.prepare("SELECT summary,actor FROM audit_events WHERE action='media.place'").bind().first();
+      assert.match(audit.summary, /^Jarvis \(preparazione automatica\)/);
     } finally { db.close(); }
   });
 

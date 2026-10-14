@@ -1,6 +1,6 @@
 import { notesSummary, reviewNotes, structureNotes } from './notes.js';
 import { applyVenueInfo, extractVenueInfo } from './venue-info.js';
-// Autopilota di Jarvis (2026-10-02): appena arriva una richiesta email, Jarvis la classifica
+// Autopilota di Jarvis (2026-10-02, Premium compreso dal 2026-10-14): appena arriva una richiesta email, Jarvis la classifica
 // e, se il locale ha scritto in modo esplicito nome e piano di un nuovo menu, prepara da solo
 // la bozza (con l'inglese). Le regole restano quelle di docs/renmenu-service-rules.md:
 // la classificazione è una PROPOSTA con la riga di provenienza, Riccardo la conferma; nessun
@@ -81,10 +81,9 @@ export function autopilotPlan(request, understood = null) {
   }
   if (entry.kind !== 'nuovo') return { proposal, action: 'proponi', why: 'Per ora questo tipo di richiesta lo prepari tu.' };
   if (!proposal.explicitPlan) return { proposal, action: 'proponi', why: proposal.ambiguousPlan ? (proposal.hesitant ? 'Il cliente cita un piano ma non ha ancora deciso: piano da confermare.' : 'Il testo cita più piani: scegli tu.') : 'Il piano non è scritto nella richiesta: scegli tu Standard, Annuale o Premium.' };
-  if (!proposal.venue) return { proposal, action: 'proponi', why: 'Manca una riga «Locale: …»: indica il nome del locale (Menu ID) e genera tu la bozza.' };
-  // Premium su misura: nessuna bozza automatica. Jarvis prepara scheda creativa e 3 direzioni
-  // grafiche quando Riccardo genera la bozza; il preventivo (totale) lo decide sempre Riccardo.
-  if (proposal.plan === 'premium') return { proposal, action: 'proponi', why: 'Premium su misura: la bozza la avvii tu. Quando la generi preparo la scheda creativa e 3 direzioni grafiche da confrontare; il totale del preventivo lo decidi tu.' };
+  if (!proposal.venue) return { proposal, action: 'proponi', why: 'Manca il nome del locale (una riga «Locale: …» o «siamo l’Osteria …»): indicalo nella pratica (Menu ID) e genera tu la bozza.' };
+  // Premium su misura (Baffone, 2026-10-14): anche qui Jarvis fa la bozza da solo, con scheda creativa e
+  // direzione grafica; il totale del preventivo e l'invio dell'anteprima restano di Riccardo.
   return { proposal, action: 'bozza', why: '' };
 }
 

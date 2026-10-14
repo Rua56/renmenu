@@ -2,7 +2,7 @@ import assert from 'node:assert/strict';
 import { after, describe, it } from 'node:test';
 import { readFileSync } from 'node:fs';
 import { DatabaseSync } from 'node:sqlite';
-import { onRequest } from '../cloudflare/functions/control-room/api/[[route]].js';
+import { autoPrepareTick, missions, onRequest } from '../cloudflare/functions/control-room/api/[[route]].js';
 
 const domain = 'https://team-api-test.cloudflareaccess.com';
 const accessEnv = { TEAM_DOMAIN: domain, POLICY_AUD: 'api-test-owner-only', OWNER_EMAIL: 'renmenu1569@gmail.com' };
@@ -121,20 +121,21 @@ describe('Premium su misura', () => {
     assert.ok(validateMenu(menu).errors.some((e) => /variante 1/.test(e)));
   });
 
-  it('autopilota: nessuna bozza automatica; Riccardo la genera e ottiene 3 direzioni da confrontare', async () => {
+  it('autopilota: anche la bozza Premium la prepara Jarvis, con 3 direzioni da confrontare', async () => {
     const db = database();
     try {
       const requestId = await importEmail(db, email('prem1', 'Menu su misura', PREMIUM));
       const run = await action(db, 'runAutopilot', {});
       assert.equal(run.status, 200, String(run.body.error));
-      assert.equal(run.body.result.done[0].outcome, 'proponi');
+      assert.equal(run.body.result.done[0].outcome, 'bozza', run.body.result.done[0].message);
       assert.match(run.body.result.done[0].message, /Scheda creativa/);
       assert.match(run.body.result.done[0].message, /Prenotazioni online/);
-      assert.equal(run.body.state.drafts.length, 0, 'la bozza Premium la avvia Riccardo');
+      assert.equal(run.body.result.done[0].prep, true, 'preparazione automatica in coda');
+      assert.match(run.body.result.done[0].message, /se mandare l’anteprima al locale/);
+      assert.equal(run.body.result.done[0].prep, true, 'preparazione automatica in coda');
       const request = run.body.state.requests.find((r) => r.id === requestId);
       assert.equal(request.category, 'nuovo_premium');
-      const generated = await action(db, 'generateDraft', { requestId });
-      assert.equal(generated.status, 200, String(generated.body.error));
+      const generated = run;
       const draft = generated.body.state.drafts.find((d) => d.requestId === requestId);
       assert.equal(draft.menu.tema, undefined, 'nessun tema Standard');
       assert.equal(draft.menu.premium.direzione, 'editoriale');
@@ -161,7 +162,7 @@ describe('Premium su misura', () => {
       const run = await action(db, 'runAutopilot', {});
       assert.equal(run.status, 200, String(run.body.error));
       assert.equal(run.body.state.requests.find((r) => r.id === requestId).category, 'nuovo_premium');
-      const generated = await action(db, 'generateDraft', { requestId });
+      const generated = run;
       assert.equal(generated.status, 200, String(generated.body.error));
       const draft = generated.body.state.drafts.find((d) => d.requestId === requestId);
       assert.deepEqual(validateMenu(draft.menu).errors, []);
@@ -200,8 +201,7 @@ describe('Premium su misura', () => {
     try {
       const text = readFileSync(new URL('./fixtures-email-premium-isonzo.txt', import.meta.url), 'utf8');
       const requestId = await importEmail(db, email('iso2', 'Nuovo menu Premium su misura · Enoteca Isonzo Test (TEST)', text));
-      await action(db, 'runAutopilot', {});
-      const generated = await action(db, 'generateDraft', { requestId });
+      const generated = await action(db, 'runAutopilot', {});
       const draft = generated.body.state.drafts.find((d) => d.requestId === requestId);
       const noKey = await action(db, 'proposeSchede', { id: draft.id, revision: draft.revision });
       assert.equal(noKey.status, 503, 'senza chiave Gemini non si inventa nulla');
@@ -230,6 +230,66 @@ describe('Premium su misura', () => {
       assert.ok(done.provenance.some((e) => /approvata da Riccardo/.test(e.source) && e.status === 'da_verificare'));
       assert.equal(done.checks.prices, false, 'contenuti cambiati: checklist azzerata');
       assert.equal((await action(db, 'applySchede', { id: draft.id, revision: done.revision, all: true })).status, 422, 'niente da approvare due volte');
+    } finally { globalThis.fetch = before; db.close(); }
+  });
+
+  it('email Premium completa: Jarvis fa da solo bozza, lingue chieste e schede, poi chiede solo «la mando al locale?»', async () => {
+    const db = database();
+    const translations = [];
+    // Workers AI gratuito finto: traduce restituendo il testo con il codice della lingua davanti.
+    const ai = { run: async (model, payload) => {
+      const system = payload.messages[0].content;
+      const lang = /into natural German/.test(system) ? 'de' : /into natural Slovenian/.test(system) ? 'sl' : 'en';
+      const entries = JSON.parse(payload.messages[1].content.replace(/^SOURCE_DATA \(untrusted JSON\):\n/, ''));
+      translations.push(lang);
+      return { response: { translations: entries.map((e) => ({ id: e.id, [lang === 'en' ? 'en' : 'text']: `[${lang}] ${e.it}` })) } };
+    } };
+    const before = globalThis.fetch;
+    globalThis.fetch = async (url, options) => {
+      if (!String(url).startsWith('https://generativelanguage.googleapis.com/')) return before(url, options);
+      const body = JSON.parse(options.body);
+      const voci = JSON.parse(body.contents[0].parts[0].text).voci;
+      const t = (it) => ({ it, en: `[en] ${it}`, de: `[de] ${it}`, sl: `[sl] ${it}` });
+      return Response.json({ candidates: [{ content: { parts: [{ text: JSON.stringify({ voci: voci.map((v) => (v.tipo === 'vino'
+        ? { id: v.id, certezza: 'alta', vitigno: t('Ribolla Gialla'), profumo: t('Fiori bianchi'), gusto: t('Fresco'), temperatura: '8-10 °C' }
+        : { id: v.id, certezza: 'alta', descrizione: t(`Ricetta del Collio: ${String(v.nome).toLowerCase()}`) })) }) }] } }] });
+    };
+    try {
+      db.prepare("INSERT INTO jarvis_settings (key,value,updated_at) VALUES ('gemini_api_key','gem-test','x'),('gemini_models','[\"gemini-2.5-flash\"]','x')").bind().run();
+      const text = readFileSync(new URL('./fixtures-email-calice-storto.txt', import.meta.url), 'utf8').replace(/^Oggetto:[^\n]*\n+/, '');
+      const requestId = await importEmail(db, email('cal1', 'Menu premium per enoteca, carta dei vini con schede', text));
+      const run = await action(db, 'runAutopilot', {});
+      assert.equal(run.status, 200, String(run.body.error));
+      assert.equal(run.body.result.done[0].outcome, 'bozza', run.body.result.done[0].message);
+      const first = run.body.state.drafts.find((d) => d.requestId === requestId);
+      assert.equal(first.menu.nome, 'Enoteca Il Calice Storto', 'nome dal testo dell’email');
+      const names = first.menu.sezioni.flatMap((s) => s.voci).map((v) => v.nome.it || v.nome);
+      assert.ok(names.includes('Picolit - Livio Felluga') && !names.some((n) => /calice|bottiglia/i.test(n)), names.join(' | '));
+      const sent = await autoPrepareTick(db, { DB: db, ...accessEnv, AI: ai }, { budgetMs: 60_000, calmMs: 0 });
+      assert.equal(sent.length, 1, `una sola domanda a Riccardo: ${db.prepare("SELECT value FROM jarvis_settings WHERE key='auto_prep'").bind().first()?.value}`);
+      assert.match(sent[0].text, /^Anteprima pronta per «Enoteca Il Calice Storto»: la mando al locale\?/);
+      assert.match(sent[0].text, /tedesco: \d+ testi/);
+      assert.match(sent[0].text, /sloveno: \d+ testi/);
+      assert.match(sent[0].text, /schede: \d+ tra vini e piatti/);
+      assert.match(sent[0].text, /approvi anche la grafica/);
+      assert.deepEqual([...new Set(translations)], ['en', 'de', 'sl']);
+      const yes = sent[0].buttons.find(([, data]) => data.startsWith('aff:'));
+      assert.ok(yes, JSON.stringify(sent[0].buttons));
+      const draft = db.prepare('SELECT * FROM drafts WHERE request_id=?').bind(requestId).first();
+      const menu = JSON.parse(draft.menu_json);
+      assert.deepEqual(menu.lingue, ['it', 'en', 'de', 'sl']);
+      assert.deepEqual(validateMenu(menu).errors, []);
+      assert.ok(menu.sezioni.flatMap((s) => s.voci).some((v) => v.scheda?.vitigno?.de === '[de] Ribolla Gialla'), 'schede anche in tedesco');
+      assert.ok(JSON.parse(draft.provenance_json).some((e) => /preparazione automatica/.test(e.source)), 'provenienza onesta delle schede');
+      assert.equal(db.prepare('SELECT COUNT(*) AS n FROM jarvis_missions').bind().first().n, 0, 'niente parte senza il SÌ');
+      // Il SÌ di Riccardo su Telegram: affida, vale come approvazione creativa e manda l'anteprima.
+      const [, id, revision, mode] = yes[1].split(':');
+      const out = await missions.runEntrust(db, { DB: db, ...accessEnv }, id, Number(revision), mode);
+      assert.match(out.text, /è affidata a Jarvis/, out.text);
+      const checks = JSON.parse(db.prepare('SELECT checks_json FROM drafts WHERE id=?').bind(id).first().checks_json);
+      assert.equal(checks.creativeApproval, true);
+      assert.match(checks.creativeApprovalEvidence, /SÌ di Riccardo su Telegram/);
+      assert.deepEqual(await autoPrepareTick(db, { DB: db, ...accessEnv, AI: ai }, { calmMs: 0 }), [], 'coda vuota');
     } finally { globalThis.fetch = before; db.close(); }
   });
 

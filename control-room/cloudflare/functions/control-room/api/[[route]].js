@@ -19,10 +19,11 @@ import { sendOwnerNotification, OWNER_NOTIFICATION_RECIPIENT } from '../../_lib/
 import { purgePublishedEmail } from '../../_lib/email-retention.js';
 import { clientMailConfig } from '../../_lib/client-mail.js';
 import { resolveCategory, draftBlocker, PLAN_RULES } from '../../_lib/service-rules.js';
-import { translateMenu, translationEntries, translationSummary } from '../../_lib/translate.js';
+import { TRANSLATION_LANGS, translateMenu, translationEntries, translationSummary } from '../../_lib/translate.js';
 import { allExtras, applyExtras, proposeSourceExtras } from '../../_lib/extras.js';
 import { prepareEmailSource } from '../../_lib/email-text.js';
 import { autopilotMessage, autopilotPreview, classifyRequest } from '../../_lib/autopilot.js';
+import { MAX_ROUNDS, MAX_TRIES, PREP_KEY, PREP_STEPS, enrollPrep, nextStep, parsePrep } from '../../_lib/autoprep.js';
 import { understandClientRequest } from '../../_lib/request-ai.js';
 import { createMissions } from '../../_lib/missions.js';
 import { spokenText, telegramCapture } from '../../_lib/cr-chat.js';
@@ -30,7 +31,7 @@ import { noteStatement } from '../../_lib/memory.js';
 import { THEMES, proposeTheme, themeFromText } from '../../_lib/themes.js';
 import { dropRepeatedPages, notesSummary, reviewNotes, structureNotes } from '../../_lib/notes.js';
 import { briefLines, briefNotes, creativeBrief, premiumDirections, storyFromSource } from '../../_lib/premium.js';
-import { applySchede, proposeSchede } from '../../_lib/premium-schede.js';
+import { SCHEDE_AUTO_SOURCE, applySchede, proposeSchede } from '../../_lib/premium-schede.js';
 import { CANTINA_SOURCE, PER_ROUND as BOTTLES_PER_ROUND, findBottle, parseSourceNote, slotFrequencies, sourceNote, winesWithoutPhoto } from '../../_lib/bottle-search.js';
 import { menuSlots } from '../../_lib/media.js';
 import { applyVenueInfo, extractVenueInfo } from '../../_lib/venue-info.js';
@@ -252,7 +253,6 @@ async function readPendingInner(db, env, calm) {
       if (outcome.ok) outcome.redone = await discardUntouchedJarvisDraft(db, material.request_id);
       const hasDraft = await getOne(db, 'SELECT id FROM drafts WHERE request_id=?', material.request_id);
       if (outcome.ok && hasDraft) outcome.draftKept = true; // bozza già modificata o affidata: non si tocca
-      // Premium su misura: la bozza la avvia sempre Riccardo (scheda creativa + direzioni grafiche).
       // Lettura debole (le due letture concordano su meno voci di quante ne restano in dubbio): niente bozza
       // automatica, sarebbe un menu a metà e con voci al posto sbagliato. Jarvis chiede una foto migliore.
       const weakRows = await rows(db, "SELECT a.warnings_json AS w, a.source_text AS t FROM material_analyses a JOIN materials m ON m.id=a.material_id WHERE a.request_id=? AND m.archived_at IS NULL", material.request_id).catch(() => []);
@@ -264,8 +264,8 @@ async function readPendingInner(db, env, calm) {
         .reduce((n, r) => { try { return n + (JSON.parse(r.p || '[]')[0]?.checks || []).filter((c) => c.resolved === undefined).length; } catch { return n; } }, 0) : 0;
       if (outcome.ok && !hasDraft && openChecks > 0 && env.TELEGRAM_BOT_TOKEN) { outcome.checks = { count: openChecks, sure, unsure }; done.push({ material, request, outcome }); continue; }
       if (outcome.ok && !hasDraft && unsure >= 10 && sure < unsure) { outcome.weak = { sure, unsure, sections: weakRows.flatMap((r) => { try { return JSON.parse(r.w || '[]'); } catch { return []; } }).filter((w) => /^Sezioni meno sicure: /.test(w)).map((w) => w.replace(/^Sezioni meno sicure: /, '').replace(/\.$/, '')).join(', ') }; done.push({ material, request, outcome }); continue; }
-      if (outcome.ok && request?.category && request.category !== 'nuovo_premium' && request.plan !== 'premium' && !hasDraft) {
-        try { await action(jarvis, 'generateDraft', { requestId: request.id }, env); outcome.drafted = true; outcome.notesText = notesSummary(await draftNotes(db, request.id)); }
+      if (outcome.ok && request?.category && !hasDraft) {
+        try { await action(jarvis, 'generateDraft', { requestId: request.id }, env); outcome.drafted = true; outcome.notesText = notesSummary(await draftNotes(db, request.id)); outcome.prep = await enrollAutoPrep(db, request.id).catch(() => false); }
         catch (error) { outcome.draftError = String(error?.message || 'errore').slice(0, 240); }
       }
       done.push({ material, request, outcome });
@@ -326,6 +326,7 @@ export async function runAutopilot(db, env = {}) {
           }
         }
         preview.notes = await draftNotes(db, request.id);
+        preview.prep = await enrollAutoPrep(db, request.id).catch(() => false);
       }
     } catch (error) {
       outcome = 'proponi';
@@ -333,14 +334,159 @@ export async function runAutopilot(db, env = {}) {
     }
     let message = blocked ? autopilotMessage(request.subject, { ...preview, why: `Bozza non generata: ${blocked}` }, 'proponi') : autopilotMessage(request.subject, preview, outcome);
     if (edited?.applied && !blocked) message += `\n\nModifiche applicate:\n${String(edited.text).split('\n').filter((line) => line.startsWith('•')).join('\n')}`;
+    if (preview.prep && !blocked) message += `\n\nOra preparo da solo il resto${preview.plan === 'premium' ? ' (lingue chieste, schede dei vini, foto delle bottiglie e del locale)' : ''} e poi ti chiedo una cosa sola: se mandare l’anteprima al locale.`;
     const id = uid(), stamp = now();
     const why = preview.reasons ? ` Fonte: ${preview.reasons}.` : '';
     await auditedBatch(jarvis, [db.prepare('INSERT INTO notifications (id,request_id,channel,subject,body,priority,due_at,status,created_at) VALUES (?,?,?,?,?,?,?,?,?)')
       .bind(id, request.id, 'in_app', outcome === 'bozza' ? 'Jarvis · bozza pronta' : 'Jarvis · serve una tua decisione', `${message}${why}`.slice(0, 5000), outcome === 'bozza' ? 'importante' : 'normale', null, 'mock', stamp)],
     outcome === 'bozza' ? 'autopilot.draft' : 'autopilot.proposal', message, request.id, { sql: 'SELECT 1 FROM notifications WHERE id=?', args: [id] });
-    done.push({ requestId: request.id, outcome, message, buttons: edited?.applied && !blocked ? edited.buttons : null });
+    // Con la preparazione automatica la domanda importante («la mando?») arriva dopo: questo avviso è normale.
+    done.push({ requestId: request.id, outcome, message, buttons: edited?.applied && !blocked ? edited.buttons.filter(([, data]) => !(preview.prep && String(data).startsWith('affq:'))) : null, prep: Boolean(preview.prep && !blocked) });
   }
   return done;
+}
+
+// ——— Preparazione automatica (vedi _lib/autoprep.js): un passo alla volta, a ogni giro dell'orologio ———
+const PREP_LANGS = { en: 'inglese', de: 'tedesco', sl: 'sloveno', fr: 'francese', es: 'spagnolo' };
+export async function enrollAutoPrep(db, requestId) {
+  const draft = await Promise.resolve().then(() => getOne(db, 'SELECT d.id,r.plan FROM drafts d JOIN requests r ON r.id=d.request_id WHERE d.request_id=?', requestId)).catch(() => null);
+  if (!draft) return false;
+  return enrollPrep({ get: missions.setting, put: missions.putSetting }, db, { draftId: draft.id, requestId, plan: draft.plan });
+}
+// Foto del cliente e delle cantine al posto proposto (stessa scelta che Riccardo vede in Revisione).
+// Solo quelle già leggere (fino a 900 KB): le più grandi le riduce il telefono di Riccardo in Revisione.
+async function autoPlaceMedia(db, env, draft) {
+  const jarvis = asJarvis(db);
+  let found = [];
+  try { found = await rows(db, 'SELECT m.*, x.filename, x.r2_key, x.mime AS material_mime FROM media_items m JOIN materials x ON x.id=m.material_id WHERE m.request_id=? AND x.archived_at IS NULL ORDER BY m.created_at ASC', draft.request_id); }
+  catch (error) { if (/no such table/i.test(String(error?.message))) return { placed: [], heavy: [] }; throw error; }
+  const group = found.map((row) => ({ ...row, label: parseLabel(row.label_json) }));
+  const proposals = proposeTargets(JSON.parse(draft.menu_json), group);
+  const placed = [], heavy = [];
+  for (const media of group) {
+    const proposal = proposals.get(media.id);
+    if (media.status !== 'proposta' || !proposal?.target) continue;
+    if (!media.public_url) {
+      if (!env.BUCKET?.get || !env.BUCKET?.put) break;
+      const object = await env.BUCKET.get(media.r2_key);
+      const bytes = object ? new Uint8Array(await object.arrayBuffer()) : null;
+      const mime = String(media.material_mime || '');
+      if (!bytes || !PUBLIC_EXT[mime] || !publicImageOk(bytes, mime)) { heavy.push(media.filename); continue; }
+      const sha = [...new Uint8Array(await crypto.subtle.digest('SHA-256', bytes))].map((b) => b.toString(16).padStart(2, '0')).join('');
+      const key = `public/media/${sha}.${PUBLIC_EXT[mime]}`;
+      await env.BUCKET.put(key, bytes, { httpMetadata: { contentType: mime } });
+      const url = `${String(env.JARVIS_ORIGIN || 'https://renmenu-jarvis-stage.pages.dev').replace(/\/+$/, '')}/jarvis-hook/media/${sha}.${PUBLIC_EXT[mime]}`;
+      await db.prepare('UPDATE media_items SET public_key=?,public_sha=?,public_url=?,updated_at=? WHERE id=?').bind(key, sha, url, now(), media.id).run();
+    }
+    const fresh = await getOne(db, 'SELECT revision FROM drafts WHERE id=?', draft.id);
+    try {
+      await action(jarvis, 'mediaPlace', { mediaId: media.id, revision: fresh.revision, target: proposal.target, withLabel: media.kind === 'bottiglia', auto: true }, env);
+      placed.push(media.filename);
+    } catch { heavy.push(media.filename); }
+  }
+  return { placed, heavy };
+}
+async function prepStep(db, env, draft, step, entry) {
+  const jarvis = asJarvis(db);
+  const menu = JSON.parse(draft.menu_json);
+  if (step === 'lingue') {
+    const request = await getOne(db, 'SELECT source_text,plan FROM requests WHERE id=?', draft.request_id);
+    const asked = request.plan === 'premium' ? creativeBrief(prepareEmailSource(request.source_text)).lingue : [];
+    const have = Array.isArray(menu.lingue) ? menu.lingue : ['it'];
+    // Il Premium arriva fino a 4 lingue (italiano compreso): le altre restano a Riccardo.
+    const want = ['en', ...asked].filter((code, i, all) => PREP_LANGS[code] && all.indexOf(code) === i && !have.includes(code)).slice(0, Math.max(0, 4 - have.length));
+    if (!want.length || !autoTranslationReady(env)) return {};
+    const out = (await action(jarvis, 'translateDraft', { id: draft.id, revision: draft.revision, lang: want[0] }, env)).result;
+    return { again: want.length > 1, note: `${PREP_LANGS[want[0]]}: ${out.translation.translated} testi su ${out.translation.total}` };
+  }
+  if (step === 'schede') {
+    if (!menu.premium) return {};
+    const schede = parseCreative(draft.creative_json)?.schede;
+    if (!schede || schede.remaining > 0) {
+      if (entry.rounds >= MAX_ROUNDS) return { note: 'schede: mi sono fermato dopo troppi giri, le altre restano da fare' };
+      const round = (await action(jarvis, 'proposeSchede', { id: draft.id, revision: draft.revision }, env)).result;
+      if (round.remaining > 0) return { again: true };
+    }
+    const latest = await getOne(db, 'SELECT revision,creative_json FROM drafts WHERE id=?', draft.id);
+    const open = (parseCreative(latest.creative_json)?.schede?.proposals || []).filter((x) => x.stato === 'proposta');
+    if (!open.length) return { note: 'schede: nessuna voce nuova da descrivere' };
+    const done = (await action(jarvis, 'applySchede', { id: draft.id, revision: latest.revision, all: true }, env)).result;
+    return { note: `schede: ${done.applied} tra vini e piatti` };
+  }
+  if (step === 'bottiglie') {
+    if (!menu.premium || !env.BUCKET?.put || typeof env.AI?.run !== 'function') return {};
+    if (entry.rounds >= MAX_ROUNDS) return { note: 'foto delle bottiglie: mi sono fermato dopo troppi giri' };
+    try {
+      const out = (await action(jarvis, 'findBottlePhotos', { id: draft.id }, env)).result;
+      const found = (entry.bottles || 0) + out.found;
+      entry.bottles = found;
+      return out.remaining > 0 ? { again: true } : { note: `foto delle bottiglie dai siti delle cantine: ${found}` };
+    } catch (error) {
+      if (/già una foto|già cercato/.test(String(error?.message || ''))) return entry.bottles ? { note: `foto delle bottiglie dai siti delle cantine: ${entry.bottles}` } : {};
+      throw error;
+    }
+  }
+  if (step === 'foto') {
+    if (!menu.premium) return {};
+    const { placed, heavy } = await autoPlaceMedia(db, env, draft);
+    const parts = [placed.length ? `foto messe nel menu: ${placed.length}` : '', heavy.length ? `${heavy.length} da sistemare tu in Revisione (troppo grandi o senza posto sicuro)` : ''].filter(Boolean);
+    return { note: parts.join('; ') };
+  }
+  return {};
+}
+/** Un giro: porta avanti la preparazione delle bozze in coda e, alla fine, chiede a Riccardo il SÌ per l'anteprima. */
+export async function autoPrepareTick(db, env = {}, { budgetMs = 50_000, calmMs = 90_000 } = {}) {
+  const started = Date.now();
+  // Un giro alla volta (come la lettura delle foto): lo stesso passo non parte due volte.
+  try {
+    const stamp = new Date().toISOString(), stale = new Date(Date.now() - 6 * 60_000).toISOString();
+    await db.prepare("INSERT OR IGNORE INTO jarvis_settings (key,value,updated_at) VALUES ('prep_lock','',?)").bind('1970-01-01T00:00:00.000Z').run();
+    const got = await db.prepare("UPDATE jarvis_settings SET value='busy',updated_at=? WHERE key='prep_lock' AND (value<>'busy' OR updated_at<?)").bind(stamp, stale).run();
+    if (got?.meta && got.meta.changes === 0) return [];
+  } catch { /* tabella assente nei test vecchi */ }
+  const sent = [], waiting = new Set();
+  try {
+    while (Date.now() - started < budgetMs) {
+      const all = parsePrep(await missions.setting(db, PREP_KEY));
+      const calm = new Date(Date.now() - calmMs).toISOString();
+      const [draftId, entry] = Object.entries(all).filter(([id, e]) => !waiting.has(id) && String(e.at) <= calm).sort((a, b) => String(a[1].at).localeCompare(String(b[1].at)))[0] || [];
+      if (!draftId) break;
+      // Foto o PDF della stessa pratica ancora da leggere: si aspetta, la bozza può ancora essere rifatta con loro.
+      const unread = await Promise.resolve().then(() => getOne(db, "SELECT 1 AS x FROM materials WHERE request_id=? AND processing_status='da_trascrivere' AND archived_at IS NULL", entry.requestId)).catch(() => null);
+      if (unread) { waiting.add(draftId); continue; }
+      const save = async (next) => { const fresh = parsePrep(await missions.setting(db, PREP_KEY)); if (next) fresh[draftId] = next; else delete fresh[draftId]; await missions.putSetting(db, PREP_KEY, JSON.stringify(fresh)); };
+      const draft = await getOne(db, 'SELECT * FROM drafts WHERE id=?', draftId);
+      const mission = draft && await Promise.resolve().then(() => getOne(db, 'SELECT status FROM jarvis_missions WHERE request_id=?', draft.request_id)).catch(() => null);
+      // Bozza sparita, chiusa o già affidata: non c'è più niente da preparare.
+      if (!draft || !['bozza', 'revisione', 'pronta_pr'].includes(draft.status) || (mission && ['affidata', 'attesa_invio', 'attesa_cliente', 'attesa_si', 'pubblicazione', 'verifica'].includes(mission.status))) { await save(null); continue; }
+      const step = nextStep(entry);
+      if (!step || step === 'pronta') {
+        await save(null);
+        const brief = await missions.entrustBrief(db, env, draft.id);
+        const venue = (() => { try { return JSON.parse(draft.menu_json).nome; } catch { return ''; } })() || 'la pratica';
+        const done = (entry.log || []).length ? `Ho preparato da solo:\n${entry.log.map((line) => `• ${line}`).join('\n')}\n\n` : '';
+        const ask = (brief.buttons || []).some(([, data]) => String(data).startsWith('aff:')) ? `Anteprima pronta per «${venue}»: la mando al locale?` : `«${venue}»: ho preparato tutto quello che potevo, ma l’anteprima non può ancora partire.`;
+        const text = `${ask}\n\n${done}${brief.text}`;
+        await missions.ping(db, env, text, brief.buttons || null, 'importante', draft.request_id).catch(() => null);
+        sent.push({ draftId, text, buttons: brief.buttons || null });
+        continue;
+      }
+      try {
+        const out = await prepStep(db, env, draft, step, entry);
+        const next = { ...entry, log: [...(entry.log || []), ...(out.note ? [out.note] : [])].slice(-12) };
+        if (out.again) next.rounds = (entry.rounds || 0) + 1;
+        else { next.done = [...(entry.done || []), step]; next.rounds = 0; next.tries = 0; }
+        await save(next);
+      } catch (error) {
+        const tries = (entry.tries || 0) + 1;
+        const giveUp = tries >= MAX_TRIES;
+        await save({ ...entry, tries: giveUp ? 0 : tries, rounds: giveUp ? 0 : entry.rounds, done: giveUp ? [...(entry.done || []), step] : entry.done,
+          log: giveUp ? [...(entry.log || []), `${PREP_STEPS[step].toLowerCase()}: non riuscito (${String(error?.message || 'errore').slice(0, 120)})`].slice(-12) : entry.log });
+        break; // servizio lento o fuori uso: si riprova al prossimo giro
+      }
+    }
+  } finally { try { await db.prepare("UPDATE jarvis_settings SET value='',updated_at=? WHERE key='prep_lock'").bind(new Date().toISOString()).run(); } catch { /* scade da solo */ } }
+  return sent;
 }
 
 export async function state(db, env = {}) {
@@ -755,7 +901,7 @@ async function action(db, type, input, env = {}) {
       creative = { brief, directions, lines: briefLines(brief) };
       extraction.warnings.push(`Premium su misura: ${directions.length} direzioni grafiche pronte (${directions.map((d) => d.label).join(', ')}); nella bozza c’è «${directions[0].label}» (${directions[0].why}). Confrontale in Revisione: la grafica va approvata da te prima della pubblicazione.`);
       const extra = brief.lingue.filter((code) => code !== 'en');
-      if (extra.length) extraction.warnings.push(`Lingue richieste oltre all’inglese: ${extra.join(', ')}. Per ora Jarvis traduce solo in inglese: le altre restano da preparare (bozza da verificare) prima di aggiungerle al menu.`);
+      if (extra.length) extraction.warnings.push(`Lingue richieste oltre all’inglese: ${extra.join(', ')}. Jarvis le traduce subito dopo la bozza (testi da verificare, come l’inglese).`);
     }
     // Menu nuovo: Jarvis propone il tema grafico Standard (gli aggiornamenti mantengono quello online).
     if (!creative && !['aggiornamento', 'sostituzione'].includes(extraction.mode) && !extraction.menu.tema) {
@@ -964,22 +1110,25 @@ async function action(db, type, input, env = {}) {
     assert(Number.isInteger(revision) && revision === draft.revision, 'Bozza modificata da un’altra sessione. Ricarica.', 409);
     assert(['bozza', 'revisione', 'pronta_pr'].includes(draft.status), 'Bozza già chiusa: apri una nuova pratica.', 409);
     assert(autoTranslationReady(env), 'Traduzione automatica non disponibile in questo ambiente.', 503);
+    // Inglese di base; tedesco, sloveno, francese e spagnolo per le lingue chieste dal locale (Premium).
+    const lang = p.lang === undefined ? 'en' : String(p.lang);
+    assert(TRANSLATION_LANGS[lang], 'Lingua non disponibile: inglese, tedesco, sloveno, francese o spagnolo.', 422);
     const menu = JSON.parse(draft.menu_json);
-    assert(translationEntries(menu, 'en').length, 'Tutti i testi hanno già l’inglese: niente da tradurre.', 422);
+    assert(translationEntries(menu, lang).length, lang === 'en' ? 'Tutti i testi hanno già l’inglese: niente da tradurre.' : 'Tutti i testi sono già tradotti in questa lingua.', 422);
     const linkedRequest = await getOne(db, 'SELECT revision FROM requests WHERE id=?', draft.request_id);
-    const translation = await translateMenu(env.AI, menu, { lang: 'en', gemini: await geminiConfig(db, env) });
+    const translation = await translateMenu(env.AI, menu, { lang, gemini: await geminiConfig(db, env) });
     assert(!translation.unavailable, 'Servizio di traduzione non disponibile in questo momento: riprova tra poco.', 502);
     assert(translation.translated > 0, `Nessuna traduzione accettata: ${translationSummary(translation)}`, 422);
     const validation = validateMenu(translation.menu);
     assert(!validation.errors.length, `Menù non valido dopo la traduzione: ${validation.errors.slice(0, 3).join(' ')}`);
-    const previous = parseList(draft.provenance_json).filter((entry) => !String(entry.path).endsWith('.en'));
-    const provenance = [...previous, ...translation.provenance, ...parseList(draft.provenance_json).filter((entry) => String(entry.path).endsWith('.en'))];
+    const previous = parseList(draft.provenance_json).filter((entry) => !String(entry.path).endsWith(`.${lang}`));
+    const provenance = [...previous, ...translation.provenance, ...parseList(draft.provenance_json).filter((entry) => String(entry.path).endsWith(`.${lang}`))];
     const menuJson = JSON.stringify(translation.menu), timestamp = now();
     const saved = await auditedBatch(db, [
       db.prepare("UPDATE drafts SET menu_json=?,checks_json=?,provenance_json=?,status='revisione',revision=revision+1,updated_at=? WHERE id=? AND revision=? AND EXISTS (SELECT 1 FROM requests WHERE requests.id=? AND requests.revision=?)")
         .bind(menuJson, JSON.stringify(checksDefault()), JSON.stringify(provenance), timestamp, id, revision, draft.request_id, linkedRequest.revision),
       db.prepare('INSERT INTO draft_versions (id,draft_id,revision,menu_json,actor,created_at) SELECT ?,id,?,?,?,? FROM drafts WHERE id=? AND revision=?')
-        .bind(uid(), revision + 1, menuJson, 'traduzione_jarvis', timestamp, id, revision + 1),
+        .bind(uid(), revision + 1, menuJson, lang === 'en' ? 'traduzione_jarvis' : `traduzione_jarvis_${lang}`, timestamp, id, revision + 1),
       db.prepare("UPDATE requests SET status='in_revisione',revision=revision+1,updated_at=? WHERE id=? AND revision=? AND EXISTS (SELECT 1 FROM drafts WHERE drafts.id=? AND drafts.revision=? AND drafts.status='revisione')")
         .bind(timestamp, draft.request_id, linkedRequest.revision, id, revision + 1)
     ], 'draft.translate', translationSummary(translation), draft.request_id,
@@ -1023,7 +1172,7 @@ async function action(db, type, input, env = {}) {
           'draft.schede_discard', `Schede scartate: ${chosen.map((x) => x.name).join(', ').slice(0, 300)}.`, draft.request_id, { sql: 'SELECT 1 FROM drafts WHERE id=?', args: [id] });
         result = { id, discarded: chosen.length };
       } else {
-        const done = applySchede(menu, chosen);
+        const done = applySchede(menu, chosen, db.actor === 'jarvis' ? SCHEDE_AUTO_SOURCE : undefined);
         assert(done.applied.length, 'Le voci di queste schede non ci sono più nella bozza.', 409);
         const validation = validateMenu(done.menu);
         assert(!validation.errors.length, `Menù non valido con queste schede: ${validation.errors.slice(0, 3).join(' ')}`);
@@ -1036,7 +1185,7 @@ async function action(db, type, input, env = {}) {
             .bind(uid(), revision + 1, menuJson, 'schede_jarvis', timestamp, id, revision + 1),
           db.prepare("UPDATE requests SET status='in_revisione',revision=revision+1,updated_at=? WHERE id=? AND revision=? AND EXISTS (SELECT 1 FROM drafts WHERE drafts.id=? AND drafts.revision=? AND drafts.status='revisione')")
             .bind(timestamp, draft.request_id, linkedRequest.revision, id, revision + 1)
-        ], 'draft.schede_apply', `Schede approvate da Riccardo: ${done.applied.length} (${done.applied.join(', ').slice(0, 300)})${done.lost.length ? `; ${done.lost.length} voci non più nella bozza` : ''}.`, draft.request_id,
+        ], 'draft.schede_apply', `${db.actor === 'jarvis' ? 'Schede messe in bozza da Jarvis (preparazione automatica, da approvare con l’anteprima)' : 'Schede approvate da Riccardo'}: ${done.applied.length} (${done.applied.join(', ').slice(0, 300)})${done.lost.length ? `; ${done.lost.length} voci non più nella bozza` : ''}.`, draft.request_id,
           { sql: 'SELECT 1 FROM draft_versions WHERE draft_id=? AND revision=?', args: [id, revision + 1] });
         assert(saved.every((entry) => entry.meta.changes === 1), 'Bozza o pratica modificata da un’altra sessione. Ricarica.', 409);
         result = { id, applied: done.applied.length, lost: done.lost, validation };
@@ -1083,7 +1232,8 @@ async function action(db, type, input, env = {}) {
     await db.prepare('UPDATE drafts SET creative_json=? WHERE id=?').bind(JSON.stringify(next), id).run();
     result = { id, found: outcomes.filter((o) => o.found).length, outcomes, remaining: Math.max(0, all.length - round.length) };
   } else if (type === 'entrustToJarvis') {
-    result = await missions.entrust(db, env, p);
+    // L'approvazione creativa «col tocco» vale solo dal riepilogo su Telegram, non da qui.
+    result = await missions.entrust(db, env, { ...p, creativeEvidence: undefined });
   } else if (type === 'jarvisTick') {
     result = { done: await missions.tick(db, env) };
   } else if (type === 'jarvisDecide') {
@@ -1593,7 +1743,8 @@ async function action(db, type, input, env = {}) {
     // Foto per il menu: Riccardo conferma il posto proposto da Jarvis (o ne sceglie un altro), la
     // toglie o la scarta. Solo lui: Jarvis propone e basta. La foto ridotta è già stata caricata
     // dal telefono (POST media/<id>); qui si scrive nella bozza, con revisione e audit.
-    assert(db.actor !== 'jarvis', 'Solo Riccardo conferma le foto del menu.', 403);
+    // Jarvis le mette da solo solo nella preparazione automatica (p.auto): Riccardo le approva col SÌ all'anteprima.
+    assert(db.actor !== 'jarvis' || p.auto === true, 'Solo Riccardo conferma le foto del menu.', 403);
     const media = await getOne(db, 'SELECT * FROM media_items WHERE id=?', identifier(p.mediaId));
     assert(media, 'Foto non trovata.', 404);
     const draft = await getOne(db, 'SELECT * FROM drafts WHERE request_id=?', media.request_id);
@@ -1635,12 +1786,12 @@ async function action(db, type, input, env = {}) {
       writes.push(db.prepare('UPDATE drafts SET menu_json=?,provenance_json=?,revision=revision+1,updated_at=? WHERE id=? AND revision=?')
         .bind(menuJson, JSON.stringify(keepProvenance(parseList(draft.provenance_json), menu)), timestamp, draft.id, revision),
       db.prepare('INSERT INTO draft_versions (id,draft_id,revision,menu_json,actor,created_at) SELECT ?,id,?,?,?,? FROM drafts WHERE id=? AND revision=?')
-        .bind(uid(), revision + 1, menuJson, 'owner_foto', timestamp, draft.id, revision + 1));
+        .bind(uid(), revision + 1, menuJson, db.actor === 'jarvis' ? 'jarvis_foto' : 'owner_foto', timestamp, draft.id, revision + 1));
     }
     writes.push(db.prepare('UPDATE media_items SET status=?,target=?,target_name=?,with_label=?,updated_at=? WHERE id=?')
       .bind(status, target, target && target.startsWith('voce:') ? (targetLabel(menu, target).split(' › ').pop() || null) : null, media._withLabel ? 1 : 0, timestamp, media.id));
     for (const o of media._displaced || []) writes.push(db.prepare("UPDATE media_items SET status='proposta',target=NULL,target_name=NULL,updated_at=? WHERE id=?").bind(timestamp, o.id));
-    await auditedBatch(db, writes, type === 'mediaPlace' ? 'media.place' : 'media.remove', summary, media.request_id);
+    await auditedBatch(db, writes, type === 'mediaPlace' ? 'media.place' : 'media.remove', db.actor === 'jarvis' ? `Jarvis (preparazione automatica): ${summary}` : summary, media.request_id);
     result = { id: media.id, status, target };
   } else if (type === 'addVenueNote') {
     const clientId = identifier(p.clientId);

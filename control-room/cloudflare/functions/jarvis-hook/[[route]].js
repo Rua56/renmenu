@@ -3,7 +3,7 @@
 // - /jarvis-hook/tick: l'orologio (Worker con cron) con il segreto JARVIS_CLOCK_SECRET;
 // - /jarvis-hook/mail-in: le email di menu@renmenu.com dal Worker email, con il segreto degli allegati.
 // Nessun dato viene restituito: solo esiti sintetici.
-import { geminiConfig, linkPendingMailFiles, missions, readPendingMaterials, receivePendingMail, runAutopilot } from '../control-room/api/[[route]].js';
+import { autoPrepareTick, geminiConfig, linkPendingMailFiles, missions, readPendingMaterials, receivePendingMail, runAutopilot } from '../control-room/api/[[route]].js';
 import { sameSecret } from '../_lib/telegram.js';
 import { chat } from '../_lib/voice.js';
 import { serveMedia } from '../_lib/public-media.js';
@@ -117,7 +117,7 @@ export async function onRequest(context) {
         const weak = outcome?.weak ? ` Però le due letture concordano solo su ${outcome.weak.sure} voci e ${outcome.weak.unsure} righe restano in dubbio: NON preparo la bozza, verrebbe un menu a metà.${outcome.weak.sections ? ` Le parti meno sicure: ${outcome.weak.sections}; rimandami soprattutto quelle, ritagliate e ingrandite.` : ''} Mandami il menu in 2-3 screenshot (una parte per foto, testo grande) oppure come File (graffetta → File); se vuoi procedere lo stesso, in Revisione tocca «Rifai la bozza».` : '';
         const kept = outcome?.draftKept ? ' Attenzione: c’è già una bozza che hai modificato o affidato, quindi NON l’ho cambiata e questi file non sono dentro. Se vuoi includerli: Revisione → «Rifai la bozza con tutti i materiali».' : '';
         const text = !outcome?.ok ? `Non sono riuscito a leggere «${material.filename}»: ${outcome?.reason || 'errore'}.`
-          : `${head}${many ? '' : `. ${outcome.warnings?.[0] || ''}`}${kept}${weak}${outcome.drafted ? ` Bozza pronta con tutti i file della pratica: controllala in Revisione, confrontando i prezzi con le foto.${outcome.notesText ? `\n\n${outcome.notesText}` : ''}` : outcome.draftError ? ` Bozza non generata: ${outcome.draftError}` : ''}`;
+          : `${head}${many ? '' : `. ${outcome.warnings?.[0] || ''}`}${kept}${weak}${outcome.drafted ? ` Bozza pronta con tutti i file della pratica.${outcome.prep ? ' Ora preparo da solo il resto e poi ti chiedo solo se mandare l’anteprima al locale.' : ' Controllala in Revisione, confrontando i prezzi con le foto.'}${outcome.notesText ? `\n\n${outcome.notesText}` : ''}` : outcome.draftError ? ` Bozza non generata: ${outcome.draftError}` : ''}`;
         const checks = outcome?.checks ? `\n\nVoci sicure: ${outcome.checks.sure}. Mi restano ${outcome.checks.count} dubbi sui prezzi: te li chiedo uno alla volta qui sotto, tu guarda il menu e tocca il prezzo giusto. Dopo l'ultimo preparo la bozza.` : '';
         await missions.notify(env.DB, env, material.request_id, outcome?.ok ? 'foto letta' : 'foto non leggibile', `${text}${checks}`);
         if (outcome?.checks) await missions.startChecks(env.DB, env, material.request_id).catch(() => 0);
@@ -125,7 +125,9 @@ export async function onRequest(context) {
       await missions.draftAfterChecks(env.DB, env).catch(() => null);
       await missions.translateAfterEdit(env.DB, env).catch(() => null);
       const drafted = await runAutopilot(env.DB, env);
-      for (const entry of drafted) await missions.ping(env.DB, env, entry.message, entry.buttons || null, entry.outcome === 'bozza' ? 'importante' : 'normale').catch(() => null);
+      for (const entry of drafted) await missions.ping(env.DB, env, entry.message, entry.buttons || null, entry.outcome === 'bozza' && !entry.prep ? 'importante' : 'normale').catch(() => null);
+      // Bozze fatte da Jarvis: lingue, schede e foto, poi una sola domanda a Riccardo («la mando al locale?»).
+      await autoPrepareTick(env.DB, env).catch(() => null);
       const done = await missions.tick(env.DB, env);
       await missions.watchTick(env.DB, env).catch(() => null);
       const briefed = await missions.briefing(env.DB, env).catch(() => null);

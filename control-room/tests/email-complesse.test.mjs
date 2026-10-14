@@ -169,7 +169,7 @@ test('Premium: riferimento, storia, galleria, schede vini, dicitura e acconto fi
   assert.equal(brief.preventivo.acconto, true);
   assert.equal(brief.preventivo.quando, 'questa settimana');
   const hints = briefNotes(brief).map((n) => n.hint).join(' | ');
-  assert.match(hints, /solo l’inglese/);
+  assert.match(hints, /traduce da solo anche/);
   assert.match(hints, /non scrivo la storia da solo/i);
   assert.match(hints, /non l’ho inserita/);
   assert.match(hints, /totale lo decidi tu/);
