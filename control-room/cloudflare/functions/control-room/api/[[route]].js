@@ -205,7 +205,7 @@ async function discardUntouchedJarvisDraft(db, requestId) {
 }
 export async function readPendingMaterials(db, env = {}, { calmMs = 40_000 } = {}) {
   // Album da Telegram (più foto insieme): arrivano una alla volta in pochi secondi. Jarvis aspetta
-  // 40 secondi di calma sulla pratica, così le legge tutte (una per giro) e fa UNA bozza con tutte.
+  // 40 secondi di calma sulla pratica, così le legge tutte (fino a 3 per giro) e fa UNA bozza con tutte.
   const calm = new Date(Date.now() - calmMs).toISOString();
   // Un giro alla volta: l'orologio bussa ogni minuto, ma una lettura può durare 2-3 minuti. Senza questo
   // blocco due giri leggevano la stessa foto in parallelo (doppio consumo e letture annullate).
@@ -228,22 +228,30 @@ export async function geminiConfig(db, env) {
     return key && models.length ? { key, models: [...new Set([...good, ...models, ...GEMINI_PREFERRED])] } : null;
   } catch { return null; }
 }
+const READ_BATCH = 3; // file letti insieme a ogni giro dell'orologio (2-3 richieste Gemini ciascuno: dentro la quota gratuita)
 async function readPendingInner(db, env, calm) {
   let pending = [];
   try { pending = await rows(db, "SELECT id,request_id,filename FROM materials WHERE processing_status='da_trascrivere' AND archived_at IS NULL AND (mime='application/pdf' OR mime IN ('image/jpeg','image/png','image/webp')) AND created_at>'2026-10-02T22:30' AND NOT EXISTS (SELECT 1 FROM materials n WHERE n.request_id=materials.request_id AND n.archived_at IS NULL AND n.created_at>?) ORDER BY created_at ASC LIMIT 12", calm); }
   catch { return []; }
   // Letture rimandate (Google lento): aspettano il loro turno senza bloccare le altre pratiche.
-  try { const waiting = JSON.parse(await missions.setting(db, 'read_retries') || '{}') || {}; pending = pending.filter((m) => !(waiting[m.id]?.next > new Date().toISOString())).slice(0, 1); } catch { pending = pending.slice(0, 1); }
-  const done = [];
-  for (const material of pending) {
+  try { const waiting = JSON.parse(await missions.setting(db, 'read_retries') || '{}') || {}; pending = pending.filter((m) => !(waiting[m.id]?.next > new Date().toISOString())).slice(0, READ_BATCH); } catch { pending = pending.slice(0, READ_BATCH); }
+  // Fino a 3 file per giro, letti insieme (ognuno con le sue due o tre letture, come prima): un album di 3 foto
+  // è pronto in un giro invece che in tre. Poi la bozza si prepara una volta sola, dopo che sono stati letti tutti.
+  const reads = await Promise.all(pending.map((material) => action(asJarvis(db), 'readMaterial', { materialId: material.id, allowDefer: true }, env)
+    .then((r) => ({ material, outcome: r.result }), (error) => ({ material, error }))));
+  const done = [], handled = new Set();
+  for (const { material, outcome, error } of reads) {
     const jarvis = asJarvis(db);
     try {
-      const outcome = (await action(jarvis, 'readMaterial', { materialId: material.id, allowDefer: true }, env)).result;
+      if (error) throw error;
       if (outcome.deferred) { done.push({ material, outcome }); continue; }
+      // Più foto della stessa pratica in questo giro: la bozza e il riepilogo li fa la prima, le altre aspettano con lei.
+      if (outcome.ok && handled.has(material.request_id)) { outcome.waiting = true; done.push({ material, outcome }); continue; }
       // Pratica già classificata e senza bozza (es. foto aggiunta da Telegram): Jarvis prepara la bozza.
       const request = await getOne(db, 'SELECT id,category,plan,kind,subject FROM requests WHERE id=?', material.request_id);
       const stillUnread = await getOne(db, "SELECT id FROM materials WHERE request_id=? AND processing_status='da_trascrivere' AND archived_at IS NULL", material.request_id);
       if (stillUnread) { outcome.waiting = true; done.push({ material, request, outcome }); continue; } // bozza dopo l'ultima foto
+      handled.add(material.request_id);
       // Riepilogo di TUTTI i file della pratica (album da Telegram): un messaggio solo, foto per foto.
       try {
         const files = await rows(db, "SELECT m.filename, m.processing_status AS st, m.text_preview AS tp, a.warnings_json AS w FROM materials m LEFT JOIN material_analyses a ON a.material_id=m.id WHERE m.request_id=? AND m.archived_at IS NULL AND m.processing_status IN ('letto_da_jarvis','non_leggibile','foto_per_il_menu') ORDER BY m.created_at ASC", material.request_id);
@@ -1685,6 +1693,8 @@ async function action(db, type, input, env = {}) {
     }
     if (read.retryLater) {
       const minutes = RETRY_MINUTES[tries];
+      // Si rilegge subito prima di scrivere: altre foto lette nello stesso giro aggiornano lo stesso elenco.
+      try { retries = JSON.parse(await missions.setting(db, 'read_retries') || '{}') || {}; } catch { retries = {}; }
       retries[materialId] = { n: tries + 1, next: new Date(Date.now() + minutes * 60_000).toISOString() };
       await missions.putSetting(db, 'read_retries', JSON.stringify(retries));
       await auditedBatch(db, [], 'material.read.deferred', `Google non risponde: rileggo «${material.filename}» tra ${minutes} minuti (tentativo ${tries + 1} di ${RETRY_MINUTES.length}).`.slice(0, 600), request.id);
@@ -1694,7 +1704,7 @@ async function action(db, type, input, env = {}) {
       const worked = [...new Set(read.models.filter((m) => String(m).startsWith('gemini')))].slice(0, 3);
       if (worked.length) await missions.putSetting(db, 'gemini_good', JSON.stringify(worked)).catch(() => {});
     }
-    if (tries) { delete retries[materialId]; await missions.putSetting(db, 'read_retries', JSON.stringify(retries)).catch(() => {}); }
+    if (tries) { try { retries = JSON.parse(await missions.setting(db, 'read_retries') || '{}') || {}; } catch { retries = {}; } delete retries[materialId]; await missions.putSetting(db, 'read_retries', JSON.stringify(retries)).catch(() => {}); }
     // Contatore delle letture del giorno (per «stato» e la quota gratuita): resta anche se la pratica viene eliminata.
     if (material.mime !== 'application/pdf') {
       try {

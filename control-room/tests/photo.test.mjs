@@ -120,12 +120,12 @@ describe('Foto del menu nella pratica', () => {
         .bind(id, requestId, key, `${id}.jpg`, 'image/jpeg', 4, 'telegram', 'da_trascrivere', null, at).run();
       await add('p1', 'k1', '2026-10-03T00:01:00Z'); await add('p2', 'k2', '2026-10-03T00:02:00Z');
       const pages = { k1: '# Antipasti\nFrico con polenta — 12', k2: '# Dolci\nGubana — 5', k3: '# Vini\nRibolla gialla — 6' };
-      let current = 'k1';
-      const env = testEnv(db, { BUCKET: { get: async (k) => { current = k; return store.has(k) ? { arrayBuffer: async () => store.get(k).buffer } : null; } }, AI: { run: async () => ({ response: pages[current] }) }, TRANSLATION_PROVIDER: 'disabled' });
+      // Le foto si leggono insieme: il modello finto risponde in base all'immagine che riceve.
+      const which = (input) => [...store.keys()].find((k) => JSON.stringify(input).includes(Buffer.from(store.get(k)).toString('base64')));
+      const env = testEnv(db, { BUCKET: { get: async (k) => (store.has(k) ? { arrayBuffer: async () => store.get(k).buffer } : null) }, AI: { run: async (model, input) => ({ response: pages[which(input)] }) }, TRANSLATION_PROVIDER: 'disabled' });
       const first = await readPendingMaterials(db, env);
-      assert.equal(first[0].outcome.waiting, true, JSON.stringify(first));
-      assert.equal(await db.prepare('SELECT id FROM drafts WHERE request_id=?').bind(requestId).first(), null, 'aspetta la seconda foto');
-      assert.equal((await readPendingMaterials(db, env))[0].outcome.drafted, true);
+      assert.deepEqual(first.map((r) => [r.material.id, Boolean(r.outcome.drafted), Boolean(r.outcome.waiting)]), [['p1', true, false], ['p2', false, true]], 'due foto lette nello stesso giro, una bozza sola');
+      assert.equal(first[0].outcome.files.length, 2);
       const names = async () => JSON.parse((await db.prepare('SELECT menu_json FROM drafts WHERE request_id=?').bind(requestId).first()).menu_json).sezioni.flatMap((s) => s.voci.map((v) => v.nome.it));
       assert.deepEqual(await names(), ['Frico con polenta', 'Gubana']);
       await add('p3', 'k3', '2026-10-03T00:05:00Z');
@@ -167,7 +167,7 @@ describe('Foto del menu nella pratica', () => {
     } finally { db.close(); }
   });
 
-  it('album di 4 foto da Telegram: lette una alla volta, una bozza sola con TUTTE le voci (anche con nomi e descrizioni scambiati)', async () => {
+  it('album di 4 foto da Telegram: lette 3 per giro, una bozza sola con TUTTE le voci (anche con nomi e descrizioni scambiati)', async () => {
     const db = database();
     try {
       await db.prepare("INSERT INTO clients (id,name,plan,internal_notes,revision,created_at,updated_at) VALUES ('c4','Il Culo di Alex','da_definire','',1,'2026-10-03','2026-10-03')").bind().run();
@@ -181,19 +181,19 @@ describe('Foto del menu nella pratica', () => {
         a3: ['# Secondi\nGuancia di manzo — 22', '# SECONDI\nGuancia di manzo — 22'],
         a4: ['# Vini bianchi\nRibolla Gialla — calice 5 / bottiglia 40\nFriulano — calice 6 / bottiglia 32', '# VINI BIANCHI\nRibolla Gialla — calice 5 / bottiglia 40\nFriulano — calice 6 / bottiglia 32']
       };
-      let current = 'a1';
-      const env = testEnv(db, { BUCKET: { get: async (k) => { current = k; return { arrayBuffer: async () => store.get(k).buffer }; } },
-        AI: { run: async (model) => ({ response: pages[current][model.includes('mistral') ? 1 : 0] }) }, TRANSLATION_PROVIDER: 'disabled' });
+      const which = (input) => keys.find((k) => JSON.stringify(input).includes(Buffer.from(store.get(k)).toString('base64')));
+      const env = testEnv(db, { BUCKET: { get: async (k) => ({ arrayBuffer: async () => store.get(k).buffer }) },
+        AI: { run: async (model, input) => ({ response: pages[which(input)][model.includes('mistral') ? 1 : 0] }) }, TRANSLATION_PROVIDER: 'disabled' });
       const stamp = new Date().toISOString();
       for (const [i, k] of keys.entries()) await db.prepare("INSERT INTO materials (id,request_id,r2_key,filename,mime,size,source,processing_status,text_preview,created_at) VALUES (?,?,?,?,?,?,?,?,?,?)")
         .bind(`m${i + 1}`, requestId, k, `foto-${i + 1}.jpg`, 'image/jpeg', 4, 'telegram', 'da_trascrivere', null, stamp.replace(/\.\d+Z$/, `.${String(i).padStart(3, '0')}Z`)).run();
       assert.deepEqual(await readPendingMaterials(db, env), [], 'album appena arrivato: aspetta');
-      const rounds = [];
-      for (let i = 0; i < 4; i += 1) rounds.push((await readPendingMaterials(db, env, { calmMs: 0 }))[0]);
-      assert.deepEqual(rounds.map((r) => r.material.filename), ['foto-1.jpg', 'foto-2.jpg', 'foto-3.jpg', 'foto-4.jpg'], 'una foto per giro, in ordine');
+      const rounds = [...await readPendingMaterials(db, env, { calmMs: 0 }), ...await readPendingMaterials(db, env, { calmMs: 0 })];
+      assert.deepEqual(rounds.map((r) => r.material.filename), ['foto-1.jpg', 'foto-2.jpg', 'foto-3.jpg', 'foto-4.jpg'], 'tre foto nel primo giro, la quarta nel secondo, in ordine');
       assert.deepEqual(rounds.map((r) => Boolean(r.outcome.waiting)), [true, true, true, false]);
       assert.equal(rounds[3].outcome.drafted, true);
       assert.equal(rounds[3].outcome.files.length, 4, 'riepilogo di tutte e 4 le foto in un solo messaggio');
+      assert.deepEqual(await readPendingMaterials(db, env, { calmMs: 0 }), []);
       const menu = JSON.parse((await db.prepare('SELECT menu_json FROM drafts WHERE request_id=?').bind(requestId).first()).menu_json);
       const voci = menu.sezioni.flatMap((s) => s.voci);
       assert.deepEqual(voci.map((v) => v.nome.it), ['Salmone e Barbabietola', 'Tagliolini al ragù bianco', 'Guancia di manzo', 'Ribolla Gialla', 'Friulano']);
