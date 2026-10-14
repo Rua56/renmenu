@@ -67,3 +67,11 @@ test('traduzione in tedesco e sloveno: stesse regole dell’inglese, nessun nume
   assert.ok(out.provenance.every((e) => e.path.endsWith('.de') && e.status === 'da_verificare'));
   assert.match(translationSummary(out), /^Tedesco preparato da Jarvis/);
 });
+
+test('due giri dell’orologio sovrapposti: l’autopilota gira una volta sola (niente proposta doppia)', async () => {
+  const { runAutopilot } = await import('../cloudflare/functions/control-room/api/[[route]].js');
+  const seen = [];
+  const busy = { prepare: (sql) => ({ bind: () => ({ run: async () => { seen.push(sql); return { meta: { changes: 0 } }; }, all: async () => { throw new Error('non deve leggere le pratiche'); }, first: async () => null }) }) };
+  assert.deepEqual(await runAutopilot(busy, {}), []);
+  assert.ok(seen.some((sql) => /autopilot_lock/.test(sql)));
+});

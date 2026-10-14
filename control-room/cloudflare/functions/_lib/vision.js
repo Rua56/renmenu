@@ -328,6 +328,20 @@ function parse(text) {
 }
 // Compatibilità con i test e con la diagnosi: le voci con prezzo di una lettura.
 export function readingItems(text) { return parse(text).items.filter((i) => !i.course); }
+// Lettura «inventata» (prove del 14 ottobre: foto di piatti lette dai modelli di riserva): il modello ripete
+// l'esempio delle istruzioni («# Mescita — by the glass», tutti i vini a «calice 5 / bottiglia 40») o gira in
+// tondo ripetendo le stesse righe. Non è una trascrizione: va scartata, non messa tra i dubbi.
+export function echoReading(text) {
+  const rows = String(text || '').split(/\r?\n/).map((r) => r.trim()).filter(Boolean);
+  if (rows.length >= 12 && new Set(rows).size / rows.length < 0.6) return true;
+  if (!rows.some((r) => /^#{1,3}\s*mescita\s*[—–-]\s*by the glass\s*$/i.test(r))) return false;
+  const items = readingItems(text);
+  if (items.length < 4) return false;
+  const prices = items.map((i) => JSON.stringify(i.prezzi || i.prezzo || ''));
+  const top = Math.max(...[...new Set(prices)].map((v) => prices.filter((x) => x === v).length));
+  return top / items.length >= 0.6;
+}
+const usable = (text) => Boolean(text && readingItems(text).length && !echoReading(text));
 
 /**
  * Combina due letture indipendenti. Restituisce il testo da usare come fonte, in formato canonico:
@@ -507,7 +521,7 @@ export async function readMenuPhoto(ai, bytes, mime, { timeoutMs = 110_000, gemi
   const geminiRead = async () => {
     while (chain.length) {
       const model = chain.shift();
-      try { const text = await gm(model).run(); if (text && readingItems(text).length) return { text, model }; notes.push(`${model}: lettura senza voci`); }
+      try { const text = await gm(model).run(); if (usable(text)) return { text, model }; notes.push(`${model}: ${text && echoReading(text) ? 'lettura scartata (ripete l’esempio o le stesse righe)' : 'lettura senza voci'}`); }
       catch (error) { notes.push(`${model}: ${String(error?.message || 'errore').slice(0, 120)}`); }
     }
     throw new Error('Gemini non disponibile');
@@ -520,20 +534,26 @@ export async function readMenuPhoto(ai, bytes, mime, { timeoutMs = 110_000, gemi
   const texts = reads.map((r, i) => { if (r.status !== 'fulfilled') notes.push(`${primary[i].label}: ${String(r.reason?.message || 'errore').slice(0, 120)}`); return r.status === 'fulfilled' ? r.value : ''; });
   // Google sovraccarico o lento: meglio riprovare tra qualche minuto con Gemini che ripiegare subito su modelli più deboli.
   const geminiStats = { requests: primary.length, failed: texts.filter((t) => !t).length, errors: notes.filter((n) => TRANSIENT_GEMINI.test(n)).slice(0, 4) };
-  if (deferOnTransient && geminiReady && texts.some((t) => !t || !readingItems(t).length) && notes.some((n) => TRANSIENT_GEMINI.test(n))) {
+  if (deferOnTransient && geminiReady && texts.some((t) => !usable(t)) && notes.some((n) => TRANSIENT_GEMINI.test(n))) {
     return { ok: false, retryLater: true, reason: 'Google non risponde adesso', geminiStats, raw: notes.map((n) => `[nota] ${n}`) };
   }
   // Una lettura mancata (quota Gemini finita, errore): la sostituisce un modello di riserva.
   let fallbackUsed = false;
   for (let i = 0; i < texts.length; i += 1) {
-    if (texts[i] && readingItems(texts[i]).length) continue;
+    if (usable(texts[i])) continue;
     const next = spare.shift();
     if (!next) break;
     try { texts[i] = await next.run(); used[i] = next.label; fallbackUsed = Boolean(texts[i]); } catch (error) { notes.push(`${next.label}: ${String(error?.message || 'errore').slice(0, 120)}`); }
   }
+  const echoed = texts.filter((t) => t && readingItems(t).length && echoReading(t)).length;
+  if (echoed) notes.push(`${echoed} letture scartate: ripetevano l’esempio delle istruzioni o le stesse righe (non è una trascrizione)`);
   // La lettura più completa fa da base (ordine e sezioni del menu), l'altra conferma.
-  const good = texts.filter((t) => t && readingItems(t).length).sort((a, b) => readingItems(b).length - readingItems(a).length);
-  if (!good.length) return { ok: false, geminiStats, reason: 'non riesco a leggere piatti e prezzi in questa foto: prova con una foto più nitida, dritta e senza riflessi', raw: [...texts, ...notes.map((n) => `[nota] ${n}`)] };
+  const good = texts.filter(usable).sort((a, b) => readingItems(b).length - readingItems(a).length);
+  if (!good.length) {
+    // Solo letture inventate: probabilmente non è una pagina di menu (es. la foto di un piatto).
+    if (echoed) return { ok: false, notMenu: true, geminiStats, reason: 'in questa foto non vedo un menu da trascrivere (sembra la foto di un piatto o del locale)', raw: [...texts, ...notes.map((n) => `[nota] ${n}`)] };
+    return { ok: false, geminiStats, reason: 'non riesco a leggere piatti e prezzi in questa foto: prova con una foto più nitida, dritta e senza riflessi', raw: [...texts, ...notes.map((n) => `[nota] ${n}`)] };
+  }
   let combined = combineReadings(good[0], good[1]);
   // Foto piccola (es. 681×481 presa da un sito): i numeri si confondono (5 e 6), quindi legge sempre anche il terzo
   // modello e un prezzo entra solo se nessuna lettura lo contraddice.
@@ -546,7 +566,7 @@ export async function readMenuPhoto(ai, bytes, mime, { timeoutMs = 110_000, gemi
   const arbiter = small && geminiReady && chain.length ? { label: 'gemini', run: async function run() { const r = await geminiRead(); this.label = r.model; return r.text; } } : spare.shift();
   if (good.length === 2 && arbiter && (small || (combined.doubts >= (geminiReady ? 1 : 10) && combined.agreed < (geminiReady ? 1 : 0.8) * readingItems(good[0]).length))) {
     try { thirdText = await arbiter.run(); used.push(arbiter.label); } catch (error) { thirdText = ''; texts.push(`[terza lettura non riuscita] ${String(error?.message || 'errore').slice(0, 200)}`); }
-    if (thirdText && readingItems(thirdText).length) combined = combineReadings(good[0], good[1], thirdText, { strict: small });
+    if (usable(thirdText)) combined = combineReadings(good[0], good[1], thirdText, { strict: small });
     else { texts.push(`[terza lettura senza voci] ${String(thirdText || '(vuota)').slice(0, 1500)}`); thirdText = ''; }
   }
   // Sezioni dove le letture non concordano: Jarvis chiede di rimandare solo quelle.

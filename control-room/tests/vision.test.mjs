@@ -1,6 +1,6 @@
 import { describe, it } from 'node:test';
 import assert from 'node:assert/strict';
-import { combineReadings, readMenuPhoto, readMenuPdf, tidyReading } from '../cloudflare/functions/_lib/vision.js';
+import { combineReadings, echoReading, readMenuPhoto, readMenuPdf, tidyReading } from '../cloudflare/functions/_lib/vision.js';
 import { extractMenuFromText } from '../cloudflare/functions/_lib/menu.js';
 
 const A = '# Primi\nGnocchi di susine — 12\nBlecs al ragù — 11\n# Dolci\nStrudel di mele — 6\nGubana — 5';
@@ -53,6 +53,19 @@ describe('Lettura delle foto: due letture, entrano solo le voci concordi', () =>
     assert.match(r.text, /^Piatto numero 1 — 5,00$/m);
     assert.doesNotMatch(r.text, /^Piatto numero 12 — /m, 'prezzo letto diverso da tutte e tre: resta in dubbio');
     assert.match(r.warnings[0], /tre volte con tre modelli diversi: 10 voci concordi \(10 confermate dalla terza lettura\)/);
+  });
+  it('foto di un piatto: i modelli ripetono l’esempio delle istruzioni o girano in tondo → letture scartate, nessun dubbio inventato', async () => {
+    const echo = ['# Mescita — by the glass', '', ...['Prosecco', 'Pinot Grigio', 'Chardonnay', 'Pinot Nero', 'Merlot', 'Primitivo'].map((w) => `${w} — calice 5 / bottiglia 40`)].join('\n');
+    const loop = ['# Antipasti', ...Array.from({ length: 30 }, (_, i) => `Frico — ${i % 3 + 8}`)].join('\n');
+    assert.equal(echoReading(echo), true);
+    assert.equal(echoReading(loop), true);
+    // Una vera carta al calice con prezzi diversi resta una lettura buona.
+    const real = ['# Mescita — by the glass', 'Prosecco — calice 5 / bottiglia 28', 'Ribolla — calice 6 / bottiglia 30', 'Friulano — calice 5,5 / bottiglia 26', 'Refosco — calice 6 / bottiglia 32'].join('\n');
+    assert.equal(echoReading(real), false);
+    const r = await readMenuPhoto({ run: async (model) => ({ response: model.includes('llama') ? echo : loop }) }, new Uint8Array([255, 216, 255, 1, 2]), 'image/jpeg');
+    assert.equal(r.ok, false);
+    assert.equal(r.notMenu, true);
+    assert.match(r.reason, /non vedo un menu/);
   });
   it('rifiuta formati non leggibili e foto senza piatti', async () => {
     assert.equal((await readMenuPhoto({ run: async () => ({}) }, new Uint8Array(4), 'image/heic')).ok, false);

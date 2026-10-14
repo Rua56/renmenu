@@ -120,6 +120,25 @@ describe('Foto per il menu · proposte di posto', () => {
   });
 });
 
+describe('Foto per il menu · nome del file e foto in disaccordo (prova del 14 ottobre)', () => {
+  it('«dentice.jpg» vista come «frico»: propone il piatto del file ma non è sicura; foto non riconosciuta: solo dal nome del file', () => {
+    const menu = MENU();
+    menu.sezioni[0].voci.push({ nome: { it: 'Crema di dentice su crostini' }, prezzo: '13,00' });
+    const p = proposeTargets(menu, [row('dentice', 'piatto', { description: 'frico con polenta' }), row('tiramisu', 'altro'), row('IMG_1', 'altro')]);
+    assert.equal(p.get('dentice').target, 'voce:0:2');
+    assert.equal(p.get('dentice').sure, false);
+    assert.match(p.get('dentice').why, /nome del file indica «Crema di dentice su crostini», la foto sembra «Frico con polenta»/);
+    assert.equal(p.get('tiramisu').target, 'voce:0:1');
+    assert.equal(p.get('tiramisu').sure, false);
+    assert.equal(p.get('IMG_1').target, null);
+    // Nome del file e foto d'accordo (o nome generico): proposta sicura come prima.
+    const q = proposeTargets(menu, [row('frico', 'piatto', { description: 'frico con polenta' }), row('IMG_2', 'piatto', { description: 'tiramisù' })]);
+    assert.equal(q.get('frico').target, 'voce:0:0');
+    assert.equal(q.get('frico').sure, undefined);
+    assert.equal(q.get('IMG_2').target, 'voce:0:1');
+  });
+});
+
 describe('Foto per il menu · scrittura nella bozza', () => {
   const url = 'https://jarvis.example/media/' + 'a'.repeat(64) + '.jpg';
   it('foto + dati etichetta solo nei campi vuoti, galleria e logo; il menu resta valido', () => {
@@ -223,6 +242,23 @@ describe('Foto per il menu · flusso nella Control Room', () => {
     } finally { db.close(); }
   });
 
+  it('Premium: foto non riconosciuta e letture inventate («Mescita — by the glass») → foto per il menu, non un menu pieno di dubbi', async () => {
+    const db = await setup();
+    try {
+      await db.prepare("UPDATE materials SET filename='tiramisu.jpg' WHERE id='m1'").bind().run();
+      const echo = ['# Mescita — by the glass', ...['Prosecco', 'Pinot Grigio', 'Chardonnay', 'Pinot Nero', 'Merlot'].map((w) => `${w} — calice 5 / bottiglia 40`)].join('\n');
+      const ai = { run: async (model, payload) => ({ response: /oggetto JSON/.test(payload.messages[0].content[0].text) ? 'non so' : echo }) };
+      const read = await act(db, 'readMaterial', { materialId: 'm1' }, { BUCKET: bucket(new Map([['private/mail/x/1', JPEG]])), AI: ai });
+      assert.equal(read.status, 200, JSON.stringify(read.body));
+      assert.equal(read.body.result.media, true);
+      assert.equal((await db.prepare("SELECT processing_status AS s FROM materials WHERE id='m1'").bind().first()).s, 'foto_per_il_menu');
+      assert.equal(await db.prepare("SELECT 1 AS x FROM material_analyses WHERE material_id='m1'").bind().first(), null, 'nessuna lettura inventata salvata');
+      const media = read.body.state.media.find((m) => m.materialId === 'm1');
+      assert.equal(media.kind, 'altro');
+      assert.equal(media.proposal.target, 'voce:0:1', 'il nome del file suggerisce il tiramisù');
+    } finally { db.close(); }
+  });
+
   it('preparazione automatica: Jarvis mette da solo le foto leggere al loro posto, le grandi restano a Riccardo', async () => {
     const db = await setup();
     try {
@@ -238,7 +274,8 @@ describe('Foto per il menu · flusso nella Control Room', () => {
       await db.prepare("INSERT INTO jarvis_settings (key,value,updated_at) VALUES ('auto_prep',?,'x')").bind(JSON.stringify({ d1: entry })).run();
       const sent = await autoPrepareTick(db, { DB: db, ...accessEnv, ...env, JARVIS_ORIGIN: 'https://stage.example' });
       assert.equal(sent.length, 1);
-      assert.match(sent[0].text, /foto messe nel menu: 1; 1 da sistemare tu in Revisione/);
+      assert.match(sent[0].text, /^Anteprima pronta per «Enoteca Foto Test»: la mando al locale\?/);
+      assert.match(sent[0].text, /foto messe nel menu: 1; 1 troppo grandi da sistemare tu in Revisione \(frico\.jpg\)/);
       const draft = await db.prepare("SELECT * FROM drafts WHERE id='d1'").bind().first();
       const menu = JSON.parse(draft.menu_json);
       assert.match(menu.sezioni[1].voci[0].foto, /^https:\/\/stage\.example\/jarvis-hook\/media\/[0-9a-f]{64}\.jpg$/);
