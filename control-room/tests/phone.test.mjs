@@ -88,3 +88,29 @@ test('/chiamami senza numero Twilio importato: spiega cosa manca, nessuna chiama
     assert.equal(calls.filter((c) => c.href.endsWith('/twilio/outbound-call')).length, 0);
   });
 });
+
+test('chiamata automatica per gli avvisi importanti: spenta di base, poi di giorno e non più di una ogni 30 minuti', async (t) => {
+  t.mock.timers.enable({ apis: ['Date'], now: Date.parse('2026-10-14T08:00:00Z') }); // 10:00 a Roma
+  await withServices({}, async (calls) => {
+    const db = database(), env = await linked(db);
+    await missions.putSetting(db, 'owner_phone', '+393331234567');
+    const dials = () => calls.filter((c) => c.href.endsWith('/twilio/outbound-call'));
+    await missions.notify(db, env, null, 'bozza pronta', 'Bozza pronta per Al Bakaro.', 'importante');
+    assert.equal(dials().length, 0, 'spenta di base');
+    await send(db, env, '/chiamami avvisi');
+    assert.deepEqual(calls.filter((c) => c.href.endsWith('/sendMessage')).at(-1).body.reply_markup.inline_keyboard.flat().map((b) => b.callback_data), ['tel:si']);
+    await missions.telegramUpdate(db, env, { callback_query: { id: 'q1', data: 'tel:si', message: { chat: { id: 42 }, message_id: 7 } } });
+    await missions.notify(db, env, null, 'foto letta', 'Ho letto la foto.');
+    assert.equal(dials().length, 0, 'gli avvisi normali non chiamano');
+    await missions.notify(db, env, null, 'bozza pronta', 'Bozza pronta per Al Bakaro: https://renmenu.com/x. Apri Revisione.', 'importante');
+    assert.equal(dials().length, 1);
+    assert.match(dials()[0].body.conversation_initiation_client_data.dynamic_variables.motivo, /avviso importante: Bozza pronta per Al Bakaro: Apri Revisione\./);
+    await missions.notify(db, env, null, 'altro', 'Un altro avviso importante.', 'importante');
+    assert.equal(dials().length, 1, 'al massimo una ogni 30 minuti');
+    t.mock.timers.setTime(Date.parse('2026-10-14T21:00:00Z')); // 23:00 a Roma
+    await missions.notify(db, env, null, 'notte', 'Avviso di notte.', 'importante');
+    assert.equal(dials().length, 1, 'di notte niente telefonate');
+    await send(db, env, '/chiamami avvisi no');
+    assert.equal(await missions.setting(db, 'phone_alerts'), 'no');
+  });
+});

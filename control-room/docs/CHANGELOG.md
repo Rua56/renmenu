@@ -2,6 +2,10 @@
 
 Si aggiunge una voce a ogni pull request che cambia un comportamento di Jarvis o della Control Room, insieme all'aggiornamento di README, policy e funzionamento quando serve. Le voci più recenti stanno in alto.
 
+## 14 ottobre 2026
+
+- **Jarvis chiama per gli avvisi importanti (se lo accendi):** «/chiamami avvisi» mostra il pulsante Accendi/Spegni; «/chiamami avvisi sì|no» fa lo stesso a parole. Con la chiamata accesa, a ogni avviso importante (bozza pronta, nuovo messaggio WhatsApp, guasti…) Jarvis oltre al messaggio telefona e dice il motivo, solo dalle 8 alle 22 e al massimo una volta ogni 30 minuti. È spenta di base perché ogni chiamata costa minuti Twilio ed ElevenLabs. Se la chiamata non parte, lo scrive su Telegram. Nuovo test.
+
 ## 13 ottobre 2026
 
 - **Esito della telefonata:** `/chiamami esito` legge dal registro di ElevenLabs com’è andata l’ultima chiamata (stato, durata, motivo della chiusura, errore), per capire perché una linea cade.

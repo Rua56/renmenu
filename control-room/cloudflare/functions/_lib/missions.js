@@ -191,6 +191,7 @@ export function createMissions(deps) {
     await sendTg(db, env, chat, `${text}`, buttons, deps.fetchImpl, { silent: !important && night });
     const mode = await voiceAlerts(db);
     if ((mode === 'tutti' && !night) || (mode !== 'nessuno' && important)) await speakAlert(db, env, chat, text).catch(() => null);
+    if (important) await phoneAlert(db, env, chat, text).catch(() => null);
   }
   const isNight = (at) => { const hour = Number(new Intl.DateTimeFormat('en-GB', { timeZone: 'Europe/Rome', hour: '2-digit', hourCycle: 'h23' }).format(at)); return hour >= 22 || hour < 7; };
   const VOICE_ALERT_MODES = { importanti: 'solo gli avvisi importanti', tutti: 'tutti gli avvisi (di giorno)', nessuno: 'nessun avviso' };
@@ -662,6 +663,13 @@ export function createMissions(deps) {
       if (!outcome.silent) await sendTg(db, env, chat, outcome.text, null, deps.fetchImpl);
       return;
     }
+    if (verb === 'tel') {
+      await putSetting(db, 'phone_alerts', missionId === 'si' ? 'si' : 'no');
+      await ack('Fatto');
+      await clear();
+      await sendTg(db, env, chat, phoneAlertsMenu(missionId === 'si').text, null, deps.fetchImpl);
+      return;
+    }
     if (verb === 'voce') {
       if (VOICE_ALERT_MODES[missionId]) await putSetting(db, 'voice_alerts', missionId);
       await ack('Fatto');
@@ -782,7 +790,8 @@ export function createMissions(deps) {
     }
     // /chiamami (o «chiamami», «telefonami»): Jarvis telefona a Riccardo con la sua voce. A pagamento: solo su richiesta.
     if (/^\/chiamami\b/i.test(text) || /^(?:jarvis[,\s]+)?(?:chiamami|telefonami|fammi una (?:chiamata|telefonata))\b/i.test(text.trim())) {
-      await sendTg(db, env, chat, await phoneCall(db, env, text), null, deps.fetchImpl);
+      const out = await phoneCall(db, env, text);
+      await sendTg(db, env, chat, out?.text ?? out, out?.buttons || null, deps.fetchImpl);
       return;
     }
     if (/^\/voce\b/i.test(text) || (/\b(avvis\w*|notific\w*)\b/i.test(text) && /\b(a\s+voce|vocal[ei])\b/i.test(text) && text.split(/\s+/).length <= 12)) { const menu = await voiceAlertsMenu(db); await sendTg(db, env, chat, menu.text, menu.buttons, deps.fetchImpl); return; }
@@ -807,6 +816,14 @@ export function createMissions(deps) {
 
   // ——— Telefonata vera (ElevenLabs + numero Twilio importato) ———
   async function phoneCall(db, env, text) {
+    // «/chiamami avvisi sì|no»: telefonata automatica per gli avvisi importanti.
+    if (/\bavvis\w*\b/i.test(text)) {
+      const on = /(?:^|\s)(?:si|sì|on|accend\w*|attiv\w*)(?:\s|$)/i.test(text) ? true : /(?:^|\s)(?:no|off|spegn\w*|disattiv\w*)(?:\s|$)/i.test(text) ? false : null;
+      if (on !== null) await putSetting(db, 'phone_alerts', on ? 'si' : 'no');
+      const menu = phoneAlertsMenu((await setting(db, 'phone_alerts')) === 'si');
+      if (on === null) return menu;
+      return on && !(await setting(db, 'owner_phone')) ? `${menu.text}\n\nPrima però dimmi il numero: «/chiamami +39 …».` : menu.text;
+    }
     // «/chiamami esito»: com'è andata l'ultima telefonata (serve quando la linea cade).
     if (/\b(esito|com.e andata|perch\w*)\b/i.test(text)) {
       const last = await setting(db, 'phone_last_call');
@@ -823,6 +840,10 @@ export function createMissions(deps) {
     }
     const to = await setting(db, 'owner_phone');
     if (!to) return 'A quale numero ti chiamo? Scrivimi «/chiamami +39 …» con il cellulare che hai verificato su Twilio: lo ricordo per le prossime volte.';
+    return dial(db, env, to, 'Mi hai chiesto di chiamarti: dimmi pure, ti racconto come vanno le cose.');
+  }
+  /** Fa partire la telefonata. Restituisce il testo per Riccardo (anche in caso di errore). */
+  async function dial(db, env, to, reason) {
     const voice = await voiceSettings(db, env);
     if (voice.provider !== 'elevenlabs' || !voice.apiKey) return 'Per telefonarti mi serve la voce di ElevenLabs: impostala nella Control Room, sezione Jarvis.';
     try {
@@ -831,14 +852,34 @@ export function createMissions(deps) {
       const agentId = await ensureAgent(deps.fetchImpl, voice.apiKey, { agentId: await setting(db, 'phone_agent_id'), voiceId: voice.voiceId });
       await putSetting(db, 'phone_agent_id', agentId);
       const situation = await statusText(db).catch(() => '');
-      const out = await callOwner(deps.fetchImpl, voice.apiKey, { agentId, phoneNumberId: line.id, to, situation, reason: 'Mi hai chiesto di chiamarti: dimmi pure, ti racconto come vanno le cose.' });
+      const out = await callOwner(deps.fetchImpl, voice.apiKey, { agentId, phoneNumberId: line.id, to, situation, reason });
       if (out.conversationId) await putSetting(db, 'phone_last_call', out.conversationId);
-      await auditedBatch(jarvisDb(db), [], 'jarvis.phone_call', `Telefonata a Riccardo partita dal numero ${line.number || 'Twilio'}${out.callSid ? ` (Twilio ${out.callSid})` : ''}.`, null).catch(() => {});
+      await putSetting(db, 'phone_last_at', now());
+      await auditedBatch(jarvisDb(db), [], 'jarvis.phone_call', `Telefonata a Riccardo partita dal numero ${line.number || 'Twilio'}${out.callSid ? ` (Twilio ${out.callSid})` : ''}: ${String(reason).slice(0, 160)}`, null).catch(() => {});
       return `Ti sto chiamando dal ${line.number || 'numero Twilio'}. Se non squilla entro un minuto, dimmelo.`;
     } catch (error) {
       if (error?.status === 401) return 'ElevenLabs rifiuta la chiave della voce per le telefonate: serve una chiave con il permesso «Conversational AI» (Agents). Creane una nuova su ElevenLabs e salvala nella Control Room, sezione Jarvis.';
       return `La telefonata non è partita: ${String(error?.message || 'errore').slice(0, 220)}`;
     }
+  }
+  // Chiamata automatica per gli avvisi importanti: spenta di base (costa), solo dalle 8 alle 22, al massimo una ogni 30 minuti.
+  const PHONE_ALERT_GAP = 30 * MINUTE;
+  async function phoneAlert(db, env, chat, text) {
+    if ((await setting(db, 'phone_alerts').catch(() => null)) !== 'si') return;
+    const hour = Number(new Intl.DateTimeFormat('en-GB', { timeZone: 'Europe/Rome', hour: '2-digit', hourCycle: 'h23' }).format(new Date(now())));
+    if (hour < 8 || hour >= 22) return;
+    const last = Date.parse(await setting(db, 'phone_last_at') || '');
+    if (Number.isFinite(last) && Date.now() - last < PHONE_ALERT_GAP) return;
+    const to = await setting(db, 'owner_phone');
+    if (!to) return;
+    const plain = String(text).replace(/https?:\/\/\S+/g, '').split('\n').filter((line) => line.trim() && !/^\s*(\d+\.|[-•])\s/.test(line)).join(' ').replace(/\s+/g, ' ');
+    const reason = (plain.match(/[^.!?]+[.!?]+/g) || [plain]).reduce((out, sentence) => (out.length + sentence.length <= 280 ? out + sentence : out), '').trim() || plain.slice(0, 280);
+    const outcome = await dial(db, env, to, `Ti chiamo per un avviso importante: ${reason}`);
+    if (!/^Ti sto chiamando/.test(outcome)) await sendTg(db, env, chat, `Volevo chiamarti per questo avviso, ma ${outcome.charAt(0).toLowerCase()}${outcome.slice(1)}`, null, deps.fetchImpl);
+  }
+  function phoneAlertsMenu(on) {
+    return { text: `Chiamata automatica per gli avvisi importanti: ${on ? 'accesa' : 'spenta'}. Quando è accesa ti telefono dalle 8 alle 22, al massimo una volta ogni 30 minuti; di notte resta il messaggio. Ogni chiamata costa minuti Twilio ed ElevenLabs.`,
+      buttons: [[on ? 'Spegni' : 'Accendi', on ? 'tel:no' : 'tel:si']] };
   }
 
   // ——— Conversazione (testo o voce) ———
