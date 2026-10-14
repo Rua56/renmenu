@@ -11,6 +11,7 @@ import { play, setSounds, soundsAvailable, soundsOn } from './jarvis-sound.js';
 import { greetOnce, greetingFor, lastVisit, markVisit } from './jarvis-greet.js';
 import { pauseWake, startWake, wakeAvailable, wakeEnabled, wakeState, setWakeEnabled } from './jarvis-wake.js';
 import { showFor } from './jarvis-show.js';
+import { ACTIONS, findActions, navigationPhrase, norm, venueIn } from './jarvis-find.js';
 import { installApp, installed } from './hud.js';
 import { configureVoice, interpretVoice, listen, speak, speechAvailable, synthesisAvailable, stopListening, voiceSettings } from './voice.js';
 import { resetDemoState } from './demo-store.js';
@@ -1028,6 +1029,16 @@ function hudCharts(chart) {
   return `<div class="hud-charts">${chart.series.map(card).join('')}</div><p class="hud-chart-foot">Menu online adesso <strong>${chart.online}</strong></p>`;
 }
 function showOnHome(phrase) {
+  // «Apri le foto del Tralcio», «dov'è il QR»: Jarvis porta dritto alla funzione (jarvis-find.js).
+  const asked = navigationPhrase(phrase);
+  if (asked !== null) {
+    const { client, rest } = venueIn(asked, state?.clients || []);
+    const [best] = findActions(rest, { limit: 1 });
+    if (best && best.score >= 3) {
+      goToAction(best.id, client?.id || '');
+      return { say: `Ecco: ${best.label.charAt(0).toLowerCase()}${best.label.slice(1)}${client ? `, ${client.name}` : ''}.` };
+    }
+  }
   const shown = showFor(phrase, showData());
   if (!shown) return null;
   display = phrase;
@@ -1145,6 +1156,7 @@ function renderSistema() {
     ['notifiche', 'Notifiche', 'Avvisi di Jarvis ed email al proprietario', navCount('notifiche')], ['registro', 'Registro', 'Tutto quello che è successo, con data', 0], ['voce', 'Voce (browser)', 'Prova del microfono', 0]
   ];
   return `<div class="view-wrap">${header('SISTEMA', 'Sistema', 'Gli strumenti completi di prima, sempre a portata. Per il lavoro di ogni giorno basta Oggi.')}
+    <button class="find-bar" type="button" data-action="find-open"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="10.5" cy="10.5" r="6" fill="none" stroke="currentColor" stroke-width="1.8"/><path d="M15 15l5 5" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></svg><span>Cosa vuoi fare? <small>anteprima, foto, schede vini, QR…</small></span></button>
     <div class="sys-list">${tools.map(([route, label, note, n]) => `<button class="sys-row" type="button" data-route="${route}"><span><strong>${label}</strong><small>${note}</small></span>${n ? `<b class="nav-hint">${n}</b>` : ''}<i aria-hidden="true">›</i></button>`).join('')}</div>
     <details class="details-more"><summary>Tutti i numeri e i dettagli</summary>${commandDetails()}</details></div>`;
 }
@@ -1206,6 +1218,10 @@ function renderModifica() {
 }
 function setVoceName(voce, value) { if (typeof voce.nome === 'string') voce.nome = value; else voce.nome = { ...(voce.nome || {}), it: value }; }
 async function handleOggiAction(action, trigger) {
+  if (action === 'find-open') { openFind(); return true; }
+  if (action === 'find-close') { closeFind(); return true; }
+  if (action === 'find-go') { goToAction(trigger.dataset.find, trigger.dataset.findClient || ''); return true; }
+  if (action === 'find-ask') { const text = findQuery.trim(); closeFind(); openAsk(false, { firstText: text }); return true; }
   const draft = draftForRequest();
   if (action === 'pratiche-filtro') { praticheFilter = trigger.dataset.filtro; if (activeView === 'pratiche') render(); else navigate('pratiche'); return true; }
   if (action === 'scegli-piano') {
@@ -1318,6 +1334,81 @@ function openAsk(listenNow = false, { wake = false, firstText = '' } = {}) {
   openChat(askSheet, { voice: Boolean(state?.voice?.provider && state?.voice?.hasKey), bot: state?.telegram?.bot || '', listenNow, onShow: showOnHome, onClose: listenForWake, wake, firstText });
 }
 function closeAsk() { closeChat(); }
+
+// «Cosa vuoi fare?»: due parole e Jarvis porta al punto giusto (jarvis-find.js). Lente in alto, Ctrl/⌘+K.
+const findSheet = $('#find-sheet');
+let findQuery = '';
+let pendingFind = null;
+const FIND_ICON = '<svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="10.5" cy="10.5" r="6" fill="none" stroke="currentColor" stroke-width="1.8"/><path d="M15 15l5 5" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></svg>';
+// La pratica su cui lavorare per un locale: quella ancora aperta più recente.
+function praticaFor(clientId) {
+  const closed = ['completata', 'archiviata', 'chiusa'];
+  return state.requests.filter((request) => request.clientId === clientId)
+    .sort((a, b) => Number(closed.includes(a.status)) - Number(closed.includes(b.status)) || String(b.createdAt || '').localeCompare(String(a.createdAt || '')))[0] || null;
+}
+function renderFindResults() {
+  const box = findSheet.querySelector('.find-results');
+  if (!box) return;
+  const { client, rest } = venueIn(findQuery, state?.clients || []);
+  const list = findActions(rest);
+  const pratica = client ? praticaFor(client.id) : requestById();
+  const where = (action) => action.pratica && pratica ? ` · ${clientById(pratica.clientId)?.name || pratica.subject}` : '';
+  const row = (action) => `<button class="find-row" type="button" data-action="find-go" data-find="${escapeHtml(action.id)}" data-find-client="${escapeHtml(client?.id || '')}"><strong>${escapeHtml(action.label)}</strong><small>${escapeHtml(action.hint + where(action))}</small><i aria-hidden="true">›</i></button>`;
+  const title = findQuery.trim() ? (list.length ? 'Ecco dove' : '') : 'Le più usate';
+  box.innerHTML = list.length
+    ? `${title ? `<p class="lab">${title}</p>` : ''}${list.map(row).join('')}`
+    : `<p class="muted">Non trovo una funzione con queste parole.</p><button class="find-row" type="button" data-action="find-ask"><strong>Chiedilo a Jarvis</strong><small>«${escapeHtml(findQuery.trim())}»</small><i aria-hidden="true">›</i></button>`;
+}
+function openFind() {
+  if (!state) return;
+  findQuery = '';
+  findSheet.innerHTML = `<div class="sheet-head"><strong>Cosa vuoi fare?</strong><button type="button" data-action="find-close">Chiudi</button></div><label class="find-input">${FIND_ICON}<input type="search" name="find" placeholder="Es. anteprima, foto Al Tralcio, QR, prezzi" autocomplete="off" enterkeyhint="go" aria-label="Cosa vuoi fare?"></label><div class="find-results" aria-live="polite"></div><p class="muted small find-tip">Puoi anche dirlo a Jarvis: «Ehi Jarvis, apri le foto del Tralcio».</p>`;
+  findSheet.hidden = false;
+  renderFindResults();
+  const input = findSheet.querySelector('input');
+  input.addEventListener('input', () => { findQuery = input.value; renderFindResults(); });
+  input.addEventListener('keydown', (event) => { if (event.key === 'Enter') { event.preventDefault(); findSheet.querySelector('.find-row')?.click(); } });
+  setTimeout(() => input.focus(), 0);
+}
+function closeFind() { if (findSheet) { findSheet.hidden = true; findSheet.innerHTML = ''; } }
+/** Porta alla funzione: sceglie la pratica del locale nominato, apre la schermata e illumina il riquadro. */
+function goToAction(id, clientId = '') {
+  const action = ACTIONS.find((item) => item.id === id);
+  if (!action) return;
+  closeFind();
+  if (clientId) { selectedClientId = clientId; const pratica = praticaFor(clientId); if (pratica) selectedRequestId = pratica.id; }
+  if (action.action === 'numeri') { showOnHome('numeri della settimana'); return; }
+  if (action.action === 'parla') { openAsk(false); return; }
+  if (action.action === 'tema') { setTheme(document.documentElement.dataset.theme === 'dark' ? 'light' : 'dark'); return; }
+  pendingFind = { find: action.find ? [].concat(action.find) : [], label: action.label, pratica: Boolean(action.pratica) };
+  navigate(action.route);
+}
+// Dopo il disegno della schermata: apre le tendine che lo contengono, ci scorre e lo fa lampeggiare.
+function revealFound() {
+  const wanted = pendingFind;
+  pendingFind = null;
+  if (!wanted?.find.length) return;
+  requestAnimationFrame(() => {
+    const nodes = [...view.querySelectorAll('h1, h2, h3, .eyebrow, summary, button, label')];
+    let found = null;
+    const texts = nodes.map((node) => norm(node.textContent));
+    for (const text of wanted.find) {
+      const key = norm(text);
+      const at = [(t) => t === key, (t) => t.startsWith(key), (t) => key.length >= 12 && t.includes(key)].map((test) => texts.findIndex(test)).find((index) => index >= 0);
+      if (at !== undefined) { found = nodes[at]; break; }
+    }
+    if (!found) { toast(wanted.pratica ? `«${wanted.label}» non c’è in questa pratica: scegline un’altra dalla tendina «Pratica».` : `«${wanted.label}» qui non è disponibile.`); return; }
+    for (let open = found.closest('details'); open; open = open.parentElement?.closest('details')) open.open = true;
+    const target = found.closest('section, aside, details, .panel') || found;
+    target.scrollIntoView({ behavior: matchMedia('(prefers-reduced-motion: reduce)').matches ? 'auto' : 'smooth', block: 'start' });
+    target.classList.remove('find-flash'); void target.offsetWidth; target.classList.add('find-flash');
+    setTimeout(() => target.classList.remove('find-flash'), 2600);
+  });
+}
+document.addEventListener('keydown', (event) => {
+  if ((event.ctrlKey || event.metaKey) && event.key.toLowerCase() === 'k') { event.preventDefault(); if (findSheet.hidden) openFind(); else closeFind(); }
+  else if (event.key === 'Escape' && !findSheet.hidden) closeFind();
+});
 document.addEventListener('keydown', (event) => { if (event.key === 'Escape' && !askSheet.hidden) closeAsk(); });
 function toolBackBar() {
   const request = requestById();
@@ -1335,6 +1426,7 @@ function renderView() {
     view.classList.remove('view-enter'); void view.offsetWidth; view.classList.add('view-enter');
   }
   shownView = activeView;
+  if (pendingFind) revealFound();
   document.title = `${navItems.find(([id]) => id === activeView)?.[2] || 'Control Room'} · RenMenu`;
 }
 function render() {

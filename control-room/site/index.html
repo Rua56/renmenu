@@ -31,6 +31,7 @@
       </a>
       <div class="topbar-actions">
         <span class="mode-badge" id="mode-badge" role="status" aria-live="polite">Caricamento</span>
+        <button class="icon-button find-open" type="button" data-action="find-open" aria-label="Cosa vuoi fare? Cerca una funzione" title="Cosa vuoi fare? (Ctrl/⌘+K)"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="10.5" cy="10.5" r="6" fill="none" stroke="currentColor" stroke-width="1.8"/><path d="M15 15l5 5" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></svg></button>
         <button class="icon-button" id="theme-toggle" type="button" aria-label="Attiva tema chiaro" title="Cambia tema">◐</button>
       </div>
     </header>
@@ -42,6 +43,7 @@
     <nav class="bottom-nav" id="bottom-nav" aria-label="Navigazione rapida mobile"></nav>
   </div>
   <div id="toast-region" class="toast-region" aria-live="polite" aria-atomic="true"></div>
+  <section class="sheet find-sheet" id="find-sheet" hidden role="dialog" aria-modal="true" aria-label="Cosa vuoi fare?"></section>
   <section class="sheet" id="ask-sheet" hidden role="dialog" aria-modal="true" aria-label="Parla con Jarvis"></section>
   <dialog id="confirm-dialog" class="confirm-dialog" aria-labelledby="confirm-title">
     <form method="dialog" id="confirm-form">
