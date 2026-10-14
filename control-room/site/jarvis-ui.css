@@ -174,10 +174,10 @@ h1.page-title { margin: 8px 2px 12px; }
 /* ——— «Parla con Jarvis»: conversazione scritta e a voce (jarvis-chat.js) ——— */
 .chat-core { position: relative; width: 64px; height: 64px; margin: 0 auto 4px; border: 1px solid var(--line-strong); border-radius: 50%; }
 .chat-core span { position: absolute; inset: 14px; border-radius: 50%; background: radial-gradient(circle, #c9f4ff 0%, var(--teal) 40%, #0b4a63 100%); box-shadow: 0 0 18px rgba(70, 214, 255, .5); }
-.sheet[data-phase="listening"] .chat-core span { animation: chat-listen 1.1s ease-in-out infinite; }
+.sheet[data-phase="listening"] .chat-core { border-color: var(--teal); box-shadow: 0 0 0 calc(var(--lvl, 0) * 14px) rgba(70, 214, 255, .18); transition: box-shadow .08s linear; }
+.sheet[data-phase="listening"] .chat-core span { transform: scale(calc(1 + var(--lvl, 0) * .45)); transition: transform .08s linear; }
 .sheet[data-phase="thinking"] .chat-core { border-color: transparent; border-top-color: var(--teal); animation: chat-spin .9s linear infinite; }
 .sheet[data-phase="speaking"] .chat-core span { animation: chat-talk .45s ease-in-out infinite alternate; }
-@keyframes chat-listen { 50% { transform: scale(1.18); box-shadow: 0 0 34px rgba(70, 214, 255, .85); } }
 @keyframes chat-spin { to { transform: rotate(360deg); } }
 @keyframes chat-talk { to { transform: scale(1.1); } }
 .chat-status { min-height: 1.3em; margin: 0 0 4px; color: var(--muted); font: 500 12px var(--mono); letter-spacing: .04em; text-align: center; }

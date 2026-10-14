@@ -2,7 +2,8 @@
  * Microfono: riconoscimento vocale del browser (gratis), acceso solo quando lo tocchi o in «mani libere».
  * Risposte: voce del browser (gratis) oppure la voce vera di Jarvis (ElevenLabs, consuma crediti) se la
  * accendi qui. Pubblicare, cancellare e scrivere ai locali restano tocchi espliciti sui pulsanti di Jarvis. */
-import { askJarvis, isDemoMode, jarvisVoiceAudio } from './api.js';
+import { askJarvis, isDemoMode, jarvisVoiceAudio, transcribeVoice } from './api.js';
+import { earAvailable, hear, stopHearing, unlockEar } from './jarvis-ear.js';
 
 const Recognition = globalThis.SpeechRecognition || globalThis.webkitSpeechRecognition;
 const Synth = globalThis.speechSynthesis;
@@ -130,35 +131,81 @@ async function say(text, { always = false } = {}) {
 }
 
 // ——— microfono ———
-function stopListening() { if (recognition) { recognition.onend = null; recognition.abort(); recognition = null; } }
+// Di base l'orecchio di Jarvis (jarvis-ear.js: registra, capisce quando hai finito, trascrive Whisper):
+// funziona anche dopo che Jarvis ha parlato e senza toccare nulla in «mani libere». Il riconoscimento del
+// browser resta solo dove il microfono non si può registrare (e nella demo, che non chiama il server).
+let listenTurn = 0;
+let quietTurns = 0;
+function stopListening() {
+  listenTurn += 1;
+  stopHearing(false);
+  if (recognition) { const old = recognition; recognition = null; old.onend = null; old.onerror = null; old.onresult = null; old.abort(); }
+  if (sheet) sheet.style.setProperty('--lvl', '0');
+}
+function quiet(note) {
+  // In «mani libere» riprova un paio di volte prima di smettere: magari stavi pensando.
+  if (handsFree && quietTurns < 2) { quietTurns += 1; listen(); return; }
+  quietTurns = 0; handsFree = false; syncToggles();
+  setPhase('idle', note || 'Non ho sentito nulla. Tocca il microfono quando vuoi.');
+}
 function listen() {
-  if (!Recognition) { setPhase('idle', 'Questo browser non sente la voce: scrivi pure, oppure usa Chrome o Safari aggiornati.'); handsFree = false; return; }
+  if (busy) return;
   stopSpeaking(); stopListening();
+  if (earAvailable && !isDemoMode) { listenWithEar(); return; }
+  listenWithBrowser();
+}
+async function listenWithEar() {
+  const turn = listenTurn;
+  setPhase('listening');
+  let blob = null;
+  try {
+    blob = await hear({ onLevel: (level) => sheet?.style.setProperty('--lvl', level.toFixed(2)) });
+  } catch (error) {
+    if (turn !== listenTurn) return;
+    handsFree = false; syncToggles();
+    setPhase('idle', /denied|allowed|permission/i.test(String(error?.name || error?.message)) ? 'Il microfono è bloccato: consentilo nelle impostazioni del browser per questo sito.' : 'Il microfono non è partito: riprova.');
+    return;
+  }
+  if (turn !== listenTurn || !sheet || sheet.hidden) return;
+  if (!blob) { quiet(); return; }
+  setPhase('thinking', 'Trascrivo…');
+  let text = '';
+  try { text = await transcribeVoice(blob); } catch (error) {
+    if (turn !== listenTurn) return;
+    quiet(error?.message ? `${error.message} Riprova.` : '');
+    return;
+  }
+  if (turn !== listenTurn || !sheet || sheet.hidden) return;
+  if (!text) { quiet('Non ho capito le parole. Riprova un po’ più vicino al telefono.'); return; }
+  quietTurns = 0;
+  setPhase('idle');
+  send(text, { spoken: true });
+}
+function listenWithBrowser() {
+  if (!Recognition) { setPhase('idle', 'Questo browser non sente la voce: scrivi pure, oppure usa Chrome o Safari aggiornati.'); handsFree = false; syncToggles(); return; }
   const input = sheet.querySelector('input[name="text"]');
   const instance = new Recognition();
   recognition = instance;
   instance.lang = 'it-IT'; instance.continuous = false; instance.interimResults = true; instance.maxAlternatives = 1;
-  let finalText = '';
   instance.onresult = (event) => {
-    const parts = [...event.results].map((r) => r[0]?.transcript || '');
-    if (input) input.value = parts.join(' ').trim();
-    if ([...event.results].every((r) => r.isFinal)) finalText = input?.value || '';
+    if (input) input.value = [...event.results].map((r) => r[0]?.transcript || '').join(' ').trim();
   };
   instance.onerror = (event) => {
-    const quiet = event.error === 'no-speech' || event.error === 'aborted';
-    if (event.error === 'not-allowed' || event.error === 'service-not-allowed') handsFree = false;
-    setPhase('idle', quiet ? 'Non ho sentito nulla. Tocca il microfono quando vuoi.' : `Microfono non disponibile (${event.error}). Puoi scrivere.`);
-    if (quiet) handsFree = false;
-    syncToggles();
+    if (recognition !== instance) return;
+    recognition = null;
+    if (event.error === 'no-speech' || event.error === 'aborted') { quiet(); return; }
+    handsFree = false; syncToggles();
+    setPhase('idle', `Microfono non disponibile (${event.error}). Puoi scrivere.`);
   };
   instance.onend = () => {
-    if (recognition === instance) recognition = null;
-    const text = finalText.trim();
-    if (text) send(text, { spoken: true });
-    else if (phase === 'listening') setPhase('idle');
+    if (recognition !== instance) return;
+    recognition = null;
+    // Alcuni browser (Safari) non segnano mai la frase come «finale»: vale quello che si è sentito.
+    const text = String(input?.value || '').trim();
+    if (text) { quietTurns = 0; send(text, { spoken: true }); } else quiet();
   };
   setPhase('listening');
-  try { instance.start(); } catch { setPhase('idle', 'Il microfono non è partito: riprova.'); }
+  try { instance.start(); } catch { recognition = null; setPhase('idle', 'Il microfono non è partito: riprova.'); }
 }
 function syncToggles() { const box = sheet?.querySelector('[data-chat="handsfree"]'); if (box) box.checked = handsFree; }
 
@@ -205,7 +252,8 @@ async function exchange(payload) {
     // Se intanto Riccardo ha toccato il microfono (interrompendo Jarvis) l'ascolto è già partito.
     if (!sheet || sheet.hidden || phase === 'listening') return;
     const waitsForTap = replies.some((m) => m.buttons?.length);
-    if (handsFree && !waitsForTap) listen(); else setPhase('idle', waitsForTap ? 'Scegli un pulsante, oppure rispondi a voce.' : '');
+    // In «mani libere» riascolta sempre: a un pulsante si può rispondere anche a voce («sì», «la seconda»).
+    if (handsFree) listen(); else setPhase('idle', waitsForTap ? 'Scegli un pulsante, oppure rispondi a voce.' : '');
   } catch (error) {
     busy = false;
     push({ role: 'jarvis', kind: 'note', text: error?.message || 'Jarvis non risponde: riprova tra poco.' });
@@ -225,14 +273,17 @@ function onClick(event) {
   }
   if (event.target.closest('[data-chat="mic"]')) {
     if (busy) return;
-    if (phase === 'listening') { stopListening(); setPhase('idle'); return; }
+    unlockEar();
+    // Mentre ascolta, il tocco vuol dire «ho finito»: manda subito quello che ha sentito.
+    if (phase === 'listening') { if (recognition) recognition.stop(); else stopHearing(true); return; }
+    quietTurns = 0;
     listen();
   }
 }
 function onChange(event) {
   const box = event.target.closest('[data-chat]');
   if (!box) return;
-  if (box.dataset.chat === 'handsfree') { handsFree = box.checked; if (handsFree && phase === 'idle' && !busy) listen(); else if (!handsFree) setPhase(phase); }
+  if (box.dataset.chat === 'handsfree') { handsFree = box.checked; quietTurns = 0; if (handsFree) unlockEar(); if (handsFree && phase === 'idle' && !busy) listen(); else if (!handsFree) setPhase(phase); }
   if (box.dataset.chat === 'voice') { jarvisVoice = box.checked; local.set(VOICE_KEY, jarvisVoice ? 'si' : 'no'); }
 }
 function onSubmit(event) {

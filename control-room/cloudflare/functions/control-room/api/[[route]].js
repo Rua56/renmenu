@@ -6,7 +6,7 @@ import { GEMINI_PREFERRED, PHOTO_TYPES, readMenuPdf, readMenuPhoto } from '../..
 import { linkMailFiles, receiveMailFiles } from '../../_lib/mail-files.js';
 import { deletionPlan, deletionStatements } from '../../_lib/delete-request.js';
 import { MEDIA_KINDS, PUBLIC_EXT, applyMedia, classifyPhoto, isMenuPhotoKind, parseLabel, proposeTargets, publicImageOk, reapplyConfirmed, removeMedia, resolveTarget, targetLabel } from '../../_lib/media.js';
-import { speak } from '../../_lib/voice.js';
+import { speak, transcribe } from '../../_lib/voice.js';
 import { OWNER_REVIEW } from '../../_lib/missions.js';
 import { readCurrentMenu } from '../../_lib/github-live.js';
 import { isSameOriginWrite, verifyOwner } from '../../_lib/auth.js';
@@ -444,6 +444,13 @@ export async function jarvisAsk(env, input = {}) {
   const messages = capture.messages.map((m) => ({ ...m, say: m.kind === 'text' || m.kind === 'note' ? spokenText(m.text) : '' }));
   if (!messages.length) messages.push({ kind: 'text', text: 'Fatto.', buttons: [], say: 'Fatto.' });
   return { messages };
+}
+// Orecchio di Jarvis per la Control Room: la frase registrata (WAV) diventa testo con Whisper su Workers AI.
+export async function jarvisHear(env, bytes) {
+  assert(bytes?.length > 1000, 'Non ho sentito nulla.');
+  const heard = await transcribe(env.AI, bytes);
+  assert(heard.ok, `Perdona, ${heard.reason}.`);
+  return { text: heard.text.slice(0, 1000) };
 }
 // Voce di Jarvis (ElevenLabs) per la Control Room: solo se Riccardo la accende nel foglio, perché consuma crediti.
 export async function jarvisVoice(env, input = {}) {
@@ -1702,6 +1709,13 @@ export async function onRequest(context) {
       assert(isSameOriginWrite(request), 'Origine non autorizzata.', 403);
       if (segments.join('/') === 'material') return uploadMaterial(context);
       if (segments[0] === 'media' && segments.length === 2) return answer({ result: await uploadMediaImage(context, segments[1]) });
+      if (segments.join('/') === 'jarvis/hear') {
+        assert(/^audio\//.test(request.headers.get('content-type') || ''), 'Serve un audio.', 415);
+        assert(Number(request.headers.get('content-length') || 0) <= 2_500_000, 'Frase troppo lunga: massimo una ventina di secondi.', 413);
+        const bytes = new Uint8Array(await request.arrayBuffer());
+        assert(bytes.length <= 2_500_000, 'Frase troppo lunga: massimo una ventina di secondi.', 413);
+        return answer(await jarvisHear(context.env, bytes));
+      }
       if (segments[0] === 'jarvis' && ['ask', 'voice'].includes(segments[1]) && segments.length === 2) {
         assert(request.headers.get('content-type')?.startsWith('application/json'), 'Serve application/json.', 415);
         assert(Number(request.headers.get('content-length') || 0) <= 20_000, 'Messaggio troppo lungo.');

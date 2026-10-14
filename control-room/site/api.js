@@ -82,6 +82,16 @@ export async function askJarvis(payload) {
   return parseResponse(response);
 }
 
+/** Frase detta al microfono (WAV) → testo, trascritto da Jarvis con Whisper (Workers AI, gratis). */
+export async function transcribeVoice(blob) {
+  requireAuthorizedHost();
+  if (isDemoMode) return '';
+  const response = await fetch('/control-room/api/jarvis/hear', {
+    method: 'POST', credentials: 'same-origin', headers: { 'Content-Type': 'audio/wav', Accept: 'application/json' }, body: blob
+  });
+  return String((await parseResponse(response))?.text || '').trim();
+}
+
 /** Voce di Jarvis (ElevenLabs) per una risposta. null se non è configurata o non risponde. */
 export async function jarvisVoiceAudio(text) {
   requireAuthorizedHost();
