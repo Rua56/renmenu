@@ -8,7 +8,7 @@
 import PostalMime from './vendor/postal-mime/postal-mime.js';
 import { htmlToText } from './vendor/postal-mime/text-format.js';
 import { APPROVAL_SQL, DOMAIN_INBOX, REFERENCE, VERIFY_SQL, buildImportBatch, buildReplyBatch, replyReference, unforwardSubject } from './mail-import.js';
-import { assessReply } from './approvals.js';
+import { assessReply, stripQuoted } from './approvals.js';
 
 export const MAX_RAW_BYTES = 30_000_000; // Email Routing accetta fino a 25 MiB
 const FILE_TYPES = new Set(['image/jpeg', 'image/png', 'image/webp', 'application/pdf']);
@@ -100,7 +100,10 @@ export async function importIncomingMail(db, raw, { envelopeFrom, envelopeTo, no
   }
   const reference = replyReference(event);
   const approval = reference ? await db.prepare(APPROVAL_SQL).bind(reference).first() : null;
-  const reply = approval ? buildReplyBatch(event, approval, stamp) : null;
+  // Della risposta all'anteprima conta solo il testo nuovo: la citazione (con il link lungo dell'anteprima)
+  // la farebbe sembrare lunga e Jarvis si fermerebbe anche su un semplice «Approvo».
+  const replyText = approval ? stripQuoted(event.text) : '';
+  const reply = approval ? buildReplyBatch(replyText ? { ...event, text: replyText } : event, approval, stamp) : null;
   const plan = reply && !reply.error ? reply : buildImportBatch(event, stamp);
   if (plan.error) return { ok: false, error: plan.error };
   // Prima gli allegati (idempotenti), poi la pratica: l'orologio li collega appena la pratica esiste.
