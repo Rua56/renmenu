@@ -1231,7 +1231,7 @@ async function action(db, type, input, env = {}) {
     assert(gemini, 'Serve la chiave Gemini (Control Room → Lettura dei menu): la ricerca usa Google con il modello gratuito.', 503);
     const creative = parseCreative(draft.creative_json) || {};
     const searched = Array.isArray(creative.bottiglie?.cercate) ? creative.bottiglie.cercate : [];
-    const media = await rows(db, "SELECT m.status, x.text_preview AS note FROM media_items m JOIN materials x ON x.id=m.material_id WHERE m.request_id=? AND x.source=? AND m.status<>'scartata'", draft.request_id);
+    const media = await rows(db, "SELECT m.status, x.text_preview AS note FROM media_items m JOIN materials x ON x.id=m.material_id WHERE m.request_id=? AND x.source=? AND m.status<>'scartata'", draft.request_id, CANTINA_SOURCE);
     const pending = media.map((m) => parseSourceNote(m.note)?.wine).filter(Boolean);
     const all = winesWithoutPhoto(menu, [...searched.map((x) => x.name), ...pending]);
     const round = all.slice(0, BOTTLES_PER_ROUND);

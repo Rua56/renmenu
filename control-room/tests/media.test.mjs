@@ -331,6 +331,11 @@ describe('Foto per il menu · flusso nella Control Room', () => {
       assert.equal(JSON.parse(draft.creative_json).bottiglie.cercate.length, 2);
       const again = await act(db, 'findBottlePhotos', { id: 'd1' }, env);
       assert.equal(again.status, 422, 'non si cerca due volte lo stesso vino');
+      // Anche senza il registro delle ricerche, un vino con una foto della cantina in attesa non si ricerca.
+      await db.prepare("UPDATE drafts SET creative_json=NULL WHERE id='d1'").bind().run();
+      const redo = await act(db, 'findBottlePhotos', { id: 'd1' }, env);
+      assert.equal(redo.status, 200, JSON.stringify(redo.body));
+      assert.deepEqual(redo.body.result.outcomes.map((o) => o.name), ['Friulano Collio 2023']);
     } finally { globalThis.fetch = before; db.close(); }
   });
 
