@@ -277,10 +277,11 @@
     }
     const sch = (v) => (v.scheda && typeof v.scheda === 'object' ? v.scheda : {});
     // Vini scritti «Ribolla Gialla - Tenuta Stella»: il nome in grande, la cantina sotto in corsivo.
+    // Vale la cantina scritta dal locale nel nome: quella della scheda può essere una cantina sbagliata trovata online.
     const nomeVino = (v, vino) => {
       const n = t(v.nome), c = t(sch(v).cantina);
       const m = vino ? /^(.{3,}?)\s+[-–—]\s+(.{3,})$/.exec(n) : null;
-      return m ? { nome: m[1], cantina: c || m[2] } : { nome: n, cantina: vino ? c : '' };
+      return m ? { nome: m[1], cantina: m[2] } : { nome: n, cantina: vino ? c : '' };
     };
     const haScheda = (v) => PROFILO.some((k) => Number.isFinite(sch(v).profilo?.[k])) || TESSERE.some((k) => t(sch(v)[k])) || !!t(sch(v).nota);
     // Tutte le voci (anche dell'altra carta), con una chiave stabile «sezione:voce».

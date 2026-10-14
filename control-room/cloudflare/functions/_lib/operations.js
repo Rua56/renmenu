@@ -1,6 +1,6 @@
 import { createAiLiveAdapter } from './ai-live.js';
 import { approvalState, sha256Hex } from './approvals.js';
-import { GitHubLiveError, MANUAL_MERGE_CONFIRMATION, getPrStatus, listPrFiles, menuMediaFiles, mergeApprovedMenuPr, openApprovedMenuPr, readBaseSha, readCurrentMenu } from './github-live.js';
+import { GitHubLiveError, MANUAL_MERGE_CONFIRMATION, findPrByBranch, getPrStatus, listPrFiles, menuMediaFiles, mergeApprovedMenuPr, openApprovedMenuPr, readBaseSha, readCurrentMenu } from './github-live.js';
 import { reviewIssues } from './editorial.js';
 import { BLANCH_FILE_LIST, BlanchError, canonicalBlanch, isBlanchSlug, publicJsonToMenu, publicMenuJsonUrl, publicMenuPageUrl, semanticMenu } from './blanch.js';
 import { slugify, validateMenu } from './menu.js';
@@ -36,6 +36,7 @@ const RETRYABLE_WITHOUT_WRITE = new Set([
   // Controlli locali che falliscono prima di qualunque scrittura su GitHub.
   'CURRENT_SLUG_MISMATCH', 'IDEMPOTENCY_KEY_REQUIRED'
 ]);
+const OPENING_GRACE_MS = 3 * 60_000;
 const PUBLIC_LANGUAGES = new Set(['it', 'en', 'de', 'fr', 'es']);
 // This is deliberately a constant rather than configuration or client input:
 // the verification receipt may only attest the canonical public origin (renmenu.com, served by the Pages project).
@@ -461,6 +462,11 @@ async function openLivePr(context, p) {
         event: 'github.pr.idempotent', message: 'PR live già registrata: nessuna nuova scrittura GitHub avviata.' });
       return { operationId: operation.id, status: operation.status, prNumber: operation.pr_number, prUrl: operation.pr_url, reused: true };
     }
+    // Riserva appena fatta e senza errori: un'altra apertura è ancora in corso (es. il SÌ su Telegram
+    // e l'orologio insieme). Non è un esito incerto: si riprova più tardi, senza segnare la riconciliazione.
+    if (operation.status === 'reserved' && !operation.last_error
+      && Date.parse(context.now()) - Date.parse(operation.updated_at || operation.created_at || 0) < OPENING_GRACE_MS)
+      fail('Apertura della PR già in corso: riprovo fra poco.', 409);
     if (operation.status !== 'reserved' || !RETRYABLE_WITHOUT_WRITE.has(operation.last_error || '')) {
       if (operation.status !== 'needs_reconciliation')
         await markReconciliation(context, operation, prepared.draft.request_id, operation.last_error || 'UNKNOWN');
@@ -532,25 +538,36 @@ async function reconcileLivePr(context, p) {
   requireGitHubLive(context.env);
   assert(p.confirmation === 'CONFERMO RICONCILIAZIONE PR LIVE', 'Conferma esatta di riconciliazione mancante.', 403);
   const draftId = identifier(p.draftId);
-  const operation = await context.getOne(context.db, `SELECT o.*,d.request_id FROM live_pr_operations o
-    JOIN drafts d ON d.id=o.draft_id WHERE o.draft_id=?`, draftId);
+  const operation = await context.getOne(context.db, `SELECT o.*,d.request_id,d.revision AS draft_revision,d.menu_json AS draft_menu_json
+    FROM live_pr_operations o JOIN drafts d ON d.id=o.draft_id WHERE o.draft_id=?`, draftId);
   assert(operation, 'Operazione PR live non trovata.', 404);
-  assert(['reserved', 'branch_created', 'needs_reconciliation'].includes(operation.status),
+  assert(['reserved', 'branch_created', 'needs_reconciliation', 'pr_open'].includes(operation.status),
     'Operazione PR non richiede riconciliazione.', 409);
-  const prNumber = Number(p.prNumber);
-  assert(Number.isInteger(prNumber) && prNumber > 0, 'Numero PR non valido.');
-  const status = await getPrStatus(context.env, prNumber, githubOptions(context.env));
+  // Senza numero (Jarvis da solo): la PR si cerca sul branch esatto della riserva.
+  let status;
+  if (p.prNumber == null || p.prNumber === '') {
+    status = await findPrByBranch(context.env, operation.branch_name, githubOptions(context.env));
+    assert(status, 'Su GitHub non c’è nessuna PR per questa riserva.', 404);
+  } else {
+    const prNumber = Number(p.prNumber);
+    assert(Number.isInteger(prNumber) && prNumber > 0, 'Numero PR non valido.');
+    status = await getPrStatus(context.env, prNumber, githubOptions(context.env));
+  }
   assert(status.headRef === operation.branch_name, 'La PR indicata non corrisponde alla riserva Control Room.', 409);
   assert(status.state === 'open' && !status.merged, 'La PR indicata non è una draft PR aperta riconciliabile.', 409);
+  // La bozza può aver cambiato solo revisione (checklist, riaffido) con lo stesso menu: la riserva segue
+  // la revisione attuale solo se il menu è identico a quello nella PR.
+  const sameMenu = await hashString(operation.draft_menu_json) === operation.snapshot_sha;
+  const revision = sameMenu ? Number(operation.draft_revision) : Number(operation.revision);
   const stamp = context.now();
   const changed = await context.auditedBatch(context.db, [
-    context.db.prepare(`UPDATE live_pr_operations SET status='pr_open',pr_number=?,pr_url=?,last_error=NULL,updated_at=?
-      WHERE id=? AND status IN ('reserved','branch_created','needs_reconciliation')`)
-      .bind(status.number, status.htmlUrl, stamp, operation.id)
+    context.db.prepare(`UPDATE live_pr_operations SET status='pr_open',pr_number=?,pr_url=?,revision=?,last_error=NULL,updated_at=?
+      WHERE id=? AND status IN ('reserved','branch_created','needs_reconciliation','pr_open')`)
+      .bind(status.number, status.htmlUrl, revision, stamp, operation.id)
   ], 'github.pr.reconciled', 'PR live riconciliata con lettura GitHub; nessun merge, pubblicazione o deploy eseguito.', operation.request_id,
   { sql: "SELECT 1 FROM live_pr_operations WHERE id=? AND status='pr_open'", args: [operation.id] });
   assert(changed[0].meta.changes === 1, 'Operazione PR modificata durante la riconciliazione.', 409);
-  return { operationId: operation.id, status: 'pr_open', pr: status, reconciled: true };
+  return { operationId: operation.id, status: 'pr_open', pr: status, reconciled: true, revision };
 }
 
 // Indirizzo della pagina che vedono i clienti (quello del QR), salvato nella pratica.

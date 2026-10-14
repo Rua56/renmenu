@@ -151,6 +151,23 @@ describe('Jarvis autonomo: dalla bozza affidata alla pubblicazione', () => {
       for (const name of ['approval.preview', 'approval.sent', 'approval.changes', 'draft.reply_changes', 'approval.client', 'approval.activation', 'jarvis.publish_ok'])
         assert.ok(jarvisActions.includes(name) || name === 'draft.reply_changes', `manca ${name}`);
       assert.deepEqual((await action(db, 'jarvisDecide', { missionId: state.missions[0].id, yes: true })).body.result.ok, false, 'il SÌ vale una volta');
+
+      // Pubblicazione interrotta (missione ferma) e pratica riaffidata: il locale ha già approvato questa
+      // versione, quindi nessuna nuova anteprima, solo il SÌ; al SÌ si riparte dalla pubblicazione.
+      const missionId = state.missions[0].id;
+      await db.prepare("UPDATE jarvis_missions SET status='ferma' WHERE id=?").bind(missionId).run();
+      const before = await db.prepare('SELECT COUNT(*) AS n FROM jarvis_outbox').bind().first();
+      const fresh = (await call(db, 'state')).body.drafts[0];
+      const again = await action(db, 'entrustToJarvis', { draftId: fresh.id, revision: fresh.revision, confirmation: 'AFFIDO A JARVIS' });
+      assert.equal(again.status, 200, String(again.body.error));
+      assert.equal(again.body.result.status, 'attesa_si');
+      assert.equal((await db.prepare("SELECT COUNT(*) AS n FROM jarvis_outbox WHERE status='in_coda'").bind().first()).n, 0, 'nessuna anteprima in coda');
+      assert.ok((await db.prepare('SELECT COUNT(*) AS n FROM jarvis_outbox').bind().first()).n >= before.n);
+      const resumed = await action(db, 'jarvisDecide', { missionId, yes: true });
+      assert.equal(resumed.body.result.ok, true, JSON.stringify(resumed.body.result));
+      assert.equal(resumed.body.state.missions[0].status, 'pubblicazione');
+      assert.equal(resumed.body.state.approvals[0].status, 'approvata_cliente');
+      assert.equal(resumed.body.state.approvals[0].activation, 'prova_30_giorni');
     } finally { db.close(); }
   });
 

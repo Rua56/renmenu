@@ -555,6 +555,16 @@ export async function openApprovedMenuPr(env, approvedSnapshot, options = {}) {
   };
 }
 
+/**
+ * Finds the PR of a Control Room branch (any state) and returns its sanitized
+ * status, or null. Used to reconcile an operation whose PR response was lost.
+ */
+export async function findPrByBranch(env, branch, options = {}) {
+  if (typeof branch !== 'string' || !branch.startsWith('control-room/menu-')) fail('PR_NOT_MANAGED', 'Branch non gestito dalla Control Room.', { status: 403 });
+  const found = await findOperationPr(env, branch, options);
+  return found ? getPrStatus(env, Number(found.number), options) : null;
+}
+
 /** Gets sanitized status for a Control Room-managed pull request only. */
 export async function getPrStatus(env, prNumber, options = {}) {
   if (!Number.isInteger(prNumber) || prNumber < 1) fail('INVALID_PR_NUMBER', 'Numero PR non valido.', { status: 422 });
