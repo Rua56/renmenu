@@ -363,3 +363,12 @@ html[data-jarvis="speaking"] .reactor .r3 { border-color: rgba(255, 255, 255, .5
 .tool-tile:hover, .tool-tile:focus-visible { border-color: var(--teal); background: var(--c4); }
 .tool-tile.hot { border-color: var(--am); }
 .tool-tile .nav-hint { position: absolute; top: 8px; right: 8px; }
+
+/* Revisione a schede: una riga di schede che scorre di lato sul telefono. */
+.rev-tabs { position: sticky; top: 0; z-index: 5; display: flex; gap: 6px; overflow-x: auto; margin: 6px -2px 12px; padding: 8px 2px; background: var(--bg); scrollbar-width: none; }
+.rev-tabs::-webkit-scrollbar { display: none; }
+.rev-tab-button { position: relative; display: inline-flex; flex: 0 0 auto; align-items: center; gap: 6px; min-height: 40px; padding: 0 14px; border: 1px solid var(--line); border-radius: 99px; background: var(--c3); color: var(--muted); font: 600 14px var(--sans); cursor: pointer; }
+.rev-tab-button[aria-selected="true"] { border-color: var(--teal); background: var(--c4); color: var(--ink); }
+.rev-tab-button .nav-hint { position: static; }
+.rev-count { min-width: 20px; padding: 1px 6px; border-radius: 99px; background: var(--c1); color: var(--muted); font: 600 11.5px var(--mono); text-align: center; }
+.rev-tab[hidden] { display: none; }
