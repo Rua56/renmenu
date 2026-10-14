@@ -109,8 +109,8 @@ function dishesWrittenAsHeadings(text) {
   const isNote = (l) => /^\s*>/.test(l);
   const priced = /^(.*\S)\s*[—–-]\s*(?:€\s*)?(\d{1,4}(?:[.,]\d{1,2})?)\s*€?\s*$/;
   const PATH = /a persona|per persona|percorso|degustazione|\bmenu\b|tasting|coperto|servizio|\bpp\b/i;
-  // Dopo la riga i: solo righe «>» e vuote, poi titolo o fine? (un piatto isolato, non una sezione con altri piatti)
-  const endsAfterNotes = (i) => { let k = i + 1, notes = 0; while (k < lines.length && (!lines[k].trim() || isNote(lines[k]))) { if (isNote(lines[k])) notes += 1; k += 1; } return notes > 0 && (k >= lines.length || isHeading(lines[k])); };
+  // Dopo la riga i: solo righe «>» e vuote, poi titolo, fine o un altro piatto col prezzo? (un piatto isolato, non una sezione con altri piatti)
+  const endsAfterNotes = (i) => { let k = i + 1, notes = 0; while (k < lines.length && (!lines[k].trim() || isNote(lines[k]))) { if (isNote(lines[k])) notes += 1; k += 1; } return notes > 0 && (k >= lines.length || isHeading(lines[k]) || priced.test(lines[k])); };
   const out = [];
   for (let i = 0; i < lines.length; i += 1) {
     const line = lines[i];
@@ -164,7 +164,8 @@ export function fixLayout(text) {
     if (!line.trim()) { out.push(line); continue; }
     if (heading(line)) {
       parent = ''; headingParent = ''; sectionPrice = '';
-      const m = line.match(/^(\s*#{1,3}\s*)(.*?)\s*(?:[—–-]\s*)?(?:€\s*)?(\d{1,4}[.,]\d{2}(?:\s*\/\s*(?:€\s*)?\d{1,4}[.,]\d{2})?)\s*€?\s*$/);
+      const m = line.match(/^(\s*#{1,3}\s*)(.*?)\s*(?:[—–-]\s*)?(?:€\s*)?(\d{1,4}[.,]\d{2}(?:\s*\/\s*(?:€\s*)?\d{1,4}[.,]\d{2})?)\s*€?\s*$/)
+        || line.match(/^(\s*#{1,3}\s*)(.*?[A-Za-zÀ-ÿ)])\s*(?:[—–]\s*(?:€\s*)?|€\s*)(\d{1,4})\s*€?\s*$/);
       const title = m ? m[2] : line.replace(/^\s*#{1,3}\s*/, '');
       // «# Percorso Degustazione» + «con 5 Portate dalla Cucina & Dolce — 90»: è il titolo del percorso con il suo prezzo.
       if (!m && DEGU_TITLE.test(title) && /^\s*con\s/i.test(lines[i + 1] || '') && priced(lines[i + 1])) {
@@ -173,10 +174,22 @@ export function fixLayout(text) {
         const courses = lines[i + 2] && !heading(lines[i + 2]) && !priced(lines[i + 2]) && !note(lines[i + 2]) && lines[i + 2].trim();
         out.push(`${courses ? line.trim() : title.trim()} ${lines[i + 1].slice(0, p.index).trim()} — ${p[1]}${courses ? ' €' : ''}`); i += 1; continue;
       }
+      if (m) {
+        // «# Percorso degustazione con 5 portate — 90» o «# Abbinamento 5 vini — 50» senza voci sotto (subito un'altra voce
+        // col prezzo, un titolo o la fine): è una voce col suo prezzo, non un titolo.
+        let j = i + 1; while (j < lines.length && (!lines[j].trim() || note(lines[j]))) j += 1;
+        // (Una riga sotto con lo STESSO prezzo è invece la descrizione del piatto scritto come titolo: ci pensa dishesWrittenAsHeadings.)
+        const below = j < lines.length && priced(lines[j]) ? lines[j].match(PRICE_END)[1] : null;
+        const samePrice = below && Number(below.replace(',', '.')) === Number(m[3].replace(',', '.'));
+        if (j >= lines.length || heading(lines[j]) || (below && (DEGU_TITLE.test(title) || !samePrice))) { out.push(`${title.replace(/[\s—–-]+$/, '')} — ${m[3]}`); continue; }
+      }
       if (m && !DEGU_TITLE.test(title)) {
         // Prezzo sul titolo: vale per le voci sotto senza prezzo (se ce n'è almeno una).
         let j = i + 1; while (j < lines.length && (!lines[j].trim() || note(lines[j]))) j += 1;
-        if (j < lines.length && !heading(lines[j]) && !priced(lines[j]) && !/\d[.,]\d{2}/.test(lines[j])) { sectionPrice = m[3].replace(/\s*\/\s*(?:€\s*)?/, ' / '); out.push(`${m[1]}${title}`); continue; }
+        // Almeno due voci senza prezzo: con una sola è un piatto scritto come titolo con la sua descrizione sotto.
+        let bare = 0;
+        for (let k = j; k < lines.length && !heading(lines[k]); k += 1) if (lines[k].trim() && !note(lines[k]) && !priced(lines[k]) && !/\d[.,]\d{2}/.test(lines[k])) bare += 1;
+        if (bare >= 2 && j < lines.length && !heading(lines[j]) && !priced(lines[j]) && !/\d[.,]\d{2}/.test(lines[j])) { sectionPrice = m[3].replace(/\s*\/\s*(?:€\s*)?/, ' / '); out.push(`${m[1]}${title}`); continue; }
       }
       // «# Pesce spada» seguito solo da «alla piastra — 12», «alla Messinese — 12»: varianti dello stesso piatto.
       const items = [];
@@ -197,6 +210,11 @@ export function fixLayout(text) {
           if (codes) out.push(`> (${codes})`);
           continue;
         }
+      }
+      // «> olio e limone 4»: in un menu che scrive gli allergeni come numeri, il numero in fondo non è un prezzo.
+      if (note(line) && loose && !/\d[.,]\d{2}/.test(line)) {
+        const tail = allergenTail(line.replace(/^\s*>\s*/, '').trim(), true);
+        if (tail) { out.push(`> ${tail.name} (${tail.codes})`); continue; }
       }
       out.push(line); continue;
     }
@@ -523,7 +541,9 @@ export async function readMenuPhoto(ai, bytes, mime, { timeoutMs = 110_000, gemi
   const small = Boolean(size && Math.max(size.width, size.height) < SMALL_PHOTO);
   // Molte voci in disaccordo (menu lunghi, scritte piccole): una terza lettura con un altro modello fa da arbitro.
   let thirdText = '';
-  const arbiter = spare.shift();
+  // Foto piccola con Gemini disponibile: arbitra un altro modello Gemini (i modelli gratuiti di Cloudflare sbagliano
+  // troppe cifre sulle foto piccole e riempirebbero la bozza di dubbi inutili).
+  const arbiter = small && geminiReady && chain.length ? { label: 'gemini', run: async function run() { const r = await geminiRead(); this.label = r.model; return r.text; } } : spare.shift();
   if (good.length === 2 && arbiter && (small || (combined.doubts >= (geminiReady ? 1 : 10) && combined.agreed < (geminiReady ? 1 : 0.8) * readingItems(good[0]).length))) {
     try { thirdText = await arbiter.run(); used.push(arbiter.label); } catch (error) { thirdText = ''; texts.push(`[terza lettura non riuscita] ${String(error?.message || 'errore').slice(0, 200)}`); }
     if (thirdText && readingItems(thirdText).length) combined = combineReadings(good[0], good[1], thirdText, { strict: small });
