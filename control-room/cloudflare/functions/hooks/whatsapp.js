@@ -28,9 +28,11 @@ export async function onRequest(context) {
   }
 
   if (context.request.method !== 'POST') return hidden();
-  if (!config.configured) return forbidden();
+  const peek = context.request.clone();
+  if (!config.configured) { await traceDelivery(context.env.DB, peek, 'NOT_CONFIGURED'); return forbidden(); }
   const parsed = await verifyWhatsAppWebhookRequest(context.request, config);
-  if (!parsed.ok) return forbidden();
+  if (!parsed.ok) { await traceDelivery(context.env.DB, peek, parsed.reason || 'REJECTED'); return forbidden(); }
+  await traceDelivery(context.env.DB, peek, `OK ${parsed.messages.length}`);
 
   try {
     let accepted = 0;
@@ -45,4 +47,21 @@ export async function onRequest(context) {
     // Never include raw Meta payloads, message text, signatures, or secrets in logs/responses.
     return new Response(null, { status: 503, headers: { 'Cache-Control': 'no-store' } });
   }
+}
+
+// Traccia dell'ultima consegna (solo esito e metadati, mai testo né chiavi): serve a capire
+// perché un messaggio non arriva. Si legge in jarvis_settings.wa_hook_last.
+async function traceDelivery(db, request, outcome) {
+  try {
+    const url = new URL(request.url);
+    let entries = [], fields = [];
+    try {
+      const body = JSON.parse(await request.text());
+      entries = (body?.entry || []).slice(0, 5).map((e) => String(e?.id || '').slice(0, 30));
+      fields = [...new Set((body?.entry || []).flatMap((e) => (e?.changes || []).map((c) => String(c?.field || '').slice(0, 40))))].slice(0, 10);
+    } catch {}
+    const trace = { at: new Date().toISOString(), outcome: String(outcome).slice(0, 60), path: url.pathname.slice(0, 60), hasKey: url.searchParams.has('k'), signed: request.headers.has('x-hub-signature-256'), entries, fields };
+    await db.prepare('INSERT INTO jarvis_settings (key,value,updated_at) VALUES (?,?,?) ON CONFLICT(key) DO UPDATE SET value=excluded.value,updated_at=excluded.updated_at')
+      .bind('wa_hook_last', JSON.stringify(trace), trace.at).run();
+  } catch {}
 }
