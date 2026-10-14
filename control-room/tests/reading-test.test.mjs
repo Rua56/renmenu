@@ -83,3 +83,30 @@ describe('prova di lettura: giri dell’orologio', () => {
     assert.match(await lastReadingTest(db), /Ultima prova/);
   });
 });
+
+describe('prova di lettura: errori trovati il 14 ottobre', () => {
+  it('pizze con più formati: tutti i prezzi, con le etichette scritte', async () => {
+    const { combineReadings } = await import('../cloudflare/functions/_lib/vision.js');
+    const a = '# Pizze\n1 - FOCACCIA — Pizze tonde 3,50 / Pizze da 50 cm 6,00 / Pizze da 75 cm 9,00 / Pizze da un metro 12,00\n# Bufaline\nZIA GIADA — 11,50 / 13,50';
+    const b = '# Pizze\nFOCACCIA — tonda 3,50 / 50 cm 6,00 / 75 cm 9,00 / 1 metro 12,00\n# Bufaline\nZIA GIADA — normale 11,50 / famiglia 13,50';
+    const { menu: m, doubts } = draftFromReadings('Pizzeria', [combineReadings(a, b).text]);
+    const items = menuItems(m);
+    assert.deepEqual(items.map((i) => [i.name, i.prices]), [['1 - FOCACCIA', [350, 600, 900, 1200]], ['ZIA GIADA', [1150, 1350]]]);
+    assert.equal(doubts.length, 0);
+    const zia = m.sezioni[1].voci[0];
+    assert.deepEqual(zia.prezzi.map((p) => p.etichetta.it), ['Normale', 'Famiglia']);
+  });
+
+  it('prezzi senza etichetta fuori dai vini: tutti dentro, etichette da scrivere', async () => {
+    const { extractMenuFromText } = await import('../cloudflare/functions/_lib/menu.js');
+    const r = extractMenuFromText('Pizzeria', '# Classiche\nMargherita — 6,50 / 8,50\nDiavola — 7,50 / 9,50', 'pizzeria');
+    assert.deepEqual(r.menu.sezioni[0].voci.map((v) => v.prezzi.map((p) => `${p.etichetta.it}=${p.prezzo}`)), [['Prezzo 1=6,50', 'Prezzo 2=8,50'], ['Prezzo 1=7,50', 'Prezzo 2=9,50']]);
+  });
+
+  it('allergeni dopo il prezzo o tra parentesi quadre non fanno perdere il piatto', async () => {
+    const { tidyReading } = await import('../cloudflare/functions/_lib/vision.js');
+    assert.equal(tidyReading('Polenta concia — 12,00 (8-14)'), 'Polenta concia — 12,00\n> (8-14)');
+    assert.equal(tidyReading('jota: classica minestra triestina. [1][3][8][9] — 13,00'), 'jota: classica minestra triestina — 13,00\n> (1-3-8-9)');
+    assert.equal(tidyReading('Amari, liquori — Likerji 2,50'), 'Amari, liquori - Likerji — 2,50');
+  });
+});
