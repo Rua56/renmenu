@@ -113,6 +113,7 @@ html[data-theme="dark"] .msg.j { border-color: var(--hud-line); background: rgba
 /* ——— avvio «sistemi online» (una volta per sessione, da hud.js) ——— */
 .hud-boot { position: fixed; z-index: 100; inset: 0; display: grid; place-items: center; background: var(--bg-deep, #03060b); color: var(--hud, #46d6ff); font: 500 12px/1.9 var(--mono, monospace); letter-spacing: .3em; text-transform: uppercase; pointer-events: none; animation: hud-boot-out .5s ease-in 1.5s forwards; }
 .hud-boot div { text-align: center; }
+.hud-boot-core { display: block; width: 96px; height: 96px; margin: 0 auto 18px; border-radius: 50%; box-shadow: 0 0 40px var(--hud-glow, rgba(70, 214, 255, .45)); animation: hud-breathe 1.6s ease-in-out infinite; }
 .hud-boot strong { display: block; margin-bottom: 10px; font-size: 20px; letter-spacing: .45em; text-shadow: 0 0 18px var(--hud-glow, rgba(70, 214, 255, .45)); }
 .hud-boot span { display: block; opacity: 0; animation: hud-line-in .3s ease-out forwards; }
 .hud-boot span:nth-child(2) { animation-delay: .25s; } .hud-boot span:nth-child(3) { animation-delay: .55s; } .hud-boot span:nth-child(4) { animation-delay: .85s; }

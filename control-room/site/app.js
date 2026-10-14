@@ -7,6 +7,7 @@ import { mountPdfPreview } from './pdf-preview.js';
 import { extractPdfText } from './material-extract.js';
 import { closeChat, openChat } from './jarvis-chat.js';
 import { showFor } from './jarvis-show.js';
+import { installApp, installed } from './hud.js';
 import { configureVoice, interpretVoice, listen, speak, speechAvailable, synthesisAvailable, stopListening, voiceSettings } from './voice.js';
 import { resetDemoState } from './demo-store.js';
 
@@ -343,7 +344,7 @@ function jarvisPanel() {
   const tg = state.telegram || {};
   const telegram = isDemoMode ? '' : !tg.configured ? '' : !tg.linked
     ? `<div class="notice spaced-top-small">${telegramLinkUrl ? `Tocca il link e poi <strong>Avvia</strong> in Telegram (valido 15 minuti): <a href="${escapeHtml(telegramLinkUrl)}" target="_blank" rel="noopener">Apri Jarvis su Telegram</a>` : 'Collega Telegram: Jarvis ti scriverà lì e ti chiederà il SÌ prima di pubblicare.'}</div><div class="button-row spaced-top-small"><button class="button" type="button" data-action="telegram-link">${telegramLinkUrl ? 'Nuovo link' : 'Collega Telegram'}</button></div>`
-    : `<details class="hud-settings"><summary>Collegamenti e voce di Jarvis</summary><div class="button-row spaced-top-small"><span class="status good">Telegram collegato</span><button class="button secondary small-button" type="button" data-action="jarvis-briefing">Briefing ora</button><button class="button secondary small-button" type="button" data-action="telegram-test">Messaggio di prova</button></div>${voiceForm()}${readerForm()}</details>`;
+    : `<details class="hud-settings"><summary>Collegamenti e voce di Jarvis</summary><div class="button-row spaced-top-small"><span class="status good">Telegram collegato</span><button class="button secondary small-button" type="button" data-action="jarvis-briefing">Briefing ora</button><button class="button secondary small-button" type="button" data-action="telegram-test">Messaggio di prova</button></div>${installed() ? '' : '<div class="button-row spaced-top-small"><button class="button secondary small-button" type="button" data-action="install-app">Installa Jarvis sul telefono</button></div>'}${voiceForm()}${readerForm()}</details>`;
   if (!notes.length && !autopilotRunning && !telegram) return '';
   const row = (item) => `<div class="list-row"><div class="list-main"><strong>${escapeHtml(item.subject)}</strong><small>${escapeHtml(item.body)}</small><small>${time(item.createdAt)}</small></div><div class="button-row"><button class="mini-button" type="button" data-select-request="${escapeHtml(item.requestId || '')}" data-route="${item.subject.includes('bozza pronta') ? 'revisione' : 'richieste'}">Apri</button><button class="mini-button" type="button" data-action="mark-notification" data-notification-id="${escapeHtml(item.id)}" data-read="true">Fatto</button></div></div>`;
   return `<section class="panel spaced-top-small"><p class="eyebrow">JARVIS</p>${autopilotRunning ? '<p class="notice">Jarvis sta preparando le nuove richieste…</p>' : ''}<div class="list">${notes.map(row).join('')}</div>${telegram}</section>`;
@@ -1152,6 +1153,7 @@ async function handleOggiAction(action, trigger) {
   if (action === 'ask-open') { openAsk(); return true; }
   if (action === 'ask-voice') { openAsk(true); return true; }
   if (action === 'ask-close') { closeAsk(); return true; }
+  if (action === 'install-app') { installApp().then((text) => toast(text)); return true; }
   if (action === 'rileggi-online') { const request = requestById(); if (draft && request) { onlineMenus.delete(draft.id); render(); } return true; }
   if (!action.startsWith('edit-') && !action.startsWith('add-')) return false;
   if (!draft) return true;
