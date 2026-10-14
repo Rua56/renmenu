@@ -2,8 +2,9 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync, readdirSync } from 'node:fs';
 import { DatabaseSync } from 'node:sqlite';
-import { jarvisAsk, jarvisVoice, missions } from '../cloudflare/functions/control-room/api/[[route]].js';
+import { jarvisAsk, jarvisLive, jarvisVoice, missions } from '../cloudflare/functions/control-room/api/[[route]].js';
 import { spokenText, telegramCapture } from '../cloudflare/functions/_lib/cr-chat.js';
+import { pcm16, samples } from '../site/jarvis-live.js';
 
 const TOKEN = '123456789:AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA';
 function database() {
@@ -101,4 +102,73 @@ test('Orecchio di Jarvis: la frase registrata diventa testo con Whisper', async 
   assert.equal(seen[0].language, 'it');
   await assert.rejects(jarvisHear({ AI }, new Uint8Array(10)), /Non ho sentito/);
   await assert.rejects(jarvisHear({ AI: { run: async () => ({ text: '' }) } }, new Uint8Array(5000)), /non ho sentito parole chiare/);
+});
+
+// ElevenLabs finto per il dialogo dal vivo: strumenti, agente, indirizzo firmato.
+function elevenLabs({ toolsFail = false, staleAgent = '' } = {}) {
+  const calls = [];
+  const fetchImpl = async (url, init = {}) => {
+    const u = String(url), body = init.body ? JSON.parse(init.body) : null;
+    calls.push({ url: u, method: init.method || 'GET', body, key: init.headers?.['xi-api-key'] });
+    if (u.endsWith('/convai/tools')) return toolsFail ? Response.json({ detail: 'no' }, { status: 422 }) : Response.json({ id: `tool_${calls.length}` });
+    if (u.endsWith('/agents/create')) return Response.json({ agent_id: 'agent_live' });
+    if (u.includes('/get-signed-url')) {
+      if (staleAgent && u.includes(staleAgent)) return Response.json({ detail: 'not found' }, { status: 404 });
+      return Response.json({ signed_url: 'wss://api.elevenlabs.io/v1/convai/conversation?agent_id=agent_live&conversation_signature=x' });
+    }
+    return Response.json({}, { status: 500 });
+  };
+  return { calls, fetchImpl };
+}
+
+test('Dialogo dal vivo: serve la voce ElevenLabs', async () => {
+  const db = database();
+  await assert.rejects(jarvisLive({ DB: db }, { fetchImpl: elevenLabs().fetchImpl }), /voce di ElevenLabs/);
+});
+
+test('Dialogo dal vivo: crea l’agente con i suoi strumenti una volta e dà l’indirizzo firmato', async () => {
+  const db = database();
+  await missions.putSetting(db, 'voice_provider', 'elevenlabs');
+  await missions.putSetting(db, 'voice_api_key', 'el-test');
+  const net = elevenLabs();
+  const out = await jarvisLive({ DB: db }, { fetchImpl: net.fetchImpl });
+  assert.match(out.url, /^wss:\/\/api\.elevenlabs\.io\//);
+  assert.ok(out.situation.length > 0);
+  const tools = net.calls.filter((c) => c.url.endsWith('/convai/tools'));
+  assert.deepEqual(tools.map((c) => c.body.tool_config.name), ['chiedi_a_jarvis', 'mostra', 'chiudi']);
+  assert.ok(tools.every((c) => c.body.tool_config.type === 'client' && c.key === 'el-test'));
+  const agent = net.calls.find((c) => c.url.endsWith('/agents/create')).body;
+  assert.equal(agent.conversation_config.agent.prompt.tool_ids.length, 3);
+  assert.equal(agent.conversation_config.conversation.max_duration_seconds, 600);
+  assert.equal(agent.platform_settings.auth.enable_auth, true);
+  assert.equal(await missions.setting(db, 'cr_live_agent_id'), 'agent_live');
+  // La seconda volta riusa l'agente.
+  const again = elevenLabs();
+  await jarvisLive({ DB: db }, { fetchImpl: again.fetchImpl });
+  assert.equal(again.calls.filter((c) => c.url.endsWith('/agents/create')).length, 0);
+});
+
+test('Dialogo dal vivo: strumenti dentro l’agente se ElevenLabs non li crea a parte, e agente cancellato ricreato', async () => {
+  const db = database();
+  await missions.putSetting(db, 'voice_provider', 'elevenlabs');
+  await missions.putSetting(db, 'voice_api_key', 'el-test');
+  const net = elevenLabs({ toolsFail: true });
+  await jarvisLive({ DB: db }, { fetchImpl: net.fetchImpl });
+  const agent = net.calls.find((c) => c.url.endsWith('/agents/create')).body;
+  assert.equal(agent.conversation_config.agent.prompt.tools.length, 3);
+  await missions.putSetting(db, 'cr_live_agent_id', 'agent_old');
+  const stale = elevenLabs({ staleAgent: 'agent_old' });
+  const out = await jarvisLive({ DB: db }, { fetchImpl: stale.fetchImpl });
+  assert.ok(out.url);
+  assert.equal(await missions.setting(db, 'cr_live_agent_id'), 'agent_live');
+});
+
+test('Dialogo dal vivo: audio PCM 16 kHz in andata e ritorno', () => {
+  const tone = Float32Array.from({ length: 4800 }, (_, i) => Math.sin(i / 10) * 0.5);
+  const pcm = pcm16(tone, 48000, 16000);
+  assert.equal(pcm.length, 1600);
+  const back = samples(new Uint8Array(pcm.buffer), 'pcm_16000');
+  assert.equal(back.length, 1600);
+  assert.ok(Math.abs(back[100] - tone.slice(300, 303).reduce((a, b) => a + b) / 3) < 0.01);
+  assert.equal(samples(new Uint8Array([0xff, 0x7f]), 'ulaw_8000').length, 2);
 });

@@ -1904,5 +1904,5 @@ export function createMissions(deps) {
     }
     return out;
   }
-  return { alertOnce, announceExternal, ping, entrust, tick, watchTick, watchRegister, reflect, queueOnlineEmail, checkOnlineMails, makeMenuQr, decide, telegramUpdate, probeIntents, setting, putSetting, briefing, notify, startChecks, answerCheck, draftAfterChecks, translateAfterEdit, undoDraftEdit, draftTarget, voiceEditDraft, editDraftFromClient };
+  return { alertOnce, announceExternal, statusText, ping, entrust, tick, watchTick, watchRegister, reflect, queueOnlineEmail, checkOnlineMails, makeMenuQr, decide, telegramUpdate, probeIntents, setting, putSetting, briefing, notify, startChecks, answerCheck, draftAfterChecks, translateAfterEdit, undoDraftEdit, draftTarget, voiceEditDraft, editDraftFromClient };
 }

@@ -235,3 +235,11 @@ div.hud-row { cursor: default; }
 .hud-settings > summary { color: var(--muted); font: 600 12px var(--mono); letter-spacing: .06em; text-transform: uppercase; cursor: pointer; }
 @keyframes hud-open { from { opacity: 0; transform: translateY(8px) scale(.98); } }
 @media (prefers-reduced-motion: reduce) { .hud-display { animation: none; } }
+/* Dialogo dal vivo con Jarvis (ElevenLabs) */
+.chat-live { display: grid; gap: 2px; width: 100%; margin-top: 10px; padding: 12px 14px; border: 1px solid var(--teal); border-radius: 16px; background: transparent; color: var(--ink); font: 700 15px var(--sans); text-align: left; cursor: pointer; }
+.chat-live small { color: var(--muted); font-weight: 500; font-size: 12px; }
+.chat-live[aria-pressed="true"] { background: var(--teal); color: #04141c; }
+.chat-live[aria-pressed="true"] small { color: #04141c; opacity: .75; }
+.chat-live:disabled { opacity: .55; cursor: default; }
+body[data-live] .bottom-nav .ask { box-shadow: 0 0 0 2px var(--teal), 0 0 18px rgba(70, 214, 255, .35); }
+body[data-live] .bottom-nav .ask span::after { content: " · dal vivo"; color: var(--teal); }

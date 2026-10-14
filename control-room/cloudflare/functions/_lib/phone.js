@@ -83,3 +83,71 @@ export async function callOutcome(fetchImpl, key, conversationId) {
   if (data?.analysis?.call_successful) parts.push(`esito: ${data.analysis.call_successful}`);
   return parts.join(', ');
 }
+
+// ——— Dialogo dal vivo nella Control Room ———
+// Un secondo agente ElevenLabs, solo per la Control Room: Riccardo parla e Jarvis risponde subito, come al
+// telefono, ma dal browser. L'agente ha tre strumenti che esegue la pagina: chiedere al Jarvis vero (lo
+// stesso cervello di Telegram, con i suoi pulsanti), aprire un elenco a schermo, chiudere il dialogo.
+// Consuma minuti ElevenLabs: parte solo quando Riccardo tocca «Dal vivo» e dura al massimo 10 minuti.
+export const LIVE_AGENT_NAME = 'Jarvis · Control Room';
+export const LIVE_PROMPT = [
+  'Sei Jarvis, l’assistente di RenMenu (menu digitali con QR per ristoranti e bar di Gorizia). Stai parlando dal vivo con Riccardo, il titolare, nella sua Control Room.',
+  'Parli in italiano, con frasi brevi e naturali, tono calmo e un po’ ironico, come il Jarvis di Tony Stark. Dai del tu a Riccardo.',
+  'Situazione di RenMenu all’inizio del dialogo (dati veri):\n{{situazione}}',
+  'Per tutto ciò che va oltre la situazione (dettagli di una pratica, modifiche a un menu, anteprime, QR, pubblicazioni, messaggi ai clienti, impostazioni) usa lo strumento chiedi_a_jarvis con la richiesta di Riccardo detta in modo chiaro: risponde il Jarvis vero e tu riferisci la risposta in breve. Se la risposta parla di pulsanti, di’ a Riccardo che li trova sullo schermo: pubblicare e scrivere ai clienti restano sempre un suo tocco.',
+  'Quando Riccardo chiede di vedere un elenco (pratiche aperte o chiuse, locali, menu online, modifiche, attività) usa lo strumento mostra.',
+  'Quando Riccardo saluta o dice basta, saluta in una frase e usa lo strumento chiudi.',
+  'Non leggere link, codici o numeri lunghi. Non inventare dati.'
+].join('\n\n');
+const LIVE_TOOLS = [
+  { name: 'chiedi_a_jarvis', description: 'Passa una richiesta di Riccardo al Jarvis di RenMenu (lo stesso di Telegram) e restituisce la sua risposta. Da usare per ogni domanda o azione su pratiche, menu, locali, bozze, anteprime, QR e impostazioni.', field: 'richiesta', about: 'La richiesta di Riccardo, in italiano, chiara e completa.' },
+  { name: 'mostra', description: 'Apre a schermo un elenco: pratiche aperte, chiuse o da decidere, locali registrati, menu online, modifiche, attività recenti, anche di un locale o di un periodo.', field: 'cosa', about: 'Cosa mostrare, per esempio «pratiche chiuse di questa settimana».' },
+  { name: 'chiudi', description: 'Chiude il dialogo dal vivo quando Riccardo saluta o dice basta.', field: '', about: '' }
+];
+function toolConfig(tool) {
+  return {
+    type: 'client', name: tool.name, description: tool.description,
+    expects_response: tool.name !== 'chiudi', response_timeout_secs: 60,
+    parameters: tool.field ? { type: 'object', properties: { [tool.field]: { type: 'string', description: tool.about } }, required: [tool.field] } : { type: 'object', properties: {}, required: [] }
+  };
+}
+
+/** Agente del dialogo dal vivo: lo crea la prima volta (con i suoi strumenti), poi riusa l'id salvato. */
+export async function ensureLiveAgent(fetchImpl, key, { agentId = '', voiceId = '' } = {}) {
+  if (agentId) return agentId;
+  const config = (prompt) => ({
+    name: LIVE_AGENT_NAME,
+    conversation_config: {
+      agent: { prompt: { prompt: LIVE_PROMPT, ...prompt }, first_message: 'Eccomi, Riccardo. Dimmi.', language: 'it' },
+      tts: { model_id: 'eleven_flash_v2_5', agent_output_audio_format: 'pcm_16000', ...(/^[A-Za-z0-9]{10,40}$/.test(voiceId) ? { voice_id: voiceId } : {}) },
+      asr: { user_input_audio_format: 'pcm_16000' },
+      turn: { silence_end_call_timeout: 60 },
+      conversation: { max_duration_seconds: 600 }
+    },
+    platform_settings: { auth: { enable_auth: true } }
+  });
+  // Strumenti come oggetti a sé (il modo attuale di ElevenLabs); se non va, dentro l'agente (il modo vecchio).
+  let created = null;
+  try {
+    const ids = [];
+    for (const tool of LIVE_TOOLS) {
+      const out = await call(fetchImpl, key, '/tools', { method: 'POST', body: { tool_config: toolConfig(tool) } });
+      if (!out?.id) throw new Error('ElevenLabs non ha restituito lo strumento.');
+      ids.push(out.id);
+    }
+    created = await call(fetchImpl, key, '/agents/create', { method: 'POST', body: config({ tool_ids: ids }) });
+  } catch (error) {
+    if (error?.status === 401) throw error;
+    created = await call(fetchImpl, key, '/agents/create', { method: 'POST', body: config({ tools: LIVE_TOOLS.map(toolConfig) }) });
+  }
+  if (!created?.agent_id) throw new Error('ElevenLabs non ha restituito l’agente.');
+  return created.agent_id;
+}
+
+/** Indirizzo firmato (vale pochi minuti) con cui la pagina apre il dialogo con l'agente. */
+export async function liveSignedUrl(fetchImpl, key, agentId) {
+  const out = await call(fetchImpl, key, `/conversation/get-signed-url?agent_id=${encodeURIComponent(agentId)}`);
+  const url = String(out?.signed_url || '');
+  if (!url.startsWith('wss://api.elevenlabs.io/')) throw new Error('ElevenLabs non ha restituito l’indirizzo del dialogo.');
+  return url;
+}

@@ -105,6 +105,17 @@ export async function jarvisVoiceAudio(text) {
   return response.blob();
 }
 
+/** Dialogo dal vivo: indirizzo firmato ElevenLabs e situazione di partenza. Nella demo non parte. */
+export async function jarvisLiveSession() {
+  requireAuthorizedHost();
+  if (isDemoMode) throw new Error('Nella demo il dialogo dal vivo non parte: consuma minuti ElevenLabs veri.');
+  const response = await fetch('/control-room/api/jarvis/live', {
+    method: 'POST', credentials: 'same-origin',
+    headers: { 'Content-Type': 'application/json', Accept: 'application/json' }, body: '{}'
+  });
+  return parseResponse(response);
+}
+
 /** A mock must not expose a pseudo URL for a material. */
 export function getMaterialUrl(id) {
   if (!isAuthorizedHost) return null;
