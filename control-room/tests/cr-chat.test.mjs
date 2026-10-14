@@ -92,3 +92,13 @@ test('spokenText e voce di Jarvis', async () => {
   const none = await jarvisVoice({ DB: db }, { text: 'Ciao Riccardo' });
   assert.equal(none.status, 204);
 });
+
+test('Orecchio di Jarvis: la frase registrata diventa testo con Whisper', async () => {
+  const { jarvisHear } = await import('../cloudflare/functions/control-room/api/[[route]].js');
+  const seen = [];
+  const AI = { run: async (model, input) => { seen.push({ model, language: input.language }); return { text: ' quali locali sono registrati? ' }; } };
+  assert.deepEqual(await jarvisHear({ AI }, new Uint8Array(5000)), { text: 'quali locali sono registrati?' });
+  assert.equal(seen[0].language, 'it');
+  await assert.rejects(jarvisHear({ AI }, new Uint8Array(10)), /Non ho sentito/);
+  await assert.rejects(jarvisHear({ AI: { run: async () => ({ text: '' }) } }, new Uint8Array(5000)), /non ho sentito parole chiare/);
+});
