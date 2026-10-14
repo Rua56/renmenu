@@ -368,6 +368,7 @@ export async function state(db, env = {}) {
     venueMemory: await rows(db, 'SELECT id,client_id AS clientId,kind,text,source,created_at AS createdAt FROM venue_memory WHERE archived_at IS NULL ORDER BY created_at DESC LIMIT 400').catch(() => []),
     telegram: { configured: telegramReady(env), linked: Boolean(await missions.setting(db, 'telegram_chat_id')), bot: await botUsername(db, env) },
     reader: { gemini: Boolean(await missions.setting(db, 'gemini_api_key')), models: await missions.setting(db, 'gemini_models').then((v) => { try { return JSON.parse(v || '[]'); } catch { return []; } }) },
+    initiatives: (await missions.initiatives(db).catch(() => [])).slice(0, 6).map(({ key, kind, venue, text, requestId, clientId }) => ({ key, kind, venue, text, requestId: requestId || null, clientId: clientId || null })),
     voice: { provider: (await missions.setting(db, 'voice_provider')) || '', voiceId: (await missions.setting(db, 'voice_id')) || '', hasKey: Boolean(await missions.setting(db, 'voice_api_key')) },
     proposals: proposals.map(({ diffJson, ...p }) => ({ ...p, diff: JSON.parse(diffJson) })),
     analyses: rawAnalyses.map(({ provenanceJson, warningsJson, ...entry }) => ({ ...entry,
