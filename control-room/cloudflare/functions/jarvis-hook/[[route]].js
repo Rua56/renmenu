@@ -3,7 +3,7 @@
 // - /jarvis-hook/tick: l'orologio (Worker con cron) con il segreto JARVIS_CLOCK_SECRET;
 // - /jarvis-hook/mail-in: le email di menu@renmenu.com dal Worker email, con il segreto degli allegati.
 // Nessun dato viene restituito: solo esiti sintetici.
-import { autoPrepareTick, geminiConfig, linkPendingMailFiles, missions, readPendingMaterials, receivePendingMail, runAutopilot } from '../control-room/api/[[route]].js';
+import { autoPrepareTick, enrollIdleDrafts, geminiConfig, linkPendingMailFiles, missions, readPendingMaterials, receivePendingMail, runAutopilot } from '../control-room/api/[[route]].js';
 import { sameSecret } from '../_lib/telegram.js';
 import { chat } from '../_lib/voice.js';
 import { serveMedia } from '../_lib/public-media.js';
@@ -127,6 +127,7 @@ export async function onRequest(context) {
       const drafted = await runAutopilot(env.DB, env);
       for (const entry of drafted) await missions.ping(env.DB, env, entry.message, entry.buttons || null, entry.outcome === 'bozza' && !entry.prep ? 'importante' : 'normale').catch(() => null);
       // Bozze fatte da Jarvis: lingue, schede e foto, poi una sola domanda a Riccardo («la mando al locale?»).
+      await enrollIdleDrafts(env.DB).catch(() => null);
       await autoPrepareTick(env.DB, env).catch(() => null);
       const done = await missions.tick(env.DB, env);
       await missions.watchTick(env.DB, env).catch(() => null);

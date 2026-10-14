@@ -387,3 +387,55 @@ html[data-jarvis="speaking"] .reactor .r3 { border-color: rgba(255, 255, 255, .5
 .jarvis-talk .msg { scroll-margin-bottom: 170px; }
 .chat-bar input:focus, .chat-bar input:focus-visible { outline: 0; box-shadow: none; }
 .chat-bar:focus-within { border-color: var(--teal); }
+
+/* ——— Anteprima dal vivo nella conversazione: il menu come lo vede il cliente, con la modifica segnata ——— */
+.msg.j.has-card { max-width: 100%; width: 100%; }
+.live-card { margin: 10px 0 0; padding: 12px; border: 1px solid var(--line-strong); border-radius: 18px; background: var(--c0); }
+.live-card figcaption { display: grid; gap: 2px; margin-bottom: 8px; }
+.live-card figcaption span { color: var(--teal); font: 600 10.5px var(--mono); letter-spacing: .12em; }
+.live-card figcaption strong { font-size: 16px; }
+.live-card figcaption small { color: var(--muted); font-size: 12.5px; }
+.lc-lines { display: grid; gap: 4px; margin: 0 0 10px; padding: 0; list-style: none; font-size: 13.5px; }
+.lc-lines li { padding-left: 14px; position: relative; }
+.lc-lines li::before { position: absolute; left: 0; top: .5em; width: 6px; height: 6px; border-radius: 50%; background: var(--am); content: ""; }
+.lc-lines li.muted { color: var(--muted); }
+.lc-lines li.muted::before { background: var(--line-strong); }
+.lc-phone { position: relative; max-width: 330px; max-height: 420px; margin: 0 auto; overflow: auto; padding: 22px 16px 14px; border: 6px solid #1b1f27; border-radius: 30px; background: #fbf7ef; color: #231c16; box-shadow: 0 14px 40px rgba(0, 0, 0, .35); font-family: Georgia, "Times New Roman", serif; }
+.lc-notch { position: absolute; top: 6px; left: 50%; width: 70px; height: 6px; border-radius: 6px; background: #1b1f27; transform: translateX(-50%); }
+.lc-title { margin: 4px 0 10px; font-size: 19px; font-weight: 700; text-align: center; letter-spacing: .02em; }
+.lc-phone section { margin-top: 10px; }
+.lc-phone h5 { margin: 0 0 6px; padding-bottom: 4px; border-bottom: 1px solid rgba(35, 28, 22, .18); color: #7a1f2b; font: 700 11.5px var(--sans); letter-spacing: .14em; text-transform: uppercase; }
+.lc-item { display: flex; align-items: baseline; justify-content: space-between; gap: 10px; margin: 0 -6px; padding: 5px 6px; border-radius: 8px; font-size: 14px; }
+.lc-item span { min-width: 0; }
+.lc-item small { display: block; color: #6f655a; font: 12px var(--sans); }
+.lc-item b { flex: none; font-weight: 700; white-space: nowrap; }
+.lc-item s { color: #9b8f82; font-weight: 400; }
+.lc-item em { display: inline-block; margin-left: 4px; padding: 1px 6px; border-radius: 99px; background: #c8892b; color: #fff; font: 700 9.5px var(--sans); font-style: normal; letter-spacing: .06em; text-transform: uppercase; vertical-align: 2px; }
+.lc-item[class*="mk-"] { background: #fbe9c4; animation: lc-flash 1.6s ease-out 1; }
+.lc-item.mk-nuovo { background: #ddf1e2; }
+.lc-item.mk-nuovo em { background: #3f8a5f; }
+.lc-item.mk-tolto { background: #f6dede; color: #8b4a4a; text-decoration: line-through; }
+.lc-item.mk-tolto em { background: #a12c3a; text-decoration: none; }
+.lc-more { margin: 6px 0 0; color: #8a7f73; font: italic 12.5px var(--sans); text-align: center; }
+.live-card.premium .lc-phone { border-color: #0d0d0f; background: #121214; color: #efe6d4; }
+.live-card.premium .lc-phone h5 { border-color: rgba(201, 162, 90, .35); color: #c9a25a; }
+.live-card.premium .lc-item small { color: #a99f8f; }
+.live-card.premium .lc-item[class*="mk-"] { background: rgba(201, 162, 90, .2); }
+.live-card.premium .lc-item.mk-nuovo { background: rgba(91, 227, 162, .14); }
+.live-card.premium .lc-item.mk-tolto { background: rgba(255, 107, 122, .14); color: #d9a0a8; }
+.lc-open { display: block; width: 100%; min-height: 42px; margin-top: 10px; border: 1px solid var(--line-strong); border-radius: 12px; background: transparent; color: var(--teal); font: 700 14px var(--sans); cursor: pointer; }
+@keyframes lc-flash { 0% { box-shadow: 0 0 0 0 rgba(200, 137, 43, .7); } 100% { box-shadow: 0 0 0 10px rgba(200, 137, 43, 0); } }
+@media (prefers-reduced-motion: reduce) { .lc-item[class*="mk-"] { animation: none; } }
+
+/* ——— «Pronto per te» e briefing a voce ——— */
+.msg.j.ready { position: relative; max-width: 100%; border-left: 3px solid var(--am); }
+.msg.j.ready.k-pubblica { border-left-color: var(--gr); }
+.msg.j.ready.k-risposta { border-left-color: var(--teal); }
+.ready-kind, .brief-n { display: inline-block; margin-bottom: 6px; color: var(--am); font: 700 10.5px var(--mono); letter-spacing: .1em; text-transform: uppercase; }
+.k-pubblica .ready-kind { color: var(--gr); }
+.k-risposta .ready-kind { color: var(--teal); }
+.brief-n { color: var(--teal); }
+.brief-n::before { content: "BRIEFING · "; }
+.chat-btns button.quiet { border-color: var(--line-strong); color: var(--muted-strong); }
+.chat-btns button.brief-go { border-color: var(--am); background: var(--am); color: #1a1000; }
+.chat-btns button.brief-go:hover { background: transparent; color: var(--am); }

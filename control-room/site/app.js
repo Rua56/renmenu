@@ -1,11 +1,11 @@
-import { fetchMaterialPreview, getMaterialUrl, isAuthorizedHost, isDemoMode, isPreviewableMime, loadState, modeLabel, performAction, uploadFile, uploadMediaImage } from './api.js';
+import { fetchMaterialPreview, getMaterialUrl, isAuthorizedHost, isDemoMode, isPreviewableMime, jarvisReady, loadState, modeLabel, performAction, uploadFile, uploadMediaImage } from './api.js';
 import { menuDiff, validateMenu } from './model.js';
 import { criticalFields, reviewIssues, suggestedEvidence } from './editorial.js';
 import { PLAN_RULES, REQUEST_CATEGORIES, categoryByCode, draftBlocker, planIssues, planWarnings } from './service-rules.js';
 import { provisionalQrSvg, provisionalTarget } from './provisional-qr.js';
 import { mountPdfPreview } from './pdf-preview.js';
 import { extractPdfText } from './material-extract.js';
-import { announce, chatIn, closeChat, openChat, refreshChat } from './jarvis-chat.js';
+import { announce, briefing, chatIn, closeChat, onJarvisReply, openChat, refreshChat } from './jarvis-chat.js';
 import { logLines, markFresh } from './jarvis-log.js';
 import { play, setSounds, soundsAvailable, soundsOn } from './jarvis-sound.js';
 import { greetOnce, greetingFor, lastVisit, markVisit } from './jarvis-greet.js';
@@ -411,7 +411,8 @@ function prepareGreeting() {
     document.removeEventListener('pointerdown', speakOnce, true);
     // Un tocco sul nucleo o sulla barra apre già la voce: il saluto non si sovrappone.
     if (event.target.closest?.('[data-action="core-talk"], [data-action^="ask"], #ask-sheet')) return;
-    announce(text.say);
+    const waiting = (readyList || []).filter((item) => item.buttons?.length).length;
+    announce(`${text.say}${waiting ? ` Ti ho preparato ${waiting === 1 ? 'una cosa' : `${waiting} cose`} da decidere: dimmi «fammi il briefing» e te le leggo una alla volta.` : ''}`);
   };
   document.addEventListener('pointerdown', speakOnce, true);
 }
@@ -1099,6 +1100,24 @@ function renderCommand() {
 // La home è la conversazione con Jarvis (stesso cervello di Telegram): in cima, come suoi messaggi, quello che
 // aspetta una tua decisione e quello che propone; sotto, la chat. Numeri, registro e impostazioni sono in Strumenti.
 const homeTalk = $('#jarvis-talk');
+// «Pronto per te»: le decisioni che Jarvis ha già preparato (pubblicazioni, promemoria e risposte ai locali,
+// bozze da affidare, proposte), lette dal server con i loro pulsanti. Si rileggono dopo ogni risposta di Jarvis.
+let readyList = null;
+let readyLoading = false;
+async function loadReady() {
+  if (readyLoading || !isAuthorizedHost) return;
+  readyLoading = true;
+  try { const out = await jarvisReady(); readyList = Array.isArray(out?.items) ? out.items : []; }
+  catch { /* resta l'elenco di prima; senza, la home mostra le pratiche da decidere */ }
+  finally { readyLoading = false; }
+  if (activeView === 'command') refreshChat();
+}
+const READY_KIND = { pubblica: 'Da pubblicare', promemoria: 'Promemoria pronto', risposta: 'Risposta pronta', bozza: 'Bozza pronta', ferma: 'Pratica ferma', idea: 'Ti propongo' };
+function readyMessage(item) {
+  const buttons = item.buttons.map(([label, data]) => `<button type="button" data-chat-press="${escapeHtml(data)}">${escapeHtml(label)}</button>`).join('');
+  const open = item.requestId && requestById(item.requestId) ? `<button type="button" class="quiet" data-select-request="${escapeHtml(item.requestId)}" data-route="pratica">Apri la pratica</button>` : '';
+  return `<div class="msg j ready k-${escapeHtml(item.kind || 'idea')}"><span class="ready-kind">${escapeHtml(READY_KIND[item.kind] || 'Pronto')}</span><div class="chat-text">${escapeHtml(item.text)}</div><div class="chat-btns">${buttons}${open}</div></div>`;
+}
 function homeIntro() {
   const all = allPratiche();
   const decide = all.filter((info) => info.group === 'decidere');
@@ -1107,6 +1126,14 @@ function homeIntro() {
   const out = [msg(isDemoMode
     ? 'Demo: qui le risposte sono finte e non parte nulla.'
     : 'Dimmi cosa fare, a parole o a voce: «nel menu del Tralcio il frico costa 14», «crea una pratica per …», «pubblica il menu di …», «elimina la pratica di …». Pubblicare e scrivere ai clienti resta sempre un tuo SÌ.')];
+  const ready = (readyList || []).filter((item) => item.buttons?.length);
+  if (ready.length) {
+    out.push(msg(`<strong>Pronto per te</strong>: ${ready.length === 1 ? 'ho preparato una cosa che aspetta' : `ho preparato ${ready.length} cose che aspettano`} solo un tuo tocco. Se vuoi te le leggo io, una alla volta, e rispondi a voce.`,
+      `<button type="button" class="brief-go" data-chat-brief>${briefing() ? 'Ferma il briefing' : '▶ Briefing a voce'}</button>`));
+    ready.slice(0, 4).forEach((item) => out.push(readyMessage(item)));
+    if (ready.length > 4) out.push(msg(`E altre ${ready.length - 4}: te le leggo nel briefing.`));
+    return out.join('');
+  }
   decide.slice(0, 3).forEach((info) => {
     const detail = info.mission?.note || info.request.nextStep || '';
     out.push(msg(`<strong>${escapeHtml(info.client?.name || info.request.subject)}</strong>: ${escapeHtml(info.headline)}${detail ? `. ${escapeHtml(detail)}` : ''}`, open(info)));
@@ -1562,6 +1589,7 @@ async function liveTick() {
     if (snapshot === lastSnapshot) return;
     lastSnapshot = snapshot;
     state = next;
+    loadReady();
     if (['command', 'pratiche'].includes(activeView) && !document.activeElement?.matches?.('input, textarea, select')) render();
   } catch { /* rete assente: si riprova al giro dopo */ }
 }
@@ -2188,6 +2216,8 @@ async function init() {
   if (!isAuthorizedHost) { renderUnavailable(); return; }
   activeView = routeFromHash();
   try { await refresh(); } catch (error) { renderAccessError(error); return; }
+  onJarvisReply(() => loadReady());
+  loadReady();
   prepareGreeting();
   listenForWake();
   scheduleLive();
