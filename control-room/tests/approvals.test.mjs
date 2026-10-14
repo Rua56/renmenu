@@ -131,6 +131,11 @@ describe('Percorso di approvazione nella API staging', () => {
       const owner = await action(db, 'preparePreview', { draftId: draft.id, revision: reviewed.revision, recipient: 'renmenu1569@gmail.com' });
       assert.equal(owner.status, 422);
       assert.match(owner.body.error, /casella RenMenu/);
+      // Prove: se Jarvis spedisce da renmenu.com, la casella RenMenu può fare da cliente.
+      const direct = { CLIENT_MAIL_FROM: 'RenMenu <menu@renmenu.com>', EMAIL_LIVE_ENABLED: 'true', RESEND_API_KEY: 're_test_key' };
+      const test = await call(db, 'actions', { type: 'preparePreview', payload: { draftId: draft.id, revision: reviewed.revision, recipient: 'renmenu1569@gmail.com' } }, direct);
+      assert.equal(test.status, 200, JSON.stringify(test.body));
+      assert.equal(test.body.result.recipient, 'renmenu1569@gmail.com');
     } finally { db.close(); }
   });
   it('il consenso non si spunta a mano e i menu nuovi richiedono l’attivazione', async () => {
