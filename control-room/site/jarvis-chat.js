@@ -139,6 +139,13 @@ function browserSay(text) {
     poll = setInterval(() => { if (Date.now() - started > 1500 && !Synth.speaking && !Synth.pending) end(); }, 300);
   });
 }
+/** Jarvis parla fuori dalla conversazione (saluto all'apertura): voce del telefono, gratis, e il reattore segue. */
+export async function announce(text) {
+  if (!text || phase !== 'idle' || (sheet && !sheet.hidden)) return;
+  setPhase('speaking');
+  await browserSay(text);
+  if (phase === 'speaking') setPhase('idle');
+}
 async function say(text, { always = false } = {}) {
   if (!text || !sheet || (sheet.hidden && !always)) return;
   setPhase('speaking');

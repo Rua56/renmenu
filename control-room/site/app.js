@@ -5,7 +5,8 @@ import { PLAN_RULES, REQUEST_CATEGORIES, categoryByCode, draftBlocker, planIssue
 import { provisionalQrSvg, provisionalTarget } from './provisional-qr.js';
 import { mountPdfPreview } from './pdf-preview.js';
 import { extractPdfText } from './material-extract.js';
-import { closeChat, openChat } from './jarvis-chat.js';
+import { announce, closeChat, openChat } from './jarvis-chat.js';
+import { greetOnce, greetingFor, lastVisit, markVisit } from './jarvis-greet.js';
 import { pauseWake, startWake, wakeAvailable, wakeEnabled, wakeState, setWakeEnabled } from './jarvis-wake.js';
 import { showFor } from './jarvis-show.js';
 import { installApp, installed } from './hud.js';
@@ -390,6 +391,26 @@ function showWakeState(current) {
   const hint = document.querySelector('[data-wake-hint]');
   if (hint) { hint.textContent = wakeHint(current); hint.dataset.state = current; }
 }
+// Saluto all'apertura (jarvis-greet.js): il testo sotto il titolo per un minuto, la voce al primo tocco.
+let welcome = null;
+function prepareGreeting() {
+  const before = lastVisit();
+  markVisit();
+  window.addEventListener('pagehide', () => markVisit());
+  document.addEventListener('visibilitychange', () => { if (document.hidden) markVisit(); });
+  if (!greetOnce()) return;
+  const text = greetingFor({ requests: state.requests, clients: state.clients, missions: state.missions || [], audit: state.audit || [], before, now: Date.now() });
+  welcome = { ...text, until: Date.now() + 60_000, typed: false };
+  if (activeView === 'command') render();
+  setTimeout(() => { welcome = null; if (activeView === 'command') render(); }, 61_000);
+  const speakOnce = (event) => {
+    document.removeEventListener('pointerdown', speakOnce, true);
+    // Un tocco sul nucleo o sulla barra apre già la voce: il saluto non si sovrappone.
+    if (event.target.closest?.('[data-action="core-talk"], [data-action^="ask"], #ask-sheet')) return;
+    announce(text.say);
+  };
+  document.addEventListener('pointerdown', speakOnce, true);
+}
 function listenForWake() {
   startWake({ onWake: (rest) => openAsk(!rest, { wake: true, firstText: rest }), onState: showWakeState });
 }
@@ -409,7 +430,11 @@ function jarvisHero() {
   if (active) parts.push(`sto seguendo <strong>${active}</strong> ${active === 1 ? 'pratica' : 'pratiche'}`);
   const says = parts.length ? `${parts.join(', ')}.` : 'Tutto in ordine: nessuna decisione in sospeso. Puoi scrivermi o mandarmi un vocale su Telegram.';
   const tile = (route, label, value, note, hot = false) => `<button class="jarvis-action${hot && value ? ' hot' : ''}" type="button" data-route="${route}"><small>${label}</small><strong>${value}</strong><span>${note}</span></button>`;
-  return `<section class="jarvis-hero" aria-label="Jarvis"><button class="reactor reactor-main${autopilotRunning || active ? ' busy' : ''}${waitingYes ? ' wait' : ''}" type="button" data-action="core-talk" aria-label="Parla con Jarvis"><i class="arc" aria-hidden="true"></i><i class="wave" aria-hidden="true"></i><i class="wave w2" aria-hidden="true"></i><span class="r1"></span><span class="r2"></span><span class="r3"></span><span class="core"></span></button><p class="core-hint" data-wake-hint>${escapeHtml(wakeHint())}</p><div><p class="eyebrow">${new Intl.DateTimeFormat('it-IT', { weekday: 'long', day: 'numeric', month: 'long', timeZone: 'Europe/Rome' }).format(new Date())}</p><h1>${greeting}, Riccardo</h1><p class="jarvis-says">${says}</p></div></section>`;
+  // Per un minuto dopo l'apertura, prima della situazione c'è la frase sulle novità dall'ultima visita.
+  const greet = welcome && Date.now() < welcome.until ? welcome : null;
+  const typed = greet && !welcome.typed;
+  if (typed) welcome.typed = true;
+  return `<section class="jarvis-hero" aria-label="Jarvis"><button class="reactor reactor-main${autopilotRunning || active ? ' busy' : ''}${waitingYes ? ' wait' : ''}" type="button" data-action="core-talk" aria-label="Parla con Jarvis"><i class="arc" aria-hidden="true"></i><i class="wave" aria-hidden="true"></i><i class="wave w2" aria-hidden="true"></i><span class="r1"></span><span class="r2"></span><span class="r3"></span><span class="core"></span></button><p class="core-hint" data-wake-hint>${escapeHtml(wakeHint())}</p><div><p class="eyebrow">${new Intl.DateTimeFormat('it-IT', { weekday: 'long', day: 'numeric', month: 'long', timeZone: 'Europe/Rome' }).format(new Date())}</p><h1>${greeting}, Riccardo</h1><p class="jarvis-says${typed ? ' typing' : ''}">${greet?.news ? `${escapeHtml(greet.news)} ` : ''}${says}</p></div></section>`;
 }
 
 function requestOperationalCard(request, compact = false) {
@@ -1927,6 +1952,7 @@ async function init() {
   if (!isAuthorizedHost) { renderUnavailable(); return; }
   activeView = routeFromHash();
   try { await refresh(); } catch (error) { renderAccessError(error); return; }
+  prepareGreeting();
   listenForWake();
 }
 init();
