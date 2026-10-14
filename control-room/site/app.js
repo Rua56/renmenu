@@ -5,6 +5,7 @@ import { PLAN_RULES, REQUEST_CATEGORIES, categoryByCode, draftBlocker, planIssue
 import { provisionalQrSvg, provisionalTarget } from './provisional-qr.js';
 import { mountPdfPreview } from './pdf-preview.js';
 import { extractPdfText } from './material-extract.js';
+import { closeChat, openChat } from './jarvis-chat.js';
 import { configureVoice, interpretVoice, listen, speak, speechAvailable, synthesisAvailable, stopListening, voiceSettings } from './voice.js';
 import { resetDemoState } from './demo-store.js';
 
@@ -306,7 +307,7 @@ function renderNavigation() {
   const tab = activeTab();
   const link = ([id, , label]) => `<a class="nav-link" href="#${id}" aria-current="${tab === id ? 'page' : 'false'}">${TAB_ICONS[id]}<span>${label}</span>${hint(id)}</a>`;
   primaryNav.innerHTML = '';
-  bottomNav.innerHTML = `<button class="ask" type="button" data-action="ask-open" aria-label="Scrivi o parla a Jarvis"><span>Scrivi o parla a Jarvis…</span><b aria-hidden="true"><svg viewBox="0 0 24 24"><rect x="9" y="3" width="6" height="11" rx="3" fill="none" stroke="currentColor" stroke-width="1.8"/><path d="M5.5 11.5a6.5 6.5 0 0 0 13 0M12 18v3" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></svg></b></button><div class="tabs">${navItems.filter(([id]) => MAIN_TABS.includes(id)).map(link).join('')}</div>`;
+  bottomNav.innerHTML = `<button class="ask" type="button" data-action="ask-open" aria-label="Scrivi o parla a Jarvis"><span>Scrivi o parla a Jarvis…</span><b data-action="ask-voice" aria-hidden="true"><svg viewBox="0 0 24 24"><rect x="9" y="3" width="6" height="11" rx="3" fill="none" stroke="currentColor" stroke-width="1.8"/><path d="M5.5 11.5a6.5 6.5 0 0 0 13 0M12 18v3" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></svg></b></button><div class="tabs">${navItems.filter(([id]) => MAIN_TABS.includes(id)).map(link).join('')}</div>`;
 }
 function renderUnavailable() {
   modeBadge.textContent = 'NON DISPONIBILE';
@@ -1083,8 +1084,8 @@ async function handleOggiAction(action, trigger) {
     return true;
   }
   if (action === 'ask-open') { openAsk(); return true; }
+  if (action === 'ask-voice') { openAsk(true); return true; }
   if (action === 'ask-close') { closeAsk(); return true; }
-  if (action === 'ask-copy') { try { await navigator.clipboard.writeText(trigger.dataset.text); toast('Copiato: incollalo in Telegram.'); } catch { toast('Copia non riuscita: scrivilo a mano in Telegram.', 'error'); } return true; }
   if (action === 'rileggi-online') { const request = requestById(); if (draft && request) { onlineMenus.delete(draft.id); render(); } return true; }
   if (!action.startsWith('edit-') && !action.startsWith('add-')) return false;
   if (!draft) return true;
@@ -1174,20 +1175,12 @@ function renderLocale() {
     <p class="lab">PRATICHE</p><div class="oggi-cards">${infos.length ? infos.map(praticaCard).join('') : empty('Nessuna pratica per questo locale.')}</div>
     <div class="acts">${link ? `<a class="button secondary" href="${escapeHtml(link)}" target="_blank" rel="noopener">Apri il menu</a>` : ''}<button class="button secondary" type="button" data-select-client="${escapeHtml(client.id)}" data-route="clienti">Scheda completa</button></div></div>`;
 }
-// «Scrivi o parla a Jarvis»: la conversazione vera avviene su Telegram; qui le frasi utili e il collegamento.
-const ASK_PHRASES = ['Mostrami l’anteprima di …', 'Mandami il QR di …', 'Nella bozza di … metti … a … euro'];
+// «Scrivi o parla a Jarvis»: conversazione vera con Jarvis (stesso cervello di Telegram), anche a voce.
 const askSheet = $('#ask-sheet');
-function openAsk() {
-  const bot = state?.telegram?.bot;
-  const linked = state?.telegram?.linked;
-  askSheet.innerHTML = `<div class="sheet-head"><strong>Parla con Jarvis</strong><button type="button" data-action="ask-close">Chiudi</button></div>
-    <div class="log"><div class="msg j">Per scrivermi o mandarmi un vocale usa Telegram: lì capisco testo e voce, ti mostro l’anteprima e ti chiedo il SÌ prima di pubblicare.</div>${isDemoMode ? '<div class="msg j">Questa è la demo: nessun messaggio parte.</div>' : linked === false ? '<div class="msg j">Telegram non risulta ancora collegato.</div>' : ''}</div>
-    <p class="lab">Frasi utili · tocca per copiare</p><div class="quick">${ASK_PHRASES.map((phrase) => `<button type="button" data-action="ask-copy" data-text="${escapeHtml(phrase)}">${escapeHtml(phrase)}</button>`).join('')}</div>
-    ${bot && !isDemoMode ? `<a class="cta" href="https://t.me/${escapeHtml(bot)}" target="_blank" rel="noopener">Apri Telegram</a>` : ''}`;
-  askSheet.hidden = false;
-  askSheet.querySelector('button')?.focus();
+function openAsk(listenNow = false) {
+  openChat(askSheet, { voice: Boolean(state?.voice?.provider && state?.voice?.hasKey), bot: state?.telegram?.bot || '', listenNow });
 }
-function closeAsk() { askSheet.hidden = true; }
+function closeAsk() { closeChat(); }
 document.addEventListener('keydown', (event) => { if (event.key === 'Escape' && !askSheet.hidden) closeAsk(); });
 function toolBackBar() {
   const request = requestById();

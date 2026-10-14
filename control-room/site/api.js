@@ -67,6 +67,34 @@ export async function uploadMediaImage(mediaId, blob) {
   return parseResponse(response);
 }
 
+/** «Parla con Jarvis»: la frase va al cervello di Jarvis (lo stesso di Telegram), le risposte tornano qui. */
+export async function askJarvis(payload) {
+  requireAuthorizedHost();
+  if (isDemoMode) {
+    const text = payload.press ? 'Demo: pulsante ricevuto, nessuna azione eseguita.' : `Demo: ho capito «${String(payload.text || '').slice(0, 120)}». Nella Control Room vera ti risponde Jarvis con lo stesso cervello di Telegram.`;
+    return { messages: [{ kind: 'text', text, say: text, buttons: payload.press ? [] : [['Va bene', 'demo:ok']] }] };
+  }
+  const response = await fetch('/control-room/api/jarvis/ask', {
+    method: 'POST', credentials: 'same-origin',
+    headers: { 'Content-Type': 'application/json', Accept: 'application/json' },
+    body: JSON.stringify(payload)
+  });
+  return parseResponse(response);
+}
+
+/** Voce di Jarvis (ElevenLabs) per una risposta. null se non è configurata o non risponde. */
+export async function jarvisVoiceAudio(text) {
+  requireAuthorizedHost();
+  if (isDemoMode) return null;
+  const response = await fetch('/control-room/api/jarvis/voice', {
+    method: 'POST', credentials: 'same-origin',
+    headers: { 'Content-Type': 'application/json', Accept: 'audio/mpeg' },
+    body: JSON.stringify({ text })
+  });
+  if (response.status !== 200 || !(response.headers.get('content-type') || '').startsWith('audio/')) return null;
+  return response.blob();
+}
+
 /** A mock must not expose a pseudo URL for a material. */
 export function getMaterialUrl(id) {
   if (!isAuthorizedHost) return null;

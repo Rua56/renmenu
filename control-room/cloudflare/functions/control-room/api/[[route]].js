@@ -23,6 +23,7 @@ import { prepareEmailSource } from '../../_lib/email-text.js';
 import { autopilotMessage, autopilotPreview, classifyRequest } from '../../_lib/autopilot.js';
 import { understandClientRequest } from '../../_lib/request-ai.js';
 import { createMissions } from '../../_lib/missions.js';
+import { spokenText, telegramCapture } from '../../_lib/cr-chat.js';
 import { noteStatement } from '../../_lib/memory.js';
 import { THEMES, proposeTheme, themeFromText } from '../../_lib/themes.js';
 import { dropRepeatedPages, notesSummary, reviewNotes, structureNotes } from '../../_lib/notes.js';
@@ -416,6 +417,44 @@ async function mediaRows(db, rawDrafts) {
 
 // Jarvis autonomo: missioni affidate da Riccardo (vedi _lib/missions.js).
 export const missions = createMissions({ action: (...args) => action(...args), auditedBatch, getOne, rows, now, uid, fetchImpl: (...args) => globalThis.fetch(...args) });
+// «Parla con Jarvis» dalla Control Room: la frase passa dallo stesso cervello di Telegram (vedi
+// _lib/cr-chat.js) e le risposte tornano qui invece di partire su Telegram. I pulsanti premuti nella
+// Control Room valgono come i tocchi su Telegram, ma solo quelli che Jarvis ha offerto qui.
+const missionDeps = { action: (...args) => action(...args), auditedBatch, getOne, rows, now, uid };
+const FAKE_TG_TOKEN = `1000000:${'x'.repeat(35)}`;
+export async function jarvisAsk(env, input = {}) {
+  const db = env.DB;
+  const text = String(input.text || '').replace(/\s+/g, ' ').trim().slice(0, 1000);
+  const press = String(input.press || '').trim().slice(0, 64);
+  assert(text || press, 'Scrivi o di’ qualcosa a Jarvis.');
+  const chat = await missions.setting(db, 'telegram_chat_id');
+  assert(chat, 'Jarvis non ha ancora un proprietario: collega prima Telegram da Sistema → Notifiche.', 409);
+  let offered = [];
+  try { offered = JSON.parse(await missions.setting(db, 'cr_buttons') || '[]'); } catch { offered = []; }
+  if (press) assert(Array.isArray(offered) && offered.includes(press), 'Questo pulsante non è più valido: chiedi di nuovo a Jarvis.', 409);
+  const capture = telegramCapture((...args) => globalThis.fetch(...args));
+  const talk = createMissions({ ...missionDeps, fetchImpl: capture.fetchImpl });
+  // Senza token Telegram Jarvis non «manda» nulla: un token finto basta, tanto le chiamate restano qui.
+  const tgEnv = telegramReady(env) ? env : Object.assign(Object.create(env), { TELEGRAM_BOT_TOKEN: FAKE_TG_TOKEN });
+  await talk.telegramUpdate(db, tgEnv, press
+    ? { callback_query: { id: `cr-${uid()}`, data: press, message: { chat: { id: chat } } } }
+    : { message: { chat: { id: chat, type: 'private' }, text } });
+  const fresh = capture.messages.flatMap((m) => (m.buttons || []).map(([, data]) => data));
+  if (fresh.length || press) await missions.putSetting(db, 'cr_buttons', JSON.stringify([...new Set([...fresh, ...offered.filter((d) => d !== press)])].slice(0, 40)));
+  const messages = capture.messages.map((m) => ({ ...m, say: m.kind === 'text' || m.kind === 'note' ? spokenText(m.text) : '' }));
+  if (!messages.length) messages.push({ kind: 'text', text: 'Fatto.', buttons: [], say: 'Fatto.' });
+  return { messages };
+}
+// Voce di Jarvis (ElevenLabs) per la Control Room: solo se Riccardo la accende nel foglio, perché consuma crediti.
+export async function jarvisVoice(env, input = {}) {
+  const db = env.DB;
+  const text = spokenText(input.text);
+  assert(text, 'Niente da dire.');
+  const settings = { provider: await missions.setting(db, 'voice_provider'), apiKey: await readSealedSetting(env, missions.setting, missions.putSetting, db, 'voice_api_key'), voiceId: await missions.setting(db, 'voice_id') };
+  const audio = settings.provider && settings.apiKey ? await speak(settings, text) : null;
+  if (!audio?.length) return new Response(null, { status: 204 });
+  return new Response(audio, { headers: { 'Content-Type': 'audio/mpeg', 'Cache-Control': 'private, no-store' } });
+}
 async function missionRows(db) {
   try { return await rows(db, 'SELECT id,request_id AS requestId,draft_id AS draftId,status,note,rounds,step_started_at AS stepStartedAt,updated_at AS updatedAt FROM jarvis_missions ORDER BY updated_at DESC LIMIT 200'); }
   catch (error) { if (/no such table/i.test(String(error?.message))) return []; throw error; }
@@ -1663,6 +1702,12 @@ export async function onRequest(context) {
       assert(isSameOriginWrite(request), 'Origine non autorizzata.', 403);
       if (segments.join('/') === 'material') return uploadMaterial(context);
       if (segments[0] === 'media' && segments.length === 2) return answer({ result: await uploadMediaImage(context, segments[1]) });
+      if (segments[0] === 'jarvis' && ['ask', 'voice'].includes(segments[1]) && segments.length === 2) {
+        assert(request.headers.get('content-type')?.startsWith('application/json'), 'Serve application/json.', 415);
+        assert(Number(request.headers.get('content-length') || 0) <= 20_000, 'Messaggio troppo lungo.');
+        const input = await request.json();
+        return segments[1] === 'ask' ? answer(await jarvisAsk(context.env, input)) : await jarvisVoice(context.env, input);
+      }
       if (segments.join('/') === 'actions') {
         assert(request.headers.get('content-type')?.startsWith('application/json'), 'Serve application/json.', 415);
         assert(Number(request.headers.get('content-length') || 0) <= 300_000, 'Payload troppo grande.');
