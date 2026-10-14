@@ -30,6 +30,7 @@ import { callOutcome, callOwner, ensureAgent, phoneNumber, twilioNumber } from '
 import { approveSender, blockSender, takeUnannouncedHeld } from './whatsapp-in.js';
 import { lastReadingTest, startReadingTest } from './reading-test.js';
 import { LATER_MS, MUTE_MS, REPEAT_MS, activeInitiatives, loadInitiatives } from './initiative.js';
+import { draftClientReply, lastMessage, originalSubject, sendWhatsAppReply } from './client-reply.js';
 
 export const PARTIAL_MARK = '[Testo parziale: leggi l’email completa in Gmail prima di decidere]';
 export const OWNER_REVIEW = 'telegram:riccardo';
@@ -661,6 +662,7 @@ export function createMissions(deps) {
     const ack = (text) => (query?.id ? answerCallback(env, query.id, text, deps.fetchImpl) : null);
     const clear = () => (query?.message?.message_id ? clearButtons(env, chat, query.message.message_id, deps.fetchImpl) : null);
     await putSetting(db, 'tg_buttons', 'null').catch(() => {});
+    if (verb !== 'rep') await putSetting(db, 'reply_editing', 'null').catch(() => {}); // un altro pulsante chiude la modifica della risposta
     if (verb === 'chk') {
       await clear();
       const outcome = missionId === 'end' ? await answerCheck(db, env, chat, -1, 'end') : await answerCheck(db, env, chat, Number(missionId), String(extra || ''));
@@ -673,6 +675,13 @@ export function createMissions(deps) {
       await ack(missionId === 'mute' ? 'Lascio stare' : 'Più tardi');
       await clear();
       await sendTg(db, env, chat, text, null, deps.fetchImpl);
+      return;
+    }
+    if (verb === 'rep') {
+      const outcome = await answerReply(db, env, missionId, extra);
+      await ack(missionId === 'send' ? (outcome.ok ? 'Mandata' : 'Non partita') : missionId === 'edit' ? 'Dimmi come' : 'Non rispondo');
+      await clear();
+      await sendTg(db, env, chat, outcome.text, outcome.buttons || null, deps.fetchImpl, { stacked: true });
       return;
     }
     if (verb === 'tel') {
@@ -779,6 +788,7 @@ export function createMissions(deps) {
       return;
     }
     if (!chat || from !== chat) return;
+    if (await replyEditTurn(db, env, chat, text)) return;
     // Dubbi aperti: un prezzo scritto («7,50») risponde al dubbio in corso.
     if (normalizePrice(text)) {
       let open = null; try { open = JSON.parse(await setting(db, 'tg_checks') || 'null'); } catch {}
@@ -821,6 +831,13 @@ export function createMissions(deps) {
       return;
     }
     if (/^\/settimana\b/i.test(text)) { await sendTg(db, env, chat, digestText(await buildDigest(db)), null, deps.fetchImpl); return; }
+    if (/^\/risposte\b/i.test(text)) {
+      const want = /(?:^|\s)(?:si|sì|on)(?:\s|$)/i.test(text) ? 'si' : /(?:^|\s)(?:no|off)(?:\s|$)/i.test(text) ? 'no' : null;
+      if (want) await putSetting(db, 'reply_enabled', want);
+      const on = (await setting(db, 'reply_enabled')) !== 'no';
+      await sendTg(db, env, chat, on ? 'Risposte pronte accese: quando un locale scrive su WhatsApp o per email ti preparo la risposta dai dati della pratica, e parte solo se tocchi «Manda». Scrivi «/risposte no» per spegnerle.' : 'Risposte pronte spente: ti avviso dei messaggi dei locali ma non ti preparo la risposta. «/risposte sì» per riaccenderle.', null, deps.fetchImpl);
+      return;
+    }
     if (/^\/idee\b/i.test(text) || IDEAS_WORDS.test(text)) {
       const on = /^\/idee\s+(?:si|sì|on)\b/i.test(text) ? 'si' : /^\/idee\s+(?:no|off)\b/i.test(text) ? 'no' : null;
       if (on) { await putSetting(db, 'ini_enabled', on); await sendTg(db, env, chat, on === 'si' ? 'Va bene: tra le 11 e le 19 ti propongo io le cose ferme o in scadenza, al massimo due al giorno.' : 'Va bene: durante il giorno non ti propongo più nulla da solo. Restano il giro delle 8 e «/idee» quando vuoi.', null, deps.fetchImpl); return; }
@@ -924,6 +941,7 @@ export function createMissions(deps) {
     if (!file?.bytes?.length) { await sendTg(db, env, chat, 'Non riesco a scaricare il vocale da Telegram: riprova.', null, deps.fetchImpl); return; }
     const heard = await transcribe(env.AI, file.bytes);
     if (!heard.ok) { await sendTg(db, env, chat, `Perdona Riccardo, ${heard.reason}. Puoi ripetere?`, null, deps.fetchImpl); return; }
+    if (await replyEditTurn(db, env, chat, heard.text.trim(), true)) return;
     if (STATUS_WORDS.test(heard.text.trim())) { await reply(db, env, chat, `«${heard.text.trim()}»\n\n${await statusText(db)}`, false); return; }
     await converse(db, env, chat, heard.text, true);
   }
@@ -1929,6 +1947,136 @@ export function createMissions(deps) {
     return { proposals: saved };
   }
 
+  // ——— Risposte pronte ai clienti (client-reply.js): Jarvis scrive, Riccardo manda con un tocco ———
+  const REPLY_DELAY_MS = 2 * MINUTE;
+  const REPLY_EDIT_MS = 15 * MINUTE;
+  const SEND_WORDS = /^\W*(?:ok[\s,]*)?(?:manda(?:la)?|invia(?:la)?|spedisci(?:la)?|va bene,? manda(?:la)?)[\s!.]*$/i;
+  const replyButtons = (id) => [['Manda', `rep:send:${id}`], ['Cambia', `rep:edit:${id}`], ['Non rispondere', `rep:skip:${id}`]];
+  const replyShown = (saved, intro) => ({
+    text: `${intro} per «${saved.name}» (${saved.channel === 'whatsapp' ? 'WhatsApp' : `email a ${saved.to}`}):\n\n${saved.text}\n\nParte solo se tocchi «Manda».`,
+    buttons: replyButtons(saved.id)
+  });
+  async function loadReply(db, id) { try { return JSON.parse(await setting(db, `reply_${id}`) || 'null'); } catch { return null; } }
+  async function queueReplies(db, requestIds) {
+    if ((await setting(db, 'reply_enabled')) === 'no') return;
+    let queue = {}; try { queue = JSON.parse(await setting(db, 'reply_queue') || '{}') || {}; } catch {}
+    const due = new Date(Date.parse(now()) + REPLY_DELAY_MS).toISOString();
+    for (const id of requestIds) queue[id] = due;
+    await putSetting(db, 'reply_queue', JSON.stringify(queue));
+  }
+  /** I fatti della pratica per la risposta: stato, bozza, missione, materiale, link del menu, canale e destinatario. */
+  async function replyContext(db, requestId) {
+    const one = async (sql, ...args) => { try { return await getOne(db, sql, ...args); } catch { return null; } };
+    const r = await one(`SELECT r.id,r.subject,r.status,r.source_channel,r.source_text,r.contact_info,COALESCE(r.menu_id,c.menu_id) AS menu_id,c.name AS client_name,c.email AS client_email,c.phone AS client_phone
+      FROM requests r LEFT JOIN clients c ON c.id=r.client_id WHERE r.id=?`, requestId);
+    if (!r) return null;
+    const draft = await one('SELECT id,status,slug,menu_json FROM drafts WHERE request_id=? ORDER BY updated_at DESC LIMIT 1', requestId);
+    const mission = await one('SELECT id,status FROM jarvis_missions WHERE request_id=? ORDER BY updated_at DESC LIMIT 1', requestId);
+    const materials = (await one('SELECT COUNT(*) AS n FROM materials WHERE request_id=? AND archived_at IS NULL', requestId))?.n || 0;
+    const last = await one('SELECT source,received_at FROM external_events WHERE request_id=? ORDER BY received_at DESC LIMIT 1', requestId);
+    const channel = last?.source === 'whatsapp' || (!last && r.source_channel === 'whatsapp') ? 'whatsapp' : 'email';
+    const contact = String(r.contact_info || '');
+    const to = channel === 'whatsapp' ? (contact.replace(/[^\d]/g, '') || String(r.client_phone || '').replace(/[^\d]/g, ''))
+      : (/@/.test(contact) ? contact.trim() : String(r.client_email || '').trim());
+    const slug = r.menu_id || (['completata', 'verifica'].includes(mission?.status) ? draft?.slug : '');
+    let venue = ''; try { venue = JSON.parse(draft?.menu_json || '{}').nome || ''; } catch {}
+    const generic = /^(?:nuovo contatto|contatto whatsapp)/i.test(String(r.client_name || ''));
+    return {
+      requestId, channel, to, lastInboundAt: last?.received_at || null,
+      clientName: (!generic && r.client_name) || venue || r.client_name || r.subject || 'il locale',
+      message: lastMessage(r.source_text), subject: originalSubject(r.source_text),
+      requestStatus: r.status, draftStatus: draft?.status || '', missionStatus: mission?.status || '', materials,
+      menuUrl: slug ? publicMenuPageUrl(PUBLIC_ORIGIN, slug) : ''
+    };
+  }
+  /** Prepara la risposta per una pratica e la propone su Telegram. Mai inviata da sola. */
+  async function proposeReply(db, env, requestId) {
+    const chat = await setting(db, 'telegram_chat_id');
+    if (!chat || !telegramReady(env) || (await setting(db, 'reply_enabled')) === 'no') return null;
+    const ctx = await replyContext(db, requestId);
+    // Durante l'anteprima («Approvo» o correzioni) risponde già il giro delle approvazioni.
+    if (!ctx || !ctx.to || !ctx.message || ctx.missionStatus === 'attesa_cliente') return null;
+    if (['archiviata', 'chiusa'].includes(ctx.requestStatus)) return null;
+    const draft = await draftClientReply({ gemini: await geminiFor(db, env), ai: env.AI }, ctx);
+    if (!draft.text) return null;
+    const saved = { id: requestId, name: ctx.clientName, channel: ctx.channel, to: ctx.to, subject: ctx.subject, lastInboundAt: ctx.lastInboundAt,
+      message: ctx.message, text: draft.text, model: draft.model, at: now() };
+    await putSetting(db, `reply_${requestId}`, JSON.stringify(saved));
+    const shown = replyShown(saved, `«${saved.name}» ha scritto: «${ctx.message.slice(0, 300)}${ctx.message.length > 300 ? '…' : ''}»\n\nTi propongo questa risposta`);
+    await sendTg(db, env, chat, shown.text, shown.buttons, deps.fetchImpl, { stacked: true });
+    return saved;
+  }
+  /** Dall'orologio: le risposte in coda il cui momento è arrivato (una per giro: il modello può metterci qualche secondo). */
+  async function replyTick(db, env) {
+    let queue = {}; try { queue = JSON.parse(await setting(db, 'reply_queue') || '{}') || {}; } catch {}
+    const ready = Object.entries(queue).filter(([, due]) => Date.parse(due) <= Date.parse(now())).sort((a, b) => a[1].localeCompare(b[1]));
+    if (!ready.length) return null;
+    const [id] = ready[0];
+    delete queue[id];
+    await putSetting(db, 'reply_queue', JSON.stringify(queue));
+    return proposeReply(db, env, id).catch(() => null);
+  }
+  async function sendReply(db, env, saved) {
+    if (saved.channel === 'whatsapp') {
+      return sendWhatsAppReply(env, { phoneNumberId: await setting(db, 'wa_phone_number_id'), to: saved.to, text: saved.text, lastInboundAt: saved.lastInboundAt, fetchImpl: deps.fetchImpl || ((...args) => fetch(...args)), now: Date.parse(now()) });
+    }
+    const config = clientMailConfig(env);
+    if (!config.ok) return { ok: false, reason: config.reason };
+    const subject = `Re: ${saved.subject || 'il vostro menu RenMenu'}`.replace(/^Re:\s*Re:/i, 'Re:');
+    return sendClientMail({ env, to: saved.to, subject, text: saved.text, idempotencyKey: `renmenu-risposta-${saved.id}-${saved.at}`, fetchImpl: deps.fetchImpl });
+  }
+  /** Pulsanti della risposta: Manda, Cambia, Non rispondere. */
+  async function answerReply(db, env, choice, id) {
+    const saved = await loadReply(db, id);
+    if (!saved?.text) return { text: 'Questa risposta non c’è più: o è già partita o ne ho preparata una più nuova.' };
+    if (choice === 'skip') {
+      await putSetting(db, `reply_${id}`, 'null');
+      await putSetting(db, 'reply_editing', 'null');
+      return { text: `Va bene, a «${saved.name}» non rispondo io.` };
+    }
+    if (choice === 'edit') {
+      await putSetting(db, 'reply_editing', JSON.stringify({ id, until: new Date(Date.parse(now()) + REPLY_EDIT_MS).toISOString() }));
+      return { text: 'Dimmi come cambiarla, a voce o scritto (per esempio «più breve» o «digli che passo venerdì»), oppure scrivi tu il testo intero tra virgolette e lo mando così.' };
+    }
+    const out = await sendReply(db, env, saved).catch((error) => ({ ok: false, reason: String(error?.message || 'errore') }));
+    await putSetting(db, 'reply_editing', 'null');
+    if (!out.ok) return { ok: false, text: `La risposta a «${saved.name}» non è partita: ${out.reason}.\n\nSe vuoi mandala tu, eccola da copiare:\n\n${saved.text}` };
+    await putSetting(db, `reply_${id}`, 'null');
+    await auditedBatch(jarvisDb(db), [], 'client.reply', `Risposta a ${saved.channel === 'whatsapp' ? 'WhatsApp' : 'email'} mandata da Riccardo con Jarvis.`, id).catch(() => {});
+    await recordEvent(db, 'risposta.cliente', { requestId: id, detail: { channel: saved.channel } }).catch(() => {});
+    return { ok: true, text: `Mandata a «${saved.name}» ${saved.channel === 'whatsapp' ? 'su WhatsApp' : `per email (${saved.to})`}.` };
+  }
+  /** Dopo «Cambia»: il prossimo messaggio di Riccardo (scritto o vocale) cambia la risposta. true se l'ha usato. */
+  async function replyEditTurn(db, env, chat, said, spoken = false) {
+    let editing = null; try { editing = JSON.parse(await setting(db, 'reply_editing') || 'null'); } catch {}
+    if (!editing?.id || !(Date.parse(editing.until) > Date.parse(now())) || /^\//.test(said)) return false;
+    const saved = await loadReply(db, editing.id);
+    if (!saved?.text) { await putSetting(db, 'reply_editing', 'null'); return false; }
+    if (SEND_WORDS.test(said)) {
+      const out = await answerReply(db, env, 'send', editing.id);
+      await sendTg(db, env, chat, out.text, null, deps.fetchImpl);
+      return true;
+    }
+    const quoted = /^\s*[«"“]([\s\S]{5,})[»"”]\s*$/.exec(said);
+    let text = quoted && !spoken ? quoted[1].trim() : '';
+    if (!text) {
+      await sendTg(db, env, chat, 'La riscrivo…', null, deps.fetchImpl);
+      const ctx = await replyContext(db, editing.id);
+      const draft = ctx ? await draftClientReply({ gemini: await geminiFor(db, env), ai: env.AI }, { ...ctx, channel: saved.channel }, { instruction: said, previous: saved.text }) : { text: '' };
+      text = draft.text;
+      if (!text) {
+        await sendTg(db, env, chat, `Non sono riuscito a riscriverla senza inventare. Scrivimi tu il testo tra virgolette, oppure tieni questa:\n\n${saved.text}`, replyButtons(saved.id), deps.fetchImpl, { stacked: true });
+        return true;
+      }
+    } else if (saved.channel === 'email' && !/RenMenu\s*$/.test(text)) text = `${text}\n\nRiccardo · RenMenu`;
+    const next = { ...saved, text, at: now() };
+    await putSetting(db, `reply_${saved.id}`, JSON.stringify(next));
+    await putSetting(db, 'reply_editing', 'null');
+    const shown = replyShown(next, spoken ? `«${said}»\n\nEcco la risposta cambiata` : 'Ecco la risposta cambiata');
+    await sendTg(db, env, chat, shown.text, shown.buttons, deps.fetchImpl, { stacked: true });
+    return true;
+  }
+
   const notify = (db, env, requestId, subject, text, priority = 'normale') => tell(db, env, { request_id: requestId }, subject, text, null, priority);
   // Messaggi arrivati dai webhook (WhatsApp, Gmail): i webhook non chiamano nessuno, l'orologio li annuncia.
   // Alla prima esecuzione segna solo il punto di partenza, per non riversare su Telegram lo storico.
@@ -1944,6 +2092,9 @@ export function createMissions(deps) {
       await notify(db, env, event.request_id || null, `messaggio ${from}`, `Nuovo messaggio ${from} da ${event.name || 'un contatto nuovo'}${said ? `: «${said.slice(0, 300)}${said.length > 300 ? '…' : ''}»` : ' (non è un testo: guardalo nella Control Room)'}. L'ho messo tra le pratiche da verificare.`, 'importante').catch(() => null);
     }
     if (fresh.length) await putSetting(db, 'external_seen_at', fresh.at(-1).received_at);
+    // Risposta pronta: si prepara qualche minuto dopo l'ultimo messaggio, così una raffica (foto + testo) ne fa una sola.
+    const writers = [...new Set(fresh.map((e) => e.request_id).filter(Boolean))];
+    if (writers.length) await queueReplies(db, writers).catch(() => null);
     // Numeri WhatsApp sconosciuti (coesistenza col numero personale): Riccardo dice se è un locale.
     const held = await takeUnannouncedHeld(db).catch(() => []);
     const chat = held.length ? await setting(db, 'telegram_chat_id') : null;
@@ -1992,5 +2143,5 @@ export function createMissions(deps) {
     }
     return out;
   }
-  return { alertOnce, announceExternal, statusText, initiatives, initiativeTick, ping, entrust, tick, watchTick, watchRegister, reflect, queueOnlineEmail, checkOnlineMails, makeMenuQr, decide, telegramUpdate, probeIntents, setting, putSetting, briefing, notify, startChecks, answerCheck, draftAfterChecks, translateAfterEdit, undoDraftEdit, draftTarget, voiceEditDraft, editDraftFromClient };
+  return { alertOnce, announceExternal, replyTick, proposeReply, statusText, initiatives, initiativeTick, ping, entrust, tick, watchTick, watchRegister, reflect, queueOnlineEmail, checkOnlineMails, makeMenuQr, decide, telegramUpdate, probeIntents, setting, putSetting, briefing, notify, startChecks, answerCheck, draftAfterChecks, translateAfterEdit, undoDraftEdit, draftTarget, voiceEditDraft, editDraftFromClient };
 }
