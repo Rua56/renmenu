@@ -877,6 +877,37 @@
      "prezzo": "6,00"
     }
    ]
+  },
+  {
+   "nome": {
+    "it": "LE VARIANTI"
+   },
+   "voci": [
+    {
+     "nome": {
+      "it": "INTEGRALE"
+     },
+     "prezzo": "1,00"
+    },
+    {
+     "nome": {
+      "it": "SENZA GLUTINE"
+     },
+     "prezzo": "3,00"
+    },
+    {
+     "nome": {
+      "it": "DOPPIO IMPASTO"
+     },
+     "prezzo": "1,00"
+    },
+    {
+     "nome": {
+      "it": "BURRATA"
+     },
+     "prezzo": "3,00"
+    }
+   ]
   }
  ]
 }

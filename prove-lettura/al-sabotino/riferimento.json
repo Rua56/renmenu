@@ -166,6 +166,24 @@
        "prezzo": "8,00"
       }
      ]
+    },
+    {
+     "nome": {
+      "it": "Pane e coperto"
+     },
+     "prezzo": "3,00"
+    },
+    {
+     "nome": {
+      "it": "Paniere extra"
+     },
+     "prezzo": "2,50"
+    },
+    {
+     "nome": {
+      "it": "Piatto extra"
+     },
+     "prezzo": "2,00"
     }
    ]
   }

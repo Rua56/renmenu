@@ -1,0 +1,164 @@
+{
+ "sezioni": [
+  {
+   "nome": {
+    "it": "Piatti",
+    "en": "Dishes"
+   },
+   "voci": [
+    {
+     "prezzo": "18,00",
+     "nome": {
+      "it": "Il tagliere di salumi"
+     }
+    },
+    {
+     "prezzo": "12,00",
+     "nome": {
+      "it": "La verticale di formaggi"
+     }
+    },
+    {
+     "prezzo": "10,00",
+     "nome": {
+      "it": "LA ZUCCA IN SAOR"
+     }
+    },
+    {
+     "prezzo": "16,00",
+     "nome": {
+      "it": "LA TARTARA D’ASINO, CREMA AL CREN E FORMAGGIO, PETALI DI CIPOLLA E SUSINE"
+     }
+    },
+    {
+     "prezzo": "13,00",
+     "nome": {
+      "it": "LA “MILLEFOGLIE” DI SARDE SCOTTATE, PANE ALL’AGLIO E MOZZARELLA"
+     }
+    },
+    {
+     "prezzo": "15,00",
+     "nome": {
+      "it": "L’UOVO, I FUNGHI ED IL FORMAGGIO"
+     }
+    },
+    {
+     "prezzo": "14,00",
+     "nome": {
+      "it": "GLI GNOCCHI DI RICOTTA, CREMA DI FAGIOLI, GUANCIALE E ACETO"
+     }
+    },
+    {
+     "prezzo": "14,00",
+     "nome": {
+      "it": "IL RISOTTO MANTECATO CON IL CAPRINO, UVA, NOCCIOLE E CAPPERI (min. per2)"
+     }
+    },
+    {
+     "prezzo": "14,00",
+     "nome": {
+      "it": "I TORTELLI FATTI IN CASA, PATE' DI FEGATO DI VITELLO E LA FONDUTA DI FORMAGGIO STAGIONATO AL TABACCO"
+     }
+    },
+    {
+     "prezzo": "15,00",
+     "nome": {
+      "it": "LE TAGLIATELLE FATTE IN CASA, PITINA E ZUCCA"
+     }
+    },
+    {
+     "prezzo": "14,00",
+     "nome": {
+      "it": "LA VELLUTATA DI SEDANO RAPA, L'ANGUILLA AFFUMICATA E CUBETTI DI PAN TOSTATO"
+     }
+    },
+    {
+     "prezzo": "15,00",
+     "nome": {
+      "it": "GLI GNOCCHI DI PANE ED IL RAGU' DI CINGHIALE"
+     }
+    },
+    {
+     "prezzo": "14,00",
+     "nome": {
+      "it": "LE SEPPIE MARINATE ALL'ANETO E AGRUMI E SCOTTATE IN PADELLA, JULIENNE DI VERDURE CROCCANTI"
+     }
+    },
+    {
+     "prezzo": "12,00",
+     "nome": {
+      "it": "LA CIPOLLA: tortino alla cipolla, scalogno caramellato, petali di cipolla all'aceto di more ed uvetta, crema di tenerone"
+     }
+    },
+    {
+     "prezzo": "16,00",
+     "nome": {
+      "it": "ANIMELLE AL BURRO, SUSINE E VERMOUTH"
+     }
+    },
+    {
+     "prezzo": "15,00",
+     "nome": {
+      "it": "TORTINO DI LJUBLJANSKA AL FORNO, CREN, MELE, SENAPE E AJVAR"
+     }
+    },
+    {
+     "prezzo": "10,00",
+     "nome": {
+      "it": "IL FRICO CON LA POLENTA"
+     }
+    },
+    {
+     "prezzo": "5,00",
+     "nome": {
+      "it": "PATATE IN TECIA"
+     }
+    },
+    {
+     "prezzo": "5,00",
+     "nome": {
+      "it": "MELANZANE AL FUNGHETTO"
+     }
+    }
+   ]
+  },
+  {
+   "nome": {
+    "it": "Dolci",
+    "en": "Desserts"
+   },
+   "voci": [
+    {
+     "prezzo": "7,00",
+     "nome": {
+      "it": "GNOCCHI DI SUSINE DELLA TRADIZIONE MITTELEUROPEA"
+     }
+    },
+    {
+     "prezzo": "7,00",
+     "nome": {
+      "it": "LA MELA"
+     }
+    },
+    {
+     "prezzo": "7,00",
+     "nome": {
+      "it": "IL CIOCCOLATO, OLIO E SALE"
+     }
+    },
+    {
+     "prezzo": "7,00",
+     "nome": {
+      "it": "IL “MONTEBIANCO” DELLA CHINCA"
+     }
+    },
+    {
+     "prezzo": "4,00",
+     "nome": {
+      "it": "GUBANA DELL’ANTICA RICETTA"
+     }
+    }
+   ]
+  }
+ ]
+}

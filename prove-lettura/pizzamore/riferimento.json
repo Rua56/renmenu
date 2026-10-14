@@ -65,6 +65,12 @@
       "it": "Spicchio di teglia margherita"
      },
      "prezzo": "2,50"
+    },
+    {
+     "nome": {
+      "it": "Salse"
+     },
+     "prezzo": "1,00"
     }
    ]
   }

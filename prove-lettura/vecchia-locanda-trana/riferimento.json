@@ -352,6 +352,31 @@
      "prezzo": "8,50"
     }
    ]
+  },
+  {
+   "nome": {
+    "it": "SUPPLEMENTI"
+   },
+   "voci": [
+    {
+     "nome": {
+      "it": "RINFORZO PER PIZZE, CALZONI E FOCACCE (per ingrediente)"
+     },
+     "prezzo": "1,00"
+    },
+    {
+     "nome": {
+      "it": "RINFORZO MOZZARELLA DI BUFALA, PORCINI, PROSCIUTTO CRUDO, SPECK, LARDO, FRIARIELLI"
+     },
+     "prezzo": "2,00"
+    },
+    {
+     "nome": {
+      "it": "RINFORZO BURRATA INTERA"
+     },
+     "prezzo": "4,00"
+    }
+   ]
   }
  ]
 }

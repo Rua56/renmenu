@@ -1923,6 +1923,196 @@
      ]
     }
    ]
+  },
+  {
+   "nome": {
+    "it": "AGGIUNTE"
+   },
+   "voci": [
+    {
+     "nome": {
+      "it": "BUFALA DOP"
+     },
+     "prezzi": [
+      {
+       "etichetta": {
+        "it": "Prezzo 1"
+       },
+       "prezzo": "2,00"
+      },
+      {
+       "etichetta": {
+        "it": "Prezzo 2"
+       },
+       "prezzo": "4,00"
+      }
+     ]
+    },
+    {
+     "nome": {
+      "it": "BURRATA 100% LATTE ITALIANO"
+     },
+     "prezzi": [
+      {
+       "etichetta": {
+        "it": "Prezzo 1"
+       },
+       "prezzo": "2,00"
+      },
+      {
+       "etichetta": {
+        "it": "Prezzo 2"
+       },
+       "prezzo": "4,00"
+      }
+     ]
+    },
+    {
+     "nome": {
+      "it": "PATATE FRITTE*"
+     },
+     "prezzi": [
+      {
+       "etichetta": {
+        "it": "Prezzo 1"
+       },
+       "prezzo": "2,00"
+      },
+      {
+       "etichetta": {
+        "it": "Prezzo 2"
+       },
+       "prezzo": "2,50"
+      }
+     ]
+    },
+    {
+     "nome": {
+      "it": "OLIVE TAGGIASCHE"
+     },
+     "prezzi": [
+      {
+       "etichetta": {
+        "it": "Prezzo 1"
+       },
+       "prezzo": "2,00"
+      },
+      {
+       "etichetta": {
+        "it": "Prezzo 2"
+       },
+       "prezzo": "3,00"
+      }
+     ]
+    },
+    {
+     "nome": {
+      "it": "CAPASANTA*"
+     },
+     "prezzo": "3,00"
+    },
+    {
+     "nome": {
+      "it": "CARPACCIO DI TARTUFO"
+     },
+     "prezzi": [
+      {
+       "etichetta": {
+        "it": "Prezzo 1"
+       },
+       "prezzo": "5,00"
+      },
+      {
+       "etichetta": {
+        "it": "Prezzo 2"
+       },
+       "prezzo": "7,00"
+      }
+     ]
+    },
+    {
+     "nome": {
+      "it": "SALMONE"
+     },
+     "prezzi": [
+      {
+       "etichetta": {
+        "it": "Prezzo 1"
+       },
+       "prezzo": "2,50"
+      },
+      {
+       "etichetta": {
+        "it": "Prezzo 2"
+       },
+       "prezzo": "5,00"
+      }
+     ]
+    },
+    {
+     "nome": {
+      "it": "TONNO/GAMBERETTI"
+     },
+     "prezzi": [
+      {
+       "etichetta": {
+        "it": "Prezzo 1"
+       },
+       "prezzo": "2,50"
+      },
+      {
+       "etichetta": {
+        "it": "Prezzo 2"
+       },
+       "prezzo": "5,00"
+      }
+     ]
+    },
+    {
+     "nome": {
+      "it": "INTEGRALE"
+     },
+     "prezzi": [
+      {
+       "etichetta": {
+        "it": "Prezzo 1"
+       },
+       "prezzo": "0,50"
+      },
+      {
+       "etichetta": {
+        "it": "Prezzo 2"
+       },
+       "prezzo": "1,00"
+      }
+     ]
+    },
+    {
+     "nome": {
+      "it": "PIZZA BIMBO (disponibile per tutte le pizze)"
+     },
+     "prezzo": "3,50"
+    },
+    {
+     "nome": {
+      "it": "per ogni ingrediente aggiunto"
+     },
+     "prezzi": [
+      {
+       "etichetta": {
+        "it": "Prezzo 1"
+       },
+       "prezzo": "1,50"
+      },
+      {
+       "etichetta": {
+        "it": "Prezzo 2"
+       },
+       "prezzo": "2,50"
+      }
+     ]
+    }
+   ]
   }
  ]
 }

@@ -22,3 +22,6 @@ Calamari fritti | 15,00
 # Piatti
 Contorni | 6,00 / 8,00
 Dessert | 6,00 / 8,00
+Pane e coperto | 3,00
+Paniere extra | 2,50
+Piatto extra | 2,00
