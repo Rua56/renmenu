@@ -223,6 +223,47 @@ describe('Foto per il menu · flusso nella Control Room', () => {
     } finally { db.close(); }
   });
 
+  it('Premium: bottiglie dai siti delle cantine → foto proposte con la fonte, il menu non cambia', async () => {
+    const db = await setup();
+    const before = globalThis.fetch;
+    const big = new Uint8Array(6000); big.set([0xff, 0xd8, 0xff, 0xe0]);
+    globalThis.fetch = async (url, options = {}) => {
+      url = String(url);
+      if (url.startsWith('https://generativelanguage.googleapis.com/')) {
+        const wine = /vino «([^»]+)»/.exec(JSON.parse(options.body).contents[0].parts[0].text)[1];
+        return Response.json({ candidates: [{ content: { parts: [{ text: `{"pagine":["https://www.cantina-prova.it/${wine.startsWith('Ribolla') ? 'ribolla' : 'friulano'}"]}` }] } }] });
+      }
+      if (url === 'https://www.cantina-prova.it/ribolla') return new Response('<img src="/foto/ribolla-gialla-collio.jpg" alt="Ribolla Gialla">', { headers: { 'content-type': 'text/html' } });
+      if (url === 'https://www.cantina-prova.it/friulano') return new Response('<p>Pagina senza foto</p>', { headers: { 'content-type': 'text/html' } });
+      if (url.endsWith('.jpg')) return new Response(big, { headers: { 'content-type': 'image/jpeg' } });
+      return before(url, options);
+    };
+    try {
+      const store = new Map();
+      const ai = { run: async () => ({ response: '{"tipo":"bottiglia","descrizione":"bottiglia di vino bianco","etichetta":{"nome":"Ribolla Gialla","denominazione":"Collio","annata":"2024","cantina":"Cantina Prova"}}' }) };
+      const env = { BUCKET: bucket(store), AI: ai };
+      const noKey = await act(db, 'findBottlePhotos', { id: 'd1' }, env);
+      assert.equal(noKey.status, 503);
+      await db.prepare("INSERT INTO jarvis_settings (key,value,updated_at) VALUES ('gemini_api_key','gem-test','x'),('gemini_models','[\"gemini-2.5-flash\"]','x')").bind().run();
+      const found = await act(db, 'findBottlePhotos', { id: 'd1' }, env);
+      assert.equal(found.status, 200, JSON.stringify(found.body));
+      assert.equal(found.body.result.found, 1);
+      assert.deepEqual(found.body.result.outcomes.map((o) => [o.name, o.found]), [['Ribolla Gialla Collio 2024', true], ['Friulano Collio 2023', false]]);
+      const media = found.body.state.media.find((m) => m.cantina);
+      assert.equal(media.kind, 'bottiglia');
+      assert.equal(media.status, 'proposta');
+      assert.equal(media.proposal.target, 'voce:1:0', 'proposta sul vino giusto');
+      assert.equal(media.cantina.page, 'https://www.cantina-prova.it/ribolla');
+      assert.match(media.filename, /cantina-prova\.it/);
+      const draft = await db.prepare("SELECT menu_json,revision,creative_json FROM drafts WHERE id='d1'").bind().first();
+      assert.equal(draft.revision, 3, 'il menu non cambia finché Riccardo non conferma');
+      assert.equal(JSON.parse(draft.menu_json).sezioni[1].voci[0].foto, undefined);
+      assert.equal(JSON.parse(draft.creative_json).bottiglie.cercate.length, 2);
+      const again = await act(db, 'findBottlePhotos', { id: 'd1' }, env);
+      assert.equal(again.status, 422, 'non si cerca due volte lo stesso vino');
+    } finally { globalThis.fetch = before; db.close(); }
+  });
+
   it('Standard: nessun riconoscimento in più, la foto si legge come pagina di menu come prima', async () => {
     const db = await setup('standard');
     try {

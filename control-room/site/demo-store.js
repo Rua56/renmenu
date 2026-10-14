@@ -173,6 +173,7 @@ export async function performDemoAction(type, payload = {}) {
       break;
     }
     case 'proposeSchede':
+    case 'findBottlePhotos':
     case 'applySchede':
     case 'discardSchede':
     case 'translateDraft':
