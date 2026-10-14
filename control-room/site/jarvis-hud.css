@@ -49,6 +49,8 @@ html[data-theme="dark"] .hud-telemetry {
 /* ——— reattore: anello graduato esterno e mirino ——— */
 html[data-theme="dark"] .jarvis-hero { position: relative; }
 html[data-theme="dark"] .jarvis-hero .reactor { position: relative; width: 168px; height: 168px; }
+html[data-theme="dark"] .jarvis-hero .reactor-main { width: 212px; height: 212px; }
+html[data-theme="dark"] .reactor-main .core { box-shadow: 0 0 46px rgba(70, 214, 255, .75), 0 0 120px rgba(70, 214, 255, .3); }
 html[data-theme="dark"] .jarvis-hero .reactor::before {
   position: absolute; inset: -16px; border-radius: 50%; content: "";
   background: repeating-conic-gradient(from 0deg, var(--hud-line) 0deg 1.2deg, transparent 1.2deg 6deg);

@@ -39,6 +39,8 @@ let jarvisVoice = local.get(VOICE_KEY, 'no') === 'si';
 let voiceReady = false;
 let telegramBot = '';
 let showHandler = null; // «mostrami …»: la home apre l'elenco (vedi jarvis-show.js)
+let closeHandler = null; // la conversazione si è chiusa: la home riprende ad ascoltare «Ehi Jarvis»
+let woken = false; // aperta da «Ehi Jarvis» o dal nucleo: «basta» chiude anche il foglio
 let recognition = null;
 let player = null;
 let phase = 'idle'; // idle | listening | thinking | speaking
@@ -177,6 +179,8 @@ function quiet(note) {
   // In «mani libere» riprova un paio di volte prima di smettere: magari stavi pensando.
   if (handsFree && quietTurns < 2) { quietTurns += 1; listen(); return; }
   quietTurns = 0; handsFree = false; syncToggles();
+  // Svegliato con «Ehi Jarvis» e poi silenzio: si richiude e torna ad aspettare la sveglia.
+  if (woken && !note) { closeChat(); return; }
   setPhase('idle', note || 'Non ho sentito nulla. Tocca il microfono quando vuoi.');
 }
 function listen() {
@@ -311,7 +315,9 @@ async function send(text, { spoken = false } = {}) {
   if (spoken && handsFree && STOP_WORDS.test(clean)) {
     handsFree = false; syncToggles(); push({ role: 'user', text: clean });
     push({ role: 'jarvis', kind: 'text', text: 'Va bene, smetto di ascoltare. Sono qui se ti servo.' });
-    await say('Va bene. Sono qui se ti servo.'); setPhase('idle'); return;
+    await say('Va bene. Sono qui se ti servo.'); setPhase('idle');
+    if (woken) closeChat();
+    return;
   }
   push({ role: 'user', text: clean });
   // «Mostrami le pratiche chiuse», «quali locali…»: l'elenco si apre a schermo, senza chiamare Jarvis.
@@ -323,6 +329,7 @@ async function send(text, { spoken = false } = {}) {
     if (live) { live.context(`A schermo: ${shown.say}`); return; }
     await say(shown.say, { always: true });
     setPhase('idle');
+    closeHandler?.();
     return;
   }
   await exchange({ text: clean });
@@ -396,8 +403,8 @@ function onSubmit(event) {
 }
 
 /** Apre la conversazione. voice: true se la voce di Jarvis è configurata; listen: parte subito in ascolto. */
-export function openChat(element, { voice = false, bot = '', listenNow = false, onShow = null } = {}) {
-  showHandler = onShow;
+export function openChat(element, { voice = false, bot = '', listenNow = false, onShow = null, onClose = null, wake = false, firstText = '' } = {}) {
+  showHandler = onShow; closeHandler = onClose; woken = Boolean(wake);
   if (sheet !== element) {
     sheet = element;
     sheet.addEventListener('click', onClick);
@@ -408,6 +415,9 @@ export function openChat(element, { voice = false, bot = '', listenNow = false, 
   render();
   sheet.hidden = false;
   if (live) return;
+  // Svegliato a voce o dal nucleo: conversazione a mani libere, finché Riccardo non dice «basta».
+  if (wake) { handsFree = true; quietTurns = 0; syncToggles(); unlockEar(); }
+  if (firstText) { send(firstText, { spoken: true }); return; }
   if (listenNow) listen(); else sheet.querySelector('input[name="text"]')?.focus();
 }
 export function closeChat() {
@@ -415,5 +425,8 @@ export function closeChat() {
   handsFree = false;
   stopListening(); stopSpeaking();
   setPhase('idle');
+  const wasOpen = sheet && !sheet.hidden;
   if (sheet) sheet.hidden = true;
+  woken = false;
+  if (wasOpen) closeHandler?.();
 }

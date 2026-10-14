@@ -6,6 +6,7 @@ import { provisionalQrSvg, provisionalTarget } from './provisional-qr.js';
 import { mountPdfPreview } from './pdf-preview.js';
 import { extractPdfText } from './material-extract.js';
 import { closeChat, openChat } from './jarvis-chat.js';
+import { pauseWake, startWake, wakeAvailable, wakeEnabled, wakeState, setWakeEnabled } from './jarvis-wake.js';
 import { showFor } from './jarvis-show.js';
 import { installApp, installed } from './hud.js';
 import { configureVoice, interpretVoice, listen, speak, speechAvailable, synthesisAvailable, stopListening, voiceSettings } from './voice.js';
@@ -344,7 +345,7 @@ function jarvisPanel() {
   const tg = state.telegram || {};
   const telegram = isDemoMode ? '' : !tg.configured ? '' : !tg.linked
     ? `<div class="notice spaced-top-small">${telegramLinkUrl ? `Tocca il link e poi <strong>Avvia</strong> in Telegram (valido 15 minuti): <a href="${escapeHtml(telegramLinkUrl)}" target="_blank" rel="noopener">Apri Jarvis su Telegram</a>` : 'Collega Telegram: Jarvis ti scriverà lì e ti chiederà il SÌ prima di pubblicare.'}</div><div class="button-row spaced-top-small"><button class="button" type="button" data-action="telegram-link">${telegramLinkUrl ? 'Nuovo link' : 'Collega Telegram'}</button></div>`
-    : `<details class="hud-settings"><summary>Collegamenti e voce di Jarvis</summary><div class="button-row spaced-top-small"><span class="status good">Telegram collegato</span><button class="button secondary small-button" type="button" data-action="jarvis-briefing">Briefing ora</button><button class="button secondary small-button" type="button" data-action="telegram-test">Messaggio di prova</button></div>${installed() ? '' : '<div class="button-row spaced-top-small"><button class="button secondary small-button" type="button" data-action="install-app">Installa Jarvis sul telefono</button></div>'}${voiceForm()}${readerForm()}</details>`;
+    : `<details class="hud-settings"><summary>Collegamenti e voce di Jarvis</summary><div class="button-row spaced-top-small"><span class="status good">Telegram collegato</span><button class="button secondary small-button" type="button" data-action="jarvis-briefing">Briefing ora</button><button class="button secondary small-button" type="button" data-action="telegram-test">Messaggio di prova</button></div>${installed() ? '' : '<div class="button-row spaced-top-small"><button class="button secondary small-button" type="button" data-action="install-app">Installa Jarvis sul telefono</button></div>'}${wakeAvailable ? `<label class="chat-toggle spaced-top-small"><input type="checkbox" id="wake-enabled" ${wakeEnabled() ? 'checked' : ''}><span>Sveglia con «Ehi Jarvis»<small>con la Control Room aperta il browser ascolta la parola di sveglia (gratis, riconoscimento del browser)</small></span></label>` : ''}${voiceForm()}${readerForm()}</details>`;
   if (!notes.length && !autopilotRunning && !telegram) return '';
   const row = (item) => `<div class="list-row"><div class="list-main"><strong>${escapeHtml(item.subject)}</strong><small>${escapeHtml(item.body)}</small><small>${time(item.createdAt)}</small></div><div class="button-row"><button class="mini-button" type="button" data-select-request="${escapeHtml(item.requestId || '')}" data-route="${item.subject.includes('bozza pronta') ? 'revisione' : 'richieste'}">Apri</button><button class="mini-button" type="button" data-action="mark-notification" data-notification-id="${escapeHtml(item.id)}" data-read="true">Fatto</button></div></div>`;
   return `<section class="panel spaced-top-small"><p class="eyebrow">JARVIS</p>${autopilotRunning ? '<p class="notice">Jarvis sta preparando le nuove richieste…</p>' : ''}<div class="list">${notes.map(row).join('')}</div>${telegram}</section>`;
@@ -378,6 +379,20 @@ function commandDetails() {
 }
 
 // Cuore di Jarvis: saluto, una frase sullo stato e i pochi gesti che servono adesso.
+// Sotto il nucleo: come svegliare Jarvis adesso (vedi jarvis-wake.js).
+function wakeHint(current = wakeState()) {
+  if (!wakeAvailable || !wakeEnabled()) return 'Tocca il nucleo per parlare';
+  if (current === 'listening') return 'Di’ «Ehi Jarvis» o tocca il nucleo';
+  if (current === 'blocked') return 'Tocca il nucleo: poi «Ehi Jarvis» ti sente';
+  return 'Tocca il nucleo per parlare';
+}
+function showWakeState(current) {
+  const hint = document.querySelector('[data-wake-hint]');
+  if (hint) { hint.textContent = wakeHint(current); hint.dataset.state = current; }
+}
+function listenForWake() {
+  startWake({ onWake: (rest) => openAsk(!rest, { wake: true, firstText: rest }), onState: showWakeState });
+}
 function jarvisHero() {
   const hour = Number(new Intl.DateTimeFormat('it-IT', { hour: 'numeric', hour12: false, timeZone: 'Europe/Rome' }).format(new Date()));
   const greeting = hour < 5 ? 'Buonanotte' : hour < 13 ? 'Buongiorno' : hour < 18 ? 'Buon pomeriggio' : 'Buonasera';
@@ -394,7 +409,7 @@ function jarvisHero() {
   if (active) parts.push(`sto seguendo <strong>${active}</strong> ${active === 1 ? 'pratica' : 'pratiche'}`);
   const says = parts.length ? `${parts.join(', ')}.` : 'Tutto in ordine: nessuna decisione in sospeso. Puoi scrivermi o mandarmi un vocale su Telegram.';
   const tile = (route, label, value, note, hot = false) => `<button class="jarvis-action${hot && value ? ' hot' : ''}" type="button" data-route="${route}"><small>${label}</small><strong>${value}</strong><span>${note}</span></button>`;
-  return `<section class="jarvis-hero" aria-label="Jarvis"><div class="reactor${autopilotRunning || active ? ' busy' : ''}${waitingYes ? ' wait' : ''}" aria-hidden="true"><span class="r1"></span><span class="r2"></span><span class="r3"></span><span class="core">J</span></div><div><p class="eyebrow">${new Intl.DateTimeFormat('it-IT', { weekday: 'long', day: 'numeric', month: 'long', timeZone: 'Europe/Rome' }).format(new Date())}</p><h1>${greeting}, Riccardo</h1><p class="jarvis-says">${says}</p></div></section>`;
+  return `<section class="jarvis-hero" aria-label="Jarvis"><button class="reactor reactor-main${autopilotRunning || active ? ' busy' : ''}${waitingYes ? ' wait' : ''}" type="button" data-action="core-talk" aria-label="Parla con Jarvis"><i class="arc" aria-hidden="true"></i><i class="wave" aria-hidden="true"></i><i class="wave w2" aria-hidden="true"></i><span class="r1"></span><span class="r2"></span><span class="r3"></span><span class="core"></span></button><p class="core-hint" data-wake-hint>${escapeHtml(wakeHint())}</p><div><p class="eyebrow">${new Intl.DateTimeFormat('it-IT', { weekday: 'long', day: 'numeric', month: 'long', timeZone: 'Europe/Rome' }).format(new Date())}</p><h1>${greeting}, Riccardo</h1><p class="jarvis-says">${says}</p></div></section>`;
 }
 
 function requestOperationalCard(request, compact = false) {
@@ -1169,6 +1184,7 @@ async function handleOggiAction(action, trigger) {
   if (action === 'show-close') { display = null; render(); return true; }
   if (action === 'ask-open') { openAsk(); return true; }
   if (action === 'ask-voice') { openAsk(true); return true; }
+  if (action === 'core-talk') { openAsk(true, { wake: true }); return true; }
   if (action === 'ask-close') { closeAsk(); return true; }
   if (action === 'install-app') { installApp().then((text) => toast(text)); return true; }
   if (action === 'rileggi-online') { const request = requestById(); if (draft && request) { onlineMenus.delete(draft.id); render(); } return true; }
@@ -1262,8 +1278,9 @@ function renderLocale() {
 }
 // «Scrivi o parla a Jarvis»: conversazione vera con Jarvis (stesso cervello di Telegram), anche a voce.
 const askSheet = $('#ask-sheet');
-function openAsk(listenNow = false) {
-  openChat(askSheet, { voice: Boolean(state?.voice?.provider && state?.voice?.hasKey), bot: state?.telegram?.bot || '', listenNow, onShow: showOnHome });
+function openAsk(listenNow = false, { wake = false, firstText = '' } = {}) {
+  pauseWake();
+  openChat(askSheet, { voice: Boolean(state?.voice?.provider && state?.voice?.hasKey), bot: state?.telegram?.bot || '', listenNow, onShow: showOnHome, onClose: listenForWake, wake, firstText });
 }
 function closeAsk() { closeChat(); }
 document.addEventListener('keydown', (event) => { if (event.key === 'Escape' && !askSheet.hidden) closeAsk(); });
@@ -1815,6 +1832,7 @@ function handleInput(event) {
   if (list) list.innerHTML = renderClientRows();
 }
 function handleSelectChange(event) {
+  if (event.target.id === 'wake-enabled') { setWakeEnabled(event.target.checked); if (event.target.checked) listenForWake(); showWakeState(wakeState()); return; }
   if (event.target.id === 'voice-enabled') {
     const settings = configureVoice({ enabled: event.target.checked });
     voiceStatus = settings.enabled ? 'Voce abilitata; il microfono si avvia solo dopo una seconda scelta esplicita.' : 'Voce disattivata.';
@@ -1908,6 +1926,7 @@ async function init() {
   restoreVoiceHistory();
   if (!isAuthorizedHost) { renderUnavailable(); return; }
   activeView = routeFromHash();
-  try { await refresh(); } catch (error) { renderAccessError(error); }
+  try { await refresh(); } catch (error) { renderAccessError(error); return; }
+  listenForWake();
 }
 init();
