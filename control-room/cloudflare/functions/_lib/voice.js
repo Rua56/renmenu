@@ -10,7 +10,7 @@ import { geminiJson } from './gemini-json.js';
 import { askClaude, claudeKey } from './claude.js';
 
 export const STT_MODEL = '@cf/openai/whisper-large-v3-turbo';
-export const INTENTS = new Set(['risposta', 'stato', 'anteprima', 'cancella_pratica', 'affida_pratica', 'aggiorna_menu', 'crea_pratica', 'pubblica', 'ricorda', 'non_chiaro']);
+export const INTENTS = new Set(['risposta', 'stato', 'anteprima', 'cancella_pratica', 'affida_pratica', 'aggiorna_menu', 'crea_pratica', 'pubblica', 'ricorda', 'cambia_piano', 'non_chiaro']);
 export const STATUS_CUTS = new Set(['breve', 'completo', 'buone_notizie']);
 export const VOICE_PRESETS = {
   // ElevenLabs, modello multilingue: voci maschili calme e calde (la prima è la predefinita).
@@ -74,6 +74,7 @@ export async function understand(ai, utterance, context, { timeoutMs = 25_000, g
     '- "aggiorna_menu": Riccardo chiede di cambiare il menu online di un locale (prezzi, piatti da aggiungere o togliere, oppure il tema grafico/i colori: bordeaux, verde trattoria, blu mare, terracotta, nero elegante, ocra; oppure coperto, telefono, orari, Instagram o Facebook del locale). Capisci anche parole scritte o trascritte male (es. «copreto», «telfono», «instgram»). In "locale" il nome del locale così come detto. Non riscrivere le modifiche.',
     '- "crea_pratica": chiede di aprire una nuova pratica o un nuovo cliente per un locale (anche «crea un nuovo menu per …», «mi serve un menu per …»; se c’è fretta o urgenza, «in fretta», «subito», «urgente», metti "urgente": true). In "locale" il nome del locale esattamente come detto, senza parole come «locale» o «ristorante» se non fanno parte del nome.',
     '- "pubblica": chiede di pubblicare o mettere online un menu. In "locale" il nome se detto.',
+    '- "cambia_piano": chiede di cambiare il piano o l’abbonamento di un locale (Standard, Annuale, Premium), es. «passa il Tralcio a Premium». In "locale" il nome del locale.',
     '- "ricorda": chiede di ricordare, memorizzare o segnare un’informazione su un locale (orari, chiusure, preferenze, contatti, abitudini). In "locale" il nome del locale.',
     'Se nei DATI c’è una «Memoria» del locale, usala per rispondere (note di Riccardo e ultimo menu online con i prezzi).',
     '- "non_chiaro": manca un’informazione indispensabile. In "risposta" una sola domanda breve e precisa (es. «Intendi il frico di Riccardo sei il migliore?»).',

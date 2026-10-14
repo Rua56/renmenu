@@ -613,3 +613,23 @@ describe('Email ai locali spedite da Jarvis su renmenu.com', () => {
     } finally { db.close(); }
   }));
 });
+
+describe('Cambio di piano a parole', () => {
+  it('«passa … a Premium»: Jarvis chiede conferma e al SÌ cambia il piano del locale e delle pratiche aperte', async () => {
+    const db = database();
+    try {
+      await missions.putSetting(db, 'telegram_chat_id', '42');
+      await db.prepare("INSERT INTO clients (id,name,plan,internal_notes,revision,created_at,updated_at) VALUES ('cp1','Trattoria Piano','standard','',1,'2026-10-05','2026-10-05')").bind().run();
+      await db.prepare("INSERT INTO requests (id,client_id,subject,source_channel,source_text,kind,status,plan,category,internal_notes,revision,created_at,updated_at) VALUES ('rp1','cp1','Nuovo menu · Trattoria Piano','telegram','Locale: Trattoria Piano','nuovo','in_revisione','standard','nuovo_standard','',1,'2026-10-05','2026-10-05')").bind().run();
+      await missions.telegramUpdate(db, env, { message: { chat: { id: 42, type: 'private' }, text: 'passa la Trattoria Piano a premium' } });
+      const asked = telegramCalls.filter((c) => c.method === 'sendMessage').at(-1).body;
+      assert.match(asked.text, /Cambio il piano di «Trattoria Piano» da Standard a Premium/);
+      const yes = asked.reply_markup.inline_keyboard.flat().find((b) => /SÌ/.test(b.text));
+      assert.equal(yes.callback_data, 'pia:cp1:premium');
+      await missions.telegramUpdate(db, env, { callback_query: { id: 'p1', data: yes.callback_data, message: { chat: { id: 42 }, message_id: 8 } } });
+      assert.equal((await db.prepare("SELECT plan FROM clients WHERE id='cp1'").bind().first()).plan, 'premium');
+      assert.equal((await db.prepare("SELECT plan FROM requests WHERE id='rp1'").bind().first()).plan, 'premium');
+      assert.match(telegramCalls.filter((c) => c.method === 'sendMessage').at(-1).body.text, /ora è sul piano Premium/);
+    } finally { db.close(); }
+  });
+});

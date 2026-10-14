@@ -776,6 +776,13 @@ export function createMissions(deps) {
       await sendTg(db, env, chat, text, null, deps.fetchImpl);
       return;
     }
+    if (verb === 'pia' || verb === 'piano') {
+      const out = verb === 'piano' ? { text: 'Va bene, il piano resta com’è.' } : await runPlan(db, missionId, String(extra || ''));
+      await ack(verb === 'piano' ? 'Resta com’è' : 'Fatto');
+      await clear();
+      await sendTg(db, env, chat, out.text, null, deps.fetchImpl);
+      return;
+    }
     if (['del', 'delc', 'dela', 'delq', 'delno'].includes(verb)) {
       // del: una pratica · delc: un cliente senza pratiche · dela: tutte le pratiche aperte di un cliente · delq: scegli fra le pratiche di un cliente
       const outcome = verb === 'delno' ? { text: 'Va bene, non elimino niente.' } : verb === 'delq' ? await deleteOffer(db, missionId, '')
@@ -1164,6 +1171,7 @@ export function createMissions(deps) {
       if (text) { await answer(text, null, { keep: !talk.ok }); return; }
     }
     if (intent.intent === 'affida_pratica') { const asked = await voiceEntrust(db, env, intent.locale, clues, utterance); await answer(asked.text, asked.buttons || null, { keep: asked.keep === true }); return; }
+    if (intent.intent === 'cambia_piano') { const asked = await voicePlan(db, intent.locale, clues, utterance); await answer(asked.text, asked.buttons || null, { keep: asked.keep === true }); return; }
     if (intent.intent === 'cancella_pratica') { const asked = await voiceDelete(db, env, intent.locale, clues, utterance); await answer(asked.text, asked.buttons || null, { keep: asked.keep === true, pending: asked.pending || null }); return; }
     if (intent.intent === 'stato') { const report = await statusReport(db, env, intent.dettaglio || (/\b(dettagli\w*|complet\w*|report|resoconto|riepilogo|tutto)\b/i.test(said0) ? 'completo' : /buone\s+notizie|novit/i.test(said0) ? 'buone_notizie' : 'breve')); await answer(report.text, report.buttons || null, { keep: false }); return; }
     if (intent.intent === 'anteprima') { const shown = await voiceShowPreview(db, env, intent.locale, clues, utterance); await answer(shown.text, shown.buttons || null, { keep: shown.keep }); return; }
@@ -1636,6 +1644,30 @@ export function createMissions(deps) {
     }
     if (ids.length > 1) return { text: `Ci sono più clienti simili: ${ids.map((id) => `«${clients.find((c) => c.id === id)?.name}»`).join(', ')}. Quale elimino?` };
     return deleteOffer(db, ids[0], utterance);
+  }
+  // «Passa il Tralcio a Premium»: Jarvis chiede conferma col pulsante, poi cambia il piano del locale e delle sue pratiche aperte.
+  async function voicePlan(db, spokenVenue, clues, utterance) {
+    const plan = planFromText(String(utterance || '').split('\n').at(-1)) || planFromText(utterance);
+    const clients = (await rows(db, 'SELECT id,name,plan,menu_id FROM clients ORDER BY updated_at DESC LIMIT 300').catch(() => [])).map((c) => ({ ...c, menu_id: c.menu_id || '' }));
+    const named = spokenVenue ? matchVenue(spokenVenue, clients) : { client: null, candidates: [] };
+    const client = named.client || (clues.locales.length === 1 ? clients.find((c) => c.id === clues.locales[0].id) : null);
+    if (!client) return { text: spokenVenue ? `Non trovo un locale che si chiami «${spokenVenue}». Dimmi il nome esatto.` : 'Di quale locale cambio il piano?' };
+    if (!plan) return { text: `A quale piano passo «${client.name}»: Standard, Annuale o Premium?` };
+    if (client.plan === plan) return { text: `«${client.name}» è già sul piano ${PLAN_LABEL[plan].split(' (')[0].split(',')[0]}.` };
+    const from = PLAN_LABEL[client.plan] ? ` da ${PLAN_LABEL[client.plan].split(' (')[0].split(',')[0]}` : '';
+    return { text: `Cambio il piano di «${client.name}»${from} a ${PLAN_LABEL[plan]}? Vale per la scheda del locale e per le sue pratiche aperte; il menu già online non cambia finché non pubblichi.`,
+      buttons: [['SÌ, cambia piano', `pia:${client.id}:${plan}`], ['No', 'piano:x']] };
+  }
+  async function runPlan(db, clientId, plan) {
+    if (!PLAN_LABEL[plan]) return { text: 'Piano non valido.' };
+    const client = await getOne(db, 'SELECT id,name,plan FROM clients WHERE id=?', clientId);
+    if (!client) return { text: 'Quel locale non c’è più.' };
+    const stamp = now();
+    await auditedBatch(jarvisDb(db), [
+      db.prepare('UPDATE clients SET plan=?,revision=revision+1,updated_at=? WHERE id=?').bind(plan, stamp, client.id),
+      db.prepare("UPDATE requests SET plan=?,revision=revision+1,updated_at=? WHERE client_id=? AND status NOT IN ('completata','archiviata','chiusa')").bind(plan, stamp, client.id)
+    ], 'jarvis.plan_change', `Piano di «${String(client.name).slice(0, 80)}» cambiato da Riccardo: ${client.plan || 'da definire'} → ${plan}.`, null);
+    return { text: `Fatto: «${client.name}» ora è sul piano ${PLAN_LABEL[plan]}.` };
   }
   const ALL_WORDS = /\b(tutt[aei]|entramb[aeio]|ambedue|tutte\s+e\s+due|tutti\s+e\s+due|tutte\s+e\s+tre|tutti\s+e\s+tre)\b/i;
   const ORDINALS = [/\b(prima|1)\b/i, /\b(seconda|2)\b/i, /\b(terza|3)\b/i, /\b(quarta|4)\b/i];
