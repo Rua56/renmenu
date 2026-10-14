@@ -151,6 +151,14 @@ describe('email diretta su menu@renmenu.com', () => {
     // Oggetto svuotato dal client di posta: vale il codice citato nel testo.
     const quoted = await importIncomingMail(db, mime({ subject: 'Re:', text: 'Va bene così.\n\n> Anteprima rif. RM-ABC234', messageId: '<reply2@mail.example.it>' }), envelope, deps(db, bucket()));
     assert.equal(quoted.kind, 'client_reply');
+    // Risposta da Gmail con tutta l'anteprima citata (link lungo): conta solo «Approvo», niente «testo parziale».
+    const long = `https://renmenu.com/menu/?lang=it#data=${'eyJpZCI6Im9zdGVyaWEi'.repeat(300)}`;
+    const gmail = await importIncomingMail(db, mime({ subject: 'Re: Anteprima del vostro menu digitale RenMenu · rif. RM-ABC234',
+      text: `Approvo.\n\nLuca\n\nOn Wed, Oct 14, 2026 02:50 PM, RenMenu <\nmenu@renmenu.com> wrote:\n\nBuongiorno,\n\necco l’anteprima:\n${long}\n\nRiferimento anteprima: RM-ABC234`,
+      messageId: '<reply3@mail.example.it>' }), envelope, deps(db, bucket()));
+    assert.equal(gmail.kind, 'client_reply');
+    assert.match(gmail.note, /Sembra un’approvazione/);
+    assert.equal((await db.prepare('SELECT reply_text FROM publication_approvals').first()).reply_text, 'Approvo.\n\nLuca');
   });
 
   it('email solo HTML: il testo si legge lo stesso', async () => {

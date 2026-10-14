@@ -68,9 +68,12 @@ const END = '(?=[^A-Za-zÀ-ÿ]|$)';
 const DOUBT = new RegExp(`(?:^|[^A-Za-zÀ-ÿ])(?:ma|però|pero|tranne|eccetto|invece|non|anziché|anziche)${END}|(?:modific|cambi|corregg|sbagli|error|errat|manc|aggiung|togli|rimuov|sostitu)|[?]`, 'i');
 export function stripQuoted(text) {
   const kept = [];
-  for (const line of String(text || '').split(/\r?\n/)) {
+  const lines = String(text || '').split(/\r?\n/);
+  for (const [i, line] of lines.entries()) {
     if (/^\s*>/.test(line)) continue;
     if (/^\s*(il giorno|on .+ wrote:|-----|da:\s|from:\s)/i.test(line)) break;
+    // Intestazione della citazione spezzata su due righe (Gmail: «On Wed, …, RenMenu <» / «menu@renmenu.com> wrote:»).
+    if (/^\s*(on|il)\s/i.test(line) && /(wrote|ha scritto):\s*$/i.test(`${line} ${lines[i + 1] || ''}`)) break;
     kept.push(line);
   }
   return kept.join('\n').trim();
