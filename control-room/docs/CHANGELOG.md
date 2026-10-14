@@ -4,6 +4,7 @@ Si aggiunge una voce a ogni pull request che cambia un comportamento di Jarvis o
 
 ## 14 ottobre 2026
 
+- **«Errore interno» rintracciabile:** quando un'operazione della Control Room finisce con «Errore interno», Jarvis annota solo il tipo d'errore e le righe di codice dove è successo (mai il messaggio né i dati della pratica), così si trova la causa senza indovinare. Serve per «Jarvis cerca le bottiglie», che sullo staging dà ancora quell'errore. Test aggiunto.
 - **Cambio pratica in Revisione dal telefono:** il tocco sulla tendina «Pratica» ridisegnava subito la pagina, così la pratica scelta finiva su una tendina già tolta e restava quella di prima. Ora il tocco apre solo la tendina e la scelta cambia pratica (vale per tutte le tendine delle pratiche). Provato nel browser in modalità telefono sulla demo.
 - **Lettura foto, quarta prova (94%, 16 locali su 20 perfetti):** un percorso degustazione col suo prezzo seguito da una frase sola («in caso di indisponibilità del prodotto fresco…») e poi da voci col prezzo non viene più preso per un percorso con le portate: resta una voce col suo prezzo e la frase diventa la sua descrizione. Nuovo test.
 - **Foto delle bottiglie dai siti delle cantine, «Errore interno» corretto:** un indirizzo d'immagine con un «%» non valido (capita sui siti veri) faceva cadere tutta la ricerca, sia dal tasto «Jarvis cerca le bottiglie» sia nella preparazione automatica. Ora quell'immagine si salta, e se un sito risponde in modo strano la ricerca passa al vino successivo annotando il motivo. Test aggiunto.

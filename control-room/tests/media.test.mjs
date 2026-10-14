@@ -334,6 +334,20 @@ describe('Foto per il menu · flusso nella Control Room', () => {
     } finally { globalThis.fetch = before; db.close(); }
   });
 
+  it('«Errore interno»: resta il tipo d’errore e le righe di codice, mai il messaggio con i dati', async () => {
+    const db = await setup();
+    try {
+      const broken = { ...db, prepare(sql) { if (/FROM drafts WHERE id=/.test(sql)) throw new TypeError('dato privato 123'); return db.prepare(sql); } };
+      const out = await act(broken, 'findBottlePhotos', { id: 'd1' }, {});
+      assert.equal(out.status, 500);
+      const saved = JSON.parse((await db.prepare("SELECT value FROM jarvis_settings WHERE key='last_internal_error'").bind().first()).value);
+      assert.equal(saved.name, 'TypeError');
+      assert.equal(saved.path, '/control-room/api/actions');
+      assert.ok(saved.where.some((line) => line.startsWith('action ')), JSON.stringify(saved.where));
+      assert.doesNotMatch(JSON.stringify(saved), /dato privato/);
+    } finally { db.close(); }
+  });
+
   it('Standard: nessun riconoscimento in più, la foto si legge come pagina di menu come prima', async () => {
     const db = await setup('standard');
     try {

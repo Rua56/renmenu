@@ -2063,6 +2063,11 @@ export async function onRequest(context) {
     if (error?.status) return failure(error.status, error.message);
     // Internal details and data are deliberately not returned to clients or console logs.
     if (globalThis.process?.env?.JARVIS_DEBUG) console.error(error);
+    // Per capire un «Errore interno» senza dati: solo il tipo d'errore e le righe di codice, mai il messaggio.
+    try {
+      const where = String(error?.stack || '').split('\n').slice(1, 7).map((l) => l.trim().replace(/^at /, '').slice(0, 160));
+      await missions.putSetting(context.env.DB, 'last_internal_error', JSON.stringify({ at: new Date().toISOString(), path: new URL(context.request.url).pathname.slice(0, 80), name: String(error?.name || typeof error).slice(0, 40), where }));
+    } catch { /* il registro dell'errore non deve mai fare danni */ }
     return failure(500, 'Errore interno. Nessuna azione esterna è stata eseguita.');
   }
 }
