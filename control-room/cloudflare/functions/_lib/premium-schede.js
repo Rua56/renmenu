@@ -8,6 +8,8 @@ import { geminiJson } from './gemini-json.js';
 import { menuSlots, resolveTarget } from './media.js';
 
 export const SCHEDE_SOURCE = 'Scheda proposta da Jarvis, approvata da Riccardo';
+// Preparazione automatica: la scheda entra nella bozza e Riccardo la approva col SÌ all'anteprima.
+export const SCHEDE_AUTO_SOURCE = 'Scheda preparata da Jarvis (preparazione automatica, da approvare con l’anteprima)';
 const TEXT_FIELDS = ['vitigno', 'territorio', 'colore', 'profumo', 'gusto', 'abbinamenti', 'nota'];
 const PROFILE_KEYS = ['aromi', 'struttura', 'acidita', 'dolcezza', 'corpo'];
 const MAX = { vitigno: 80, territorio: 90, colore: 90, profumo: 110, gusto: 110, abbinamenti: 110, nota: 180, descrizione: 120 };
@@ -123,7 +125,7 @@ export async function proposeSchede(menu, gemini, { done = [], tries = [] } = {}
  * Applica le proposte approvate. Ritrova la voce anche se la bozza è cambiata (per nome);
  * non sovrascrive mai un campo scritto dal cliente. Restituisce { menu, applied, lost, provenance }.
  */
-export function applySchede(menu, proposals) {
+export function applySchede(menu, proposals, source = SCHEDE_SOURCE) {
   const next = structuredClone(menu);
   const applied = [], lost = [], provenance = [];
   for (const p of proposals) {
@@ -135,11 +137,11 @@ export function applySchede(menu, proposals) {
     if (p.kind === 'piatto') {
       if (filled(voce.descrizione) || !p.descrizione) continue;
       voce.descrizione = p.descrizione;
-      provenance.push({ path: `${path}.descrizione`, source: SCHEDE_SOURCE, value: p.descrizione.it, status: 'da_verificare' });
+      provenance.push({ path: `${path}.descrizione`, source, value: p.descrizione.it, status: 'da_verificare' });
     } else {
       const before = voce.scheda && typeof voce.scheda === 'object' ? voce.scheda : {};
       const scheda = { ...before };
-      for (const [k, v] of Object.entries(p.scheda || {})) if (!(k in before)) { scheda[k] = v; provenance.push({ path: `${path}.scheda.${k}`, source: SCHEDE_SOURCE, value: typeof v === 'object' ? (v.it ?? JSON.stringify(v)) : String(v), status: 'da_verificare' }); }
+      for (const [k, v] of Object.entries(p.scheda || {})) if (!(k in before)) { scheda[k] = v; provenance.push({ path: `${path}.scheda.${k}`, source, value: typeof v === 'object' ? (v.it ?? JSON.stringify(v)) : String(v), status: 'da_verificare' }); }
       voce.scheda = scheda;
     }
     applied.push(p.name);

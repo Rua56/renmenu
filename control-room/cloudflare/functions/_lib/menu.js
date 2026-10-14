@@ -168,8 +168,16 @@ export function venueFromSource(source) {
   // «sono Marta, titolare dell'Enoteca Isonzo Test (…) a Gorizia»: il nome come scritto, con le maiuscole.
   // Le email di Gmail vanno a capo da sole: le righe spezzate si riuniscono prima di cercare.
   const prose = String(source || '').replace(/\r/g, '').replace(/([^\n.!?:;])\n(?=[a-zà-ÿ(])/g, '$1 ');
-  const owner = prose.match(new RegExp(`\\b(?:titolar[ei]|proprietari[oa]|gestor[ei]|responsabile|chef)\\s+(?:(?:del|dello|della)\\s+|dell['’]\\s*)(${VENUE_WORDS})\\s+([^\\n]{2,120})`, 'iu'));
-  if (owner) {
+  // Anche «gestisco la Trattoria da Nives a Gradisca», «siamo l'Osteria Al Tralcio di Gorizia» e
+  // «…a Cormons, l'Enoteca Il Calice Storto»: il tipo di locale seguito da parole con la maiuscola.
+  const patterns = [
+    new RegExp(`\\b(?:titolar[ei]|proprietari[oa]|gestor[ei]|responsabile|chef)\\s+(?:(?:del|dello|della)\\s+|dell['’]\\s*)(${VENUE_WORDS})\\s+([^\\n]{2,120})`, 'iu'),
+    new RegExp(`\\b(?:gestisco|gestiamo|siamo|sono|rappresento|lavoro\\s+(?:al|alla|all['’]|presso))\\s+(?:(?:il|la|lo|l['’]|un|una|un['’])\\s*)?(${VENUE_WORDS})\\s+([^\\n]{2,120})`, 'iu'),
+    new RegExp(`(?:^|[\\s,(])(?:l['’]|la\\s+|il\\s+)?(${VENUE_WORDS.split('|').map((w) => w.charAt(0).toUpperCase() + w.slice(1)).join('|')})\\s+([A-ZÀ-Ý][^\\n]{1,120})`, 'u')
+  ];
+  for (const pattern of patterns) {
+    const owner = prose.match(pattern);
+    if (!owner) continue;
     // Dopo il tipo di locale: un articolo/preposizione («da Mario», «al Ponte») poi solo parole con la maiuscola.
     const words = owner[2].split(/\s+/), kept = [];
     for (const [k, w] of words.entries()) {
@@ -441,7 +449,9 @@ export function extractMenuFromText(venue, source, requestedSlug) {
     const labeled = labeledVariants(row);
     if (labeled) { variantItem(labeled.name, labeled.variants, lineNumber, row); continue; }
     // «Franciacorta Satèn — bottiglia 48», «Rosso della casa: calice 4»: un solo prezzo con la sua etichetta.
-    const tail = tailOf(row);
+    // «Vintage Tunina - Jermann - bottiglia 65»: con più trattini l'etichetta è dopo l'ultimo.
+    const first = tailOf(row), lastDash = row.match(/^(.*[A-Za-zÀ-ÿ]{3}.*)\s+[—–-]\s+(.+)$/);
+    const tail = first && labelOnlyRow(first[2]) ? first : lastDash && labelOnlyRow(lastDash[2]) ? lastDash : first;
     const single = tail && labelOnlyRow(tail[2]);
     if (single && /^(?:Calice|Bottiglia|Mezza bottiglia|Magnum)$/.test(single.label) && !/\d/.test(tail[1].replace(/\b(?:19|20)\d{2}\b/g, ''))) { variantItem(tail[1].trim(), [single], lineNumber, row); continue; }
     const unlabeled = unlabeledVariants(row, { section: sectionName(), columns: section.columns });
