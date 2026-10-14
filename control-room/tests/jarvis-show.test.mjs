@@ -43,3 +43,32 @@ test('mostrami: le altre frasi restano a Jarvis', () => {
     assert.equal(show(text), null, text);
   }
 });
+
+test('mostrami i numeri: grafici di 7 o 30 giorni, anche di un locale', () => {
+  const p = [
+    { ...info('n1', 'c1', 'chiuse', 'completata', 'nuovo', '2026-10-13T12:00:00Z'), request: { id: 'n1', clientId: 'c1', status: 'completata', subject: 'Menu', createdAt: '2026-10-12T12:00:00Z', updatedAt: '2026-10-13T12:00:00Z' } },
+    { ...info('n2', 'c2', 'decidere', 'nuova', 'nuovo'), request: { id: 'n2', clientId: 'c2', status: 'nuova', subject: 'Menu', createdAt: '2026-10-14T09:00:00Z' } },
+    { ...info('n3', 'c2', 'corso', 'nuova', 'nuovo'), request: { id: 'n3', clientId: 'c2', status: 'nuova', subject: 'Menu', createdAt: '2026-09-01T09:00:00Z' } }
+  ];
+  const a = [
+    { id: 'm1', requestId: 'n1', action: 'github.pr.merged', createdAt: '2026-10-13T13:00:00Z' },
+    { id: 'p1', requestId: null, action: 'jarvis.phone_call', createdAt: '2026-10-14T08:00:00Z' },
+    { id: 'p2', requestId: null, action: 'jarvis.phone_call', createdAt: '2026-10-14T09:00:00Z' },
+    { id: 'x', requestId: null, action: 'jarvis.chat', createdAt: '2026-10-14T09:00:00Z' }
+  ];
+  const d = { pratiche: p, clients, audit: a, now: Date.parse('2026-10-14T12:00:00Z') };
+  const week = showFor('mostrami i numeri', d);
+  assert.equal(week.topic, 'numeri');
+  assert.equal(week.chart.days.length, 7);
+  assert.equal(week.chart.days.at(-1).today, true);
+  const total = (shown, key) => shown.chart.series.find((s) => s.key === key)?.total;
+  assert.deepEqual(['nuove', 'chiuse', 'menu', 'chiamate'].map((k) => total(week, k)), [2, 1, 1, 2]);
+  assert.deepEqual(week.chart.series.find((s) => s.key === 'chiamate').values.slice(-1), [2]);
+  assert.equal(week.say, 'Negli ultimi 7 giorni: 2 richieste nuove, 1 pratica chiusa, 1 menu pubblicato, 2 chiamate. Un menu online in tutto.');
+  assert.equal(showFor('grafici del mese', d).chart.days.length, 30);
+  assert.equal(showFor('come stiamo andando?', d).topic, 'numeri');
+  const bakaro = showFor('i numeri del Bakaro', d);
+  assert.equal(bakaro.title, 'Numeri degli ultimi 7 giorni · Al Bakaro');
+  assert.equal(total(bakaro, 'nuove'), 1);
+  assert.equal(total(bakaro, 'chiamate'), undefined);
+});

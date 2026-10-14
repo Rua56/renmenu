@@ -95,13 +95,13 @@ export const LIVE_PROMPT = [
   'Parli in italiano, con frasi brevi e naturali, tono calmo e un po’ ironico, come il Jarvis di Tony Stark. Dai del tu a Riccardo.',
   'Situazione di RenMenu all’inizio del dialogo (dati veri):\n{{situazione}}',
   'Per tutto ciò che va oltre la situazione (dettagli di una pratica, modifiche a un menu, anteprime, QR, pubblicazioni, messaggi ai clienti, impostazioni) usa lo strumento chiedi_a_jarvis con la richiesta di Riccardo detta in modo chiaro: risponde il Jarvis vero e tu riferisci la risposta in breve. Se la risposta parla di pulsanti, di’ a Riccardo che li trova sullo schermo: pubblicare e scrivere ai clienti restano sempre un suo tocco.',
-  'Quando Riccardo chiede di vedere un elenco (pratiche aperte o chiuse, locali, menu online, modifiche, attività) usa lo strumento mostra.',
+  'Quando Riccardo chiede di vedere un elenco (pratiche aperte o chiuse, locali, menu online, modifiche, attività) o i numeri e i grafici della settimana usa lo strumento mostra.',
   'Quando Riccardo saluta o dice basta, saluta in una frase e usa lo strumento chiudi.',
   'Non leggere link, codici o numeri lunghi. Non inventare dati.'
 ].join('\n\n');
 const LIVE_TOOLS = [
   { name: 'chiedi_a_jarvis', description: 'Passa una richiesta di Riccardo al Jarvis di RenMenu (lo stesso di Telegram) e restituisce la sua risposta. Da usare per ogni domanda o azione su pratiche, menu, locali, bozze, anteprime, QR e impostazioni.', field: 'richiesta', about: 'La richiesta di Riccardo, in italiano, chiara e completa.' },
-  { name: 'mostra', description: 'Apre a schermo un elenco: pratiche aperte, chiuse o da decidere, locali registrati, menu online, modifiche, attività recenti, anche di un locale o di un periodo.', field: 'cosa', about: 'Cosa mostrare, per esempio «pratiche chiuse di questa settimana».' },
+  { name: 'mostra', description: 'Apre a schermo un elenco: pratiche aperte, chiuse o da decidere, locali registrati, menu online, modifiche, attività recenti, anche di un locale o di un periodo, oppure i grafici dei numeri («i numeri della settimana»).', field: 'cosa', about: 'Cosa mostrare, per esempio «pratiche chiuse di questa settimana».' },
   { name: 'chiudi', description: 'Chiude il dialogo dal vivo quando Riccardo saluta o dice basta.', field: '', about: '' }
 ];
 function toolConfig(tool) {

@@ -135,3 +135,13 @@ html[data-theme="dark"] .hud-row { border-top-color: rgba(70, 214, 255, .1); }
 html[data-theme="dark"] .hud-row:hover { background: linear-gradient(90deg, var(--hud-dim), transparent 70%); }
 html[data-theme="dark"] .hud-row time { color: var(--teal-soft); }
 html[data-theme="dark"] .hud-adesso .oggi-card { box-shadow: 0 0 30px rgba(255, 179, 71, .08); }
+
+/* ——— grafici olografici: barre luminose, scansione che passa ——— */
+html[data-theme="dark"] .hud-chart { background: linear-gradient(180deg, rgba(70, 214, 255, .05), rgba(70, 214, 255, .01)); border-color: var(--hud-line); }
+html[data-theme="dark"] .hud-chart.info { --c: var(--hud); }
+html[data-theme="dark"] .hud-chart-head strong { text-shadow: 0 0 14px var(--c); }
+html[data-theme="dark"] .hud-bar { filter: drop-shadow(0 0 2px var(--c)); }
+html[data-theme="dark"] .hud-bar.today { filter: drop-shadow(0 0 5px var(--c)); }
+html[data-theme="dark"] .hud-chart::before { content: ''; position: absolute; inset: 0; background: linear-gradient(180deg, transparent 0, rgba(70, 214, 255, .1) 50%, transparent 100%); transform: translateY(-100%); animation: hud-scan 3.2s linear infinite; pointer-events: none; }
+@keyframes hud-scan { to { transform: translateY(100%); } }
+@media (prefers-reduced-motion: reduce) { html[data-theme="dark"] .hud-chart::before { animation: none; display: none; } }
