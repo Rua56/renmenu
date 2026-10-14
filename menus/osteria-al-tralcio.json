@@ -1,0 +1,879 @@
+{
+  "id": "osteria-al-tralcio",
+  "nome": "Osteria Al Tralcio",
+  "lingue": [
+    "it",
+    "en"
+  ],
+  "sezioni": [
+    {
+      "nome": {
+        "it": "Antipasti",
+        "en": "Starters"
+      },
+      "voci": [
+        {
+          "nome": {
+            "it": "Crudo di San Daniele 24 mesi con focaccia calda",
+            "en": "24-month San Daniele raw ham with warm focaccia"
+          },
+          "prezzo": "14,00",
+          "descrizione": {
+            "it": "Prosciutto crudo stagionato prodotto esclusivamente nel comune di San Daniele del Friuli, servito con focaccia lievitata",
+            "en": "Cured ham produced exclusively in the municipality of San Daniele del Friuli, served with warm leavened focaccia"
+          },
+          "foto": "https://renmenu-jarvis-stage.pages.dev/jarvis-hook/media/bb29580ee934c5e6b183ebad2ca1ac5c65238fe7fd9c1bec4c1bf31198247346.jpg"
+        },
+        {
+          "nome": {
+            "it": "Burrata, melanzane e pomodorini confit",
+            "en": "Burrata, aubergines and confit cherry tomatoes"
+          },
+          "prezzo": "12,00",
+          "descrizione": {
+            "it": "Formaggio fresco a pasta filata di latte vaccino accompagnato da melanzane grigliate e pomodori cotti lentamente in forn",
+            "en": "Fresh stretched-curd cheese made from cow's milk accompanied by grilled eggplant and slow-roasted cherry tomatoes"
+          }
+        },
+        {
+          "nome": {
+            "it": "Frico croccante con polenta morbida",
+            "en": "Crispy Frico with soft polenta"
+          },
+          "prezzo": "11,00",
+          "descrizione": {
+            "it": "Tipico piatto friulano a base di formaggio Montasio fuso e rosolato fino a diventare croccante, servito con polenta di m",
+            "en": "Traditional Friulian dish made with Montasio cheese melted and browned until crispy, served with corn polenta"
+          }
+        },
+        {
+          "nome": {
+            "it": "Crema di dentice su crostini di pane nero",
+            "en": "Dentex cream on dark bread crostini"
+          },
+          "prezzo": "13,00",
+          "descrizione": {
+            "it": "Vellutata di pesce dentice servita su fette di pane di segale tostato",
+            "en": "Creamy dentex fish soup served on toasted rye bread slices"
+          },
+          "foto": "https://renmenu-jarvis-stage.pages.dev/jarvis-hook/media/7d074407ce55564e8bbac2ce1385899c85312291c31c54a7c2afcbad7905cd62.jpg"
+        }
+      ]
+    },
+    {
+      "nome": {
+        "it": "Primi",
+        "en": "First courses"
+      },
+      "voci": [
+        {
+          "nome": {
+            "it": "Cjarsons alle erbe con burro fuso e ricotta affumicata",
+            "en": "Herb Cjarsons with melted butter and smoked ricotta"
+          },
+          "prezzo": "15,00",
+          "descrizione": {
+            "it": "Pasta fresca ripiena di un mix di erbe aromatiche, condita con burro fuso e scaglie di ricotta affumicata",
+            "en": "Fresh pasta filled with a mix of aromatic herbs, dressed with melted butter and shavings of smoked ricotta"
+          }
+        },
+        {
+          "nome": {
+            "it": "Tagliolini al ragù bianco di cervo",
+            "en": "Tagliolini with white venison ragù"
+          },
+          "prezzo": "16,00",
+          "descrizione": {
+            "it": "Pasta all'uovo lunga condita con un sugo di carne di cervo tritata, soffritto di verdure e aromi",
+            "en": "Long egg pasta served with a sauce of minced venison, sautéed vegetables, and herbs"
+          }
+        },
+        {
+          "nome": {
+            "it": "Gnocchi di susine con burro e cannella",
+            "en": "Plum gnocchi with butter and cinnamon"
+          },
+          "prezzo": "14,00",
+          "descrizione": {
+            "it": "Gnocchi di patate ripieni di susine, conditi con burro fuso e una spolverata di cannella",
+            "en": "Potato dumplings stuffed with plums, dressed with melted butter and a dusting of cinnamon"
+          }
+        }
+      ]
+    },
+    {
+      "nome": {
+        "it": "Secondi",
+        "en": "Main courses"
+      },
+      "voci": [
+        {
+          "nome": {
+            "it": "Guancetta di manzo brasata al Refosco con purè",
+            "en": "Refosco-braised beef cheek with mashed potato"
+          },
+          "prezzo": "22,00",
+          "descrizione": {
+            "it": "Taglio di carne bovina cotto lentamente nel vino rosso Refosco, servito con purè di patate",
+            "en": "Beef cheek slow-cooked in Refosco red wine, served with mashed potatoes"
+          }
+        },
+        {
+          "nome": {
+            "it": "Filetto di trota del Natisone con verdure di stagione",
+            "en": "Natisone trout fillet with seasonal vegetables"
+          },
+          "prezzo": "19,00",
+          "descrizione": {
+            "it": "Filetto di trota di fiume cotto delicatamente e accompagnato da verdure di stagione",
+            "en": "River trout fillet gently cooked and accompanied by seasonal vegetables"
+          }
+        },
+        {
+          "nome": {
+            "it": "Musetto con brovada",
+            "en": "Musetto with brovada"
+          },
+          "prezzo": "17,00",
+          "descrizione": {
+            "it": "Cotechino tipico friulano servito con rape bianche fermentate nelle vinacce",
+            "en": "Traditional Friulian pork sausage served with white turnips fermented in grape pomace"
+          }
+        }
+      ]
+    },
+    {
+      "nome": {
+        "it": "Dolci",
+        "en": "Desserts"
+      },
+      "voci": [
+        {
+          "nome": {
+            "it": "Gubana con grappa",
+            "en": "Gubana with grappa"
+          },
+          "prezzo": "6,00",
+          "descrizione": {
+            "it": "Dolce lievitato tipico delle Valli del Natisone, farcito con un ricco ripieno di noci, uvetta, pinoli e spezie, servito ",
+            "en": "Traditional leavened cake from the Natisone Valleys, filled with a rich mixture of walnuts, raisins, pine nuts, and spic"
+          }
+        },
+        {
+          "nome": {
+            "it": "Strudel di mele con gelato alla vaniglia",
+            "en": "Apple strudel with vanilla ice cream"
+          },
+          "prezzo": "7,00",
+          "descrizione": {
+            "it": "Sfogliata sottile ripiena di mele, uvetta, pinoli e cannella, accompagnata da una pallina di gelato alla vaniglia",
+            "en": "Thin pastry filled with apples, raisins, pine nuts, and cinnamon, served with a scoop of vanilla ice cream"
+          }
+        }
+      ]
+    },
+    {
+      "nome": {
+        "it": "Bollicine",
+        "en": "Sparkling wines"
+      },
+      "voci": [
+        {
+          "nome": {
+            "it": "Ribolla Gialla Spumante - Tenuta Stella",
+            "en": "Ribolla Gialla Spumante - Tenuta Stella"
+          },
+          "prezzi": [
+            {
+              "etichetta": {
+                "it": "Calice",
+                "en": "Glass"
+              },
+              "prezzo": "7,00"
+            },
+            {
+              "etichetta": {
+                "it": "Bottiglia",
+                "en": "Bottle"
+              },
+              "prezzo": "32,00"
+            }
+          ],
+          "scheda": {
+            "vitigno": {
+              "it": "Ribolla Gialla",
+              "en": "Ribolla Gialla"
+            },
+            "territorio": {
+              "it": "Collio, Friuli Venezia Giulia",
+              "en": "Collio, Friuli Venezia Giulia"
+            },
+            "colore": {
+              "it": "Giallo paglierino brillante con perlage fine",
+              "en": "Bright straw yellow with fine perlage"
+            },
+            "profumo": {
+              "it": "Note agrumate, fiori bianchi e sentori di crosta di pane",
+              "en": "Citrus notes, white flowers, and hints of bread crust"
+            },
+            "gusto": {
+              "it": "Fresco, sapido e di buona persistenza",
+              "en": "Fresh, savory, and with good persistence"
+            },
+            "abbinamenti": {
+              "it": "Crudo di San Daniele 24 mesi con focaccia calda, pesce crudo",
+              "en": "Crudo di San Daniele 24 mesi con focaccia calda, raw fish"
+            },
+            "nota": {
+              "it": "Spumante metodo classico che esalta l'eleganza del vitigno autoctono friulano",
+              "en": "Classic method sparkling wine that enhances the elegance of the native Friulian grape"
+            },
+            "temperatura": "6-8 °C",
+            "profilo": {
+              "aromi": 70,
+              "struttura": 60,
+              "acidita": 80,
+              "dolcezza": 0,
+              "corpo": 50
+            }
+          },
+          "foto": "https://renmenu-jarvis-stage.pages.dev/jarvis-hook/media/dd095cb5956413478b3217b1c0f84b93587afd803637951cdc81b2b2f08a45b3.jpg"
+        },
+        {
+          "nome": {
+            "it": "Franciacorta Cuvée Prestige - Ca' del Bosco",
+            "en": "Franciacorta Cuvée Prestige - Ca' del Bosco"
+          },
+          "prezzi": [
+            {
+              "etichetta": {
+                "it": "Calice",
+                "en": "Glass"
+              },
+              "prezzo": "10,00"
+            },
+            {
+              "etichetta": {
+                "it": "Bottiglia",
+                "en": "Bottle"
+              },
+              "prezzo": "55,00"
+            }
+          ],
+          "scheda": {
+            "vitigno": {
+              "it": "Chardonnay, Pinot Nero, Pinot Bianco",
+              "en": "Chardonnay, Pinot Nero, Pinot Bianco"
+            },
+            "territorio": {
+              "it": "Franciacorta, Lombardia",
+              "en": "Franciacorta, Lombardy"
+            },
+            "colore": {
+              "it": "Giallo paglierino con riflessi dorati",
+              "en": "Straw yellow with golden reflections"
+            },
+            "profumo": {
+              "it": "Sentori di frutta a polpa bianca, agrumi e note di pasticceria",
+              "en": "Hints of white-fleshed fruit, citrus, and pastry notes"
+            },
+            "gusto": {
+              "it": "Equilibrato, cremoso e di grande finezza",
+              "en": "Balanced, creamy, and of great finesse"
+            },
+            "abbinamenti": {
+              "it": "Pesce crudo, formaggi stagionati",
+              "en": "Raw fish, aged cheeses"
+            },
+            "nota": {
+              "it": "Iconico spumante metodo classico italiano noto per la sua costanza qualitativa",
+              "en": "Iconic Italian classic method sparkling wine known for its consistent quality"
+            },
+            "temperatura": "6-8 °C",
+            "profilo": {
+              "aromi": 75,
+              "struttura": 70,
+              "acidita": 70,
+              "dolcezza": 0,
+              "corpo": 60
+            }
+          },
+          "foto": "https://renmenu-jarvis-stage.pages.dev/jarvis-hook/media/742cc7a47de715b92f2652c2938ad307bc04af4270063fd0a47c61c2969c3964.jpg"
+        }
+      ]
+    },
+    {
+      "nome": {
+        "it": "Bianchi",
+        "en": "White wines"
+      },
+      "voci": [
+        {
+          "nome": {
+            "it": "Ribolla Gialla - Sturm",
+            "en": "Ribolla Gialla - Sturm"
+          },
+          "prezzi": [
+            {
+              "etichetta": {
+                "it": "Calice",
+                "en": "Glass"
+              },
+              "prezzo": "6,00"
+            },
+            {
+              "etichetta": {
+                "it": "Bottiglia",
+                "en": "Bottle"
+              },
+              "prezzo": "28,00"
+            }
+          ],
+          "scheda": {
+            "vitigno": {
+              "it": "Ribolla Gialla",
+              "en": "Ribolla Gialla"
+            },
+            "territorio": {
+              "it": "Collio, Friuli Venezia Giulia",
+              "en": "Collio, Friuli Venezia Giulia"
+            },
+            "colore": {
+              "it": "Giallo paglierino con riflessi verdognoli",
+              "en": "Straw yellow with greenish reflections"
+            },
+            "profumo": {
+              "it": "Fresco, con note di mela verde, fiori di campo e agrumi",
+              "en": "Fresh, with notes of green apple, wildflowers, and citrus"
+            },
+            "gusto": {
+              "it": "Secco, sapido e caratterizzato da una spiccata acidità",
+              "en": "Dry, savory, and characterized by marked acidity"
+            },
+            "abbinamenti": {
+              "it": "Burrata, melanzane e pomodorini confit, pesce crudo",
+              "en": "Burrata, melanzane e pomodorini confit, raw fish"
+            },
+            "nota": {
+              "it": "Espressione pura e verticale del vitigno simbolo del Collio",
+              "en": "Pure and vertical expression of the symbolic grape of the Collio"
+            },
+            "temperatura": "8-10 °C",
+            "profilo": {
+              "aromi": 65,
+              "struttura": 50,
+              "acidita": 85,
+              "dolcezza": 0,
+              "corpo": 40
+            }
+          },
+          "foto": "https://renmenu-jarvis-stage.pages.dev/jarvis-hook/media/1fe9572a52415d05caccea708fa07a7031fbe4387ee69b94df86f89b1d11a82a.jpg"
+        },
+        {
+          "nome": {
+            "it": "Malvasia - Sturm",
+            "en": "Malvasia - Sturm"
+          },
+          "prezzi": [
+            {
+              "etichetta": {
+                "it": "Calice",
+                "en": "Glass"
+              },
+              "prezzo": "6,00"
+            },
+            {
+              "etichetta": {
+                "it": "Bottiglia",
+                "en": "Bottle"
+              },
+              "prezzo": "28,00"
+            }
+          ],
+          "scheda": {
+            "vitigno": {
+              "it": "Malvasia Istriana",
+              "en": "Malvasia Istriana"
+            },
+            "territorio": {
+              "it": "Collio, Friuli Venezia Giulia",
+              "en": "Collio, Friuli Venezia Giulia"
+            },
+            "colore": {
+              "it": "Giallo paglierino brillante",
+              "en": "Bright straw yellow"
+            },
+            "profumo": {
+              "it": "Note floreali, agrumate e di frutta a polpa bianca",
+              "en": "Floral, citrus, and white fruit notes"
+            },
+            "gusto": {
+              "it": "Sapido, fresco e di buona persistenza",
+              "en": "Savory, fresh, and persistent"
+            },
+            "abbinamenti": {
+              "it": "Pesce crudo, antipasti di mare",
+              "en": "Raw fish, seafood appetizers"
+            },
+            "nota": {
+              "it": "Un bianco aromatico ed elegante tipico del territorio friulano",
+              "en": "An aromatic and elegant white wine typical of the Friuli region"
+            },
+            "temperatura": "10-12 °C",
+            "profilo": {
+              "aromi": 75,
+              "struttura": 60,
+              "acidita": 70,
+              "dolcezza": 10,
+              "corpo": 65
+            }
+          },
+          "foto": "https://renmenu-jarvis-stage.pages.dev/jarvis-hook/media/11faa80b4b971271132b94563fa7ea1d7c427f0cc3dd1937d028a45249699c3d.jpg"
+        },
+        {
+          "nome": {
+            "it": "Sauvignon - Doro Princic",
+            "en": "Sauvignon - Doro Princic"
+          },
+          "prezzi": [
+            {
+              "etichetta": {
+                "it": "Calice",
+                "en": "Glass"
+              },
+              "prezzo": "7,00"
+            },
+            {
+              "etichetta": {
+                "it": "Bottiglia",
+                "en": "Bottle"
+              },
+              "prezzo": "34,00"
+            }
+          ],
+          "scheda": {
+            "vitigno": {
+              "it": "Sauvignon Blanc",
+              "en": "Sauvignon Blanc"
+            },
+            "territorio": {
+              "it": "Collio, Friuli Venezia Giulia",
+              "en": "Collio, Friuli Venezia Giulia"
+            },
+            "colore": {
+              "it": "Giallo paglierino con riflessi verdognoli",
+              "en": "Straw yellow with greenish highlights"
+            },
+            "profumo": {
+              "it": "Sentori di foglia di pomodoro, salvia e frutta esotica",
+              "en": "Notes of tomato leaf, sage, and exotic fruit"
+            },
+            "gusto": {
+              "it": "Intenso, minerale e di spiccata acidità",
+              "en": "Intense, mineral, and with marked acidity"
+            },
+            "abbinamenti": {
+              "it": "Burrata, melanzane e pomodorini confit",
+              "en": "Burrata, melanzane e pomodorini confit"
+            },
+            "nota": {
+              "it": "Un'espressione classica e vibrante del Sauvignon nel Collio",
+              "en": "A classic and vibrant expression of Sauvignon in the Collio"
+            },
+            "temperatura": "10-12 °C",
+            "profilo": {
+              "aromi": 85,
+              "struttura": 65,
+              "acidita": 80,
+              "dolcezza": 5,
+              "corpo": 60
+            }
+          },
+          "foto": "https://renmenu-jarvis-stage.pages.dev/jarvis-hook/media/0e23ae9afb8188345999383bf97cfc531432f8cbaeb0dd1c46acde08992063d8.jpg"
+        },
+        {
+          "nome": {
+            "it": "Rassauer Friulano - Castello di Spessa",
+            "en": "Rassauer Friulano - Castello di Spessa"
+          },
+          "prezzi": [
+            {
+              "etichetta": {
+                "it": "Calice",
+                "en": "Glass"
+              },
+              "prezzo": "6,50"
+            },
+            {
+              "etichetta": {
+                "it": "Bottiglia",
+                "en": "Bottle"
+              },
+              "prezzo": "30,00"
+            }
+          ],
+          "scheda": {
+            "vitigno": {
+              "it": "Friulano",
+              "en": "Friulano"
+            },
+            "territorio": {
+              "it": "Collio, Friuli Venezia Giulia",
+              "en": "Collio, Friuli Venezia Giulia"
+            },
+            "colore": {
+              "it": "Giallo paglierino intenso",
+              "en": "Intense straw yellow"
+            },
+            "profumo": {
+              "it": "Fiori di campo, mandorla amara e pera",
+              "en": "Wildflowers, bitter almond, and pear"
+            },
+            "gusto": {
+              "it": "Morbido, sapido e di lunga persistenza",
+              "en": "Soft, savory, and long-lasting"
+            },
+            "abbinamenti": {
+              "it": "Crudo di San Daniele 24 mesi con focaccia calda",
+              "en": "Crudo di San Daniele 24 mesi con focaccia calda"
+            },
+            "nota": {
+              "it": "Il vitigno simbolo della tradizione enologica friulana",
+              "en": "The iconic grape variety of Friulian winemaking tradition"
+            },
+            "temperatura": "10-12 °C",
+            "profilo": {
+              "aromi": 70,
+              "struttura": 75,
+              "acidita": 60,
+              "dolcezza": 10,
+              "corpo": 75
+            }
+          }
+        },
+        {
+          "nome": {
+            "it": "Vintage Tunina - Jermann",
+            "en": "Vintage Tunina - Jermann"
+          },
+          "prezzi": [
+            {
+              "etichetta": {
+                "it": "Bottiglia",
+                "en": "Bottle"
+              },
+              "prezzo": "65,00"
+            }
+          ],
+          "scheda": {
+            "vitigno": {
+              "it": "Chardonnay, Sauvignon, Ribolla Gialla, Malvasia",
+              "en": "Chardonnay, Sauvignon, Ribolla Gialla, Malvasia"
+            },
+            "territorio": {
+              "it": "Venezia Giulia",
+              "en": "Venezia Giulia"
+            },
+            "colore": {
+              "it": "Giallo dorato",
+              "en": "Golden yellow"
+            },
+            "profumo": {
+              "it": "Complesso, con note di frutta matura, miele e spezie",
+              "en": "Complex, with notes of ripe fruit, honey, and spices"
+            },
+            "gusto": {
+              "it": "Avvolgente, strutturato e di grande equilibrio",
+              "en": "Enveloping, structured, and well-balanced"
+            },
+            "abbinamenti": {
+              "it": "Filetto di trota del Natisone con verdure di stagione",
+              "en": "Filetto di trota del Natisone con verdure di stagione"
+            },
+            "nota": {
+              "it": "Un blend iconico che rappresenta l'eccellenza dei bianchi friulani",
+              "en": "An iconic blend representing the excellence of Friulian white wines"
+            },
+            "temperatura": "12-14 °C",
+            "profilo": {
+              "aromi": 90,
+              "struttura": 95,
+              "acidita": 70,
+              "dolcezza": 15,
+              "corpo": 90
+            }
+          }
+        },
+        {
+          "nome": {
+            "it": "Collio Bianco - Terre del Faet",
+            "en": "Collio Bianco - Terre del Faet"
+          },
+          "prezzi": [
+            {
+              "etichetta": {
+                "it": "Calice",
+                "en": "Glass"
+              },
+              "prezzo": "6,00"
+            },
+            {
+              "etichetta": {
+                "it": "Bottiglia",
+                "en": "Bottle"
+              },
+              "prezzo": "27,00"
+            }
+          ],
+          "scheda": {
+            "vitigno": {
+              "it": "Friulano, Ribolla Gialla, Malvasia",
+              "en": "Friulano, Ribolla Gialla, Malvasia"
+            },
+            "territorio": {
+              "it": "Collio, Friuli Venezia Giulia",
+              "en": "Collio, Friuli Venezia Giulia"
+            },
+            "colore": {
+              "it": "Giallo paglierino",
+              "en": "Straw yellow"
+            },
+            "profumo": {
+              "it": "Fruttato, con note di fiori bianchi e agrumi",
+              "en": "Fruity, with notes of white flowers and citrus"
+            },
+            "gusto": {
+              "it": "Fresco, minerale e armonico",
+              "en": "Fresh, mineral, and harmonious"
+            },
+            "abbinamenti": {
+              "it": "Frico croccante con polenta morbida",
+              "en": "Frico croccante con polenta morbida"
+            },
+            "nota": {
+              "it": "Un assemblaggio che esprime l'identità del territorio del Collio",
+              "en": "A blend that expresses the identity of the Collio territory"
+            },
+            "temperatura": "10-12 °C",
+            "profilo": {
+              "aromi": 70,
+              "struttura": 70,
+              "acidita": 75,
+              "dolcezza": 5,
+              "corpo": 70
+            }
+          },
+          "foto": "https://renmenu-jarvis-stage.pages.dev/jarvis-hook/media/8d550e08e0e293b2d8c7879aff3a9d62b275b4d4bd03a75a439bd3812a44944a.jpg"
+        }
+      ]
+    },
+    {
+      "nome": {
+        "it": "Rossi",
+        "en": "Red wines"
+      },
+      "voci": [
+        {
+          "nome": {
+            "it": "Pinot Nero - Masut da Rive",
+            "en": "Pinot Nero - Masut da Rive"
+          },
+          "prezzi": [
+            {
+              "etichetta": {
+                "it": "Calice",
+                "en": "Glass"
+              },
+              "prezzo": "7,00"
+            },
+            {
+              "etichetta": {
+                "it": "Bottiglia",
+                "en": "Bottle"
+              },
+              "prezzo": "33,00"
+            }
+          ],
+          "scheda": {
+            "vitigno": {
+              "it": "Pinot Nero",
+              "en": "Pinot Noir"
+            },
+            "territorio": {
+              "it": "Friuli Venezia Giulia",
+              "en": "Friuli Venezia Giulia"
+            },
+            "colore": {
+              "it": "Rosso rubino tenue",
+              "en": "Pale ruby red"
+            },
+            "profumo": {
+              "it": "Frutti di bosco, ciliegia, note speziate",
+              "en": "Wild berries, cherry, spicy notes"
+            },
+            "gusto": {
+              "it": "Elegante, tannini setosi, buona freschezza",
+              "en": "Elegant, silky tannins, good freshness"
+            },
+            "abbinamenti": {
+              "it": "Tagliolini al ragù bianco di cervo,Guancetta di manzo brasata al Refosco con purè",
+              "en": "Tagliolini al ragù bianco di cervo,Guancetta di manzo brasata al Refosco con purè"
+            },
+            "nota": {
+              "it": "Un vitigno internazionale che trova nel territorio friulano un'espressione raffinata",
+              "en": "An international grape variety that finds a refined expression in the Friulian territory"
+            },
+            "temperatura": "16-18 °C",
+            "profilo": {
+              "aromi": 80,
+              "struttura": 65,
+              "acidita": 75,
+              "dolcezza": 0,
+              "corpo": 60
+            },
+            "cantina": "Königschloffer"
+          },
+          "foto": "https://renmenu-jarvis-stage.pages.dev/jarvis-hook/media/c2dba3d43526b4b69ecb8d07b09a9f9c03933c49da63c10a9d14ecc7b5921ece.jpg"
+        },
+        {
+          "nome": {
+            "it": "Cabernet Franc - Castelvecchio",
+            "en": "Cabernet Franc - Castelvecchio"
+          },
+          "prezzi": [
+            {
+              "etichetta": {
+                "it": "Calice",
+                "en": "Glass"
+              },
+              "prezzo": "6,00"
+            },
+            {
+              "etichetta": {
+                "it": "Bottiglia",
+                "en": "Bottle"
+              },
+              "prezzo": "26,00"
+            }
+          ],
+          "scheda": {
+            "vitigno": {
+              "it": "Cabernet Franc",
+              "en": "Cabernet Franc"
+            },
+            "territorio": {
+              "it": "Carso",
+              "en": "Carso"
+            },
+            "colore": {
+              "it": "Rosso rubino intenso",
+              "en": "Intense ruby red"
+            },
+            "profumo": {
+              "it": "Erbe aromatiche, peperone verde, frutti rossi",
+              "en": "Aromatic herbs, green bell pepper, red fruits"
+            },
+            "gusto": {
+              "it": "Strutturato, erbaceo, tannico",
+              "en": "Structured, herbaceous, tannic"
+            },
+            "abbinamenti": {
+              "it": "Tagliolini al ragù bianco di cervo,Guancetta di manzo brasata al Refosco con purè",
+              "en": "Tagliolini al ragù bianco di cervo,Guancetta di manzo brasata al Refosco con purè"
+            },
+            "nota": {
+              "it": "Vitigno tipico della tradizione friulana, noto per il suo carattere deciso e vegetale",
+              "en": "A traditional Friulian grape variety, known for its bold and vegetal character"
+            },
+            "temperatura": "16-18 °C",
+            "profilo": {
+              "aromi": 70,
+              "struttura": 85,
+              "acidita": 60,
+              "dolcezza": 0,
+              "corpo": 80
+            }
+          }
+        },
+        {
+          "nome": {
+            "it": "Refosco dal Peduncolo Rosso - Ronchi di Manzano",
+            "en": "Refosco dal Peduncolo Rosso - Ronchi di Manzano"
+          },
+          "prezzi": [
+            {
+              "etichetta": {
+                "it": "Calice",
+                "en": "Glass"
+              },
+              "prezzo": "6,00"
+            },
+            {
+              "etichetta": {
+                "it": "Bottiglia",
+                "en": "Bottle"
+              },
+              "prezzo": "27,00"
+            }
+          ],
+          "scheda": {
+            "vitigno": {
+              "it": "Refosco dal Peduncolo Rosso",
+              "en": "Refosco dal Peduncolo Rosso"
+            },
+            "territorio": {
+              "it": "Friuli Colli Orientali",
+              "en": "Friuli Colli Orientali"
+            },
+            "colore": {
+              "it": "Rosso rubino con riflessi violacei",
+              "en": "Ruby red with violet reflections"
+            },
+            "profumo": {
+              "it": "Frutti di bosco, mora, note di sottobosco",
+              "en": "Wild berries, blackberry, undergrowth notes"
+            },
+            "gusto": {
+              "it": "Vigoroso, fresco, tannico",
+              "en": "Vigorous, fresh, tannic"
+            },
+            "abbinamenti": {
+              "it": "Musetto con brovada,Guancetta di manzo brasata al Refosco con purè",
+              "en": "Musetto con brovada,Guancetta di manzo brasata al Refosco con purè"
+            },
+            "nota": {
+              "it": "Vitigno autoctono friulano per eccellenza, caratterizzato dal peduncolo rosso",
+              "en": "The quintessential native Friulian grape variety, characterized by its red stalk"
+            },
+            "temperatura": "16-18 °C",
+            "profilo": {
+              "aromi": 75,
+              "struttura": 90,
+              "acidita": 85,
+              "dolcezza": 0,
+              "corpo": 85
+            }
+          },
+          "foto": "https://renmenu-jarvis-stage.pages.dev/jarvis-hook/media/1f408ea17c0514d8ee4c6c601316b899c72f003646b79a1d86dfdab191199eff.jpg"
+        }
+      ]
+    }
+  ],
+  "premium": {
+    "direzione": "bistrot",
+    "caratteri": "artigianale",
+    "colori": {
+      "fondo": "#f3ebe0",
+      "testo": "#2a211b",
+      "accento": "#a67c2e",
+      "secondario": "#6e1f2b"
+    }
+  },
+  "telefono": "0481 530 214",
+  "coperto": "2,50",
+  "indirizzo": "Via Rastello 21, Gorizia",
+  "orari": {
+    "it": "12:00–14:30 e 19:00–22:30 · Chiuso il lunedì",
+    "en": "12:00–14:30 and 19:00–22:30 · Closed on Monday"
+  }
+}
