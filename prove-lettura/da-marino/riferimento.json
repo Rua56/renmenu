@@ -1,0 +1,127 @@
+{
+ "nome": "Osteria da Marino (Trieste)",
+ "sezioni": [
+  {
+   "nome": {
+    "it": "Piatti"
+   },
+   "voci": [
+    {
+     "nome": {
+      "it": "tartara di manzo"
+     },
+     "prezzo": "16,00"
+    },
+    {
+     "nome": {
+      "it": "il nostro frico"
+     },
+     "prezzo": "13,00"
+    },
+    {
+     "nome": {
+      "it": "spalletta di maiale"
+     },
+     "prezzo": "16,00"
+    },
+    {
+     "nome": {
+      "it": "sformatino di verdure di stagione"
+     },
+     "prezzo": "12,00"
+    },
+    {
+     "nome": {
+      "it": "selezione di salumi di piccoli produttori della regione e dintorni"
+     },
+     "prezzo": "20,00"
+    },
+    {
+     "nome": {
+      "it": "selezione di formaggi del carso"
+     },
+     "prezzo": "20,00"
+    },
+    {
+     "nome": {
+      "it": "“strucolo in straza”"
+     },
+     "prezzo": "16,00"
+    },
+    {
+     "nome": {
+      "it": "fuzi con la gallina"
+     },
+     "prezzo": "16,00"
+    },
+    {
+     "nome": {
+      "it": "mlinci con funghi del giorno"
+     },
+     "prezzo": "16,00"
+    },
+    {
+     "nome": {
+      "it": "jota"
+     },
+     "prezzo": "13,00"
+    },
+    {
+     "nome": {
+      "it": "“piatto caldaia”"
+     },
+     "prezzo": "18,00"
+    },
+    {
+     "nome": {
+      "it": "stinco di maiale"
+     },
+     "prezzo": "18,00"
+    },
+    {
+     "nome": {
+      "it": "filetto di maiale"
+     },
+     "prezzo": "24,00"
+    },
+    {
+     "nome": {
+      "it": "goulash"
+     },
+     "prezzo": "18,00"
+    },
+    {
+     "nome": {
+      "it": "tagliata di diaframma di manzo"
+     },
+     "prezzo": "18,00"
+    },
+    {
+     "nome": {
+      "it": "costata di manzo"
+     },
+     "prezzo": "70,00"
+    }
+   ]
+  },
+  {
+   "nome": {
+    "it": "dolci"
+   },
+   "voci": [
+    {
+     "nome": {
+      "it": "strudel di mele"
+     },
+     "prezzo": "7,00"
+    },
+    {
+     "nome": {
+      "it": "dolce del giorno"
+     },
+     "prezzo": "7,00"
+    }
+   ]
+  }
+ ]
+}

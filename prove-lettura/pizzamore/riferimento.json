@@ -1,0 +1,72 @@
+{
+ "nome": "Pizzamore (Crocetta del Montello)",
+ "sezioni": [
+  {
+   "nome": {
+    "it": "Aperitivando"
+   },
+   "voci": [
+    {
+     "nome": {
+      "it": "Aperipizza"
+     },
+     "prezzo": "15,00"
+    },
+    {
+     "nome": {
+      "it": "Arancino rosso"
+     },
+     "prezzo": "2,20"
+    },
+    {
+     "nome": {
+      "it": "Crocchè salame e provola"
+     },
+     "prezzo": "2,20"
+    },
+    {
+     "nome": {
+      "it": "Frittatina alla siciliana"
+     },
+     "prezzo": "2,20"
+    },
+    {
+     "nome": {
+      "it": "Frittatina cacio e pepe"
+     },
+     "prezzo": "2,20"
+    },
+    {
+     "nome": {
+      "it": "Frittatina panata di pasta"
+     },
+     "prezzo": "2,20"
+    },
+    {
+     "nome": {
+      "it": "Tris di frittate"
+     },
+     "prezzo": "6,00"
+    },
+    {
+     "nome": {
+      "it": "Patatine chips"
+     },
+     "prezzo": "5,00"
+    },
+    {
+     "nome": {
+      "it": "Polentine fritte"
+     },
+     "prezzo": "6,00"
+    },
+    {
+     "nome": {
+      "it": "Spicchio di teglia margherita"
+     },
+     "prezzo": "2,50"
+    }
+   ]
+  }
+ ]
+}

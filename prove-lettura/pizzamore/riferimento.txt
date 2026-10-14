@@ -1,0 +1,12 @@
+FOTO: foto-2.jpg
+# Aperitivando
+Aperipizza | 15,00
+Arancino rosso | 2,20
+Crocchè salame e provola | 2,20
+Frittatina alla siciliana | 2,20
+Frittatina cacio e pepe | 2,20
+Frittatina panata di pasta | 2,20
+Tris di frittate | 6,00
+Patatine chips | 5,00
+Polentine fritte | 6,00
+Spicchio di teglia margherita | 2,50

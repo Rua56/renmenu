@@ -1,0 +1,21 @@
+FOTO: foto-1.jpg
+# Piatti
+tartara di manzo | 16,00
+il nostro frico | 13,00
+spalletta di maiale | 16,00
+sformatino di verdure di stagione | 12,00
+selezione di salumi di piccoli produttori della regione e dintorni | 20,00
+selezione di formaggi del carso | 20,00
+“strucolo in straza” | 16,00
+fuzi con la gallina | 16,00
+mlinci con funghi del giorno | 16,00
+jota | 13,00
+“piatto caldaia” | 18,00
+stinco di maiale | 18,00
+filetto di maiale | 24,00
+goulash | 18,00
+tagliata di diaframma di manzo | 18,00
+costata di manzo | 70,00
+# dolci
+strudel di mele | 7,00
+dolce del giorno | 7,00

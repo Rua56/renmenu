@@ -251,5 +251,29 @@
   "riferimento": {
    "file": "turbo-pizza/riferimento.json"
   }
+ },
+ {
+  "id": "da-marino",
+  "nome": "Osteria da Marino (Trieste)",
+  "foto": [
+   {
+    "file": "da-marino/foto-1.jpg"
+   }
+  ],
+  "riferimento": {
+   "file": "da-marino/riferimento.json"
+  }
+ },
+ {
+  "id": "pizzamore",
+  "nome": "Pizzamore (Crocetta del Montello)",
+  "foto": [
+   {
+    "file": "pizzamore/foto-2.jpg"
+   }
+  ],
+  "riferimento": {
+   "file": "pizzamore/riferimento.json"
+  }
  }
 ]
