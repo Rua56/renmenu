@@ -1,6 +1,8 @@
 /* «Mostrami …»: Jarvis apre a schermo l'elenco chiesto a voce o per iscritto (pratiche aperte, chiuse,
  * da decidere, locali registrati, menu online, modifiche, attività recenti), anche filtrato per locale
  * («le pratiche del Bakaro») o per periodo («oggi», «ieri», «questa settimana», «questo mese»).
+ * «Mostrami i numeri» apre i grafici olografici: richieste nuove, pratiche chiuse, menu pubblicati e
+ * chiamate di Jarvis giorno per giorno (7 giorni, o 30 con «del mese»).
  * Funziona sui dati già caricati nella pagina: nessuna chiamata, nessun costo. Le altre frasi (modifiche
  * alla bozza, anteprime, pubblicazioni) restano a Jarvis. */
 const plain = (value) => String(value || '').toLocaleLowerCase('it-IT').normalize('NFD').replace(/[̀-ͯ]/g, '').replace(/[’']/g, ' ').replace(/\s+/g, ' ').trim();
@@ -9,6 +11,7 @@ const STOP = new Set(['ristorante', 'trattoria', 'osteria', 'pizzeria', 'locale'
 const SINGLE = { pratiche: ['pratica', 'pratiche'], locali: ['locale', 'locali'], menu: ['menu', 'menu'], modifiche: ['modifica', 'modifiche'], attivita: ['attività', 'attività'] };
 
 function topic(words) {
+  if (/\b(?:numeri|grafic\w*|andamento|statistic\w*|trend|come (?:sta|stiamo|va|vanno|sto) andando)\b/.test(words)) return 'numeri';
   if (/\b(?:attivita|registro|storico|cronologia|cosa e successo|cos e successo|ultime azioni|novita)\b/.test(words)) return 'attivita';
   if (/\b(?:modific\w*|aggiornament\w*|cambi(?:amenti)?)\b/.test(words) && !/\b(?:metti|togli|aggiungi|cambia|porta|sostituisci|rinomina)\b/.test(words)) return 'modifiche';
   if (/\bmenu\s+(?:online|creati|pubblicati|attivi|fatti|realizzati)\b|\b(?:i|tutti i|quanti)\s+menu\b|\bmenu\s+(?:che|gia)\b/.test(words)) return 'menu';
@@ -46,6 +49,46 @@ const inPeriod = (value, range) => {
 };
 const PLANS = { standard: 'Standard', annuale: 'Annuale', premium: 'Premium' };
 const count = (n, [one, many]) => `${n} ${n === 1 ? one : many}`;
+const DAY_MS = 86_400_000;
+const WEEKDAYS = ['dom', 'lun', 'mar', 'mer', 'gio', 'ven', 'sab'];
+// Le quattro serie dei grafici: cosa contano e come si dicono a voce.
+const SERIES = [
+  { key: 'nuove', label: 'Richieste nuove', noun: ['richiesta nuova', 'richieste nuove'], tone: 'info' },
+  { key: 'chiuse', label: 'Pratiche chiuse', noun: ['pratica chiusa', 'pratiche chiuse'], tone: 'good' },
+  { key: 'menu', label: 'Menu pubblicati', noun: ['menu pubblicato', 'menu pubblicati'], tone: 'good' },
+  { key: 'chiamate', label: 'Chiamate', noun: ['chiamata', 'chiamate'], tone: 'hot' }
+];
+
+/** Numeri giorno per giorno degli ultimi `span` giorni (oggi compreso), anche di un solo locale. */
+export function numbersFor({ pratiche = [], clients = [], audit = [], now = Date.now(), span = 7, venue = null } = {}) {
+  const today = new Date(now); today.setHours(0, 0, 0, 0);
+  const days = Array.from({ length: span }, (_, i) => {
+    const start = new Date(today); start.setDate(start.getDate() - (span - 1 - i));
+    const end = new Date(start); end.setDate(end.getDate() + 1);
+    return { from: start.getTime(), to: end.getTime(), label: `${WEEKDAYS[start.getDay()]} ${start.getDate()}`, today: i === span - 1 };
+  });
+  const slot = (value) => {
+    const t = Date.parse(value || '');
+    return Number.isFinite(t) ? days.findIndex((d) => t >= d.from && t < d.to) : -1;
+  };
+  const ofVenue = (info) => !venue || info.request.clientId === venue.id;
+  const requestOf = new Map(pratiche.map((info) => [info.request.id, info]));
+  const values = Object.fromEntries(SERIES.map((s) => [s.key, days.map(() => 0)]));
+  const add = (key, when) => { const i = slot(when); if (i >= 0) values[key][i] += 1; };
+  pratiche.filter(ofVenue).forEach((info) => {
+    add('nuove', info.request.createdAt);
+    if (info.group === 'chiuse') add('chiuse', info.request.updatedAt || info.request.createdAt);
+  });
+  audit.forEach((a) => {
+    if (a.action === 'github.pr.merged') {
+      const info = requestOf.get(a.requestId);
+      if (!venue || (info && ofVenue(info))) add('menu', a.createdAt);
+    } else if (a.action === 'jarvis.phone_call' && !venue) add('chiamate', a.createdAt);
+  });
+  const series = SERIES.filter((s) => !venue || s.key !== 'chiamate').map((s) => ({ ...s, values: values[s.key], total: values[s.key].reduce((a, b) => a + b, 0) }));
+  const online = clients.filter((c) => c.menuId && (!venue || c.id === venue.id)).length;
+  return { days: days.map(({ label, today: isToday }) => ({ label, today: isToday })), series, online };
+}
 
 /**
  * Cosa mostrare per una frase. data: { pratiche (con group/headline/tone), clients, audit, now }.
@@ -59,6 +102,14 @@ export function showFor(text, { pratiche = [], clients = [], audit = [], now = D
   // Serve un verbo da «mostrami» oppure una frase corta fatta solo dell'elenco («pratiche chiuse»).
   if (!SHOW_VERB.test(words) && words.split(' ').length > 4) return null;
   const venue = venueIn(words, clients);
+  if (what === 'numeri') {
+    const span = /\b(?:mese|30 giorni|trenta giorni)\b/.test(words) ? 30 : 7;
+    const chart = numbersFor({ pratiche, clients, audit, now, span, venue });
+    const title = `Numeri degli ultimi ${span} giorni${venue ? ` · ${venue.name}` : ''}`;
+    const said = chart.series.map((s) => count(s.total, s.noun)).join(', ');
+    const say = `Negli ultimi ${span} giorni${venue ? ` per ${venue.name}` : ''}: ${said}. ${chart.online === 1 ? 'Un menu online' : `Menu online: ${chart.online}`}${venue ? '' : ' in tutto'}.`;
+    return { topic: 'numeri', filter: null, title, say, rows: [], chart };
+  }
   const range = period(words, now);
   const suffix = `${venue ? ` di ${venue.name}` : ''}${range ? ` ${range.label}` : ''}`;
   const clientName = (id) => clients.find((c) => c.id === id)?.name || '';
