@@ -450,3 +450,152 @@ html.pm-lock, html.pm-lock body { overflow: hidden; }
 .pm-card--foto .pm-card__top { padding-right: 0; }
 .pm-card--foto .pm-card__orig, .pm-card--foto .pm-card__nome { padding-right: 30px; }
 .pm-coppia__img--bott img { height: 56px; width: auto; max-width: 100%; }
+
+/* ═══ Lusso (v6): carta stampata da ristorante stellato. Niente riquadri né pastiglie: righe con filetti
+   d'oro, prezzi con i puntini di guida, maiuscoletto, schede del vino da enoteca, movimento lento. ═══ */
+body.pm {
+  --pm-oro-chiaro: color-mix(in oklab, var(--pm-oro) 50%, #fff4d6);
+  --pm-oro-scuro: color-mix(in oklab, var(--pm-oro) 78%, #000);
+  --pm-oro-luce: linear-gradient(100deg, var(--pm-oro-scuro) 0%, var(--pm-oro) 22%, var(--pm-oro-chiaro) 48%, var(--pm-oro) 70%, var(--pm-oro-scuro) 100%);
+  --pm-filetto: linear-gradient(90deg, transparent, color-mix(in oklab, var(--pm-oro) 45%, transparent) 16%, color-mix(in oklab, var(--pm-oro) 45%, transparent) 84%, transparent);
+  --pm-morbido: cubic-bezier(.22, .61, .36, 1);
+  font-feature-settings: 'kern', 'liga';
+}
+.pm-prezzo { white-space: nowrap; }
+.pm-eur { font-size: .74em; letter-spacing: 0; opacity: .8; margin-right: -.12em; }
+.pm-orn { color: var(--pm-oro); }
+.pm-orn::before, .pm-orn::after { background: linear-gradient(90deg, transparent, currentColor); opacity: .7; }
+.pm-orn::after { background: linear-gradient(270deg, transparent, currentColor); }
+
+/* Apertura e riquadri d'insieme: angoli da carta, non da app */
+.pm-open, .pm-open::before, .pm-open::after { border-radius: 0; }
+.pm-degu, .pm-degu::before { border-radius: 2px; }
+.pm-racconto__card { border-radius: 2px; box-shadow: none; background: none; border-color: color-mix(in oklab, var(--pm-oro) 35%, transparent); }
+.pm-racconto__strip img { border-radius: 2px; }
+
+/* Indice delle sezioni: maiuscoletto con un filo d'oro sotto quella attiva */
+.pm-nav { gap: 24px; padding-top: 16px; }
+.pm-nav a { border: 0; border-bottom: 1px solid transparent; border-radius: 0; background: none; padding: 10px 0 9px; font: 600 .66rem/1 var(--pm-corpo); letter-spacing: .22em; text-transform: uppercase; color: var(--pm-muted); }
+.pm-nav a svg { display: none; }
+.pm-nav a[aria-current='true'] { background: none; color: var(--pm-testo); border-bottom-color: var(--pm-oro); }
+
+/* Sezioni: titolo centrato con numero romano e filetto con losanga */
+.pm-sezione { padding: 60px 0 0; }
+.pm-pannello { background: none; border: 0; border-radius: 0; padding: 0; box-shadow: none; }
+.pm-pannello::before { display: none; }
+.pm-pannello .pm-sezione__head { display: grid; justify-items: center; text-align: center; gap: 0; padding: 0 0 6px; border: 0; }
+.pm-sezione__tit { display: grid; justify-items: center; }
+.pm-pannello .pm-sezione__num { display: grid; justify-items: center; gap: 8px; margin: 0 0 10px; }
+.pm-sezione__num > span { font: 500 1.05rem/1 var(--pm-titoli); letter-spacing: .12em; text-indent: .12em; background: var(--pm-oro-luce); -webkit-background-clip: text; background-clip: text; color: transparent; }
+.pm-sezione__num small { font: 600 .58rem/1 var(--pm-corpo); letter-spacing: .26em; text-transform: uppercase; color: var(--pm-muted); }
+.pm-pannello h2 { font: 400 clamp(2.2rem, 9vw, 3rem)/1.02 var(--pm-titoli); letter-spacing: .005em; }
+.pm-sezione__head .pm-orn { margin: 16px 0 0; font-size: .62rem; }
+.pm-pannello > .pm-sezione__desc { text-align: center; margin: 14px auto 0; padding: 0; }
+.pm-pannello .pm-voci { gap: 0; margin-top: 18px; }
+
+/* Piatti e vini: righe, non schede */
+.pm-card { background: none; border: 0; border-radius: 0; box-shadow: none; padding: 20px 0; overflow: visible; }
+.pm-card::after { left: 0; right: 0; top: auto; bottom: 0; background: var(--pm-filetto); opacity: .75; }
+.pm-card:last-child::after { display: none; }
+.pm-card--apri::before { display: none; }
+@media (hover: hover) { .pm-card--apri:hover { transform: none; } .pm-card--apri:hover .pm-card__nome { color: var(--pm-oro); } }
+.pm-card--apri:active { transform: none; opacity: .75; }
+.pm-card__top, .pm-card--foto .pm-card__top { flex-direction: row; align-items: baseline; gap: 10px; padding-right: 0; }
+.pm-card__nome, .pm-card--foto .pm-card__nome { font: 500 1.3rem/1.22 var(--pm-titoli); letter-spacing: .005em; padding: 0; flex: 0 1 auto; transition: color .3s ease; }
+.pm-lead { flex: 1 1 18px; min-width: 18px; align-self: baseline; height: 1px; transform: translateY(-.3em); background: radial-gradient(circle, color-mix(in oklab, var(--pm-oro) 70%, transparent) .7px, transparent 1.1px) 0 50% / 6px 2px repeat-x; }
+.pm-pill, .pm-pill--solo, .pm-card--foto .pm-card__top .pm-pill { background: none; border: 0; border-radius: 0; padding: 0; align-self: baseline; font: 500 1.22rem/1 var(--pm-titoli); font-variant-numeric: lining-nums proportional-nums; color: var(--pm-oro); }
+.pm-pill--solo small { font: italic 400 .9rem/1 var(--pm-titoli); color: var(--pm-muted); margin-left: 4px; }
+.pm-card__top .pm-cuore, .pm-card .pm-card__body > .pm-cuore { position: static; flex: none; width: 30px; height: 30px; margin: 0 -6px 0 2px; align-self: center; color: color-mix(in oklab, var(--pm-muted) 70%, transparent); }
+.pm-card__top .pm-cuore svg { width: 17px; height: 17px; stroke-width: 1.4; }
+.pm-card__top > .pm-card__nome:first-child + .pm-cuore { margin-left: auto; }
+.pm-card__cantina { font: italic 400 1.04rem/1.3 var(--pm-titoli); color: var(--pm-muted); margin: 3px 0 0; }
+.pm-card__desc { font: italic 400 1.04rem/1.45 var(--pm-titoli); color: var(--pm-muted); margin: 6px 0 0; max-width: 46ch; }
+.pm--moderno .pm-card__desc { font-family: var(--pm-corpo); font-style: normal; font-size: .9rem; }
+.pm-card__orig, .pm-card--foto .pm-card__orig { margin: 0 0 7px; padding: 0; font: 600 .58rem/1.2 var(--pm-corpo); letter-spacing: .24em; color: var(--pm-oro); }
+.pm-badge { background: none; border: 0; padding: 0; border-radius: 0; color: inherit; letter-spacing: inherit; }
+.pm-pills, .pm-card--foto .pm-pills { display: flex; flex-wrap: wrap; gap: 4px 24px; margin-top: 9px; }
+.pm-pills .pm-pill, .pm-card--foto .pm-pills .pm-pill { flex-direction: row; align-items: baseline; gap: 8px; padding: 0; border-radius: 0; font-size: 1.16rem; }
+.pm-pill small, .pm-card--foto .pm-pill small { font: 600 .56rem/1 var(--pm-corpo); letter-spacing: .22em; text-transform: uppercase; color: var(--pm-muted); }
+.pm-card__cta { margin-top: 11px; gap: 6px; font: italic 500 .98rem/1 var(--pm-titoli); letter-spacing: .01em; text-transform: none; color: var(--pm-oro); }
+.pm-card__cta svg { width: 13px; height: 13px; stroke-width: 1.6; }
+.pm-card .pm-voce__meta { margin-top: 9px; }
+/* Foto del piatto con passe-partout; bottiglie libere, senza cornice */
+.pm-card--foto { grid-template-columns: 74px 1fr; gap: 18px; align-items: start; }
+.pm-card__img { width: 74px; height: 92px; border: 0; border-radius: 1px; box-shadow: 0 0 0 1px color-mix(in oklab, var(--pm-oro) 45%, transparent), 0 0 0 4px var(--pm-fondo), 0 0 0 5px color-mix(in oklab, var(--pm-oro) 22%, transparent); }
+.pm-card__img--bott { width: 74px; height: 118px; box-shadow: none; }
+.pm-card--foto:has(.pm-card__img--bott) { grid-template-columns: 74px 1fr; }
+@media (hover: hover) { .pm-card--apri:hover .pm-card__img--bott img { transform: translateY(-3px); } }
+/* Chiusura della carta: senza riquadro */
+.pm-fine { background: none; border: 0; border-top: 1px solid var(--pm-linea); border-radius: 0; padding: 24px 0 0; }
+
+/* ── Scheda che sale dal basso ── */
+.pm-sheet { border-radius: 14px 14px 0 0; border-color: color-mix(in oklab, var(--pm-oro) 30%, transparent); transition: transform .62s var(--pm-morbido); }
+.pm-sheet__velo { background: rgba(8, 6, 5, .7); transition: opacity .5s ease; }
+.pm-sheet__x { border-color: color-mix(in oklab, var(--pm-oro) 35%, transparent); }
+.pm-sheet__in { padding: 28px 26px 8px; text-align: center; }
+.pm-sheet__foto + .pm-sheet__in { margin-top: -18px; }
+.pm-sheet__in h2 { font: 400 clamp(2.05rem, 8.4vw, 2.7rem)/1.06 var(--pm-titoli); margin: 4px 0 0; padding-right: 0; letter-spacing: .005em; }
+.pm-sheet__in .pm-card__orig { justify-content: center; margin-bottom: 10px; }
+.pm-sheet__cantina { font: italic 400 1.18rem/1.3 var(--pm-titoli); color: var(--pm-muted); margin: 6px 0 0; }
+.pm-sheet__in .pm-pills { justify-content: center; gap: 0; margin: 22px 0 28px; }
+.pm-sheet__in .pm-pills .pm-pill { flex-direction: column; align-items: center; gap: 8px; padding: 2px 28px; font-size: 1.7rem; }
+.pm-sheet__in .pm-pills .pm-pill + .pm-pill { border-left: 1px solid color-mix(in oklab, var(--pm-oro) 35%, transparent); }
+.pm-sheet__quote { background: none; border: 0; border-radius: 0; margin: 0 auto 30px; padding: 0 6px; max-width: 30ch; font: italic 400 1.28rem/1.5 var(--pm-titoli); color: var(--pm-testo); }
+.pm-sheet__quote::before { content: '\201C'; display: block; height: .5em; margin-bottom: 10px; font: 400 3.6rem/1 var(--pm-titoli); background: var(--pm-oro-luce); -webkit-background-clip: text; background-clip: text; color: transparent; }
+.pm-sheet__label { justify-content: center; gap: 14px; margin: 6px 0 18px; font-size: .6rem; letter-spacing: .28em; }
+.pm-sheet__label::before, .pm-sheet__label::after { content: ''; flex: 1; height: 1px; background: linear-gradient(90deg, transparent, color-mix(in oklab, var(--pm-oro) 45%, transparent)); }
+.pm-sheet__label::after { background: linear-gradient(270deg, transparent, color-mix(in oklab, var(--pm-oro) 45%, transparent)); }
+/* Profilo: cinque punti d'oro */
+.pm-profilo { max-width: 330px; margin: 0 auto 32px; gap: 13px; }
+.pm-barra { grid-template-columns: 1fr auto; gap: 16px; font: 600 .6rem/1 var(--pm-corpo); letter-spacing: .22em; text-align: left; color: var(--pm-muted); }
+.pm-barra i.pm-punti5 { display: inline-flex; gap: 8px; height: auto; background: none; border-radius: 0; overflow: visible; }
+.pm-barra .pm-punti5 b { width: 9px; height: 9px; border-radius: 50%; border: 1px solid color-mix(in oklab, var(--pm-oro) 60%, transparent); background: transparent; transform: none; animation: none; }
+.pm-barra .pm-punti5 b.on { border-color: transparent; background: var(--pm-oro-luce); box-shadow: 0 0 6px color-mix(in oklab, var(--pm-oro) 35%, transparent); }
+/* Scheda sommelier: testo impaginato, filetti al posto delle scatole */
+.pm-tessere { grid-template-columns: 1fr 1fr; gap: 0 24px; margin: 0 0 28px; text-align: left; }
+.pm-tessera, .pm-tessera--termo { background: none; border: 0; border-radius: 0; border-top: 1px solid var(--pm-linea); padding: 14px 0 16px; }
+.pm-tessera span { font: 600 .56rem/1 var(--pm-corpo); letter-spacing: .24em; color: var(--pm-oro); margin-bottom: 8px; }
+.pm-tessera p { font: 400 1.08rem/1.42 var(--pm-titoli); }
+.pm-tessera--temp p { font: 400 1.6rem/1 var(--pm-titoli); }
+.pm-tessera--termo { row-gap: 4px; align-content: start; }
+.pm-termo { width: 8px; height: 34px; border: 1px solid color-mix(in oklab, var(--pm-oro) 55%, transparent); background: none; }
+.pm-termo i { background: linear-gradient(0deg, var(--pm-oro), var(--pm-oro-chiaro)); }
+/* Abbinamenti: righe */
+.pm-coppie { gap: 0; margin: 0 0 24px; text-align: left; }
+.pm-coppia { border: 0; border-top: 1px solid var(--pm-linea); border-radius: 0; background: none; padding: 12px 0; }
+.pm-coppia:last-child { border-bottom: 1px solid var(--pm-linea); }
+.pm-coppia b { font: 500 1.14rem/1.2 var(--pm-titoli); }
+.pm-coppia small { font: 500 1rem/1.2 var(--pm-titoli); }
+.pm-coppia__img { border-radius: 1px; }
+.pm-sheet__in .pm-voce__meta { justify-content: center; }
+.pm-sheet__azioni { justify-content: center; margin-top: 12px; }
+.pm-sheet__azioni .pm-cuore { border-color: color-mix(in oklab, var(--pm-oro) 40%, transparent); color: var(--pm-oro); }
+/* Foto del piatto: grande, sfuma piano nella pagina */
+.pm-sheet__foto:not(.pm-sheet__foto--bott) { aspect-ratio: 4 / 3.4; }
+.pm-sheet__foto::after { height: 28%; }
+/* Bottiglia da vetrina: fondo scuro, luce dall'alto, ombra a terra, bordo netto con filo d'oro */
+.pm-sheet__foto--bott { height: 54vh; max-height: 450px; background: radial-gradient(ellipse 50% 46% at 50% 14%, color-mix(in oklab, var(--pm-oro) 26%, transparent), transparent 72%), radial-gradient(ellipse 30% 6% at 50% 91%, rgba(0, 0, 0, .6), transparent 72%), linear-gradient(180deg, #19130f, #0a0807); }
+.pm-sheet__foto--bott::after, .pm--scuro .pm-sheet__foto--bott::after { inset: auto 0 0; height: 1px; background: var(--pm-filetto); opacity: 1; }
+.pm-sheet__foto--bott + .pm-sheet__in { margin-top: 0; }
+.pm-sheet__foto--bott img { padding: 44px 0 30px; filter: drop-shadow(0 22px 18px rgba(0, 0, 0, .65)); }
+.pm-aromi i { left: var(--x); top: var(--y); max-width: 36%; white-space: normal; text-align: center; font: italic 400 1rem/1.15 var(--pm-titoli); color: var(--pm-oro-chiaro); text-shadow: 0 1px 12px rgba(0, 0, 0, .9); transform: translate(-50%, 0); }
+
+/* ── Movimento: lento e morbido, niente rimbalzi né riflessi ── */
+@media (prefers-reduced-motion: no-preference) {
+  .pm-anima .pm-card, .pm-anima .pm-sezione__head { opacity: 0; transform: translateY(14px); filter: none; }
+  .pm-anima .pm-card.pm-in, .pm-anima .pm-sezione__head.pm-in { opacity: 1; transform: none; filter: none; transition: opacity 1.1s var(--pm-morbido) var(--d, 0ms), transform 1.2s var(--pm-morbido) var(--d, 0ms); }
+  .pm-anima .pm-card--apri.pm-in:active { transform: none; }
+  .pm-anima .pm-sezione__head.pm-in .pm-orn::before, .pm-anima .pm-sezione__head.pm-in .pm-orn::after { animation: pm-filo 1.4s var(--pm-morbido) calc(var(--d, 0ms) + .2s) both; }
+  @keyframes pm-filo { from { transform: scaleX(0); opacity: 0; } }
+  .pm-sheet__in > * { animation: pm-sale .9s var(--pm-morbido) both; }
+  .pm-sheet__in > :nth-child(2) { animation-delay: .08s; } .pm-sheet__in > :nth-child(3) { animation-delay: .16s; } .pm-sheet__in > :nth-child(4) { animation-delay: .24s; } .pm-sheet__in > :nth-child(n+5) { animation-delay: .32s; }
+  @keyframes pm-sale { from { opacity: 0; transform: translateY(10px); } }
+  .pm-barra .pm-punti5 b.on { animation: pm-punto .7s var(--pm-morbido) calc(.45s + var(--j) * 45ms) both; }
+  @keyframes pm-punto { from { opacity: 0; transform: scale(.3); } }
+  .pm-sheet__foto--bott img { animation: pm-bott-sale 1.3s var(--pm-morbido) both, pm-bott-respira 7s 1.3s ease-in-out infinite; }
+  @keyframes pm-bott-sale { from { opacity: 0; transform: translateY(22px) scale(.97); } }
+  @keyframes pm-bott-respira { 50% { transform: translateY(-4px); } }
+  .pm-aromi i { animation: pm-aroma-sale 3.6s var(--pm-morbido) var(--d) forwards; }
+  @keyframes pm-aroma-sale { 0% { opacity: 0; transform: translate(-50%, 14px); } 25% { opacity: 1; } 78% { opacity: .9; } 100% { opacity: 0; transform: translate(-50%, -28px); } }
+}
+@media (prefers-reduced-motion: reduce) { .pm-aromi { display: none; } }
