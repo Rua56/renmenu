@@ -41,7 +41,7 @@ export function findLocales(text, clients) {
     const name = keyWords(client.name);
     if (!name.length) return null;
     const hits = name.filter((w) => heard(w, said)).length;
-    const need = name.length <= 2 ? name.length : Math.ceil(name.length * 0.67);
+    const need = name.length <= 2 ? name.length : Math.ceil((name.length * 2) / 3 - 1e-9); // «Enoteca Il Calice Storto»: bastano «calice storto»
     return hits >= need ? { client, score: hits / name.length } : null;
   }).filter(Boolean).sort((a, b) => b.score - a.score).map((entry) => entry.client).slice(0, 3);
 }
@@ -82,7 +82,8 @@ const RX = {
   crea: /\b(crea\w*|apri\w*|nuov[ao]|registra\w*|inizia\w*|serve|servirebbe)\b.*\b(pratica|cliente|menu|locale)\b/,
   modifica: /\b(\d+(?:[.,]\d+)?|euro|€|(?:uno|due|tre|quattro|cinque|sei|sette|otto|nove|dieci|undici|dodici|tredici|quattordici|quindici|sedici|diciassette|diciotto|diciannove|venti\w*|trenta\w*|quaranta\w*|cinquanta)|alz\w*|port\w*\s+a|prezz\w*|cost\w*|aument\w*|abbass\w*|scont\w*|togli\w*|tolg\w*|rimuov\w*|elimin\w*|aggiung\w*|inserisc\w*|metti\w*|cambi\w*|modific\w*|sostitu\w*|coperto|tema|temi|color\w*|grafica|telefon\w*|numero|orari\w*|apert\w*|chius\w*|instagram|facebook|finit\w*|esaurit\w*|terminat\w*|non\b[a-z ]{0,30}\bpiu)\b/,
   cancella: /\b(elimin\w*|cancell\w*|butta\w*|rimuov\w*|togli\w*)\b.*\b(pratica|pratiche|cliente|clienti)\b/,
-  affida: /\b(affid\w+|approva\s+e\s+affida)\b|\b(manda\w*|invia\w*|spedisci)\b.*\banteprima\b.*\b(cliente|locale)\b/,
+  affida: /\b(affid\w+|approva\s+e\s+affida)\b|\b(manda\w*|invia\w*|spedisci)\b.*\banteprima\b.*\b(cliente|locale|al|alla|allo|ai|a)\b/,
+  piano: /\b(piano|abbonamento)\b.*\b(standard|annuale|premium)\b|\b(pass\w*|cambi\w*|mett\w*|port\w*)\b.*\b(a|al|in|sul)\s+(?:piano\s+)?(standard|annuale|premium)\b/,
   stato: /\b(situazione|aggiornami|aggiornamento|resoconto|report|riepilogo|novita|buone\s+notizie|come\s+siamo\s+messi|come\s+va\w*|tutto\s+(?:a\s+posto|apposto|ok|bene|regolare)|a\s+che\s+punto|cosa\s+c\s+e\s+da\s+fare|pratiche|problemi|da\s+segnalare|mia\s+attenzione|cosa\s+non\s+va)\b/,
   anteprima: /\b(anteprima|bozza)\b.*\b(mostra\w*|vedere|fammi|mandami|invia\w*)\b|\b(mostra\w*|fammi\s+vedere|mandami|voglio\s+vedere)\b.*\b(anteprima|bozza)\b/,
   domanda: /\?|\b(quant[oiae]|quale|quali|come|cosa|quando|dove|perch\w*|dimmi|sai|mostra\w*|elenca\w*|situazione|riepilog\w*)\b/
@@ -96,6 +97,7 @@ export function guessIntent(text, { locales = [], dishes = [] } = {}) {
   const venue = locales[0]?.name || dishes[0]?.client?.name || '';
   if (RX.affida.test(t)) return { intent: 'affida_pratica', locale: venue };
   if (RX.cancella.test(t) && !dishes.length) return { intent: 'cancella_pratica', locale: venue };
+  if (RX.piano.test(t) && !dishes.length && !RX.crea.test(t)) return { intent: 'cambia_piano', locale: venue };
   if (RX.anteprima.test(t)) return { intent: 'anteprima', locale: venue };
   if (RX.stato.test(t) && !dishes.length && !RX.crea.test(t)) return { intent: 'stato', locale: '' };
   if (RX.ricorda.test(t)) return { intent: 'ricorda', locale: venue };

@@ -43,3 +43,11 @@ test('dati del locale detti con un valore sono una correzione della bozza, anche
     assert.equal(guessIntent(phrase, {}).intent, 'aggiorna_menu', phrase);
   assert.equal(guessIntent('quanto è il coperto?', {}).intent, 'risposta');
 });
+
+test('comprensione: nomi lunghi, anteprima al locale e cambio di piano', () => {
+  const venues = [{ name: 'Enoteca Il Calice Storto' }, { name: 'Osteria Al Tralcio' }];
+  assert.equal(findLocales('butta via la pratica doppia del Calice Storto', venues)[0]?.name, 'Enoteca Il Calice Storto');
+  assert.equal(guessIntent('manda l’anteprima al Tralcio', { locales: findLocales('manda l’anteprima al Tralcio', venues) }).intent, 'affida_pratica');
+  assert.deepEqual(guessIntent('cambia il piano del Tralcio in premium', { locales: [venues[1]] }), { intent: 'cambia_piano', locale: 'Osteria Al Tralcio' });
+  assert.equal(guessIntent('apri una nuova pratica per Bar Centrale piano standard').intent, 'crea_pratica');
+});
