@@ -119,13 +119,22 @@ const PRICE_TOKEN = /(?<![\d,.])(\d{1,4})(?:[,.](\d{1,2}))?(?![\d,.]*\d)\s*(?:�
 const money = (whole, cents = '') => `${Number(whole)},${String(cents).padEnd(2, '0')}`;
 const italianName = (value) => (typeof value === 'string' ? value : value?.it || '').trim();
 import { detectExtra } from './extras.js';
+import { prepareEmailSource } from './email-text.js';
+// Firma in fondo alla risposta («Luca», «Marta Zorzut», «Trattoria da Nives»): poche parole con l'iniziale
+// maiuscola (o articoli e preposizioni), senza numeri né punteggiatura. Non è una richiesta di modifica.
+const CONNECTOR = /^(?:da|di|de|del|della|al|alla|il|la|lo|le|e|&)$/i;
+const ACTION = /\b(?:aggiung|togli|tolg|rimuov|elimin|cancell|cambi|modific|sostitu|manc|mett|spost|corregg|prezz)/i;
+const isSignature = (line) => !/[\d.!?:,;]/.test(line) && !ACTION.test(line) && line.split(/\s+/).length <= 5
+  && line.split(/\s+/).every((word) => CONNECTOR.test(word) || /^[A-ZÀ-Ý][\p{L}'’-]*$/u.test(word));
 const GREETING = /^(?:grazie|cordiali saluti|saluti|buongiorno|buonasera|ciao|a presto|un saluto)\b/i;
 
 export function proposeReplyChanges(text, menu) {
   // Ogni riga è una frase a sé ("… 50 poi⏎vorrei aggiungere il coperto"), come i punti.
   // Una riga che inizia con una lettera è una frase nuova; "bottiglia⏎22,00" (a capo dell'email
   // dentro la frase) o una riga dopo ":" / "," resta unita.
-  const reply = stripQuoted(text).split(/\r?\n/).map((line) => line.trim()).filter(Boolean)
+  const lines = prepareEmailSource(stripQuoted(text)).split(/\r?\n/).map((line) => line.trim()).filter(Boolean);
+  while (lines.length && isSignature(lines[lines.length - 1])) lines.pop();
+  const reply = lines
     .reduce((acc, line) => (!acc ? line : /[,:;]$/.test(acc) || !/^[A-Za-zÀ-ÿ]/.test(line) ? `${acc} ${line}` : `${acc.replace(/[.!?]$/, '')}. ${line}`), '')
     .replace(/\s+/g, ' ').trim();
   const items = [];
@@ -144,7 +153,7 @@ export function proposeReplyChanges(text, menu) {
       .replace(/^(?:poi|e)\s+/i, '').replace(/\s+(?:poi|e)$/i, '')
       // "Buongiorno, lo spritz ora costa 5": il saluto in testa non nasconde la richiesta.
       .replace(/^(?:buongiorno|buonasera|salve|ciao|gentile\s+riccardo|ciao\s+riccardo)\s*[,!:]\s*(?=\S)/i, '');
-    if (!sentence || GREETING.test(sentence) || /^(?:approv\w*|ok|va bene|tutto ok)\W*$/i.test(sentence)) continue;
+    if (!sentence || /^\d{1,2}$/.test(sentence) || GREETING.test(sentence) || /^(?:approv\w*|ok|va bene|tutto ok)\W*$/i.test(sentence)) continue;
     const extra = detectExtra(sentence, menu);
     if (extra) { add(extra); continue; }
     const words = new Set(plainWords(sentence));
