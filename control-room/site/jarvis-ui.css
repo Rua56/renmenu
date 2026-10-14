@@ -353,3 +353,13 @@ html[data-jarvis="speaking"] .reactor .r3 { border-color: rgba(255, 255, 255, .5
 .find-flash { animation: find-flash 2.4s ease-out; }
 @keyframes find-flash { 0%, 30% { box-shadow: 0 0 0 2px var(--teal), 0 0 22px var(--teal); } 100% { box-shadow: 0 0 0 0 transparent; } }
 @media (prefers-reduced-motion: reduce) { .find-flash { animation: none; outline: 2px solid var(--teal); } }
+
+/* Pratica come centro: i tasti di tutto quello che serve, in griglia. */
+.tool-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; }
+@media (min-width: 720px) { .tool-grid { grid-template-columns: repeat(4, minmax(0, 1fr)); } }
+.tool-tile { position: relative; display: flex; flex-direction: column; gap: 3px; min-height: 64px; padding: 11px 12px; border: 1px solid var(--line); border-radius: 14px; background: var(--c3); color: var(--ink); text-align: left; cursor: pointer; }
+.tool-tile strong { font: 600 14.5px var(--sans); }
+.tool-tile small { color: var(--muted); font-size: 12.5px; line-height: 1.3; }
+.tool-tile:hover, .tool-tile:focus-visible { border-color: var(--teal); background: var(--c4); }
+.tool-tile.hot { border-color: var(--am); }
+.tool-tile .nav-hint { position: absolute; top: 8px; right: 8px; }

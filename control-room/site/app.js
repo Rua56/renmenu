@@ -1144,9 +1144,36 @@ function renderPratica() {
   return `<div class="view-wrap pratica"><button class="back-bar" type="button" data-route="command">← Oggi</button>
     <header class="pratica-head ${tone}"><p class="eyebrow">${escapeHtml(client?.name || 'Pratica')} · ${escapeHtml(requestTypeLabel(request))}</p><h1>${escapeHtml(request.subject)}</h1><p class="oggi-tag inline">${escapeHtml(info.headline)}</p>${mission?.note && !closed ? `<p class="muted small">${escapeHtml(mission.note)}</p>` : request.nextStep ? `<p class="muted small">${escapeHtml(request.nextStep)}</p>` : ''}</header>
     ${stepsBar(info.step)}${demoNotice()}${cambiaBlock(draft, request)}
-    ${editable ? '<div class="button-row spaced-top-small"><button class="button secondary" type="button" data-route="modifica">Modifica a mano</button><button class="button secondary" type="button" data-route="anteprima">Anteprima</button></div><p class="muted small">Per modificare a voce, scrivi o manda un vocale a Jarvis su Telegram.</p>' : ''}
     ${next}
-    <details class="details-more"><summary>Dettagli e strumenti di questa pratica</summary>${planRulesPanel(request, draft)}<div class="button-row spaced-top-small">${[['revisione', 'Revisione'], ['approvazioni', 'Approvazioni'], ['materiali', 'Materiali'], ['richieste', 'Richiesta originale'], ['registro', 'Registro']].map(([route, label]) => `<button class="button secondary small-button" type="button" data-select-request="${escapeHtml(request.id)}" data-route="${route}">${label}</button>`).join('')}</div></details></div>`;
+    ${praticaTools(request, draft, closed)}
+    <details class="details-more"><summary>Regole del piano e strumenti completi</summary>${planRulesPanel(request, draft)}<div class="button-row spaced-top-small">${[['revisione', 'Revisione completa'], ['richieste', 'Richiesta originale'], ['builder', 'Builder']].map(([route, label]) => `<button class="button secondary small-button" type="button" data-select-request="${escapeHtml(request.id)}" data-route="${route}">${label}</button>`).join('')}</div></details></div>`;
+}
+// «Cosa puoi fare»: tutto quello che serve per questa pratica, in un posto solo. Ogni tasto porta dritto
+// al riquadro giusto (stesso percorso di «Cosa vuoi fare?»), con un numero quando c'è qualcosa da vedere.
+function praticaTools(request, draft, closed) {
+  const editable = draft && ['bozza', 'revisione', 'pronta_pr'].includes(draft.status);
+  const premium = Boolean(draft?.menu?.premium);
+  const notes = (Array.isArray(draft?.notes) ? draft.notes : []).filter((n) => !['testo', 'inserito'].includes(n.kind)).length;
+  const media = (state.media || []).filter((m) => m.requestId === request.id && m.status !== 'scartata').length;
+  const files = state.materials.filter((m) => m.requestId === request.id && !m.archivedAt).length;
+  const tiles = [
+    [notes && editable, 'da-sistemare', 'Da sistemare', `${notes} ${notes === 1 ? 'riga' : 'righe'} da controllare`, notes],
+    [editable, 'modifica', 'Nomi e prezzi', 'cambia, aggiungi, togli'],
+    [draft, 'vedi-menu', 'Vedi il menu', 'come lo vede il cliente'],
+    [draft && media, 'foto', 'Foto per il menu', `${media} ${media === 1 ? 'foto' : 'foto'} del locale`],
+    [premium, 'schede', 'Schede vini e piatti', 'descrizioni e bottiglie'],
+    [premium && editable, 'premium', 'Scheda creativa', 'stile Premium'],
+    [editable && !premium, 'tema', 'Aspetto', 'colori e stile'],
+    [editable, 'traduci', 'Lingue', 'traduzione in inglese'],
+    [draft && !closed, 'anteprima-cliente', 'Manda al locale', 'anteprima con il tuo SÌ'],
+    [draft, 'qr', 'Link e QR', 'indirizzo del menu'],
+    [files, 'fonti', 'File originali', `${files} ricevut${files === 1 ? 'o' : 'i'}`],
+    [editable, 'checklist', 'Checklist', 'prezzi, allergeni, lingue']
+  ].filter(([show]) => show);
+  const tile = ([, id, label, note, n]) => `<button class="tool-tile${n ? ' hot' : ''}" type="button" data-action="find-go" data-find="${id}" data-find-request="${escapeHtml(request.id)}"><strong>${label}</strong><small>${escapeHtml(note)}</small>${n ? `<b class="nav-hint">${n}</b>` : ''}</button>`;
+  const client = clientById(request.clientId);
+  const more = `${client ? `<button class="tool-tile" type="button" data-select-client="${escapeHtml(client.id)}" data-route="locale"><strong>Il locale</strong><small>piano, email, rinnovo</small></button>` : ''}<button class="tool-tile" type="button" data-select-request="${escapeHtml(request.id)}" data-route="registro"><strong>Registro</strong><small>cosa è successo</small></button>`;
+  return `<section class="pratica-tools" aria-label="Cosa puoi fare su questa pratica"><p class="lab">COSA PUOI FARE</p><div class="tool-grid">${tiles.map(tile).join('')}${more}</div>${editable ? '<p class="muted small">Per modificare a voce, scrivi o manda un vocale a Jarvis.</p>' : ''}</section>`;
 }
 function renderSistema() {
   const tools = [
@@ -1220,7 +1247,7 @@ function setVoceName(voce, value) { if (typeof voce.nome === 'string') voce.nome
 async function handleOggiAction(action, trigger) {
   if (action === 'find-open') { openFind(); return true; }
   if (action === 'find-close') { closeFind(); return true; }
-  if (action === 'find-go') { goToAction(trigger.dataset.find, trigger.dataset.findClient || ''); return true; }
+  if (action === 'find-go') { goToAction(trigger.dataset.find, trigger.dataset.findClient || '', trigger.dataset.findRequest || ''); return true; }
   if (action === 'find-ask') { const text = findQuery.trim(); closeFind(); openAsk(false, { firstText: text }); return true; }
   const draft = draftForRequest();
   if (action === 'pratiche-filtro') { praticheFilter = trigger.dataset.filtro; if (activeView === 'pratiche') render(); else navigate('pratiche'); return true; }
@@ -1372,11 +1399,12 @@ function openFind() {
 }
 function closeFind() { if (findSheet) { findSheet.hidden = true; findSheet.innerHTML = ''; } }
 /** Porta alla funzione: sceglie la pratica del locale nominato, apre la schermata e illumina il riquadro. */
-function goToAction(id, clientId = '') {
+function goToAction(id, clientId = '', requestId = '') {
   const action = ACTIONS.find((item) => item.id === id);
   if (!action) return;
   closeFind();
-  if (clientId) { selectedClientId = clientId; const pratica = praticaFor(clientId); if (pratica) selectedRequestId = pratica.id; }
+  if (requestId && requestById(requestId)) { selectedRequestId = requestId; selectedClientId = requestById(requestId).clientId || selectedClientId; }
+  else if (clientId) { selectedClientId = clientId; const pratica = praticaFor(clientId); if (pratica) selectedRequestId = pratica.id; }
   if (action.action === 'numeri') { showOnHome('numeri della settimana'); return; }
   if (action.action === 'parla') { openAsk(false); return; }
   if (action.action === 'tema') { setTheme(document.documentElement.dataset.theme === 'dark' ? 'light' : 'dark'); return; }
