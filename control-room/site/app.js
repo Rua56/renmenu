@@ -7,6 +7,7 @@ import { mountPdfPreview } from './pdf-preview.js';
 import { extractPdfText } from './material-extract.js';
 import { announce, closeChat, openChat } from './jarvis-chat.js';
 import { logLines, markFresh } from './jarvis-log.js';
+import { play, setSounds, soundsAvailable, soundsOn } from './jarvis-sound.js';
 import { greetOnce, greetingFor, lastVisit, markVisit } from './jarvis-greet.js';
 import { pauseWake, startWake, wakeAvailable, wakeEnabled, wakeState, setWakeEnabled } from './jarvis-wake.js';
 import { showFor } from './jarvis-show.js';
@@ -347,7 +348,7 @@ function jarvisPanel() {
   const tg = state.telegram || {};
   const telegram = isDemoMode ? '' : !tg.configured ? '' : !tg.linked
     ? `<div class="notice spaced-top-small">${telegramLinkUrl ? `Tocca il link e poi <strong>Avvia</strong> in Telegram (valido 15 minuti): <a href="${escapeHtml(telegramLinkUrl)}" target="_blank" rel="noopener">Apri Jarvis su Telegram</a>` : 'Collega Telegram: Jarvis ti scriverà lì e ti chiederà il SÌ prima di pubblicare.'}</div><div class="button-row spaced-top-small"><button class="button" type="button" data-action="telegram-link">${telegramLinkUrl ? 'Nuovo link' : 'Collega Telegram'}</button></div>`
-    : `<details class="hud-settings"><summary>Collegamenti e voce di Jarvis</summary><div class="button-row spaced-top-small"><span class="status good">Telegram collegato</span><button class="button secondary small-button" type="button" data-action="jarvis-briefing">Briefing ora</button><button class="button secondary small-button" type="button" data-action="telegram-test">Messaggio di prova</button></div>${installed() ? '' : '<div class="button-row spaced-top-small"><button class="button secondary small-button" type="button" data-action="install-app">Installa Jarvis sul telefono</button></div>'}${wakeAvailable ? `<label class="chat-toggle spaced-top-small"><input type="checkbox" id="wake-enabled" ${wakeEnabled() ? 'checked' : ''}><span>Sveglia con «Ehi Jarvis»<small>con la Control Room aperta il browser ascolta la parola di sveglia (gratis, riconoscimento del browser)</small></span></label>` : ''}${voiceForm()}${readerForm()}</details>`;
+    : `<details class="hud-settings"><summary>Collegamenti e voce di Jarvis</summary><div class="button-row spaced-top-small"><span class="status good">Telegram collegato</span><button class="button secondary small-button" type="button" data-action="jarvis-briefing">Briefing ora</button><button class="button secondary small-button" type="button" data-action="telegram-test">Messaggio di prova</button></div>${installed() ? '' : '<div class="button-row spaced-top-small"><button class="button secondary small-button" type="button" data-action="install-app">Installa Jarvis sul telefono</button></div>'}${soundsAvailable ? `<label class="chat-toggle spaced-top-small"><input type="checkbox" id="sounds-enabled" ${soundsOn() ? 'checked' : ''}><span>Suoni di Jarvis<small>bip leggeri sui tocchi, quando ti ascolta e quando arriva una novità</small></span></label>` : ''}${wakeAvailable ? `<label class="chat-toggle spaced-top-small"><input type="checkbox" id="wake-enabled" ${wakeEnabled() ? 'checked' : ''}><span>Sveglia con «Ehi Jarvis»<small>con la Control Room aperta il browser ascolta la parola di sveglia (gratis, riconoscimento del browser)</small></span></label>` : ''}${voiceForm()}${readerForm()}</details>`;
   if (!notes.length && !autopilotRunning && !telegram) return '';
   const row = (item) => `<div class="list-row"><div class="list-main"><strong>${escapeHtml(item.subject)}</strong><small>${escapeHtml(item.body)}</small><small>${time(item.createdAt)}</small></div><div class="button-row"><button class="mini-button" type="button" data-select-request="${escapeHtml(item.requestId || '')}" data-route="${item.subject.includes('bozza pronta') ? 'revisione' : 'richieste'}">Apri</button><button class="mini-button" type="button" data-action="mark-notification" data-notification-id="${escapeHtml(item.id)}" data-read="true">Fatto</button></div></div>`;
   return `<section class="panel spaced-top-small"><p class="eyebrow">JARVIS</p>${autopilotRunning ? '<p class="notice">Jarvis sta preparando le nuove richieste…</p>' : ''}<div class="list">${notes.map(row).join('')}</div>${telegram}</section>`;
@@ -413,7 +414,7 @@ function prepareGreeting() {
   document.addEventListener('pointerdown', speakOnce, true);
 }
 function listenForWake() {
-  startWake({ onWake: (rest) => openAsk(!rest, { wake: true, firstText: rest }), onState: showWakeState });
+  startWake({ onWake: (rest) => { play('wake'); openAsk(!rest, { wake: true, firstText: rest }); }, onState: showWakeState });
 }
 function jarvisHero() {
   const hour = Number(new Intl.DateTimeFormat('it-IT', { hour: 'numeric', hour12: false, timeZone: 'Europe/Rome' }).format(new Date()));
@@ -1050,6 +1051,7 @@ function proposeBlock() {
 function logBlock() {
   const lines = markFresh(logLines(state.audit || [], { limit: 6 }));
   if (!lines.length) return '';
+  if (lines.some((l) => l.fresh)) play('news');
   const line = (l) => `<li class="log-line ${escapeHtml(l.kind)}${l.fresh ? ' fresh' : ''}"><time>${escapeHtml(l.time)}</time><b>${escapeHtml(l.who)}</b><span>${escapeHtml(l.text)}</span></li>`;
   return `<section class="hud-log" aria-label="Registro dal vivo"><div class="hud-log-head"><p class="eyebrow">REGISTRO · DAL VIVO</p><button class="hud-more" type="button" data-route="registro">Tutto →</button></div><ol class="hud-log-lines" aria-live="polite">${lines.map(line).join('')}</ol><p class="hud-log-cursor" aria-hidden="true">&gt; in ascolto<i>▌</i></p></section>`;
 }
@@ -1323,10 +1325,16 @@ function toolBackBar() {
   return `<button class="back-bar" type="button" data-select-request="${escapeHtml(request.id)}" data-route="pratica">← Torna alla pratica · ${escapeHtml(request.subject)}</button>`;
 }
 
+// Cambio schermata: la nuova entra con una scansione HUD (solo quando cambia davvero, non agli aggiornamenti).
+let shownView = '';
 function renderView() {
   const renderers = { locali: renderLocali, locale: renderLocale, sistema: renderSistema, pratica: renderPratica, pratiche: renderPratiche, modifica: renderModifica, command: renderCommand, richieste: renderRequests, clienti: renderClients, materiali: renderMaterials, builder: renderBuilder, revisione: renderReview, anteprima: renderPreview, approvazioni: renderApprovals, notifiche: renderNotifications, registro: renderAudit, voce: renderVoice };
   view.dataset.screen = activeView;
   view.innerHTML = toolBackBar() + renderers[activeView]() + (activeView === 'builder' ? renderAiPanel() : '');
+  if (shownView && shownView !== activeView) {
+    view.classList.remove('view-enter'); void view.offsetWidth; view.classList.add('view-enter');
+  }
+  shownView = activeView;
   document.title = `${navItems.find(([id]) => id === activeView)?.[2] || 'Control Room'} · RenMenu`;
 }
 function render() {
@@ -1890,6 +1898,7 @@ function handleInput(event) {
   if (list) list.innerHTML = renderClientRows();
 }
 function handleSelectChange(event) {
+  if (event.target.id === 'sounds-enabled') { setSounds(event.target.checked); return; }
   if (event.target.id === 'wake-enabled') { setWakeEnabled(event.target.checked); if (event.target.checked) listenForWake(); showWakeState(wakeState()); return; }
   if (event.target.id === 'voice-enabled') {
     const settings = configureVoice({ enabled: event.target.checked });
@@ -1914,6 +1923,14 @@ function openConfirmation(config) {
 }
 
 primaryNav.addEventListener('click', () => { mobileMenuOpen = false; });
+// Suoni HUD (jarvis-sound.js): un bip leggero sui tocchi che cambiano schermata o aprono qualcosa.
+document.addEventListener('click', (event) => {
+  const target = event.target.closest?.('[data-route], [data-action], a.nav-link');
+  if (!target) return;
+  const action = target.dataset.action || '';
+  if (['core-talk', 'ask-open', 'ask-voice', 'show'].includes(action)) play('open');
+  else if (target.dataset.route || target.matches('a.nav-link') || ['show-close', 'ask-close'].includes(action)) play('tap');
+}, true);
 document.addEventListener('click', (event) => { handleClick(event).catch((error) => toast(error.message || 'Operazione non riuscita.', 'error')); });
 view.addEventListener('submit', (event) => { handleSubmit(event).catch((error) => toast(error.message || 'Operazione non riuscita.', 'error')); });
 view.addEventListener('input', handleInput);
