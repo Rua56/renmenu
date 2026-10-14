@@ -29,6 +29,9 @@ import { noteStatement } from '../../_lib/memory.js';
 import { THEMES, proposeTheme, themeFromText } from '../../_lib/themes.js';
 import { dropRepeatedPages, notesSummary, reviewNotes, structureNotes } from '../../_lib/notes.js';
 import { briefLines, briefNotes, creativeBrief, premiumDirections, storyFromSource } from '../../_lib/premium.js';
+import { applySchede, proposeSchede } from '../../_lib/premium-schede.js';
+import { CANTINA_SOURCE, PER_ROUND as BOTTLES_PER_ROUND, findBottle, parseSourceNote, slotFrequencies, sourceNote, winesWithoutPhoto } from '../../_lib/bottle-search.js';
+import { menuSlots } from '../../_lib/media.js';
 import { applyVenueInfo, extractVenueInfo } from '../../_lib/venue-info.js';
 import { applyPriceCorrections } from '../../_lib/corrections.js';
 import { applyOps as applyDraftOps, editLogKey, replayableOps } from '../../_lib/draft-edit.js';
@@ -396,7 +399,7 @@ export async function state(db, env = {}) {
 // Foto per il menu (Premium): riconoscimento di Jarvis + proposta di posto calcolata sulla bozza attuale.
 async function mediaRows(db, rawDrafts) {
   let list = [];
-  try { list = await rows(db, 'SELECT m.*, x.filename FROM media_items m JOIN materials x ON x.id=m.material_id WHERE x.archived_at IS NULL ORDER BY m.created_at ASC LIMIT 400'); }
+  try { list = await rows(db, 'SELECT m.*, x.filename, x.source AS material_source, x.text_preview AS material_note FROM media_items m JOIN materials x ON x.id=m.material_id WHERE x.archived_at IS NULL ORDER BY m.created_at ASC LIMIT 400'); }
   catch { return []; }
   const byRequest = new Map();
   for (const raw of list) { const row = { ...raw, label: parseLabel(raw.label_json) }; byRequest.set(row.request_id, [...(byRequest.get(row.request_id) || []), row]); }
@@ -410,7 +413,7 @@ async function mediaRows(db, rawDrafts) {
       const placed = row.status === 'confermata' && menu ? resolveTarget(menu, row.target, row.target_name) : null;
       out.push({ id: row.id, requestId, materialId: row.material_id, filename: row.filename, kind: row.kind, description: row.description || '',
         label: parseLabel(row.label_json), status: row.status, target: placed || row.target, targetLabel: menu && (placed || row.target) ? targetLabel(menu, placed || row.target) : '',
-        withLabel: Boolean(row.with_label), publicUrl: row.public_url || '', uploaded: Boolean(row.public_url),
+        withLabel: Boolean(row.with_label), publicUrl: row.public_url || '', uploaded: Boolean(row.public_url), cantina: row.material_source === CANTINA_SOURCE ? parseSourceNote(row.material_note) : null,
         proposal: proposal && { target: proposal.target, label: menu && proposal.target ? targetLabel(menu, proposal.target) : '', why: proposal.why, score: proposal.score } });
     }
   }
@@ -738,7 +741,7 @@ async function action(db, type, input, env = {}) {
     // 3 direzioni grafiche; la prima entra nella bozza, le altre si confrontano in Revisione.
     let creative = null;
     if (request.plan === 'premium' && !['aggiornamento', 'sostituzione'].includes(extraction.mode)) {
-      const images = await getOne(db, "SELECT COUNT(*) AS n FROM materials WHERE request_id=? AND archived_at IS NULL AND mime LIKE 'image/%'", requestId);
+      const images = await getOne(db, "SELECT COUNT(*) AS n FROM materials WHERE request_id=? AND archived_at IS NULL AND mime LIKE 'image/%' AND source<>'sito_cantina'", requestId);
       const brief = creativeBrief(emailSource, { attachments: Number(images?.n || 0) });
       const directions = premiumDirections(brief);
       delete extraction.menu.tema;
@@ -980,6 +983,102 @@ async function action(db, type, input, env = {}) {
       { sql: 'SELECT 1 FROM draft_versions WHERE draft_id=? AND revision=?', args: [id, revision + 1] });
     assert(saved.every((entry) => entry.meta.changes === 1), 'Bozza o pratica modificata da un’altra sessione. Ricarica.', 409);
     result = { id, translation: { translated: translation.translated, total: translation.total, skipped: translation.skipped }, validation };
+  } else if (type === 'proposeSchede' || type === 'applySchede' || type === 'discardSchede') {
+    // Schede Premium (livello Al Bakaro): Jarvis propone schede dei vini e descrizioni dei piatti, Riccardo
+    // approva. Proporre non cambia il menu (resta in creative_json.schede); approvare crea una revisione.
+    const id = identifier(p.id), revision = Number(p.revision);
+    const draft = await getOne(db, 'SELECT * FROM drafts WHERE id=?', id);
+    assert(draft, 'Bozza non trovata.', 404);
+    assert(Number.isInteger(revision) && revision === draft.revision, 'Bozza modificata da un’altra sessione. Ricarica.', 409);
+    assert(['bozza', 'revisione', 'pronta_pr'].includes(draft.status), 'Bozza già chiusa: apri una nuova pratica.', 409);
+    const menu = JSON.parse(draft.menu_json);
+    assert(menu?.premium && typeof menu.premium === 'object', 'Le schede sono del menu Premium: questa bozza non è Premium.', 422);
+    const creative = parseCreative(draft.creative_json) || {};
+    const schede = creative.schede && typeof creative.schede === 'object' ? creative.schede : { proposals: [], skipped: [] };
+    const list = Array.isArray(schede.proposals) ? schede.proposals : [];
+    const timestamp = now();
+    if (type === 'proposeSchede') {
+      const gemini = await geminiConfig(db, env);
+      assert(gemini, 'Serve la chiave Gemini (Control Room → Lettura dei menu): le schede si preparano con il modello gratuito.', 503);
+      const done = [...list.map((x) => x.name), ...(schede.skipped || []).filter((x) => !/riprova/.test(x.reason)).map((x) => x.name)];
+      const round = await proposeSchede(menu, gemini, { done });
+      assert(!round.unavailable, 'Gemini non risponde in questo momento: riprova tra poco.', 502);
+      const fresh = round.proposals.map((x, n) => ({ ...x, key: `${Date.now().toString(36)}-${n}`, stato: 'proposta' }));
+      const next = { ...creative, schede: { proposals: [...list, ...fresh], skipped: [...(schede.skipped || []).filter((x) => !/riprova/.test(x.reason)), ...round.skipped].slice(-200), remaining: round.remaining, at: timestamp } };
+      await auditedBatch(db, [db.prepare('UPDATE drafts SET creative_json=?,updated_at=? WHERE id=? AND revision=?').bind(JSON.stringify(next), timestamp, id, revision)],
+        'draft.schede_propose', `Schede proposte da Jarvis: ${fresh.length}${round.skipped.length ? `, ${round.skipped.length} lasciate al cliente` : ''}${round.remaining ? `, ne restano ${round.remaining}` : ''}.`, draft.request_id,
+        { sql: 'SELECT 1 FROM drafts WHERE id=?', args: [id] });
+      result = { id, proposed: fresh.length, skipped: round.skipped, remaining: round.remaining };
+    } else {
+      const keys = p.all === true ? list.filter((x) => x.stato === 'proposta').map((x) => x.key) : (Array.isArray(p.keys) ? p.keys.map(String).slice(0, 300) : []);
+      const chosen = list.filter((x) => x.stato === 'proposta' && keys.includes(x.key));
+      assert(chosen.length, 'Nessuna scheda da approvare o scartare.', 422);
+      const marked = list.map((x) => (chosen.includes(x) ? { ...x, stato: type === 'applySchede' ? 'approvata' : 'scartata' } : x));
+      const nextCreative = JSON.stringify({ ...creative, schede: { ...schede, proposals: marked } });
+      if (type === 'discardSchede') {
+        await auditedBatch(db, [db.prepare('UPDATE drafts SET creative_json=?,updated_at=? WHERE id=? AND revision=?').bind(nextCreative, timestamp, id, revision)],
+          'draft.schede_discard', `Schede scartate: ${chosen.map((x) => x.name).join(', ').slice(0, 300)}.`, draft.request_id, { sql: 'SELECT 1 FROM drafts WHERE id=?', args: [id] });
+        result = { id, discarded: chosen.length };
+      } else {
+        const done = applySchede(menu, chosen);
+        assert(done.applied.length, 'Le voci di queste schede non ci sono più nella bozza.', 409);
+        const validation = validateMenu(done.menu);
+        assert(!validation.errors.length, `Menù non valido con queste schede: ${validation.errors.slice(0, 3).join(' ')}`);
+        const linkedRequest = await getOne(db, 'SELECT revision FROM requests WHERE id=?', draft.request_id);
+        const menuJson = JSON.stringify(done.menu);
+        const saved = await auditedBatch(db, [
+          db.prepare("UPDATE drafts SET menu_json=?,creative_json=?,checks_json=?,provenance_json=?,status='revisione',revision=revision+1,updated_at=? WHERE id=? AND revision=? AND EXISTS (SELECT 1 FROM requests WHERE requests.id=? AND requests.revision=?)")
+            .bind(menuJson, nextCreative, JSON.stringify(checksDefault()), JSON.stringify([...parseList(draft.provenance_json), ...done.provenance]), timestamp, id, revision, draft.request_id, linkedRequest.revision),
+          db.prepare('INSERT INTO draft_versions (id,draft_id,revision,menu_json,actor,created_at) SELECT ?,id,?,?,?,? FROM drafts WHERE id=? AND revision=?')
+            .bind(uid(), revision + 1, menuJson, 'schede_jarvis', timestamp, id, revision + 1),
+          db.prepare("UPDATE requests SET status='in_revisione',revision=revision+1,updated_at=? WHERE id=? AND revision=? AND EXISTS (SELECT 1 FROM drafts WHERE drafts.id=? AND drafts.revision=? AND drafts.status='revisione')")
+            .bind(timestamp, draft.request_id, linkedRequest.revision, id, revision + 1)
+        ], 'draft.schede_apply', `Schede approvate da Riccardo: ${done.applied.length} (${done.applied.join(', ').slice(0, 300)})${done.lost.length ? `; ${done.lost.length} voci non più nella bozza` : ''}.`, draft.request_id,
+          { sql: 'SELECT 1 FROM draft_versions WHERE draft_id=? AND revision=?', args: [id, revision + 1] });
+        assert(saved.every((entry) => entry.meta.changes === 1), 'Bozza o pratica modificata da un’altra sessione. Ricarica.', 409);
+        result = { id, applied: done.applied.length, lost: done.lost, validation };
+      }
+    }
+  } else if (type === 'findBottlePhotos') {
+    // Foto delle bottiglie dai siti delle cantine (scelta di Baffone): diventano «Foto per il menu» proposte,
+    // con la fonte, e vanno confermate in Revisione come quelle del cliente. Il menu non cambia qui.
+    const id = identifier(p.id);
+    const draft = await getOne(db, 'SELECT * FROM drafts WHERE id=?', id);
+    assert(draft, 'Bozza non trovata.', 404);
+    assert(['bozza', 'revisione', 'pronta_pr'].includes(draft.status), 'Bozza già chiusa: apri una nuova pratica.', 409);
+    const menu = JSON.parse(draft.menu_json);
+    assert(menu?.premium && typeof menu.premium === 'object', 'Le foto delle cantine sono per il menu Premium.', 422);
+    assert(env.BUCKET?.put, 'Archivio privato non configurato.', 503);
+    assert(typeof env.AI?.run === 'function', 'Riconoscimento delle foto non disponibile in questo ambiente.', 503);
+    const gemini = await geminiConfig(db, env);
+    assert(gemini, 'Serve la chiave Gemini (Control Room → Lettura dei menu): la ricerca usa Google con il modello gratuito.', 503);
+    const creative = parseCreative(draft.creative_json) || {};
+    const searched = Array.isArray(creative.bottiglie?.cercate) ? creative.bottiglie.cercate : [];
+    const media = await rows(db, "SELECT m.status, x.text_preview AS note FROM media_items m JOIN materials x ON x.id=m.material_id WHERE m.request_id=? AND x.source=? AND m.status<>'scartata'", draft.request_id);
+    const pending = media.map((m) => parseSourceNote(m.note)?.wine).filter(Boolean);
+    const all = winesWithoutPhoto(menu, [...searched.map((x) => x.name), ...pending]);
+    const round = all.slice(0, BOTTLES_PER_ROUND);
+    assert(round.length, all.length === 0 && !searched.length ? 'Tutti i vini hanno già una foto.' : 'Jarvis ha già cercato tutti i vini senza foto.', 422);
+    const df = slotFrequencies(menuSlots(menu));
+    const outcomes = [];
+    for (const slot of round) {
+      const res = await findBottle(gemini, slot, df, { classify: (bytes, mime) => classifyPhoto(env.AI, bytes, mime) });
+      if (!res.found) { outcomes.push({ name: slot.name, found: false, reason: res.reason }); continue; }
+      const f = res.found, materialId = uid(), key = `private/requests/${draft.request_id}/${materialId}`, stamp = now();
+      const host = new URL(f.page).hostname.replace(/^www\./, '');
+      await env.BUCKET.put(key, f.bytes, { httpMetadata: { contentType: f.mime } });
+      await auditedBatch(db, [
+        db.prepare("INSERT INTO materials (id,request_id,r2_key,filename,mime,size,source,processing_status,text_preview,created_at) VALUES (?,?,?,?,?,?,?,'foto_per_il_menu',?,?)")
+          .bind(materialId, draft.request_id, key, `Bottiglia dal sito ${host}`.slice(0, 180), f.mime, f.bytes.length, CANTINA_SOURCE, sourceNote(slot, f.page, f.image), stamp),
+        db.prepare("INSERT INTO media_items (id,request_id,material_id,kind,description,label_json,status,created_at,updated_at) VALUES (?,?,?,'bottiglia',?,?,'proposta',?,?)")
+          .bind(uid(), draft.request_id, materialId, f.seen.description || '', JSON.stringify(f.seen.label || {}), stamp, stamp)
+      ], 'media.cantina', `Foto della bottiglia di «${slot.name}» trovata su ${host}: da confermare in Revisione (verifica di poterla usare).`, draft.request_id,
+        { sql: 'SELECT 1 FROM materials WHERE id=?', args: [materialId] });
+      outcomes.push({ name: slot.name, found: true, host });
+    }
+    const next = { ...creative, bottiglie: { cercate: [...searched, ...outcomes.map(({ name, found, reason, host }) => ({ name, found, reason: reason || '', host: host || '' }))].slice(-300), at: now() } };
+    await db.prepare('UPDATE drafts SET creative_json=? WHERE id=?').bind(JSON.stringify(next), id).run();
+    result = { id, found: outcomes.filter((o) => o.found).length, outcomes, remaining: Math.max(0, all.length - round.length) };
   } else if (type === 'entrustToJarvis') {
     result = await missions.entrust(db, env, p);
   } else if (type === 'jarvisTick') {

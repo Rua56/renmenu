@@ -172,8 +172,12 @@ export async function performDemoAction(type, payload = {}) {
       result = { draft: clone(draft), extraction };
       break;
     }
+    case 'proposeSchede':
+    case 'findBottlePhotos':
+    case 'applySchede':
+    case 'discardSchede':
     case 'translateDraft':
-      throw actionError('Traduzione automatica disponibile solo nello staging privato.', 501);
+      throw actionError(type === 'translateDraft' ? 'Traduzione automatica disponibile solo nello staging privato.' : 'Le schede di Jarvis sono disponibili solo nello staging privato.', 501);
     case 'saveDraft': {
       const draft = find(state.drafts, payload.id, 'Bozza');
       requireRevision(draft, payload.revision);
