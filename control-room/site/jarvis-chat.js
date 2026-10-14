@@ -7,7 +7,7 @@ import { askJarvis, isDemoMode, jarvisVoiceAudio } from './api.js';
 const Recognition = globalThis.SpeechRecognition || globalThis.webkitSpeechRecognition;
 const Synth = globalThis.speechSynthesis;
 const STOP_WORDS = /^(?:ok\s+)?(?:basta|stop|fine|chiudi|grazie(?:\s+jarvis)?(?:,?\s+(?:basta|a dopo|ciao))?|a dopo|ciao jarvis)[.!]?$/i;
-const SUGGESTIONS = ['Com’è la situazione?', 'Cosa devo fare oggi?', 'Mostrami l’anteprima di …', 'Nella bozza di … metti … a … euro'];
+const SUGGESTIONS = ['Com’è la situazione?', 'Mostrami le pratiche aperte', 'Quali locali sono registrati?', 'Modifiche di questa settimana', 'Mostrami l’anteprima di …', 'Nella bozza di … metti … a … euro'];
 const HISTORY_KEY = 'jarvis-chat';
 const VOICE_KEY = 'jarvis-chat-voice';
 
@@ -35,6 +35,7 @@ let handsFree = false;
 let jarvisVoice = local.get(VOICE_KEY, 'no') === 'si';
 let voiceReady = false;
 let telegramBot = '';
+let showHandler = null; // «mostrami …»: la home apre l'elenco (vedi jarvis-show.js)
 let recognition = null;
 let player = null;
 let phase = 'idle'; // idle | listening | thinking | speaking
@@ -107,12 +108,12 @@ function browserSay(text) {
     Synth.cancel(); Synth.speak(utterance);
   });
 }
-async function say(text) {
-  if (!text || !sheet || sheet.hidden) return;
+async function say(text, { always = false } = {}) {
+  if (!text || !sheet || (sheet.hidden && !always)) return;
   setPhase('speaking');
   if (jarvisVoice && voiceReady) {
     const blob = await jarvisVoiceAudio(text).catch(() => null);
-    if (blob && sheet && !sheet.hidden && phase === 'speaking') {
+    if (blob && sheet && (always || !sheet.hidden) && phase === 'speaking') {
       const url = URL.createObjectURL(blob);
       const played = await new Promise((resolve) => {
         const audio = new Audio(url);
@@ -173,6 +174,16 @@ async function send(text, { spoken = false } = {}) {
     await say('Va bene. Sono qui se ti servo.'); setPhase('idle'); return;
   }
   push({ role: 'user', text: clean });
+  // «Mostrami le pratiche chiuse», «quali locali…»: l'elenco si apre a schermo, senza chiamare Jarvis.
+  const shown = showHandler?.(clean);
+  if (shown) {
+    push({ role: 'jarvis', kind: 'text', text: shown.say });
+    handsFree = false; stopListening();
+    sheet.hidden = true;
+    await say(shown.say, { always: true });
+    setPhase('idle');
+    return;
+  }
   await exchange({ text: clean });
 }
 async function press(data, trigger) {
@@ -231,7 +242,8 @@ function onSubmit(event) {
 }
 
 /** Apre la conversazione. voice: true se la voce di Jarvis è configurata; listen: parte subito in ascolto. */
-export function openChat(element, { voice = false, bot = '', listenNow = false } = {}) {
+export function openChat(element, { voice = false, bot = '', listenNow = false, onShow = null } = {}) {
+  showHandler = onShow;
   if (sheet !== element) {
     sheet = element;
     sheet.addEventListener('click', onClick);
