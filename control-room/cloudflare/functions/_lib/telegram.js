@@ -23,11 +23,32 @@ export function sendTelegram(env, chatId, text, buttons = null, fetchImpl, optio
   if (options.silent) body.disable_notification = true;
   const button = ([label, data]) => ({ text: String(label).slice(0, 60), callback_data: String(data).slice(0, 64) });
   // stacked: un pulsante per riga (elenchi di pratiche); altrimenti tutti sulla stessa riga.
-  if (buttons?.length) body.reply_markup = { inline_keyboard: options.stacked ? buttons.map((b) => [button(b)]) : [buttons.map(button)] };
+  // columns: N pulsanti per riga (il menu dei comandi).
+  const rows = options.columns ? buttons?.reduce((out, b, i) => (i % options.columns ? out.at(-1).push(button(b)) : out.push([button(b)]), out), []) : null;
+  if (buttons?.length) body.reply_markup = { inline_keyboard: rows || (options.stacked ? buttons.map((b) => [button(b)]) : [buttons.map(button)]) };
   return call(env, 'sendMessage', body, fetchImpl);
 }
 export const answerCallback = (env, id, text, fetchImpl) => call(env, 'answerCallbackQuery', { callback_query_id: id, text: String(text || '').slice(0, 190) }, fetchImpl);
 export const clearButtons = (env, chatId, messageId, fetchImpl) => call(env, 'editMessageReplyMarkup', { chat_id: chatId, message_id: messageId, reply_markup: { inline_keyboard: [] } }, fetchImpl);
+// Comandi di Jarvis: il menu «/» accanto al campo di scrittura di Telegram e i pulsanti di /menu.
+// [comando, descrizione nel menu «/», etichetta del pulsante]. Cambiando l'elenco, cambia COMMANDS_VERSION.
+export const COMMANDS = [
+  ['menu', 'Tutti i comandi come pulsanti', '☰ Comandi'],
+  ['stato', 'La situazione adesso', '📋 Situazione'],
+  ['idee', 'Cosa ti propongo di fare', '💡 Proposte di oggi'],
+  ['briefing', 'Il riepilogo del mattino, adesso', '☀️ Briefing'],
+  ['settimana', 'Com’è andata la settimana', '📅 Settimana'],
+  ['risposte', 'Risposte pronte ai clienti (sì/no)', '✉️ Risposte ai clienti'],
+  ['voce', 'Avvisi a voce', '🔊 Avvisi a voce'],
+  ['chiamami', 'Jarvis ti telefona adesso', '📞 Chiamami'],
+  ['claude', 'Claude acceso o spento', '🧠 Claude sì/no'],
+  ['proposte', 'Proposte del lunedì', '🗂 Proposte del lunedì'],
+  ['rifletti', 'Rifletti sulla settimana adesso', '🔁 Rifletti ora'],
+  ['provalettura', 'Prova di lettura dei menu', '🔬 Prova lettura'],
+  ['provaemail', 'Email di prova da renmenu.com', '📧 Email di prova']
+];
+export const COMMANDS_VERSION = '1';
+export const setMyCommands = (env, fetchImpl) => call(env, 'setMyCommands', { commands: COMMANDS.map(([command, description]) => ({ command, description })) }, fetchImpl);
 export const getMe = (env, fetchImpl) => call(env, 'getMe', {}, fetchImpl);
 export const setWebhook = (env, secret, fetchImpl) => call(env, 'setWebhook', {
   url: TELEGRAM_HOOK_URL, secret_token: secret, allowed_updates: ['message', 'callback_query'], drop_pending_updates: true
