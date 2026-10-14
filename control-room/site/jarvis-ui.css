@@ -84,6 +84,9 @@ h1.page-title { margin: 8px 2px 12px; }
 html[data-jarvis="listening"] .reactor-main .wave { animation-duration: 1.4s; }
 html[data-jarvis="speaking"] .reactor-main .arc { animation-duration: 5s; }
 html[data-jarvis="thinking"] .reactor-main .arc { animation-duration: 1.8s; }
+.jarvis-says.typing { animation: jv-type 1.8s steps(36, end) both; }
+@keyframes jv-type { from { clip-path: inset(0 100% 0 0); } to { clip-path: inset(0 0 0 0); } }
+@media (prefers-reduced-motion: reduce) { .jarvis-says.typing { animation: none; } }
 .core-hint { margin: 0 0 10px; color: var(--muted); font: 600 11px var(--mono); letter-spacing: .16em; text-transform: uppercase; }
 .core-hint[data-state="listening"] { color: var(--teal); }
 .core-hint[data-state="listening"]::before { display: inline-block; width: 6px; height: 6px; margin-right: 8px; border-radius: 50%; background: var(--teal); box-shadow: 0 0 8px var(--teal); content: ""; vertical-align: 1px; animation: hud-pulse 1.6s ease-in-out infinite; }
