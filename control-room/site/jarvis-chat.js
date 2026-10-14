@@ -1,5 +1,5 @@
 /* «Parla con Jarvis» nella Control Room: conversazione scritta e a voce con lo stesso Jarvis di Telegram.
- * Microfono: riconoscimento vocale del browser (gratis), acceso solo quando lo tocchi o in «mani libere».
+ * Microfono: l'orecchio di Jarvis (jarvis-ear.js, trascrizione Whisper gratis), acceso solo quando lo tocchi o in «mani libere».
  * Risposte: voce del browser (gratis) oppure la voce vera di Jarvis (ElevenLabs, consuma crediti) se la
  * accendi qui. Pubblicare, cancellare e scrivere ai locali restano tocchi espliciti sui pulsanti di Jarvis. */
 import { askJarvis, isDemoMode, jarvisVoiceAudio, transcribeVoice } from './api.js';
@@ -46,7 +46,7 @@ function setPhase(next, note = '') {
   if (!sheet) return;
   sheet.dataset.phase = next;
   const status = sheet.querySelector('#chat-status');
-  const labels = { idle: handsFree ? 'Mani libere: tocca il microfono per cominciare' : 'Tocca il microfono e parla, oppure scrivi', listening: 'Ti ascolto…', thinking: 'Jarvis sta pensando…', speaking: 'Jarvis risponde…' };
+  const labels = { idle: handsFree ? 'Mani libere: tocca il microfono per cominciare' : 'Tocca il microfono e parla, oppure scrivi', listening: 'Ti ascolto…', thinking: 'Jarvis sta pensando…', speaking: handsFree ? 'Jarvis risponde… poi ti riascolto' : 'Jarvis risponde…' };
   if (status) status.textContent = note || labels[next];
   const mic = sheet.querySelector('[data-chat="mic"]');
   if (mic) { mic.setAttribute('aria-pressed', String(next === 'listening')); mic.setAttribute('aria-label', next === 'listening' ? 'Smetti di ascoltare' : next === 'speaking' ? 'Interrompi e parla' : 'Parla con Jarvis'); }
@@ -98,15 +98,24 @@ function stopSpeaking() {
   if (player) { const audio = player; player = null; audio.pause(); audio.onended?.(); }
   try { Synth?.cancel(); } catch { /* ok */ }
 }
+const pause = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
 function browserSay(text) {
   return new Promise((resolve) => {
     if (!Synth || !globalThis.SpeechSynthesisUtterance || !text) { resolve(); return; }
+    // Su molti telefoni la voce del browser non avvisa mai che ha finito: senza questi controlli
+    // le «mani libere» aspetterebbero per sempre e non riascolterebbero più.
+    let done = false, watchdog = 0, poll = 0;
+    const end = () => { if (done) return; done = true; clearTimeout(watchdog); clearInterval(poll); resolve(); };
     const utterance = new SpeechSynthesisUtterance(text);
     utterance.lang = 'it-IT';
     const italian = Synth.getVoices().find((v) => v.lang?.toLowerCase().startsWith('it'));
     if (italian) utterance.voice = italian;
-    utterance.onend = () => resolve(); utterance.onerror = () => resolve();
-    Synth.cancel(); Synth.speak(utterance);
+    utterance.onend = end; utterance.onerror = end;
+    if (Synth.speaking || Synth.pending) Synth.cancel();
+    Synth.speak(utterance);
+    watchdog = setTimeout(end, 2500 + text.length * 90);
+    const started = Date.now();
+    poll = setInterval(() => { if (Date.now() - started > 1500 && !Synth.speaking && !Synth.pending) end(); }, 300);
   });
 }
 async function say(text, { always = false } = {}) {
@@ -119,8 +128,11 @@ async function say(text, { always = false } = {}) {
       const played = await new Promise((resolve) => {
         const audio = new Audio(url);
         player = audio;
-        audio.onended = () => resolve(true); audio.onerror = () => resolve(false);
-        audio.play().catch(() => resolve(false));
+        let guard = setTimeout(() => resolve(false), 15000); // se non parte mai, passa alla voce del telefono
+        audio.onloadedmetadata = () => { clearTimeout(guard); guard = setTimeout(() => resolve(true), (Number.isFinite(audio.duration) && audio.duration > 0 ? Math.min(audio.duration, 120) : 120) * 1000 + 3000); };
+        audio.onended = () => { clearTimeout(guard); resolve(true); };
+        audio.onerror = () => { clearTimeout(guard); resolve(false); };
+        audio.play().catch(() => { clearTimeout(guard); resolve(false); });
       });
       player = null;
       URL.revokeObjectURL(url);
@@ -162,6 +174,9 @@ async function listenWithEar() {
     blob = await hear({ onLevel: (level) => sheet?.style.setProperty('--lvl', level.toFixed(2)) });
   } catch (error) {
     if (turn !== listenTurn) return;
+    // Il telefono ha messo in pausa il microfono dopo aver parlato: basta un tocco per ripartire,
+    // e le mani libere restano accese per i turni dopo.
+    if (error?.name === 'EarStuck') { setPhase('idle', 'Il telefono ha messo in pausa il microfono: toccalo per continuare.'); return; }
     handsFree = false; syncToggles();
     setPhase('idle', /denied|allowed|permission/i.test(String(error?.name || error?.message)) ? 'Il microfono è bloccato: consentilo nelle impostazioni del browser per questo sito.' : 'Il microfono non è partito: riprova.');
     return;
@@ -249,6 +264,9 @@ async function exchange(payload) {
     busy = false;
     const words = replies.map((m) => m.say).filter(Boolean).join(' ').slice(0, 900);
     await say(words);
+    // Un attimo prima di riaprire il microfono: il telefono torna dall'altoparlante alla registrazione
+    // e la coda della voce di Jarvis non finisce nella frase successiva.
+    if (handsFree && words) await pause(400);
     // Se intanto Riccardo ha toccato il microfono (interrompendo Jarvis) l'ascolto è già partito.
     if (!sheet || sheet.hidden || phase === 'listening') return;
     const waitsForTap = replies.some((m) => m.buttons?.length);
