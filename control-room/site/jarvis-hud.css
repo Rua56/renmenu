@@ -76,8 +76,8 @@ html[data-theme="dark"] .lab::before, html[data-theme="dark"] .oggi-block > .eye
 html[data-theme="dark"] .lab::after, html[data-theme="dark"] .oggi-block > .eyebrow::after { flex: 1; height: 1px; background: linear-gradient(90deg, var(--hud-line), transparent); content: ""; }
 
 /* ——— angoli HUD su schede e riquadri ——— */
-html[data-theme="dark"] :is(.oggi-card, .panel, .sys-list, .locale, .fact, .oggi-calm, .notice) { position: relative; }
-html[data-theme="dark"] :is(.oggi-card, .panel, .sys-list, .locale, .oggi-calm)::after {
+html[data-theme="dark"] :is(.oggi-card, .panel, .sys-list, .locale, .fact, .oggi-calm, .notice, .hud-readout, .hud-display) { position: relative; }
+html[data-theme="dark"] :is(.oggi-card, .panel, .sys-list, .locale, .oggi-calm, .hud-readout, .hud-display)::after {
   position: absolute; inset: -1px; z-index: 1; display: block; width: auto; height: auto; border: 0; border-radius: inherit; pointer-events: none; content: "";
   --c: var(--hud); --l: 14px;
   background:
@@ -124,3 +124,13 @@ html[data-theme="dark"] .msg.j { border-color: var(--hud-line); background: rgba
   html[data-theme="dark"] .jarvis-hero .reactor::before, html[data-theme="dark"] .reactor .core, html[data-theme="dark"] .ask b::after { animation: none !important; }
   .hud-boot { display: none; }
 }
+
+/* ——— home minimale: indicatori ed elenchi olografici ——— */
+html[data-theme="dark"] .hud-readout { background: linear-gradient(180deg, rgba(70, 214, 255, .06), rgba(70, 214, 255, .01)); border-color: var(--hud-line); }
+html[data-theme="dark"] .hud-readout strong { color: var(--hud); text-shadow: 0 0 14px var(--hud-glow); }
+html[data-theme="dark"] .hud-readout.on { box-shadow: 0 0 22px var(--hud-dim), inset 0 0 18px var(--hud-dim); }
+html[data-theme="dark"] .hud-display { background: linear-gradient(180deg, rgba(10, 30, 48, .92), rgba(6, 16, 28, .92)); border-color: var(--hud-line); box-shadow: 0 0 40px rgba(70, 214, 255, .1), inset 0 1px 0 rgba(70, 214, 255, .18); }
+html[data-theme="dark"] .hud-row { border-top-color: rgba(70, 214, 255, .1); }
+html[data-theme="dark"] .hud-row:hover { background: linear-gradient(90deg, var(--hud-dim), transparent 70%); }
+html[data-theme="dark"] .hud-row time { color: var(--teal-soft); }
+html[data-theme="dark"] .hud-adesso .oggi-card { box-shadow: 0 0 30px rgba(255, 179, 71, .08); }

@@ -6,6 +6,7 @@ import { provisionalQrSvg, provisionalTarget } from './provisional-qr.js';
 import { mountPdfPreview } from './pdf-preview.js';
 import { extractPdfText } from './material-extract.js';
 import { closeChat, openChat } from './jarvis-chat.js';
+import { showFor } from './jarvis-show.js';
 import { configureVoice, interpretVoice, listen, speak, speechAvailable, synthesisAvailable, stopListening, voiceSettings } from './voice.js';
 import { resetDemoState } from './demo-store.js';
 
@@ -342,7 +343,7 @@ function jarvisPanel() {
   const tg = state.telegram || {};
   const telegram = isDemoMode ? '' : !tg.configured ? '' : !tg.linked
     ? `<div class="notice spaced-top-small">${telegramLinkUrl ? `Tocca il link e poi <strong>Avvia</strong> in Telegram (valido 15 minuti): <a href="${escapeHtml(telegramLinkUrl)}" target="_blank" rel="noopener">Apri Jarvis su Telegram</a>` : 'Collega Telegram: Jarvis ti scriverà lì e ti chiederà il SÌ prima di pubblicare.'}</div><div class="button-row spaced-top-small"><button class="button" type="button" data-action="telegram-link">${telegramLinkUrl ? 'Nuovo link' : 'Collega Telegram'}</button></div>`
-    : `<div class="button-row spaced-top-small"><span class="status good">Telegram collegato</span><button class="button secondary small-button" type="button" data-action="jarvis-briefing">Briefing ora</button><button class="button secondary small-button" type="button" data-action="telegram-test">Messaggio di prova</button></div>${voiceForm()}${readerForm()}`;
+    : `<details class="hud-settings"><summary>Collegamenti e voce di Jarvis</summary><div class="button-row spaced-top-small"><span class="status good">Telegram collegato</span><button class="button secondary small-button" type="button" data-action="jarvis-briefing">Briefing ora</button><button class="button secondary small-button" type="button" data-action="telegram-test">Messaggio di prova</button></div>${voiceForm()}${readerForm()}</details>`;
   if (!notes.length && !autopilotRunning && !telegram) return '';
   const row = (item) => `<div class="list-row"><div class="list-main"><strong>${escapeHtml(item.subject)}</strong><small>${escapeHtml(item.body)}</small><small>${time(item.createdAt)}</small></div><div class="button-row"><button class="mini-button" type="button" data-select-request="${escapeHtml(item.requestId || '')}" data-route="${item.subject.includes('bozza pronta') ? 'revisione' : 'richieste'}">Apri</button><button class="mini-button" type="button" data-action="mark-notification" data-notification-id="${escapeHtml(item.id)}" data-read="true">Fatto</button></div></div>`;
   return `<section class="panel spaced-top-small"><p class="eyebrow">JARVIS</p>${autopilotRunning ? '<p class="notice">Jarvis sta preparando le nuove richieste…</p>' : ''}<div class="list">${notes.map(row).join('')}</div>${telegram}</section>`;
@@ -909,23 +910,44 @@ function praticaCard(info) {
   const detail = mission?.note && info.group !== 'chiuse' ? mission.note : request.nextStep || '';
   return `<button class="oggi-card ${info.tone}" type="button" data-select-request="${escapeHtml(request.id)}" data-route="pratica"><span class="oggi-tag">${escapeHtml(info.headline)}</span><strong>${escapeHtml(client?.name || request.subject)}</strong><span class="oggi-sub">${escapeHtml(request.subject)}${detail ? ` · ${escapeHtml(detail)}` : ''}</span><span class="oggi-cta">${escapeHtml(info.cta)} →</span></button>`;
 }
-function oggiDecisions() {
-  const all = allPratiche();
+// Home minimale: solo ciò che serve adesso, quattro indicatori e, su richiesta, l'elenco chiesto a Jarvis.
+let display = null;
+function showData() {
+  return { pratiche: state.requests.map(praticaInfo), clients: state.clients, audit: state.audit || [], now: Date.now() };
+}
+function adessoBlock(all) {
   const decide = all.filter((info) => info.group === 'decidere');
-  const corso = all.filter((info) => info.group === 'corso');
-  const chiuse = all.filter((info) => info.group === 'chiuse');
-  const shown = decide.slice(0, 4);
-  const first = decide.length
-    ? `<section class="oggi-block"><p class="eyebrow">DA DECIDERE · ${decide.length}</p><div class="oggi-cards">${shown.map(praticaCard).join('')}</div>${decide.length > shown.length ? `<button class="button secondary small-button" type="button" data-action="pratiche-filtro" data-filtro="decidere">Altre ${decide.length - shown.length} da decidere</button>` : ''}</section>`
-    : '<section class="oggi-block"><p class="eyebrow">DA DECIDERE · 0</p><p class="oggi-calm">Niente aspetta una tua decisione.</p></section>';
-  const second = corso.length
-    ? `<section class="oggi-block"><p class="eyebrow">IN CORSO · ${corso.length}</p><div class="oggi-cards compact">${corso.slice(0, 3).map(praticaCard).join('')}</div></section>` : '';
-  const filtro = (key, label, n) => `<button class="oggi-all-link" type="button" data-action="pratiche-filtro" data-filtro="${key}"><strong>${n}</strong><span>${label}</span></button>`;
-  const third = `<section class="oggi-block"><p class="eyebrow">TUTTE LE PRATICHE</p><div class="oggi-all">${filtro('decidere', 'da decidere', decide.length)}${filtro('corso', 'in corso', corso.length)}${filtro('chiuse', 'chiuse', chiuse.length)}</div></section>`;
-  return first + second + third;
+  if (!decide.length) return '<section class="oggi-block hud-adesso"><p class="eyebrow">ADESSO</p><p class="oggi-calm">Niente aspetta una tua decisione. Chiedimi pure di mostrarti pratiche, locali o menu.</p></section>';
+  const more = decide.length > 1 ? `<button class="hud-more" type="button" data-action="show" data-show="pratiche da decidere">Altre ${decide.length - 1} da decidere →</button>` : '';
+  return `<section class="oggi-block hud-adesso"><p class="eyebrow">ADESSO</p><div class="oggi-cards">${praticaCard(decide[0])}</div>${more}</section>`;
+}
+const READOUTS = [['pratiche aperte', 'Aperte', (all) => all.filter((i) => i.group !== 'chiuse').length], ['pratiche chiuse', 'Chiuse', (all) => all.filter((i) => i.group === 'chiuse').length], ['locali registrati', 'Locali', () => state.clients.length], ['menu online', 'Menu online', () => state.clients.filter((c) => c.menuId).length]];
+function hudReadouts(all) {
+  return `<nav class="hud-readouts" aria-label="Mostra elenchi">${READOUTS.map(([phrase, label, n]) => `<button type="button" class="hud-readout${display === phrase ? ' on' : ''}" data-action="show" data-show="${phrase}" aria-pressed="${display === phrase}"><strong>${n(all)}</strong><span>${label}</span></button>`).join('')}</nav>`;
+}
+function hudDisplay() {
+  if (!display) return '';
+  const shown = showFor(display, showData());
+  if (!shown) return '';
+  const row = (r) => {
+    const body = `<span class="hud-dot ${escapeHtml(r.tone || 'info')}" aria-hidden="true"></span><span class="hud-row-main"><strong>${escapeHtml(r.title)}</strong><small>${escapeHtml(r.sub)}</small></span>${r.when ? `<time>${escapeHtml(time(r.when))}</time>` : ''}`;
+    if (r.kind === 'request') return `<button class="hud-row" type="button" data-select-request="${escapeHtml(r.id)}" data-route="pratica">${body}</button>`;
+    if (r.kind === 'client') return `<button class="hud-row" type="button" data-select-client="${escapeHtml(r.id)}" data-route="locale">${body}</button>`;
+    return `<div class="hud-row">${body}</div>`;
+  };
+  return `<section class="hud-display" id="hud-display" aria-label="${escapeHtml(shown.title)}"><div class="hud-display-head"><p class="eyebrow">${escapeHtml(shown.title)} · ${shown.rows.length}</p><button type="button" data-action="show-close" aria-label="Chiudi l’elenco">✕</button></div>${shown.rows.length ? `<div class="hud-rows">${shown.rows.map(row).join('')}</div>` : `<p class="oggi-calm">${escapeHtml(shown.say)}</p>`}</section>`;
+}
+function showOnHome(phrase) {
+  const shown = showFor(phrase, showData());
+  if (!shown) return null;
+  display = phrase;
+  if (activeView !== 'command') navigate('command'); else render();
+  requestAnimationFrame(() => $('#hud-display')?.scrollIntoView({ behavior: 'smooth', block: 'start' }));
+  return shown;
 }
 function renderCommand() {
-  return `<div class="view-wrap">${jarvisHero()}${demoNotice()}${oggiDecisions()}${jarvisPanel()}</div>`;
+  const all = allPratiche();
+  return `<div class="view-wrap jarvis-home">${jarvisHero()}${demoNotice()}${adessoBlock(all)}${hudReadouts(all)}${hudDisplay()}${jarvisPanel()}</div>`;
 }
 function renderPratiche() {
   const all = allPratiche();
@@ -1083,6 +1105,8 @@ async function handleOggiAction(action, trigger) {
     await doAction('updateRequest', { id: request.id, revision: request.revision, patch: { plan, category: `nuovo_${plan}`, subject } }, `Piano ${PLAN_RULES[plan].label} segnato. Ora puoi preparare la bozza.`);
     return true;
   }
+  if (action === 'show') { showOnHome(trigger.dataset.show); return true; }
+  if (action === 'show-close') { display = null; render(); return true; }
   if (action === 'ask-open') { openAsk(); return true; }
   if (action === 'ask-voice') { openAsk(true); return true; }
   if (action === 'ask-close') { closeAsk(); return true; }
@@ -1178,7 +1202,7 @@ function renderLocale() {
 // «Scrivi o parla a Jarvis»: conversazione vera con Jarvis (stesso cervello di Telegram), anche a voce.
 const askSheet = $('#ask-sheet');
 function openAsk(listenNow = false) {
-  openChat(askSheet, { voice: Boolean(state?.voice?.provider && state?.voice?.hasKey), bot: state?.telegram?.bot || '', listenNow });
+  openChat(askSheet, { voice: Boolean(state?.voice?.provider && state?.voice?.hasKey), bot: state?.telegram?.bot || '', listenNow, onShow: showOnHome });
 }
 function closeAsk() { closeChat(); }
 document.addEventListener('keydown', (event) => { if (event.key === 'Escape' && !askSheet.hidden) closeAsk(); });
