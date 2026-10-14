@@ -178,3 +178,27 @@ test('Risposte ai clienti: l’annuncio del messaggio mette in coda la risposta 
     assert.ok(Date.parse(queue.r1) > Date.now());
   } finally { globalThis.fetch = previous; }
 });
+
+test('Menu dei comandi: «/menu» mostra un pulsante per comando, il tocco lo esegue, il menu «/» si imposta una volta', async () => {
+  const db = database();
+  const calls = [];
+  const previous = globalThis.fetch;
+  globalThis.fetch = async (url, init = {}) => { calls.push({ method: String(url).split('/').pop(), body: JSON.parse(init.body || '{}') }); return Response.json({ ok: true, result: { message_id: calls.length } }); };
+  try {
+    await missions.putSetting(db, 'telegram_chat_id', '42');
+    const env = { DB: db, TELEGRAM_BOT_TOKEN: TOKEN };
+    await missions.telegramUpdate(db, env, { message: { chat: { id: 42, type: 'private' }, text: '/menu' } });
+    const commands = calls.find((c) => c.method === 'setMyCommands');
+    assert.ok(commands.body.commands.some((c) => c.command === 'stato'));
+    const menu = calls.filter((c) => c.method === 'sendMessage').at(-1).body;
+    assert.match(menu.text, /Ecco i comandi/);
+    assert.equal(menu.reply_markup.inline_keyboard[0].length, 2);
+    const datas = menu.reply_markup.inline_keyboard.flat().map((b) => b.callback_data);
+    assert.ok(datas.includes('cmd:stato') && datas.includes('cmd:risposte') && !datas.includes('cmd:menu'));
+    await missions.telegramUpdate(db, env, { callback_query: { id: 'q', data: 'cmd:risposte', message: { chat: { id: 42 }, message_id: 1 } } });
+    assert.match(calls.filter((c) => c.method === 'sendMessage').at(-1).body.text, /Risposte pronte accese/);
+    await missions.telegramUpdate(db, env, { message: { chat: { id: 42, type: 'private' }, text: '/sconosciuto' } });
+    assert.match(calls.filter((c) => c.method === 'sendMessage').at(-1).body.text, /Tocca un comando qui sotto/);
+    assert.equal(calls.filter((c) => c.method === 'setMyCommands').length, 1);
+  } finally { globalThis.fetch = previous; }
+});

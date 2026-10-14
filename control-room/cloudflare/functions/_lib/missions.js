@@ -12,7 +12,7 @@ import { assessReply, proposeReplyChanges, referenceCode, sha256Hex } from './ap
 import { sendOwnerNotification } from './owner-notifications.js';
 import { clientMailConfig, sendClientMail } from './client-mail.js';
 import { briefingDue, buildBriefing, romeDay } from './briefing.js';
-import { answerCallback, clearButtons, downloadTelegramFile, sendDocument, sendPhoto, sendTelegram, sendVoice, telegramReady } from './telegram.js';
+import { COMMANDS, COMMANDS_VERSION, answerCallback, clearButtons, downloadTelegramFile, sendDocument, sendPhoto, sendTelegram, sendVoice, setMyCommands, telegramReady } from './telegram.js';
 import { buildMenuQr, menuLink } from './qr.js';
 import { isBlanchSlug, publicMenuJsonUrl, publicMenuPageUrl } from './blanch.js';
 import { CHAT_MODEL, chat as freeChat, matchVenue, planFromText, speak, transcribe, understand, venueSaid } from './voice.js';
@@ -677,6 +677,13 @@ export function createMissions(deps) {
       await sendTg(db, env, chat, text, null, deps.fetchImpl);
       return;
     }
+    if (verb === 'cmd') {
+      // Pulsante del menu dei comandi: come se Riccardo avesse scritto il comando.
+      const known = COMMANDS.find(([name]) => name === missionId);
+      await ack(known ? known[2] : 'Comando sconosciuto');
+      if (known) await telegramUpdate(db, env, { message: { chat: { id: chat, type: 'private' }, text: `/${known[0]}` } });
+      return;
+    }
     if (verb === 'rep') {
       const outcome = await answerReply(db, env, missionId, extra);
       await ack(missionId === 'send' ? (outcome.ok ? 'Mandata' : 'Non partita') : missionId === 'edit' ? 'Dimmi come' : 'Non rispondo');
@@ -788,6 +795,9 @@ export function createMissions(deps) {
       return;
     }
     if (!chat || from !== chat) return;
+    await syncCommands(db, env);
+    // Solo «/menu» o «comandi»: «menu» da solo può essere la risposta a un pulsante (titolo di una pratica).
+    if (/^\/menu\b/i.test(text) || /^\W*(?:jarvis[\s,!.]*)?(?:i\s+)?comandi[\s?!.]*$/i.test(text)) { await commandsMenu(db, env, chat); return; }
     if (await replyEditTurn(db, env, chat, text)) return;
     // Dubbi aperti: un prezzo scritto («7,50») risponde al dubbio in corso.
     if (normalizePrice(text)) {
@@ -849,10 +859,21 @@ export function createMissions(deps) {
       return;
     }
     if (/^\/aiuto\b|^\/help\b/i.test(text) || text.startsWith('/')) {
-      await sendTg(db, env, chat, 'Puoi scrivermi o mandarmi un vocale: «com’è la situazione?», «al Bakaro il frico ora costa 14», «crea una nuova pratica per il locale … con piano Standard», «pubblica il menu di …». Capisco anche /stato, /idee, /briefing, /settimana, /voce, /chiamami, /claude, /provaemail, /prova lettura, /proposte, /rifletti, le foto e i PDF dei menu. Pubblicare richiede sempre il tuo SÌ col pulsante.', null, deps.fetchImpl);
+      await commandsMenu(db, env, chat, 'Puoi scrivermi o mandarmi un vocale: «com’è la situazione?», «al Bakaro il frico ora costa 14», «crea una nuova pratica per il locale … con piano Standard», «pubblica il menu di …». Capisco anche le foto e i PDF dei menu. Pubblicare richiede sempre il tuo SÌ col pulsante. Tocca un comando qui sotto.');
       return;
     }
     await converse(db, env, chat, text, false);
+  }
+
+  // ——— Menu dei comandi: pulsanti in chat (/menu) e menu «/» di Telegram ———
+  async function commandsMenu(db, env, chat, intro = 'Ecco i comandi: tocca quello che ti serve. Puoi sempre anche scrivermi o mandarmi un vocale.') {
+    await sendTg(db, env, chat, intro, COMMANDS.filter(([name]) => name !== 'menu').map(([name, , label]) => [label, `cmd:${name}`]), deps.fetchImpl, { columns: 2 });
+  }
+  // Il menu «/» accanto al campo di scrittura si aggiorna una volta per versione dell'elenco.
+  async function syncCommands(db, env) {
+    if ((await setting(db, 'tg_commands_v').catch(() => null)) === COMMANDS_VERSION) return;
+    const out = await setMyCommands(env, deps.fetchImpl).catch(() => null);
+    if (out?.ok) await putSetting(db, 'tg_commands_v', COMMANDS_VERSION).catch(() => {});
   }
 
   // ——— Telefonata vera (ElevenLabs + numero Twilio importato) ———
