@@ -1,5 +1,5 @@
 import { premiumErrors } from './premium.js';
-import { PAGE_TITLE, WINE_SECTION, allergenNumbers, cleanMeta, degustazioneNote, namelessVariants, columnsHeader, degustazioneHeading, degustazionePrice, descriptionLike, fmt, labelOnlyRow, labelSuffix, labeledVariants, marketPrice, pairingRow, proseLike, splitAvailability, tastingTier, undecidedPrice, unlabeledVariants } from './menu-structure.js';
+import { PAGE_TITLE, WINE_SECTION, allergenNumbers, cleanMeta, degustazioneNote, namelessVariants, columnsHeader, degustazioneHeading, degustazionePrice, descriptionLike, fmt, freeVariants, labelOnlyRow, labelSuffix, labeledVariants, marketPrice, pairingRow, proseLike, splitAvailability, tastingTier, undecidedPrice, unlabeledVariants } from './menu-structure.js';
 // Independent server-side rules. scripts/validate-menus.py remains the publication authority.
 const PRICE = /^\d+(?:[,.]\d{1,2})?$/;
 const TAGS = new Set(['veg', 'vegan', 'spicy', 'gf', 'new', 'top', 'frozen']);
@@ -246,7 +246,7 @@ export function priceRow(row) {
  *  con le parole del cliente. Solo se la riga che resta è davvero «nome + prezzo». */
 export function priceTail(raw) {
   const text = String(raw || '').trim().replace(/^[-•*]\s*/, '');
-  if (!text || /^[#>\[]/.test(text)) return null;
+  if (!text || /^[#>\[]/.test(text) || freeVariants(text)) return null;
   const dashed = text.replace(/(\d)\s*[,.]\s*-{1,2}(?=\s*(?:€|euro|eur)?\s*(?:$|\(|\/))/i, '$1');
   const m = dashed.match(/^(.{2,150}?[A-Za-zÀ-ÿ)'’.](?:\s*[—–\-:]\s*|\s+|\.{2,}\s*)(?:€\s*)?\d{1,3}(?:[,.]\d{1,2})?(?:\s*(?:€|euro|eur))?)\s*(?:\(([^()]{3,80})\)|[/|]\s*([^\d€/][^€/]{2,80}))\s*\.?$/i);
   const note = m && (m[2] || m[3] || '').trim().replace(/[.\s]+$/, '');
@@ -288,7 +288,7 @@ const DEFAULT_SECTION_RE = /^(?:piatti|dal materiale ricevuto)$/i;
 
 export function extractMenuFromText(venue, source, requestedSlug) {
   const slug = slugify(requestedSlug || venue);
-  const items = [], unknown = [], provenance = [], consumed = [], confirm = [], inferred = new Map();
+  const items = [], unknown = [], provenance = [], consumed = [], confirm = [], inferred = new Map(), unnamedPrices = new Map();
   let section = { nome: { it: DEFAULT_SECTION }, voci: [], unnamed: true };
   const sections = [section];
   const tailNotes = new Map();
@@ -449,6 +449,15 @@ export function extractMenuFromText(venue, source, requestedSlug) {
       variantItem(unlabeled.name, unlabeled.variants, lineNumber, row, unlabeled.inferred ? `Due prezzi senza etichetta in «${sectionName()}»: inseriti come calice ${fmt(unlabeled.variants[0].amount)} € e bottiglia ${fmt(unlabeled.variants[1].amount)} €. Conferma.` : '');
       continue;
     }
+    // Prezzi per formato dalla lettura foto («Focaccia — tonda 3,50 / 50 cm 6,00 / un metro 12,00»): tutti, con le etichette
+    // scritte. Senza etichette e senza colonne dichiarate restano «Prezzo 1», «Prezzo 2»… e una nota per sezione da completare.
+    const free = section.tipo === 'degustazione' ? null : freeVariants(row);
+    if (free) {
+      const named = !free.unnamed ? free.variants : section.columns?.length === free.variants.length ? free.variants.map((v, i) => ({ ...v, label: section.columns[i] })) : null;
+      variantItem(free.name, named || free.variants.map((v, i) => ({ ...v, label: `Prezzo ${i + 1}` })), lineNumber, row);
+      if (!named) (unnamedPrices.get(section) || unnamedPrices.set(section, { rows: [], line: lineNumber }).get(section)).rows.push(free.name);
+      continue;
+    }
     // «calice 5» / «bottiglia 40» sotto il nome del vino (o sotto la voce appena letta con varianti).
     const only = labelOnlyRow(row);
     if (only) {
@@ -551,6 +560,11 @@ export function extractMenuFromText(venue, source, requestedSlug) {
     if (!sec.voci.length) continue;
     const names = group.rows.slice(0, 4).map((n) => `«${n}»`).join(', ') + (group.rows.length > 4 ? '…' : '');
     confirm.push({ text: `${sec.nome.it}: ${names}`, line: group.line, hint: group.rows.length === 1 ? group.fallback : `In «${sec.nome.it}» ${group.rows.length} vini hanno due prezzi senza etichetta (${names}): li ho messi come calice (il più basso) e bottiglia (il più alto). Conferma l’ordine.` });
+  }
+  for (const [sec, group] of unnamedPrices) {
+    if (!sec.voci.length) continue;
+    const names = group.rows.slice(0, 4).map((n) => `«${n}»`).join(', ') + (group.rows.length > 4 ? '…' : '');
+    confirm.push({ text: `${sec.nome.it}: ${names}`, line: group.line, hint: `In «${sec.nome.it}» ${group.rows.length === 1 ? 'una voce ha' : `${group.rows.length} voci hanno`} più prezzi senza etichetta (${names}): li ho messi come «Prezzo 1», «Prezzo 2»… nell’ordine scritto. Scrivi tu cosa indicano (es. normale / famiglia).` });
   }
   for (const s of kept) if (s.tipo === 'degustazione') {
     const formulas = s.voci.filter((v) => v.prezzi?.length), courses = s.voci.filter((v) => !v.prezzo && !v.prezzi);
