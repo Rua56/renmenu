@@ -69,6 +69,9 @@ export async function searchWinePages(gemini, slot, { fetchImpl = globalThis.fet
   return [];
 }
 
+// «%» non valido nell'indirizzo di un'immagine (succede sui siti veri): decodeURIComponent lancerebbe un errore.
+const safeDecode = (v) => { try { return decodeURIComponent(v); } catch { return v; } };
+
 /** Immagini della pagina che possono essere la bottiglia: og:image e <img> che nominano il vino. */
 export function imageCandidates(html, pageUrl, wineName) {
   const want = words(wineName);
@@ -77,7 +80,7 @@ export function imageCandidates(html, pageUrl, wineName) {
     let url;
     try { url = publicHttps(new URL(String(src || '').replace(/&amp;/g, '&').trim(), pageUrl).toString()); } catch { url = null; }
     if (!url || /\.svg(?:\?|$)|\.gif(?:\?|$)|^data:/i.test(url) || SKIP_IMG.test(`${url} ${alt || ''}`)) return;
-    const hay = norm(`${decodeURIComponent(url.split('?')[0]).split('/').slice(-2).join(' ')} ${alt || ''}`);
+    const hay = norm(`${safeDecode(url.split('?')[0]).split('/').slice(-2).join(' ')} ${alt || ''}`);
     const hits = want.filter((w) => hay.includes(w)).length;
     const score = bonus + hits * 2 + (/bottigli|bottle|flasche|packshot|etichett/.test(hay) ? 1 : 0);
     if (score > (out.get(url) ?? -1)) out.set(url, score);
