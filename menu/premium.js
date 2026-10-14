@@ -188,6 +188,17 @@
         px[p * 4 + 3] = 0;
         for (const q of [x > 0 ? p - 1 : -1, x < w - 1 ? p + 1 : -1, y > 0 ? p - w : -1, y < h - 1 ? p + w : -1]) if (q >= 0 && !visto[q] && chiaro(q * 4)) { visto[q] = 1; coda.push(q); }
       }
+      // Bordo morbido: i pixel chiari rimasti attaccati al fondo tolto diventano semitrasparenti
+      // (niente alone bianco né contorno seghettato intorno alla bottiglia).
+      const vuoto = (q) => px[q * 4 + 3] === 0;
+      const sfuma = [];
+      for (let y = 1; y < h - 1; y++) for (let x = 1; x < w - 1; x++) {
+        const p = y * w + x;
+        if (vuoto(p) || !(vuoto(p - 1) || vuoto(p + 1) || vuoto(p - w) || vuoto(p + w))) continue;
+        const media = (px[p * 4] + px[p * 4 + 1] + px[p * 4 + 2]) / 3;
+        sfuma.push([p, media > 170 ? Math.round(255 * Math.max(0, (255 - media) / 85)) : 200]);
+      }
+      for (const [p, a] of sfuma) px[p * 4 + 3] = Math.min(px[p * 4 + 3], a);
       ctx.putImageData(data, 0, 0);
       const out = cv.toDataURL('image/png');
       scontornate.set(src, out);
@@ -257,13 +268,20 @@
     let view = params.get('view') === 'wine' && haBere ? 'bere' : haCucina ? 'cucina' : 'bere';
     let query = '';
 
-    const price = (p) => (p ? `€\u00a0${esc(p)}` : '');
+    // Come nelle carte stampate: «€ 14», non «€ 14,00» (i centesimi veri restano: «€ 6,50»).
+    const price = (p) => (p ? `<span class="pm-prezzo"><span class="pm-eur">€</span>\u00a0${esc(String(p).replace(/^(\d+)[,.]00$/, '$1'))}</span>` : '');
     function meta(v) {
       const tags = (v.tag || []).map((k) => (R.tags?.[k] ? `<span class="${k === 'top' ? 'pm-tag--top' : ''}">${R.tags[k].icon} ${esc(R.tags[k][lang] || R.tags[k].it)}</span>` : '')).join('');
       const all = (v.allergeni || []).length ? `<span>${S().allergeni}${v.allergeni.map((k) => `<i>${esc(k)}</i>`).join('')}</span>` : '';
       return tags || all ? `<div class="pm-voce__meta">${tags}${all}</div>` : '';
     }
     const sch = (v) => (v.scheda && typeof v.scheda === 'object' ? v.scheda : {});
+    // Vini scritti «Ribolla Gialla - Tenuta Stella»: il nome in grande, la cantina sotto in corsivo.
+    const nomeVino = (v, vino) => {
+      const n = t(v.nome), c = t(sch(v).cantina);
+      const m = vino ? /^(.{3,}?)\s+[-–—]\s+(.{3,})$/.exec(n) : null;
+      return m ? { nome: m[1], cantina: c || m[2] } : { nome: n, cantina: vino ? c : '' };
+    };
     const haScheda = (v) => PROFILO.some((k) => Number.isFinite(sch(v).profilo?.[k])) || TESSERE.some((k) => t(sch(v)[k])) || !!t(sch(v).nota);
     // Tutte le voci (anche dell'altra carta), con una chiave stabile «sezione:voce».
     const tutte = [];
@@ -283,32 +301,35 @@
     }
     function voce(v, vino) {
       const varianti = pills(v);
-      const p = !varianti && v.prezzo ? `<span class="pm-pill pm-pill--solo">${price(v.prezzo)}${v.unita ? `<small>${esc(t(v.unita))}</small>` : ''}</span>` : '';
+      const p = !varianti && v.prezzo ? `<span class="pm-lead" aria-hidden="true"></span><span class="pm-pill pm-pill--solo">${price(v.prezzo)}${v.unita ? `<small>${esc(t(v.unita))}</small>` : ''}</span>` : '';
       const foto = safeImg(v.foto), scheda = haScheda(v), k = keyOf.get(v);
       const apri = !!(foto || scheda || abbinati.has(k));
-      const terr = t(sch(v).territorio), cantina = t(sch(v).cantina);
-      const badge = vino && (terr || cantina) ? `<p class="pm-card__orig">${terr ? `<span class="pm-badge">${esc(terr)}</span>` : ''}${cantina ? `<span>${esc(cantina)}</span>` : ''}</p>` : '';
+      const terr = t(sch(v).territorio), nv = nomeVino(v, vino);
+      const badge = vino && terr ? `<p class="pm-card__orig"><span class="pm-badge">${esc(terr)}</span></p>` : '';
       const cta = apri ? `<span class="pm-card__cta">${scheda && vino ? S().somm : S().scopri}<svg viewBox="0 0 24 24" aria-hidden="true"><path d="m9 6 6 6-6 6"/></svg></span>` : '';
       const img = foto ? `<span class="pm-card__img${vino ? ' pm-card__img--bott' : ''}"><img src="${esc(foto)}" alt="" loading="lazy" decoding="async"></span>` : '';
-      return `<article class="pm-card${foto ? ' pm-card--foto' : ''}${apri ? ' pm-card--apri' : ''}"${apri ? ` data-k="${k}" role="button" tabindex="0" aria-haspopup="dialog" aria-label="${esc(t(v.nome))} — ${esc(scheda && vino ? S().somm : S().scopri)}"` : ''}>${img}<div class="pm-card__body">${badge}<div class="pm-card__top"><h3 class="pm-card__nome">${esc(t(v.nome))}</h3>${p}</div>${k ? cuore(k) : ''}${v.descrizione && t(v.descrizione) ? `<p class="pm-card__desc">${esc(t(v.descrizione))}</p>` : ''}${varianti}${meta(v)}${cta}</div></article>`;
+      return `<article class="pm-card${foto ? ' pm-card--foto' : ''}${apri ? ' pm-card--apri' : ''}"${apri ? ` data-k="${k}" role="button" tabindex="0" aria-haspopup="dialog" aria-label="${esc(t(v.nome))} — ${esc(scheda && vino ? S().somm : S().scopri)}"` : ''}>${img}<div class="pm-card__body">${badge}<div class="pm-card__top"><h3 class="pm-card__nome">${esc(nv.nome)}</h3>${p}${k ? cuore(k) : ''}</div>${nv.cantina ? `<p class="pm-card__cantina">${esc(nv.cantina)}</p>` : ''}${v.descrizione && t(v.descrizione) ? `<p class="pm-card__desc">${esc(t(v.descrizione))}</p>` : ''}${varianti}${meta(v)}${cta}</div></article>`;
     }
     // Pannello dal basso: foto grande, racconto e scheda sommelier.
     function schedaHtml({ key, v, vino }) {
       const s = sch(v), foto = safeImg(v.foto);
       const temp = servingTemp(t(s.temperatura));
       const profumi = vino && foto ? aromi(t(s.profumo)) : [];
+      const nv = nomeVino(v, vino);
       const coppie = (abbinati.get(key) || []).map((k) => perKey.get(k)).filter(Boolean);
       const coppieHtml = coppie.length ? `<p class="pm-sheet__label">${vino ? S().abbina : S().abbinaVino}</p><div class="pm-coppie">${coppie.map((x) => { const f = safeImg(x.v.foto); return `<button type="button" class="pm-coppia" data-apri="${x.key}">${f ? `<span class="pm-coppia__img${x.vino ? ' pm-coppia__img--bott' : ''}"><img src="${esc(f)}" alt="" loading="lazy"></span>` : `<span class="pm-coppia__img pm-coppia__img--icona">${x.vino ? SEZ_ICON.vini : SEZ_ICON.piatto}</span>`}<span><b>${esc(t(x.v.nome))}</b>${prezzoBreve(x.v) ? `<small>${prezzoBreve(x.v)}</small>` : ''}</span><svg viewBox="0 0 24 24" aria-hidden="true"><path d="m9 6 6 6-6 6"/></svg></button>`; }).join('')}</div>` : '';
       const termometro = temp ? `<span class="pm-termo" style="--t:${Math.round(Math.max(0.08, Math.min(1, (temp.media - 4) / 16)) * 100)}%" aria-hidden="true"><i></i></span>` : '';
       const p = pills(v) || (v.prezzo ? `<div class="pm-pills"><span class="pm-pill pm-pill--solo">${price(v.prezzo)}${v.unita ? `<small>${esc(t(v.unita))}</small>` : ''}</span></div>` : '');
       const testo = t(s.nota) || t(v.descrizione);
-      const barre = PROFILO.filter((k) => Number.isFinite(s.profilo?.[k])).map((k) => { const n = Math.max(0, Math.min(100, Math.round(s.profilo[k]))); return `<div class="pm-barra"><span>${S().profilo[k]}</span><i><b style="--w:${n}%"></b></i><em>${n}</em></div>`; }).join('');
+      // Profilo come nelle schede delle enoteche: cinque punti, niente punteggi.
+      const barre = PROFILO.filter((k) => Number.isFinite(s.profilo?.[k])).map((k, r) => { const n = Math.round(Math.max(0, Math.min(100, s.profilo[k])) / 20); return `<div class="pm-barra" role="img" aria-label="${S().profilo[k]}: ${n}/5"><span>${S().profilo[k]}</span><i class="pm-punti5">${[0, 1, 2, 3, 4].map((j) => `<b${j < n ? ' class="on"' : ''} style="--j:${r * 5 + j}"></b>`).join('')}</i></div>`; }).join('');
       const tessere = TESSERE.filter((k) => t(s[k])).map((k) => `<div class="pm-tessera${k === 'temperatura' ? ` pm-tessera--temp${temp ? ' pm-tessera--termo' : ''}` : ''}"><span>${S().campi[k]}</span>${k === 'temperatura' ? termometro : ''}<p>${esc(t(s[k]))}</p></div>`).join('');
-      const nuvola = profumi.length ? `<span class="pm-aromi" aria-hidden="true">${profumi.map((a, n) => `<i style="--a:${Math.round((n / profumi.length) * 360 + 25)}deg;--d:${(0.45 + n * 0.12).toFixed(2)}s">${esc(a)}</i>`).join('')}</span>` : '';
+      // Profumi ai lati della bottiglia, mai sopra l'etichetta.
+      const nuvola = profumi.length ? `<span class="pm-aromi" aria-hidden="true">${profumi.map((a, n) => `<i style="--x:${n % 2 ? 80 : 20}%;--y:${18 + Math.floor(n / 2) * 24 + (n % 2) * 9}%;--d:${(0.6 + n * 0.35).toFixed(2)}s">${esc(a)}</i>`).join('')}</span>` : '';
       return `${foto ? `<figure class="pm-sheet__foto${vino ? ' pm-sheet__foto--bott' : ''}"><img src="${esc(foto)}" alt="${esc(t(v.nome))}">${nuvola}</figure>` : ''}
         <div class="pm-sheet__in">
-          ${t(s.territorio) || t(s.cantina) ? `<p class="pm-card__orig">${t(s.territorio) ? `<span class="pm-badge">${esc(t(s.territorio))}</span>` : ''}${t(s.cantina) ? `<span>${esc(t(s.cantina))}</span>` : ''}</p>` : ''}
-          <h2 id="pm-sheet-t">${esc(t(v.nome))}</h2>${p}
+          ${t(s.territorio) ? `<p class="pm-card__orig"><span class="pm-badge">${esc(t(s.territorio))}</span></p>` : ''}
+          <h2 id="pm-sheet-t">${esc(nv.nome)}</h2>${nv.cantina ? `<p class="pm-sheet__cantina">${esc(nv.cantina)}</p>` : ''}${p}
           ${testo ? `<blockquote class="pm-sheet__quote">${esc(testo)}</blockquote>` : ''}
           ${barre ? `<div class="pm-profilo">${barre}</div>` : ''}
           ${tessere ? `${vino && haScheda(v) ? `<p class="pm-sheet__label">${S().somm}</p>` : ''}<div class="pm-tessere">${tessere}</div>` : ''}
@@ -429,7 +450,7 @@
           ${desc}</div></section>`;
       }
       const conta = `${voci.length} ${voci.length === 1 ? (vino ? S().vino1 : S().piatto1) : (vino ? S().viniN : S().piattiN)}`;
-      return `<section class="pm-sezione" id="pm-sez-${i}"><div class="pm-pannello"><header class="pm-sezione__head"><span class="pm-medaglia" aria-hidden="true">${iconFor(s)}</span><div class="pm-sezione__tit"><span class="pm-sezione__num">${num} · ${conta}</span><h2>${esc(t(s.nome))}</h2></div></header>${desc}<div class="pm-voci">${voci.map((v) => voce(v, vino)).join('')}</div></div></section>`;
+      return `<section class="pm-sezione" id="pm-sez-${i}"><div class="pm-pannello"><header class="pm-sezione__head"><div class="pm-sezione__tit"><span class="pm-sezione__num"><span aria-hidden="true">${ROMAN[n] || num}</span><small>${conta}</small></span><h2>${esc(t(s.nome))}</h2></div><span class="pm-orn" aria-hidden="true">✦</span></header>${desc}<div class="pm-voci">${voci.map((v) => voce(v, vino)).join('')}</div></div></section>`;
     }
 
     function draw() {
