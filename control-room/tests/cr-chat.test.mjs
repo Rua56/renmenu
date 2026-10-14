@@ -51,14 +51,14 @@ test('Parla con Jarvis: i pulsanti valgono come su Telegram, ma solo quelli offe
   await missions.putSetting(db, 'telegram_chat_id', '42');
   await withNetwork(async (calls) => {
     const env = { DB: db, TELEGRAM_BOT_TOKEN: TOKEN };
-    await assert.rejects(jarvisAsk(env, { press: 'tel:si' }), /non è più valido/);
+    await assert.rejects(jarvisAsk(env, { press: 'tel:no' }), /non è più valido/);
     const menu = await jarvisAsk(env, { text: '/chiamami avvisi' });
     const offered = menu.messages.flatMap((m) => m.buttons).map(([, data]) => data);
-    assert.ok(offered.includes('tel:si'));
-    await jarvisAsk(env, { press: 'tel:si' });
-    assert.equal(await missions.setting(db, 'phone_alerts'), 'si');
+    assert.ok(offered.includes('tel:no'));
+    await jarvisAsk(env, { press: 'tel:no' });
+    assert.equal(await missions.setting(db, 'phone_alerts'), 'no');
     // Usato una volta, il pulsante non vale più.
-    await assert.rejects(jarvisAsk(env, { press: 'tel:si' }), /non è più valido/);
+    await assert.rejects(jarvisAsk(env, { press: 'tel:no' }), /non è più valido/);
     assert.equal(calls.filter((u) => u.includes('api.telegram.org')).length, 0);
   });
 });

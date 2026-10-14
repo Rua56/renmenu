@@ -89,28 +89,39 @@ test('/chiamami senza numero Twilio importato: spiega cosa manca, nessuna chiama
   });
 });
 
-test('chiamata automatica per gli avvisi importanti: spenta di base, poi di giorno e non più di una ogni 30 minuti', async (t) => {
+test('chiamata automatica per gli avvisi importanti: accesa di base, senza limite, una chiamata per pratica e mai di notte', async (t) => {
   t.mock.timers.enable({ apis: ['Date'], now: Date.parse('2026-10-14T08:00:00Z') }); // 10:00 a Roma
   await withServices({}, async (calls) => {
     const db = database(), env = await linked(db);
     await missions.putSetting(db, 'owner_phone', '+393331234567');
     const dials = () => calls.filter((c) => c.href.endsWith('/twilio/outbound-call'));
-    await missions.notify(db, env, null, 'bozza pronta', 'Bozza pronta per Al Bakaro.', 'importante');
-    assert.equal(dials().length, 0, 'spenta di base');
-    await send(db, env, '/chiamami avvisi');
-    assert.deepEqual(calls.filter((c) => c.href.endsWith('/sendMessage')).at(-1).body.reply_markup.inline_keyboard.flat().map((b) => b.callback_data), ['tel:si']);
-    await missions.telegramUpdate(db, env, { callback_query: { id: 'q1', data: 'tel:si', message: { chat: { id: 42 }, message_id: 7 } } });
+    const motivo = (i) => dials()[i].body.conversation_initiation_client_data.dynamic_variables.motivo;
     await missions.notify(db, env, null, 'foto letta', 'Ho letto la foto.');
     assert.equal(dials().length, 0, 'gli avvisi normali non chiamano');
-    await missions.notify(db, env, null, 'bozza pronta', 'Bozza pronta per Al Bakaro: https://renmenu.com/x. Apri Revisione.', 'importante');
+    await missions.ping(db, env, 'Nuovo messaggio WhatsApp da Bar Centrale: https://renmenu.com/x. Guardalo.', null, 'importante', 'r1');
+    assert.equal(dials().length, 1, 'accesa di base: nuova richiesta, chiamata');
+    assert.match(motivo(0), /avviso importante: Nuovo messaggio WhatsApp da Bar Centrale: Guardalo\./);
+    await missions.ping(db, env, 'Altro messaggio dallo stesso locale.', null, 'importante', 'r1');
+    // Un altro avviso mentre la chiamata è appena partita: aspetta e parte nella chiamata dopo.
+    await missions.ping(db, env, 'Nuovo messaggio Gmail da Al Bakaro.', null, 'importante', 'r2');
+    await missions.notify(db, env, null, 'bozza pronta', 'Bozza pronta per Codelli.', 'importante');
     assert.equal(dials().length, 1);
-    assert.match(dials()[0].body.conversation_initiation_client_data.dynamic_variables.motivo, /avviso importante: Bozza pronta per Al Bakaro: Apri Revisione\./);
-    await missions.notify(db, env, null, 'altro', 'Un altro avviso importante.', 'importante');
-    assert.equal(dials().length, 1, 'al massimo una ogni 30 minuti');
+    assert.equal(await missions.phoneTick(db, env), null, 'ancora troppo presto');
+    t.mock.timers.setTime(Date.parse('2026-10-14T08:04:00Z'));
+    assert.equal(await missions.phoneTick(db, env), 2);
+    assert.equal(dials().length, 2);
+    assert.match(motivo(1), /2 avvisi importanti: 1\) Nuovo messaggio Gmail da Al Bakaro\. 2\) Bozza pronta per Codelli\./);
+    // Nessun tetto: un'ora dopo, un'altra pratica chiama ancora (anche r1 di nuovo, passati 10 minuti).
+    t.mock.timers.setTime(Date.parse('2026-10-14T09:00:00Z'));
+    await missions.ping(db, env, 'Bar Centrale ha riscritto.', null, 'importante', 'r1');
+    assert.equal(dials().length, 3);
     t.mock.timers.setTime(Date.parse('2026-10-14T21:00:00Z')); // 23:00 a Roma
-    await missions.notify(db, env, null, 'notte', 'Avviso di notte.', 'importante');
-    assert.equal(dials().length, 1, 'di notte niente telefonate');
+    await missions.ping(db, env, 'Avviso di notte.', null, 'importante', 'r9');
+    assert.equal(dials().length, 3, 'di notte niente telefonate');
     await send(db, env, '/chiamami avvisi no');
     assert.equal(await missions.setting(db, 'phone_alerts'), 'no');
+    t.mock.timers.setTime(Date.parse('2026-10-15T08:00:00Z'));
+    await missions.ping(db, env, 'Nuovo messaggio.', null, 'importante', 'r8');
+    assert.equal(dials().length, 3, 'spenta resta spenta');
   });
 });

@@ -131,6 +131,7 @@ export async function onRequest(context) {
       const briefed = await missions.briefing(env.DB, env).catch(() => null);
       await missions.initiativeTick(env.DB, env).catch(() => null);
       await missions.replyTick(env.DB, env).catch(() => null);
+      await missions.phoneTick(env.DB, env).catch(() => null);
       const backup = await dailyBackup(env.DB, env.BUCKET).catch(() => null);
       if (backup && !backup.ok && backup.attempts >= 3) {
         await missions.alertOnce(env.DB, env, 'backup', 'copia di sicurezza', `Copia di sicurezza del database non riuscita oggi (${backup.error}). Ritento domattina alle 3: se si ripete, controlla il bucket R2 dello staging.`, { minutes: 20 * 60 }).catch(() => null);

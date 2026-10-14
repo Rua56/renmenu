@@ -186,10 +186,10 @@ export function createMissions(deps) {
     const id = uid();
     await db.prepare('INSERT INTO notifications (id,request_id,channel,subject,body,priority,due_at,status,created_at) VALUES (?,?,?,?,?,?,?,?,?)')
       .bind(id, mission?.request_id || null, 'in_app', `Jarvis · ${subject}`, String(text).slice(0, 5000), priority, null, 'mock', now()).run();
-    await ping(db, env, text, buttons, priority);
+    await ping(db, env, text, buttons, priority, mission?.request_id || null);
   }
   // Solo Telegram (per chi ha già scritto la riga della Control Room, come l'autopilota).
-  async function ping(db, env, text, buttons = null, priority = 'normale') {
+  async function ping(db, env, text, buttons = null, priority = 'normale', requestId = null) {
     const chat = await setting(db, 'telegram_chat_id');
     if (!chat || !telegramReady(env)) return;
     const important = priority === 'importante' || priority === 'urgente';
@@ -197,7 +197,7 @@ export function createMissions(deps) {
     await sendTg(db, env, chat, `${text}`, buttons, deps.fetchImpl, { silent: !important && night });
     const mode = await voiceAlerts(db);
     if ((mode === 'tutti' && !night) || (mode !== 'nessuno' && important)) await speakAlert(db, env, chat, text).catch(() => null);
-    if (important) await phoneAlert(db, env, chat, text).catch(() => null);
+    if (important) await phoneAlert(db, env, chat, text, requestId).catch(() => null);
   }
   const isNight = (at) => { const hour = Number(new Intl.DateTimeFormat('en-GB', { timeZone: 'Europe/Rome', hour: '2-digit', hourCycle: 'h23' }).format(at)); return hour >= 22 || hour < 7; };
   const VOICE_ALERT_MODES = { importanti: 'solo gli avvisi importanti', tutti: 'tutti gli avvisi (di giorno)', nessuno: 'nessun avviso' };
@@ -692,6 +692,7 @@ export function createMissions(deps) {
       return;
     }
     if (verb === 'tel') {
+      await phoneAlertsOn(db);
       await putSetting(db, 'phone_alerts', missionId === 'si' ? 'si' : 'no');
       await ack('Fatto');
       await clear();
@@ -888,6 +889,7 @@ export function createMissions(deps) {
     // «/chiamami avvisi sì|no»: telefonata automatica per gli avvisi importanti.
     if (/\bavvis\w*\b/i.test(text)) {
       const on = /(?:^|\s)(?:si|sì|on|accend\w*|attiv\w*)(?:\s|$)/i.test(text) ? true : /(?:^|\s)(?:no|off|spegn\w*|disattiv\w*)(?:\s|$)/i.test(text) ? false : null;
+      await phoneAlertsOn(db); // prima la nuova impostazione di base, poi la scelta di Riccardo
       if (on !== null) await putSetting(db, 'phone_alerts', on ? 'si' : 'no');
       const menu = phoneAlertsMenu((await setting(db, 'phone_alerts')) === 'si');
       if (on === null) return menu;
@@ -932,22 +934,68 @@ export function createMissions(deps) {
     }
   }
   // Chiamata automatica per gli avvisi importanti: spenta di base (costa), solo dalle 8 alle 22, al massimo una ogni 30 minuti.
-  const PHONE_ALERT_GAP = 30 * MINUTE;
-  async function phoneAlert(db, env, chat, text) {
-    if ((await setting(db, 'phone_alerts').catch(() => null)) !== 'si') return;
-    const hour = Number(new Intl.DateTimeFormat('en-GB', { timeZone: 'Europe/Rome', hour: '2-digit', hourCycle: 'h23' }).format(new Date(now())));
+  // Nessun limite al numero di chiamate (richiesta di Riccardo, 14 ott). Solo due regole di buon senso:
+  // non si chiama mentre un'altra chiamata è appena partita (gli avvisi aspettano e partono insieme nella
+  // chiamata dopo) e più messaggi della stessa pratica in pochi minuti fanno una chiamata sola.
+  const PHONE_BUSY_MS = 3 * MINUTE;
+  const PHONE_SAME_REQUEST_MS = 10 * MINUTE;
+  const romeHour = () => Number(new Intl.DateTimeFormat('en-GB', { timeZone: 'Europe/Rome', hour: '2-digit', hourCycle: 'h23' }).format(new Date(now())));
+  // Chiamata accesa per gli avvisi importanti: di base sì (Riccardo l'ha chiesto); «/chiamami avvisi no» la spegne.
+  async function phoneAlertsOn(db) {
+    if ((await setting(db, 'phone_alerts_default').catch(() => null)) !== '2') {
+      await putSetting(db, 'phone_alerts', 'si').catch(() => {});
+      await putSetting(db, 'phone_alerts_default', '2').catch(() => {});
+    }
+    return (await setting(db, 'phone_alerts').catch(() => null)) === 'si';
+  }
+  const alertReason = (text) => {
+    const plain = String(text).replace(/https?:\/\/\S+/g, '').split('\n').filter((line) => line.trim() && !/^\s*(\d+\.|[-•])\s/.test(line)).join(' ').replace(/\s+/g, ' ');
+    return (plain.match(/[^.!?]+[.!?]+/g) || [plain]).reduce((out, sentence) => (out.length + sentence.length <= 280 ? out + sentence : out), '').trim() || plain.slice(0, 280);
+  };
+  async function phoneAlert(db, env, chat, text, requestId = null) {
+    if (!(await phoneAlertsOn(db))) return;
+    const hour = romeHour();
     if (hour < 8 || hour >= 22) return;
+    let recent = {}; try { recent = JSON.parse(await setting(db, 'phone_requests') || '{}') || {}; } catch {}
+    const stamp = Date.parse(now());
+    if (requestId && stamp - Date.parse(recent[requestId] || '') < PHONE_SAME_REQUEST_MS) return;
+    if (requestId) {
+      recent[requestId] = now();
+      for (const [id, at] of Object.entries(recent)) if (stamp - Date.parse(at) > PHONE_SAME_REQUEST_MS) delete recent[id];
+      await putSetting(db, 'phone_requests', JSON.stringify(recent)).catch(() => {});
+    }
+    const reason = alertReason(text);
     const last = Date.parse(await setting(db, 'phone_last_at') || '');
-    if (Number.isFinite(last) && Date.now() - last < PHONE_ALERT_GAP) return;
+    if (Number.isFinite(last) && stamp - last < PHONE_BUSY_MS) {
+      let queued = []; try { queued = JSON.parse(await setting(db, 'phone_pending') || '[]') || []; } catch {}
+      queued.push(reason);
+      await putSetting(db, 'phone_pending', JSON.stringify(queued.slice(-6)));
+      return;
+    }
+    await callAlert(db, env, chat, [reason]);
+  }
+  async function callAlert(db, env, chat, reasons) {
     const to = await setting(db, 'owner_phone');
     if (!to) return;
-    const plain = String(text).replace(/https?:\/\/\S+/g, '').split('\n').filter((line) => line.trim() && !/^\s*(\d+\.|[-•])\s/.test(line)).join(' ').replace(/\s+/g, ' ');
-    const reason = (plain.match(/[^.!?]+[.!?]+/g) || [plain]).reduce((out, sentence) => (out.length + sentence.length <= 280 ? out + sentence : out), '').trim() || plain.slice(0, 280);
-    const outcome = await dial(db, env, to, `Ti chiamo per un avviso importante: ${reason}`);
-    if (!/^Ti sto chiamando/.test(outcome)) await sendTg(db, env, chat, `Volevo chiamarti per questo avviso, ma ${outcome.charAt(0).toLowerCase()}${outcome.slice(1)}`, null, deps.fetchImpl);
+    const said = reasons.length === 1 ? `Ti chiamo per un avviso importante: ${reasons[0]}` : `Ti chiamo per ${reasons.length} avvisi importanti: ${reasons.map((r, i) => `${i + 1}) ${r}`).join(' ')}`;
+    const outcome = await dial(db, env, to, said.slice(0, 900));
+    if (!/^Ti sto chiamando/.test(outcome)) await sendTg(db, env, chat, `Volevo chiamarti per ${reasons.length === 1 ? 'questo avviso' : 'questi avvisi'}, ma ${outcome.charAt(0).toLowerCase()}${outcome.slice(1)}`, null, deps.fetchImpl);
+  }
+  /** Dall'orologio: gli avvisi arrivati mentre una chiamata era appena partita, tutti in una chiamata. */
+  async function phoneTick(db, env) {
+    let queued = []; try { queued = JSON.parse(await setting(db, 'phone_pending') || '[]') || []; } catch {}
+    if (!queued.length) return null;
+    const last = Date.parse(await setting(db, 'phone_last_at') || '');
+    if (Number.isFinite(last) && Date.parse(now()) - last < PHONE_BUSY_MS) return null;
+    await putSetting(db, 'phone_pending', '[]');
+    const hour = romeHour();
+    if (hour < 8 || hour >= 22 || !(await phoneAlertsOn(db))) return null;
+    const chat = await setting(db, 'telegram_chat_id');
+    await callAlert(db, env, chat, queued);
+    return queued.length;
   }
   function phoneAlertsMenu(on) {
-    return { text: `Chiamata automatica per gli avvisi importanti: ${on ? 'accesa' : 'spenta'}. Quando è accesa ti telefono dalle 8 alle 22, al massimo una volta ogni 30 minuti; di notte resta il messaggio. Ogni chiamata costa minuti Twilio ed ElevenLabs.`,
+    return { text: `Chiamata automatica per gli avvisi importanti: ${on ? 'accesa' : 'spenta'}. Quando è accesa ti telefono per ogni nuova richiesta di un cliente e per ogni avviso importante, senza limite di chiamate, dalle 8 alle 22 (di notte resta il messaggio). Se arrivano più avvisi insieme li senti in una sola chiamata. Ogni chiamata costa minuti Twilio ed ElevenLabs.`,
       buttons: [[on ? 'Spegni' : 'Accendi', on ? 'tel:no' : 'tel:si']] };
   }
 
@@ -2131,6 +2179,8 @@ export function createMissions(deps) {
       const who = `${h.name ? `${h.name} ` : ''}(+${h.waId})`;
       await sendTg(db, env, chat, `WhatsApp da un numero che non conosco: ${who}${h.preview ? `, «${h.preview}»` : ''}. È un locale? Se è una chat privata non apro niente e non te lo chiedo più.`,
         [['Sì, è un locale: apri la pratica', `wak:${h.waId}`], ['No, è privato: ignoralo', `wap:${h.waId}`]], deps.fetchImpl, { stacked: true }).catch(() => null);
+      // Può essere un cliente nuovo: anche questo è un avviso importante.
+      await phoneAlert(db, env, chat, `WhatsApp da un numero che non conosco, ${h.name || 'senza nome'}: potrebbe essere un locale. Guarda su Telegram.`, `wa:${h.waId}`).catch(() => null);
     }
     return fresh.length + held.length;
   }
@@ -2171,5 +2221,5 @@ export function createMissions(deps) {
     }
     return out;
   }
-  return { alertOnce, announceExternal, replyTick, proposeReply, statusText, initiatives, initiativeTick, ping, entrust, tick, watchTick, watchRegister, reflect, queueOnlineEmail, checkOnlineMails, makeMenuQr, decide, telegramUpdate, probeIntents, setting, putSetting, briefing, notify, startChecks, answerCheck, draftAfterChecks, translateAfterEdit, undoDraftEdit, draftTarget, voiceEditDraft, editDraftFromClient };
+  return { alertOnce, announceExternal, replyTick, phoneTick, proposeReply, statusText, initiatives, initiativeTick, ping, entrust, tick, watchTick, watchRegister, reflect, queueOnlineEmail, checkOnlineMails, makeMenuQr, decide, telegramUpdate, probeIntents, setting, putSetting, briefing, notify, startChecks, answerCheck, draftAfterChecks, translateAfterEdit, undoDraftEdit, draftTarget, voiceEditDraft, editDraftFromClient };
 }
