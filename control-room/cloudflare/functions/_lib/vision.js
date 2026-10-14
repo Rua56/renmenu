@@ -27,6 +27,9 @@ const PROMPT = [
   '- se una voce ha più prezzi (es. calice e bottiglia, piccola e grande) scrivili sulla stessa riga con le etichette: Nome — calice 5 / bottiglia 40; se le etichette sono in testa alle colonne (es. "calice  bottiglia", "normale  famiglia", "tonda  50 cm  1 metro") ripetile su OGNI riga: Margherita — normale 6,50 / famiglia 8,50; scrivi TUTTI i prezzi della riga, anche 3 o 4;',
   '- i numeri degli allergeni scritti accanto al prezzo vanno nella riga della descrizione, non dopo il prezzo (es. Polenta concia — 12 poi > (8-14));',
   '- percorso o menu degustazione: titolo con il prezzo su una riga, es. # Percorso degustazione — 55 a persona; poi una portata per riga, senza prezzo; supplementi come "Abbinamento vini — 25";',
+  '- un piatto scritto su due righe (il prezzo accanto alla seconda) va su UNA riga sola con il nome intero: Battuta di carne al coltello con stracciatella e granella di pistacchio — 15;',
+  '- varianti sotto un nome (es. "Ravioli di borragine:" e sotto "al ragù 8", "ai funghi 10") vanno scritte una per riga con il nome intero: Ravioli di borragine al ragù — 8;',
+  '- se il prezzo è scritto solo sul titolo della sezione (es. CONTORNI € 5,00) scrivilo su ogni voce della sezione; prezzo a peso: Lombata — 7 all’etto;',
   '- copia le parole come sono scritte: non tradurre, non correggere, non completare, non aggiungere ingredienti o allergeni non scritti;',
   '- se un nome o un prezzo non si legge con sicurezza scrivi [?] al suo posto;',
   '- niente commenti, niente introduzioni, solo le righe.'
@@ -128,11 +131,119 @@ function dishesWrittenAsHeadings(text) {
   }
   return out.join('\n');
 }
+/* Impaginazioni vere viste nella prova di lettura (14 ottobre), sistemate prima di tutto il resto:
+ * - allergeni come numeri sciolti dopo il nome («Penne con scampi 1 2 3 4 — 9,00», Da Marcello);
+ * - piatto su due righe con il prezzo sulla seconda, che il modello spezza in nome + descrizione
+ *   («Battuta di carne al coltello con — 15» / «> stracciatella e granella di pistacchio 1 3 9 10»);
+ * - varianti sotto un nome («Ravioli di borragine:» / «al ragù — 8»; «# Pesce spada» / «alla piastra — 12»);
+ * - prezzo scritto sul titolo della sezione per tutte le voci («# CONTORNI — 5,00» / «Patatine fritte»);
+ * - prezzo a peso («— 7,00hg», «— 70/kg») e «cad» dopo il prezzo;
+ * - «Jota: classica minestra triestina. — 13» (nome: descrizione);
+ * - prezzi con lo spazio al posto della virgola («15 00») nelle righe con più prezzi. */
+const PRICE_END = /\s*[—–]\s*(?:€\s*)?(\d{1,4}(?:[.,]\d{1,2})?(?:\s*\/\s*\d{1,4}(?:[.,]\d{1,2})?)*)\s*€?\s*$/;
+const CONNECTOR = /(?:\s(?:con|di|del|della|dei|delle|e|ed|al|alla|alle|ai|agli|allo|in|su|o|da)|[(,])\s*$/i;
+const VARIANT_START = /^(?:al|alla|alle|ai|agli|allo|all['’]|con|in|di|del|della|e)\s/; // in minuscolo, come sulle carte
+const DEGU_TITLE = /percorso|degustazion|menu|menù|a persona|tasting/i;
+const allergenTail = (name, loose) => {
+  const m = String(name).match(loose ? /^(.*?[A-Za-zÀ-ÿ)”"'’.*])\s*((?:\b\d{1,2}\b[\s,-]*){1,14})$/ : /^(.*?[A-Za-zÀ-ÿ)”"'’.*])\s*(\d{1,2}(?:[\s,-]+\d{1,2}){1,13})$/);
+  if (!m) return null;
+  const list = m[2].trim().split(/[\s,-]+/).map(Number);
+  return list.every((n) => n >= 1 && n <= 14) ? { name: m[1].replace(/\*+$/, '').trim(), codes: list.join('-') } : null;
+};
+export function fixLayout(text) {
+  const lines = String(text || '').split(/\r?\n/).map((l) => l.replace(/\s+$/, ''));
+  const priced = (l) => PRICE_END.test(l);
+  const heading = (l) => /^\s*#{1,3}\s/.test(l);
+  const note = (l) => /^\s*>/.test(l);
+  // Il menu usa i numeri sciolti per gli allergeni se almeno tre righe finiscono con due o più numeri prima del prezzo.
+  const loose = lines.filter((l) => { const p = l.match(PRICE_END); return p && allergenTail(l.slice(0, p.index), false); }).length >= 3;
+  const out = [];
+  let sectionPrice = '', parent = '', headingParent = '';
+  for (let i = 0; i < lines.length; i += 1) {
+    let line = lines[i];
+    if (!line.trim()) { out.push(line); continue; }
+    if (heading(line)) {
+      parent = ''; headingParent = ''; sectionPrice = '';
+      const m = line.match(/^(\s*#{1,3}\s*)(.*?)\s*(?:[—–-]\s*)?(?:€\s*)?(\d{1,4}[.,]\d{2}(?:\s*\/\s*(?:€\s*)?\d{1,4}[.,]\d{2})?)\s*€?\s*$/);
+      const title = m ? m[2] : line.replace(/^\s*#{1,3}\s*/, '');
+      // «# Percorso Degustazione» + «con 5 Portate dalla Cucina & Dolce — 90»: è il titolo del percorso con il suo prezzo.
+      if (!m && DEGU_TITLE.test(title) && /^\s*con\s/i.test(lines[i + 1] || '') && priced(lines[i + 1])) {
+        const p = lines[i + 1].match(PRICE_END);
+        // Senza portate elencate sotto è una voce con il suo prezzo, non un titolo.
+        const courses = lines[i + 2] && !heading(lines[i + 2]) && !priced(lines[i + 2]) && !note(lines[i + 2]) && lines[i + 2].trim();
+        out.push(`${courses ? line.trim() : title.trim()} ${lines[i + 1].slice(0, p.index).trim()} — ${p[1]}${courses ? ' €' : ''}`); i += 1; continue;
+      }
+      if (m && !DEGU_TITLE.test(title)) {
+        // Prezzo sul titolo: vale per le voci sotto senza prezzo (se ce n'è almeno una).
+        let j = i + 1; while (j < lines.length && (!lines[j].trim() || note(lines[j]))) j += 1;
+        if (j < lines.length && !heading(lines[j]) && !priced(lines[j]) && !/\d[.,]\d{2}/.test(lines[j])) { sectionPrice = m[3].replace(/\s*\/\s*(?:€\s*)?/, ' / '); out.push(`${m[1]}${title}`); continue; }
+      }
+      // «# Pesce spada» seguito solo da «alla piastra — 12», «alla Messinese — 12»: varianti dello stesso piatto.
+      const items = [];
+      for (let j = i + 1; j < lines.length && !heading(lines[j]); j += 1) if (lines[j].trim() && !note(lines[j]) && !lines[j].startsWith(DOUBT)) items.push(lines[j]);
+      if (!m && items.length && items.every((l) => VARIANT_START.test(l.trim()) && priced(l)) && title.split(/\s+/).length <= 4) { headingParent = title.replace(/[:\s]+$/, ''); continue; }
+      out.push(line); continue;
+    }
+    if (note(line) || line.startsWith(DOUBT)) {
+      if (note(line) && !/\(\s*\d/.test(line)) {
+        // Descrizione che in realtà è il seguito del nome (riga sopra spezzata su un connettore, o seguito in minuscolo
+        // che finisce con i numeri degli allergeni, come i nomi di questo menu).
+        const prev = out.length - 1, p = prev >= 0 ? out[prev].match(PRICE_END) : null;
+        const body = line.replace(/^\s*>\s*/, '').trim();
+        if (p && (CONNECTOR.test(out[prev].slice(0, p.index)) || (loose && /^[a-zà-ÿ]/.test(body) && allergenTail(body, true)))) {
+          let rest = line.replace(/^\s*>\s*/, '').trim(), codes = '';
+          const tail = allergenTail(rest, true); if (tail && loose) { rest = tail.name; codes = tail.codes; }
+          out[prev] = `${out[prev].slice(0, p.index).trim()} ${rest} — ${p[1]}`;
+          if (codes) out.push(`> (${codes})`);
+          continue;
+        }
+      }
+      out.push(line); continue;
+    }
+    // «Risotto per minimo 2 persone:» senza prezzo, poi le varianti: il nome va davanti a ognuna.
+    if (!priced(line) && /:\s*$/.test(line) && VARIANT_START.test((lines[i + 1] || '').trim())) { parent = line.replace(/:\s*$/, '').trim(); continue; }
+    const lead = parent || headingParent;
+    if (lead && VARIANT_START.test(line.trim())) line = `${lead} ${line.trim()}`;
+    else if (!VARIANT_START.test(line.trim())) parent = '';
+    // Prezzo a peso.
+    const weight = line.match(/^(.*?\S)\s*[—–-]?\s*(?:€\s*)?(\d{1,4}(?:[.,]\d{1,2})?)\s*(?:€\s*)?(?:\/\s*|al\s+|all['’]\s*|l['’]\s*)?(hg|etto|kg|chilo|kilo)\b\.?\s*$/i);
+    if (weight) { out.push(`${weight[1].replace(/\s*[—–-]\s*$/, '')} — ${weight[2]}`, `> Prezzo ${/hg|etto/i.test(weight[3]) ? 'all’etto' : 'al kg'}`); continue; }
+    // «— 16,00 cad 1»: «cad» e i numeri degli allergeni dopo il prezzo.
+    const cad = line.match(/^(.*\S\s*[—–]\s*(?:€\s*)?\d{1,4}[.,]\d{2})\s*€?\s*(?:cad\.?|cadauno|a persona)\s*((?:\d{1,2}[\s,-]*)*)$/i);
+    if (cad) { out.push(cad[1]); if (cad[2].trim()) out.push(`> (${cad[2].trim().split(/[\s,-]+/).join('-')})`); continue; }
+    // Prezzi «15 00» in una riga che ne ha altri con la virgola.
+    if (/\d[.,]\d{2}/.test(line)) line = line.replace(/(\s)(\d{1,3}) (00|50)(?=\s*(?:\/|$|€))/g, '$1$2,$3');
+    const p = line.match(PRICE_END);
+    if (!p && sectionPrice && /[A-Za-zÀ-ÿ]{3}/.test(line) && !/\d[.,]\d{2}/.test(line)) {
+      const tail = allergenTail(line.replace(/\s*\(\s*([\d\s,-]+)\s*\)\s*\*?\s*$/, (x, c) => ` ${c.trim()}`), true);
+      if (tail) { out.push(`${tail.name} — ${sectionPrice}`, `> (${tail.codes})`); continue; }
+      out.push(`${line.replace(/\s*\*\s*$/, '').trim()} — ${sectionPrice}`); continue;
+    }
+    if (p) {
+      let name = line.slice(0, p.index).trim(), codes = '';
+      const squared = name.match(/^(.*?\S)\s*((?:\[\s*\d{1,2}\s*\]\s*)+)$/);
+      if (squared) { name = squared[1]; codes = (squared[2].match(/\d{1,2}/g) || []).join('-'); }
+      const tail = !codes && allergenTail(name, loose);
+      if (tail) { name = tail.name; codes = tail.codes; }
+      // «Jota: classica minestra triestina.»: nome breve, poi la descrizione.
+      const colon = name.match(/^([^:]{2,40}):\s+(.{8,})$/);
+      if (colon && colon[1].split(/\s+/).length <= 4 && !VARIANT_START.test(colon[2]) && !/\d/.test(colon[1]) && /^["“A-Za-zÀ-ÿ]/.test(colon[1]) && colon[2].split(/\s+/).length >= 2) {
+        out.push(`${colon[1].trim()} — ${p[1]}`, `> ${colon[2].trim().replace(/[.;,]+$/, '')}${codes ? ` (${codes})` : ''}`); continue;
+      }
+      out.push(`${name} — ${p[1]}`);
+      if (codes) out.push(`> (${codes})`);
+      continue;
+    }
+    out.push(line);
+  }
+  return out.join('\n');
+}
+
 export function tidyReading(text) {
   const out = [];
   let item = -1; // ultima riga «voce» (non titolo, non descrizione) ancora senza prezzo o appena chiusa
   let legend = false;
-  for (const raw of dishesWrittenAsHeadings(text).split(/\r?\n/)) {
+  for (const raw of dishesWrittenAsHeadings(fixLayout(text)).split(/\r?\n/)) {
     // «> prosciutto cotto 5,00»: una riga col prezzo è una voce, non una descrizione.
     const line = /^\s*>\s*.*\d[.,]\d{2}\s*(?:€|euro)?\s*$/i.test(raw) ? raw.replace(/^\s*>\s*/, '').trimEnd() : raw.trimEnd();
     if (!line.trim()) { out.push(line); continue; }
@@ -206,7 +317,7 @@ export function readingItems(text) { return parse(text).items.filter((i) => !i.c
  * «# Percorso — 55,00 € a persona» con le portate. Entra solo ciò che le DUE letture confermano;
  * tutto il resto diventa una riga «[da verificare] …» con entrambe le letture.
  */
-export function combineReadings(first, second, third = '') {
+export function combineReadings(first, second, third = '', { strict = false } = {}) {
   const A = parse(first), B = parse(second || ''), C = third ? parse(third) : null;
   const usedC = new Set();
   let byThird = 0;
@@ -270,6 +381,13 @@ export function combineReadings(first, second, third = '') {
       continue;
     }
     if (hit.index >= 0) { used.add(hit.index); lastB = Math.max(lastB, hit.index); }
+    // Foto piccola: due letture uguali non bastano se la terza legge un altro prezzo per lo stesso piatto.
+    const third = strict && C && hit.index >= 0 && !row.course ? C.items.find((o) => !o.course && similar(o.name, row.name)) : null;
+    if (third && amountsKey(third) !== amountsKey(row)) {
+      doubts.push(`${DOUBT} ${row.name}: letto ${priceText(row)} da due letture, ${priceText(third)} dalla terza (foto piccola)`);
+      checks.push({ line: doubts.at(-1), section: A.sections[row.section]?.name || '', name: row.name, options: [priceText(row), priceText(third)], descr: row.descr || '' });
+      continue;
+    }
     agreed += 1;
     sectionHead(row.section);
     const other = hit.other;
@@ -338,6 +456,22 @@ export async function transcribeGemini({ key, model, fetchImpl = globalThis.fetc
   return String(text).replace(/```[a-z]*\n?|```/g, '').trim();
 }
 
+/** Larghezza e altezza di un PNG o JPEG dai primi byte (null se non si capisce). */
+export const SMALL_PHOTO = 1000;
+export function imageSize(bytes) {
+  const b = bytes instanceof Uint8Array ? bytes : new Uint8Array(bytes || []);
+  if (b.length >= 24 && b[0] === 0x89 && b[1] === 0x50) return { width: (b[16] << 24 | b[17] << 16 | b[18] << 8 | b[19]) >>> 0, height: (b[20] << 24 | b[21] << 16 | b[22] << 8 | b[23]) >>> 0 };
+  if (b.length > 4 && b[0] === 0xff && b[1] === 0xd8) {
+    let i = 2;
+    while (i + 9 < b.length) {
+      if (b[i] !== 0xff) { i += 1; continue; }
+      const marker = b[i + 1], len = b[i + 2] << 8 | b[i + 3];
+      if (marker >= 0xc0 && marker <= 0xcf && ![0xc4, 0xc8, 0xcc].includes(marker)) return { height: b[i + 5] << 8 | b[i + 6], width: b[i + 7] << 8 | b[i + 8] };
+      i += 2 + len;
+    }
+  }
+  return null;
+}
 export const TRANSIENT_GEMINI = /Gemini (?:503|500|429|senza testo)|tempo scaduto|abort|fetch failed|network|UNAVAILABLE|RESOURCE_EXHAUSTED/i;
 export async function readMenuPhoto(ai, bytes, mime, { timeoutMs = 110_000, gemini = null, deferOnTransient = false } = {}) {
   const geminiReady = Boolean(gemini?.key && gemini?.models?.length);
@@ -383,12 +517,16 @@ export async function readMenuPhoto(ai, bytes, mime, { timeoutMs = 110_000, gemi
   const good = texts.filter((t) => t && readingItems(t).length).sort((a, b) => readingItems(b).length - readingItems(a).length);
   if (!good.length) return { ok: false, geminiStats, reason: 'non riesco a leggere piatti e prezzi in questa foto: prova con una foto più nitida, dritta e senza riflessi', raw: [...texts, ...notes.map((n) => `[nota] ${n}`)] };
   let combined = combineReadings(good[0], good[1]);
+  // Foto piccola (es. 681×481 presa da un sito): i numeri si confondono (5 e 6), quindi legge sempre anche il terzo
+  // modello e un prezzo entra solo se nessuna lettura lo contraddice.
+  const size = imageSize(bytes);
+  const small = Boolean(size && Math.max(size.width, size.height) < SMALL_PHOTO);
   // Molte voci in disaccordo (menu lunghi, scritte piccole): una terza lettura con un altro modello fa da arbitro.
   let thirdText = '';
   const arbiter = spare.shift();
-  if (good.length === 2 && arbiter && combined.doubts >= (geminiReady ? 1 : 10) && combined.agreed < (geminiReady ? 1 : 0.8) * readingItems(good[0]).length) {
+  if (good.length === 2 && arbiter && (small || (combined.doubts >= (geminiReady ? 1 : 10) && combined.agreed < (geminiReady ? 1 : 0.8) * readingItems(good[0]).length))) {
     try { thirdText = await arbiter.run(); used.push(arbiter.label); } catch (error) { thirdText = ''; texts.push(`[terza lettura non riuscita] ${String(error?.message || 'errore').slice(0, 200)}`); }
-    if (thirdText && readingItems(thirdText).length) combined = combineReadings(good[0], good[1], thirdText);
+    if (thirdText && readingItems(thirdText).length) combined = combineReadings(good[0], good[1], thirdText, { strict: small });
     else { texts.push(`[terza lettura senza voci] ${String(thirdText || '(vuota)').slice(0, 1500)}`); thirdText = ''; }
   }
   // Sezioni dove le letture non concordano: Jarvis chiede di rimandare solo quelle.
@@ -398,6 +536,7 @@ export async function readMenuPhoto(ai, bytes, mime, { timeoutMs = 110_000, gemi
     ? `Foto letta da Jarvis ${thirdText ? 'tre volte con tre modelli diversi' : 'due volte con modelli diversi'}${withGemini ? ' (Gemini)' : ''}${fallbackUsed ? ' (uno di riserva, il primo non rispondeva)' : ''}: ${combined.agreed} voci concordi${thirdText && combined.byThird ? ` (${combined.byThird} confermate dalla terza lettura)` : ''}${combined.doubts ? `, ${combined.doubts} righe da verificare sulla foto` : ''}.`
     : 'Foto letta una sola volta (il secondo modello non ha risposto): tutte le voci restano da verificare sulla foto.'];
   if (good.length === 2 && weakSections.length) warnings.push(`Sezioni meno sicure: ${weakSections.join(', ')}.`);
+  if (small) warnings.push(`Foto piccola (${size.width}×${size.height}): i prezzi in dubbio sono segnalati, ma conviene chiedere al locale una foto più grande o il PDF.`);
   return { ok: true, geminiStats, text: combined.text, agreed: combined.agreed, doubts: combined.doubts, checks: combined.checks || [], models: used,
     method: good.length === 2 ? (thirdText ? 'jarvis_foto_tripla_lettura' : 'jarvis_foto_doppia_lettura') : 'jarvis_foto_lettura_singola', warnings,
     raw: [...(thirdText ? [...texts, thirdText] : texts), ...notes.map((n) => `[nota] ${n}`)] };

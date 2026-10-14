@@ -106,7 +106,38 @@ describe('prova di lettura: errori trovati il 14 ottobre', () => {
   it('allergeni dopo il prezzo o tra parentesi quadre non fanno perdere il piatto', async () => {
     const { tidyReading } = await import('../cloudflare/functions/_lib/vision.js');
     assert.equal(tidyReading('Polenta concia — 12,00 (8-14)'), 'Polenta concia — 12,00\n> (8-14)');
-    assert.equal(tidyReading('jota: classica minestra triestina. [1][3][8][9] — 13,00'), 'jota: classica minestra triestina — 13,00\n> (1-3-8-9)');
+    assert.equal(tidyReading('jota: classica minestra triestina. [1][3][8][9] — 13,00'), 'jota — 13,00\n> classica minestra triestina (1-3-8-9)');
     assert.equal(tidyReading('Amari, liquori — Likerji 2,50'), 'Amari, liquori - Likerji — 2,50');
+  });
+});
+
+describe('prova di lettura: impaginazioni vere (seconda prova)', () => {
+  const draft = async (text) => {
+    const { combineReadings } = await import('../cloudflare/functions/_lib/vision.js');
+    return menuItems(draftFromReadings('Locale', [combineReadings(text, text).text]).menu).map((i) => `${i.name} = ${i.prices.join('/')}`);
+  };
+
+  it('nomi su due righe, allergeni come numeri, varianti sotto un nome (Da Marcello)', async () => {
+    const items = await draft(['# Antipasti', 'Misto mare “Casa Nostra” 1 2 3 4 7 12 14 — 12,00', 'Carpaccio di polpo con pomodoro — 15,00', '> fresco e olive taggiasche 4',
+      'Battuta di carne al coltello con — 15,00', '> stracciatella e granella di pistacchio 1 3 9 10', '# Primi', 'Penne con scampi 1 2 3 4 — 9,00',
+      'Ravioli di borragine:', 'al ragù 1 7 9 — 8,00', 'ai funghi porcini o carciofi 1 7 — 10,00', '# Secondi', 'Tonno al sesamo con rucola 4 11 — 13,00', '# Pesce spada', 'alla piastra 4 — 12,00'].join('\n'));
+    assert.deepEqual(items, ['Misto mare “Casa Nostra” = 1200', 'Carpaccio di polpo con pomodoro fresco e olive taggiasche = 1500', 'Battuta di carne al coltello con stracciatella e granella di pistacchio = 1500',
+      'Penne con scampi = 900', 'Ravioli di borragine al ragù = 800', 'Ravioli di borragine ai funghi porcini o carciofi = 1000', 'Tonno al sesamo con rucola = 1300', 'Pesce spada alla piastra = 1200']);
+  });
+
+  it('prezzo sul titolo della sezione, prezzo a peso, «cad», percorso col prezzo (La Pigna, Alle Volte, Cardamomo)', async () => {
+    const items = await draft(['# Secondi', 'Lombata di Rubia Gallega froll. 90gg — 7,00hg', '# CONTORNI € 5,00', 'Patatine fritte (8)*', 'Insalata mista',
+      '# Primi', 'Risotto minimo x 2 persone — 16,00 cad 1', '# Percorso Degustazione', 'con 5 Portate dalla Cucina & Dolce — 90,00', 'Abbinamento 5 Vini — 50,00'].join('\n'));
+    assert.deepEqual(items, ['Lombata di Rubia Gallega froll. 90gg = 700', 'Patatine fritte = 500', 'Insalata mista = 500', 'Risotto minimo x 2 persone = 1600',
+      'Percorso Degustazione con 5 Portate dalla Cucina & Dolce = 9000', 'Abbinamento 5 Vini = 5000']);
+  });
+
+  it('foto piccola: due letture uguali non bastano se la terza legge un altro prezzo', async () => {
+    const { combineReadings, imageSize } = await import('../cloudflare/functions/_lib/vision.js');
+    const r = combineReadings('KEBABBO — 5,00\nMARGHERITA — 4,00', 'KEBABBO — 5,00\nMARGHERITA — 4,00', 'KEBABBO — 6,00\nMARGHERITA — 4,00', { strict: true });
+    assert.match(r.text, /^MARGHERITA — 4,00$/m);
+    assert.match(r.text, /\[da verificare\] KEBABBO: letto 5,00 da due letture, 6,00 dalla terza/);
+    const png = new Uint8Array(24); png.set([0x89, 0x50, 0x4e, 0x47]); png.set([0, 0, 2, 0xa9, 0, 0, 1, 0xe1], 16);
+    assert.deepEqual(imageSize(png), { width: 681, height: 481 });
   });
 });

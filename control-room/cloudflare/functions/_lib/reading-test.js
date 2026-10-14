@@ -34,6 +34,9 @@ const cents = (value) => {
 export function menuItems(menu) {
   const out = [];
   for (const section of menu?.sezioni || []) {
+    // Il prezzo di un percorso degustazione conta come una voce col nome del percorso.
+    const tasting = section.tipo === 'degustazione' ? cents(section.prezzo) : null;
+    if (tasting !== null && section?.nome?.it) out.push({ name: section.nome.it, prices: [tasting], section: section.nome.it });
     for (const item of section.voci || []) {
       const name = item?.nome?.it || '';
       const prices = Array.isArray(item.prezzi) ? item.prezzi.map((v) => cents(v.prezzo)).filter((c) => c !== null) : [cents(item.prezzo)].filter((c) => c !== null);
