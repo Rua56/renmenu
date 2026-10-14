@@ -78,8 +78,8 @@ html[data-theme="dark"] .lab::before, html[data-theme="dark"] .oggi-block > .eye
 html[data-theme="dark"] .lab::after, html[data-theme="dark"] .oggi-block > .eyebrow::after { flex: 1; height: 1px; background: linear-gradient(90deg, var(--hud-line), transparent); content: ""; }
 
 /* ——— angoli HUD su schede e riquadri ——— */
-html[data-theme="dark"] :is(.oggi-card, .panel, .sys-list, .locale, .fact, .oggi-calm, .notice, .hud-readout, .hud-display) { position: relative; }
-html[data-theme="dark"] :is(.oggi-card, .panel, .sys-list, .locale, .oggi-calm, .hud-readout, .hud-display)::after {
+html[data-theme="dark"] :is(.oggi-card, .panel, .sys-list, .locale, .fact, .oggi-calm, .notice, .hud-readout, .hud-display, .hud-log) { position: relative; }
+html[data-theme="dark"] :is(.oggi-card, .panel, .sys-list, .locale, .oggi-calm, .hud-readout, .hud-display, .hud-log)::after {
   position: absolute; inset: -1px; z-index: 1; display: block; width: auto; height: auto; border: 0; border-radius: inherit; pointer-events: none; content: "";
   --c: var(--hud); --l: 14px;
   background:
@@ -147,3 +147,5 @@ html[data-theme="dark"] .hud-bar.today { filter: drop-shadow(0 0 5px var(--c)); 
 html[data-theme="dark"] .hud-chart::before { content: ''; position: absolute; inset: 0; background: linear-gradient(180deg, transparent 0, rgba(70, 214, 255, .1) 50%, transparent 100%); transform: translateY(-100%); animation: hud-scan 3.2s linear infinite; pointer-events: none; }
 @keyframes hud-scan { to { transform: translateY(100%); } }
 @media (prefers-reduced-motion: reduce) { html[data-theme="dark"] .hud-chart::before { animation: none; display: none; } }
+html[data-theme="dark"] .hud-log { background: linear-gradient(180deg, rgba(4, 14, 22, .94), rgba(6, 16, 28, .94)); border-color: var(--hud-line); box-shadow: inset 0 0 30px rgba(70, 214, 255, .06); }
+html[data-theme="dark"] .log-line span { color: #b9e9f7; text-shadow: 0 0 6px rgba(70, 214, 255, .25); }

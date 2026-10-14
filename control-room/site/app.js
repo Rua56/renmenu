@@ -5,7 +5,9 @@ import { PLAN_RULES, REQUEST_CATEGORIES, categoryByCode, draftBlocker, planIssue
 import { provisionalQrSvg, provisionalTarget } from './provisional-qr.js';
 import { mountPdfPreview } from './pdf-preview.js';
 import { extractPdfText } from './material-extract.js';
-import { closeChat, openChat } from './jarvis-chat.js';
+import { announce, closeChat, openChat } from './jarvis-chat.js';
+import { logLines, markFresh } from './jarvis-log.js';
+import { greetOnce, greetingFor, lastVisit, markVisit } from './jarvis-greet.js';
 import { pauseWake, startWake, wakeAvailable, wakeEnabled, wakeState, setWakeEnabled } from './jarvis-wake.js';
 import { showFor } from './jarvis-show.js';
 import { installApp, installed } from './hud.js';
@@ -390,6 +392,26 @@ function showWakeState(current) {
   const hint = document.querySelector('[data-wake-hint]');
   if (hint) { hint.textContent = wakeHint(current); hint.dataset.state = current; }
 }
+// Saluto all'apertura (jarvis-greet.js): il testo sotto il titolo per un minuto, la voce al primo tocco.
+let welcome = null;
+function prepareGreeting() {
+  const before = lastVisit();
+  markVisit();
+  window.addEventListener('pagehide', () => markVisit());
+  document.addEventListener('visibilitychange', () => { if (document.hidden) markVisit(); });
+  if (!greetOnce()) return;
+  const text = greetingFor({ requests: state.requests, clients: state.clients, missions: state.missions || [], audit: state.audit || [], before, now: Date.now() });
+  welcome = { ...text, until: Date.now() + 60_000, typed: false };
+  if (activeView === 'command') render();
+  setTimeout(() => { welcome = null; if (activeView === 'command') render(); }, 61_000);
+  const speakOnce = (event) => {
+    document.removeEventListener('pointerdown', speakOnce, true);
+    // Un tocco sul nucleo o sulla barra apre già la voce: il saluto non si sovrappone.
+    if (event.target.closest?.('[data-action="core-talk"], [data-action^="ask"], #ask-sheet')) return;
+    announce(text.say);
+  };
+  document.addEventListener('pointerdown', speakOnce, true);
+}
 function listenForWake() {
   startWake({ onWake: (rest) => openAsk(!rest, { wake: true, firstText: rest }), onState: showWakeState });
 }
@@ -409,7 +431,11 @@ function jarvisHero() {
   if (active) parts.push(`sto seguendo <strong>${active}</strong> ${active === 1 ? 'pratica' : 'pratiche'}`);
   const says = parts.length ? `${parts.join(', ')}.` : 'Tutto in ordine: nessuna decisione in sospeso. Puoi scrivermi o mandarmi un vocale su Telegram.';
   const tile = (route, label, value, note, hot = false) => `<button class="jarvis-action${hot && value ? ' hot' : ''}" type="button" data-route="${route}"><small>${label}</small><strong>${value}</strong><span>${note}</span></button>`;
-  return `<section class="jarvis-hero" aria-label="Jarvis"><button class="reactor reactor-main${autopilotRunning || active ? ' busy' : ''}${waitingYes ? ' wait' : ''}" type="button" data-action="core-talk" aria-label="Parla con Jarvis"><i class="arc" aria-hidden="true"></i><i class="wave" aria-hidden="true"></i><i class="wave w2" aria-hidden="true"></i><span class="r1"></span><span class="r2"></span><span class="r3"></span><span class="core"></span></button><p class="core-hint" data-wake-hint>${escapeHtml(wakeHint())}</p><div><p class="eyebrow">${new Intl.DateTimeFormat('it-IT', { weekday: 'long', day: 'numeric', month: 'long', timeZone: 'Europe/Rome' }).format(new Date())}</p><h1>${greeting}, Riccardo</h1><p class="jarvis-says">${says}</p></div></section>`;
+  // Per un minuto dopo l'apertura, prima della situazione c'è la frase sulle novità dall'ultima visita.
+  const greet = welcome && Date.now() < welcome.until ? welcome : null;
+  const typed = greet && !welcome.typed;
+  if (typed) welcome.typed = true;
+  return `<section class="jarvis-hero" aria-label="Jarvis"><button class="reactor reactor-main${autopilotRunning || active ? ' busy' : ''}${waitingYes ? ' wait' : ''}" type="button" data-action="core-talk" aria-label="Parla con Jarvis"><i class="arc" aria-hidden="true"></i><i class="wave" aria-hidden="true"></i><i class="wave w2" aria-hidden="true"></i><span class="r1"></span><span class="r2"></span><span class="r3"></span><span class="core"></span></button><p class="core-hint" data-wake-hint>${escapeHtml(wakeHint())}</p><div><p class="eyebrow">${new Intl.DateTimeFormat('it-IT', { weekday: 'long', day: 'numeric', month: 'long', timeZone: 'Europe/Rome' }).format(new Date())}</p><h1>${greeting}, Riccardo</h1><p class="jarvis-says${typed ? ' typing' : ''}">${greet?.news ? `${escapeHtml(greet.news)} ` : ''}${says}</p></div></section>`;
 }
 
 function requestOperationalCard(request, compact = false) {
@@ -1020,9 +1046,16 @@ function proposeBlock() {
   };
   return `<section class="hud-display hud-propose" aria-label="Jarvis propone"><div class="hud-display-head"><p class="eyebrow">JARVIS PROPONE · ${state.initiatives.length}</p></div><div class="hud-rows">${list.map(row).join('')}</div></section>`;
 }
+// «Registro dal vivo»: cosa stanno facendo Jarvis e Riccardo, come un terminale (jarvis-log.js).
+function logBlock() {
+  const lines = markFresh(logLines(state.audit || [], { limit: 6 }));
+  if (!lines.length) return '';
+  const line = (l) => `<li class="log-line ${escapeHtml(l.kind)}${l.fresh ? ' fresh' : ''}"><time>${escapeHtml(l.time)}</time><b>${escapeHtml(l.who)}</b><span>${escapeHtml(l.text)}</span></li>`;
+  return `<section class="hud-log" aria-label="Registro dal vivo"><div class="hud-log-head"><p class="eyebrow">REGISTRO · DAL VIVO</p><button class="hud-more" type="button" data-route="registro">Tutto →</button></div><ol class="hud-log-lines" aria-live="polite">${lines.map(line).join('')}</ol><p class="hud-log-cursor" aria-hidden="true">&gt; in ascolto<i>▌</i></p></section>`;
+}
 function renderCommand() {
   const all = allPratiche();
-  return `<div class="view-wrap jarvis-home">${jarvisHero()}${demoNotice()}${adessoBlock(all)}${proposeBlock()}${hudReadouts(all)}${display === 'numeri della settimana' ? '' : '<button class="hud-more" type="button" data-action="show" data-show="numeri della settimana">Grafici della settimana →</button>'}${hudDisplay()}${jarvisPanel()}</div>`;
+  return `<div class="view-wrap jarvis-home">${jarvisHero()}${demoNotice()}${adessoBlock(all)}${proposeBlock()}${hudReadouts(all)}${display === 'numeri della settimana' ? '' : '<button class="hud-more" type="button" data-action="show" data-show="numeri della settimana">Grafici della settimana →</button>'}${hudDisplay()}${logBlock()}${jarvisPanel()}</div>`;
 }
 function renderPratiche() {
   const all = allPratiche();
@@ -1318,9 +1351,34 @@ function navigate(target) {
 
 let autopilotRunning = false;
 let telegramLinkUrl = '';
+// La home si aggiorna da sola mentre è aperta e in primo piano: ridisegna solo se qualcosa è cambiato,
+// e mai mentre stai scrivendo o mentre è aperta un'altra schermata (lì i moduli hanno le loro revisioni).
+const LIVE_MS = 20_000;
+let liveTimer = 0;
+let lastSnapshot = '';
+function scheduleLive() {
+  clearTimeout(liveTimer);
+  liveTimer = setTimeout(liveTick, LIVE_MS);
+}
+async function liveTick() {
+  scheduleLive();
+  if (document.hidden || !['command', 'pratiche'].includes(activeView) || autopilotRunning) return;
+  if (document.activeElement?.matches?.('input, textarea, select')) return;
+  try {
+    const next = await loadState();
+    if (!next || !Array.isArray(next.requests)) return;
+    const snapshot = JSON.stringify(next);
+    if (snapshot === lastSnapshot) return;
+    lastSnapshot = snapshot;
+    state = next;
+    if (['command', 'pratiche'].includes(activeView) && !document.activeElement?.matches?.('input, textarea, select')) render();
+  } catch { /* rete assente: si riprova al giro dopo */ }
+}
+document.addEventListener('visibilitychange', () => { if (!document.hidden && state) liveTick(); });
 async function refresh() {
   state = await loadState();
   if (!state || !Array.isArray(state.requests)) throw new Error('Stato API non conforme al contratto.');
+  lastSnapshot = JSON.stringify(state);
   if (!requestById()) selectedRequestId = state.requests[0]?.id || null;
   render();
   // Autopilota: appena la Control Room si apre, Jarvis lavora sulle richieste nuove.
@@ -1927,6 +1985,8 @@ async function init() {
   if (!isAuthorizedHost) { renderUnavailable(); return; }
   activeView = routeFromHash();
   try { await refresh(); } catch (error) { renderAccessError(error); return; }
+  prepareGreeting();
   listenForWake();
+  scheduleLive();
 }
 init();
