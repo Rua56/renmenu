@@ -47,7 +47,7 @@ export const COMMANDS = [
   ['provalettura', 'Prova di lettura dei menu', '🔬 Prova lettura'],
   ['provaemail', 'Email di prova da renmenu.com', '📧 Email di prova']
 ];
-export const COMMANDS_VERSION = '1';
+export const COMMANDS_VERSION = '2';
 // Pulsante fisso «☰ Menu» sotto il campo di scrittura (tastiera di risposta persistente): toccarlo manda MENU_BUTTON.
 export const MENU_BUTTON = '☰ Menu';
 export const KEYBOARD_VERSION = '1';
