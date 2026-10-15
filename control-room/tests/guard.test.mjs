@@ -78,3 +78,21 @@ describe('Sorveglianza dei menu online', () => {
     } finally { globalThis.fetch = previous; db.close(); }
   });
 });
+
+describe('Menu da stampare', () => {
+  it('su Telegram manda il link della versione A4', async () => {
+    const db = database();
+    const previous = globalThis.fetch;
+    globalThis.fetch = fakeFetch;
+    try {
+      calls.length = 0;
+      await missions.putSetting(db, 'telegram_chat_id', '42');
+      db.prepare("INSERT INTO clients (id,name,plan,payment_status,menu_id,created_at,updated_at) VALUES ('c1','Osteria Al Tralcio','premium','attivo','osteria-al-tralcio','2026-10-15','2026-10-15')").bind().run();
+      const env = { DB: db, TELEGRAM_BOT_TOKEN: TOKEN, OWNER_EMAIL: 'renmenu1569@gmail.com' };
+      await say(db, env, 'mandami il menu da stampare di Al Tralcio');
+      assert.match(texts().at(-1), /Menu da stampare di «Osteria Al Tralcio»[^\n]*\nhttps:\/\/renmenu\.com\/menu\/stampa\.html\?m=osteria-al-tralcio/);
+      await say(db, env, 'versione da stampare');
+      assert.match(texts().at(-1), /Di quale locale vuoi il menu da stampare\? Quelli online: Osteria Al Tralcio/);
+    } finally { globalThis.fetch = previous; db.close(); }
+  });
+});

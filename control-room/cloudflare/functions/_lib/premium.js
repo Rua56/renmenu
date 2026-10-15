@@ -15,7 +15,7 @@ export const DIREZIONI = {
 };
 export const CARATTERI = ['classico', 'moderno', 'artigianale'];
 const PALETTE_KEYS = ['fondo', 'testo', 'accento', 'secondario'];
-const PREMIUM_KEYS = new Set(['direzione', 'caratteri', 'colori', 'logo', 'copertina', 'motto', 'storia', 'firma', 'galleria']);
+const PREMIUM_KEYS = new Set(['direzione', 'caratteri', 'colori', 'logo', 'copertina', 'motto', 'storia', 'firma', 'galleria', 'whatsapp', 'recensioni']);
 const HEX = /^#[0-9a-f]{6}$/i;
 const IMAGE = /^(?:\.\.\/|\/)?[a-z0-9_./-]+\.(?:webp|png|jpe?g|svg|avif)$/i;
 // Lingue con testi d'interfaccia nel template Premium.
@@ -184,6 +184,8 @@ export function premiumErrors(value) {
     if (!ok) errors.push(`menu.premium.${key}: serve testo o traduzioni per lingua.`);
   }
   if ('firma' in value && !(typeof value.firma === 'string' && value.firma.trim() && value.firma.trim().length <= 80)) errors.push('menu.premium.firma: testo breve (massimo 80 caratteri).');
+  if ('whatsapp' in value && !(typeof value.whatsapp === 'string' && /^\+?[\d\s.\/-]{8,20}$/.test(value.whatsapp) && value.whatsapp.replace(/\D/g, '').length >= 8 && value.whatsapp.replace(/\D/g, '').length <= 15)) errors.push('menu.premium.whatsapp: serve un numero di telefono (con prefisso, es. +39 333 1234567).');
+  if ('recensioni' in value && !(typeof value.recensioni === 'string' && /^https:\/\/[^\s"<>]+$/.test(value.recensioni))) errors.push('menu.premium.recensioni: serve un indirizzo https (link per lasciare una recensione).');
   if ('galleria' in value) {
     const gallery = value.galleria;
     if (!Array.isArray(gallery) || gallery.length > 8) errors.push('menu.premium.galleria: elenco di massimo 8 foto.');

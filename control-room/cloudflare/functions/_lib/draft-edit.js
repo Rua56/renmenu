@@ -99,7 +99,7 @@ const OP_SCHEMA = {
 const SYSTEM = [
   'Sei Jarvis, assistente di Riccardo per RenMenu. Riccardo ti detta (anche a voce, con errori di trascrizione) una correzione alla BOZZA di un menu.',
   'Trasformala in operazioni, usando SOLO gli indici dell’elenco: [S2] è la sezione 2, [2.5] è la voce 5 della sezione 2 (si=2, vi=5).',
-  'Tipi consentiti: prezzo (si, vi, prezzo); varianti (si, vi, varianti[{etichetta, prezzo}]: più prezzi per la stessa voce, per esempio calice e bottiglia, piccola e grande, oppure vitello e maiale se il nome elenca le alternative); aggiungi (si, nome, prezzo oppure varianti, descrizione facoltativa, dopo_vi facoltativo; se la sezione è nuova scrivi il suo nome in sezione e ometti si); rimuovi (si, vi); rinomina (si, vi, nome); descrizione (si, vi, descrizione; stringa vuota per toglierla); sposta (si, vi, a_si; se la sezione di destinazione non esiste ancora scrivi il suo nome in sezione e ometti a_si); rinomina_sezione (si, nome); rimuovi_sezione (si: toglie l’intera sezione con tutte le sue voci, solo se Riccardo chiede di togliere la sezione); unisci_sezioni (sezioni: [indici delle sezioni da unire, per esempio [5,6,7]]: le voci finiscono tutte nella prima, le altre spariscono; usalo quando Riccardo vuole una sola sezione al posto di più sezioni con lo stesso nome); motto (nome: la frase che compare sotto il logo nell’apertura del menu Premium, per esempio uno slogan del locale; nessun indice); locale (campo: nome, indirizzo, telefono, instagram, maps, orari, sottotitolo o coperto; nome: il valore scritto da Riccardo; campo nome è il nome del locale, per esempio «il locale si chiama Trattoria da Nives», mai nel sottotitolo; per orari scrivi le sue parole, Jarvis le riordina; per coperto nome è solo l’importo, per esempio 3,00: il coperto NON è mai una sezione né una voce, va sempre in locale con campo coperto); storia (nome: il testo della storia del locale, solo menu Premium, paragrafi separati da una riga a capo; nessun indice); aspetto (direzione: editoriale, bistrot o moderno; colori: {fondo, testo, accento, secondario} in formato #rrggbb, solo quelli che Riccardo ha scritto; nessun indice).',
+  'Tipi consentiti: prezzo (si, vi, prezzo); varianti (si, vi, varianti[{etichetta, prezzo}]: più prezzi per la stessa voce, per esempio calice e bottiglia, piccola e grande, oppure vitello e maiale se il nome elenca le alternative); aggiungi (si, nome, prezzo oppure varianti, descrizione facoltativa, dopo_vi facoltativo; se la sezione è nuova scrivi il suo nome in sezione e ometti si); rimuovi (si, vi); rinomina (si, vi, nome); descrizione (si, vi, descrizione; stringa vuota per toglierla); sposta (si, vi, a_si; se la sezione di destinazione non esiste ancora scrivi il suo nome in sezione e ometti a_si); rinomina_sezione (si, nome); rimuovi_sezione (si: toglie l’intera sezione con tutte le sue voci, solo se Riccardo chiede di togliere la sezione); unisci_sezioni (sezioni: [indici delle sezioni da unire, per esempio [5,6,7]]: le voci finiscono tutte nella prima, le altre spariscono; usalo quando Riccardo vuole una sola sezione al posto di più sezioni con lo stesso nome); motto (nome: la frase che compare sotto il logo nell’apertura del menu Premium, per esempio uno slogan del locale; nessun indice); locale (campo: nome, indirizzo, telefono, instagram, maps, orari, sottotitolo, coperto, whatsapp o recensioni; whatsapp è il numero per il pulsante «Prenota su WhatsApp» e recensioni il link per lasciare una recensione (per esempio quello di Google), entrambi solo menu Premium; nome: il valore scritto da Riccardo; campo nome è il nome del locale, per esempio «il locale si chiama Trattoria da Nives», mai nel sottotitolo; per orari scrivi le sue parole, Jarvis le riordina; per coperto nome è solo l’importo, per esempio 3,00: il coperto NON è mai una sezione né una voce, va sempre in locale con campo coperto); storia (nome: il testo della storia del locale, solo menu Premium, paragrafi separati da una riga a capo; nessun indice); aspetto (direzione: editoriale, bistrot o moderno; colori: {fondo, testo, accento, secondario} in formato #rrggbb, solo quelli che Riccardo ha scritto; nessun indice).',
   'Regole ferree: non inventare nulla. Nomi, prezzi e descrizioni devono essere quelli detti da Riccardo (i prezzi in formato 12,00). Non toccare le voci che Riccardo non nomina. Non scrivere allergeni, ingredienti o traduzioni. Se la richiesta è incomprensibile o ambigua, restituisci operazioni vuote e spiega in «dubbio», in italiano, cosa ti serve sapere.',
   'Una sezione nuova si crea una volta sola: se aggiungi più voci alla stessa sezione nuova, scrivi lo stesso nome in sezione e Jarvis le mette tutte insieme. Per dividere una voce in due piatti distinti: rimuovi la voce e aggiungi i due piatti nella stessa sezione. Se Riccardo dice di tenere una voce con due prezzi, usa varianti. Rispondi solo con JSON, in questa forma: {"operazioni":[{"tipo":"sposta","si":10,"vi":0,"sezione":"Bevande"},{"tipo":"prezzo","si":2,"vi":1,"prezzo":"9,00"}],"dubbio":""}. Ogni operazione ha sempre il campo «tipo».'
 ].join('\n');
@@ -252,9 +252,10 @@ export function validateOps(rawOps, menu, utterance) {
     }
     if (type === 'locale') {
       const written = plain(raw.campo).replace(/[^a-z]+/g, ' ').trim();
-      const field = ['indirizzo', 'telefono', 'instagram', 'maps', 'orari', 'sottotitolo', 'coperto', 'nome'].find((f) => written === f || written.split(' ').includes(f)) || written;
-      const FIELDS = ['indirizzo', 'telefono', 'instagram', 'maps', 'orari', 'sottotitolo', 'coperto', 'nome'];
-      if (!FIELDS.includes(field)) { problems.push('Dati del locale: il campo deve essere nome, indirizzo, telefono, instagram, maps, orari, sottotitolo o coperto.'); continue; }
+      const field = ['indirizzo', 'telefono', 'instagram', 'maps', 'orari', 'sottotitolo', 'coperto', 'nome', 'whatsapp', 'recensioni'].find((f) => written === f || written.split(' ').includes(f)) || written;
+      const FIELDS = ['indirizzo', 'telefono', 'instagram', 'maps', 'orari', 'sottotitolo', 'coperto', 'nome', 'whatsapp', 'recensioni'];
+      if (!FIELDS.includes(field)) { problems.push('Dati del locale: il campo deve essere nome, indirizzo, telefono, instagram, maps, orari, sottotitolo, coperto, whatsapp o recensioni.'); continue; }
+      if ((field === 'whatsapp' || field === 'recensioni') && !menu?.premium) { problems.push(`Pulsante ${field === 'whatsapp' ? '«Prenota su WhatsApp»' : '«Lascia una recensione»'}: c’è solo nei menu Premium.`); continue; }
       if (field === 'coperto') {
         const p = normalizePrice(String(raw.nome ?? raw.testo ?? raw.prezzo ?? '').replace(/[^\d,.]/g, ''));
         if (!p || !prices.has(p)) { problems.push('Coperto: non ho sentito l’importo.'); continue; }
@@ -271,9 +272,9 @@ export function validateOps(rawOps, menu, utterance) {
         }
         if (String(raw.nome ?? raw.testo ?? '').replace(/\s+/g, ' ').trim().length > 200) { problems.push('Dati del locale (orari): testo troppo lungo. Dimmi giorni e fasce, per esempio «mercoledì chiuso, gli altri giorni 12-15 e 19-22».'); continue; }
       }
-      let value = clip(raw.nome ?? raw.testo, field === 'orari' ? 200 : field === 'maps' ? 300 : 120);
+      let value = clip(raw.nome ?? raw.testo, field === 'orari' ? 200 : field === 'maps' || field === 'recensioni' ? 300 : 120);
       if (field === 'instagram') value = value.replace(/^https?:\/\/(?:www\.)?instagram\.com\//i, '').replace(/^@/, '').replace(/\/$/, '');
-      const okShape = { telefono: /^\+?[0-9][0-9 ().-]{5,23}$/, instagram: /^[a-z0-9._]{1,30}$/i, maps: /^https:\/\/\S+$/ }[field];
+      const okShape = { telefono: /^\+?[0-9][0-9 ().-]{5,23}$/, instagram: /^[a-z0-9._]{1,30}$/i, maps: /^https:\/\/\S+$/, whatsapp: /^\+?[0-9][0-9 .\/-]{7,19}$/, recensioni: /^https:\/\/[^\s"<>]+$/ }[field];
       if (!value || (okShape && !okShape.test(value))) { problems.push(`Dati del locale (${field}): valore mancante o non valido.`); continue; }
       const strip = (t) => plain(t).replace(/[^a-z0-9]/g, '');
       if (!strip(utterance).includes(strip(value))) { problems.push(`Dati del locale (${field}): non ho letto «${value}» nella tua frase.`); continue; }
@@ -417,6 +418,11 @@ export function applyOps(menuIn, provenanceIn, ops, source) {
       const base = op.direzione && op.direzione !== before.direzione ? DIREZIONI[direzione].colori : (before.colori || DIREZIONI[direzione].colori);
       menu.premium = { ...before, direzione, caratteri: DIREZIONI[direzione].caratteri, colori: { ...base, ...(op.colori || {}) } };
       summary.push(`Aspetto: ${DIREZIONI[direzione].label}${op.colori ? `, colori ${Object.entries(op.colori).map(([k, v]) => `${k} ${v}`).join(', ')}` : ''}.`);
+      continue;
+    }
+    if (op.tipo === 'locale' && (op.campo === 'whatsapp' || op.campo === 'recensioni')) {
+      menu.premium = { ...(menu.premium || {}), [op.campo]: op.nome };
+      summary.push(op.campo === 'whatsapp' ? `Pulsante «Prenota su WhatsApp»: ${op.nome}.` : `Pulsante «Lascia una recensione»: ${op.nome}.`);
       continue;
     }
     if (op.tipo === 'locale') {
