@@ -26,12 +26,18 @@ export function referenceCode(random = crypto.getRandomValues(new Uint8Array(6))
 
 // Il visualizzatore pubblico legge il menu dal frammento #data= (base64 di UTF-8):
 // il frammento non arriva mai al server, quindi l'anteprima non pubblica nulla.
-export function previewUrl(menu, lang = 'it') {
-  const bytes = new TextEncoder().encode(JSON.stringify(menu));
+const base64url = (value) => {
+  const bytes = new TextEncoder().encode(JSON.stringify(value));
   let binary = '';
   for (const byte of bytes) binary += String.fromCharCode(byte);
-  const encoded = btoa(binary).replace(/\+/g, '-').replace(/\//g, '_');
-  return `${PUBLIC_VIEWER}?lang=${lang}#data=${encoded}`;
+  return btoa(binary).replace(/\+/g, '-').replace(/\//g, '_');
+};
+export function previewUrl(menu, lang = 'it') {
+  // Trattoria Blanch ha la sua pagina: l'anteprima la mostra com'è davvero (foto delle bottiglie comprese).
+  if (isBlanchSlug(menu?.id)) {
+    try { return `${PUBLIC_VIEWER.replace(/\/menu\/$/, '/blanch/')}?lang=${lang}#bozza=${base64url(menuToCompiled(menu))}`; } catch { /* formato non esportabile: visore comune */ }
+  }
+  return `${PUBLIC_VIEWER}?lang=${lang}#data=${base64url(menu)}`;
 }
 
 const venueName = (menu) => (typeof menu?.nome === 'string' ? menu.nome : menu?.nome?.it || 'il vostro locale').trim();
@@ -119,6 +125,7 @@ const PRICE_TOKEN = /(?<![\d,.])(\d{1,4})(?:[,.](\d{1,2}))?(?![\d,.]*\d)\s*(?:�
 const money = (whole, cents = '') => `${Number(whole)},${String(cents).padEnd(2, '0')}`;
 const italianName = (value) => (typeof value === 'string' ? value : value?.it || '').trim();
 import { detectExtra } from './extras.js';
+import { isBlanchSlug, menuToCompiled } from './blanch.js';
 import { prepareEmailSource } from './email-text.js';
 // Firma in fondo alla risposta («Luca», «Marta Zorzut», «Trattoria da Nives»): poche parole con l'iniziale
 // maiuscola (o articoli e preposizioni), senza numeri né punteggiatura. Non è una richiesta di modifica.

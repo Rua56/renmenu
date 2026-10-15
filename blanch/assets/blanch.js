@@ -127,6 +127,20 @@
   const translate = value => typeof value === 'string' ? value : (value && (value[language] || value.it || value.en || value.de)) || '';
   const normalize = text => String(text ?? '').normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase();
   const sectionId = index => `sezione-${view}-${index}`;
+  // Foto delle bottiglie: pubblicate con il menu in menus/media/; se il file non c'è ancora (anteprima di una bozza)
+  // si ripiega sulla copia servita da Jarvis.
+  const STAGE_MEDIA = /^https:\/\/renmenu-jarvis-stage\.pages\.dev\/jarvis-hook\/media\/([a-f0-9]{64}\.(?:jpg|webp|png))$/;
+  const photoSrc = url => { const m = STAGE_MEDIA.exec(String(url || '')); return m ? `../menus/media/${m[1]}` : ''; };
+  const zoom = document.createElement('dialog');
+  zoom.className = 'bottle-zoom';
+  zoom.addEventListener('click', () => zoom.close());
+  document.body.appendChild(zoom);
+  // Anteprima di una bozza (link di Jarvis): il menu arriva nell'indirizzo e non è ancora online.
+  const draftData = (() => {
+    const m = /^#bozza=([A-Za-z0-9_-]+={0,2})$/.exec(location.hash);
+    if (!m) return null;
+    try { return JSON.parse(new TextDecoder().decode(Uint8Array.from(atob(m[1].replace(/-/g, '+').replace(/_/g, '/')), c => c.charCodeAt(0)))); } catch { return null; }
+  })();
 
   function updateUrl() {
     const url = new URL(location.href);
@@ -176,7 +190,10 @@
       : `<div class="menu-item__price">${esc(item.price)}</div>`;
     const variants = (item.variants || []).length
       ? `<ul class="menu-item__variants">${item.variants.map(v => `<li><span>${esc(translate(v.label))}</span><b>${esc(v.price)}</b></li>`).join('')}</ul>` : '';
-    return `<article class="menu-item"><div><h4 class="menu-item__name">${esc(translate(item.name))}</h4>${desc ? `<p class="menu-item__desc">${esc(desc)}</p>` : ''}${info ? `<p class="menu-item__meta">${esc(info)}</p>` : ''}${variants}</div>${price}</article>`;
+    const body = `<div><h4 class="menu-item__name">${esc(translate(item.name))}</h4>${desc ? `<p class="menu-item__desc">${esc(desc)}</p>` : ''}${info ? `<p class="menu-item__meta">${esc(info)}</p>` : ''}${variants}</div>`;
+    const photo = photoSrc(item.photo);
+    const bottle = photo ? `<button class="menu-item__bottle" type="button" data-zoom="${esc(photo)}" aria-label="${esc(translate(item.name))}"><img src="${esc(photo)}" data-stage="${esc(item.photo)}" alt="" loading="lazy" decoding="async"></button>` : '';
+    return `<article class="menu-item${photo ? ' menu-item--bottle' : ''}">${bottle}${body}${price}</article>`;
   }
 
   function sectionHtml({section, index, items}, term) {
@@ -209,8 +226,26 @@
   document.querySelectorAll('[data-view]').forEach(button => button.addEventListener('click', () => { view = button.dataset.view; queryInput.value = ''; render(); }));
   document.querySelectorAll('[data-action="wine"]').forEach(link => link.addEventListener('click', () => { view = 'wine'; queryInput.value = ''; render(); }));
   queryInput.addEventListener('input', render);
+  results.addEventListener('error', event => {
+    const img = event.target;
+    if (img.tagName === 'IMG' && img.dataset.stage && img.src !== img.dataset.stage) img.src = img.dataset.stage;
+  }, true);
+  results.addEventListener('click', event => {
+    const button = event.target.closest('[data-zoom]');
+    if (!button) return;
+    const shown = button.querySelector('img');
+    zoom.innerHTML = `<img src="${esc(shown ? shown.currentSrc || shown.src : button.dataset.zoom)}" alt="${esc(button.getAttribute('aria-label') || '')}">`;
+    if (typeof zoom.showModal === 'function') zoom.showModal();
+  });
 
-  fetch('data/menu.json', {cache: 'no-cache'})
+  if (draftData) {
+    const banner = document.createElement('p');
+    banner.className = 'draft-banner';
+    banner.textContent = 'Anteprima della bozza: non è ancora online.';
+    document.body.prepend(banner);
+    data = draftData;
+    render();
+  } else fetch('data/menu.json', {cache: 'no-cache'})
     .then(response => { if (!response.ok) throw new Error('menu unavailable'); return response.json(); })
     .then(json => { data = json; render(); })
     .catch(() => { loadFailed = true; render(); });

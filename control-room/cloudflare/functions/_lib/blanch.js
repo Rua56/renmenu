@@ -7,8 +7,12 @@
  * già stampato non cambiano mai.
  *
  * Regola di sicurezza: dopo l'esportazione i file nuovi vengono riletti e devono dare esattamente il menu approvato;
- * ciò che il formato Blanch non può contenere (telefono, allergeni per piatto, foto, tema, ecc.) blocca la pubblicazione
- * con un messaggio chiaro, invece di sparire in silenzio. */
+ * ciò che il formato Blanch non può contenere (telefono, allergeni per piatto, foto dei piatti, tema, ecc.) blocca la
+ * pubblicazione con un messaggio chiaro, invece di sparire in silenzio.
+ *
+ * Foto delle bottiglie (2026-10-15, richiesta di Baffone): colonna facoltativa «photo» in fondo a wines.tsv, con
+ * l'indirizzo della foto confermata in Revisione (come nei menu Premium). Il file resta a 7 colonne finché nessun vino
+ * ha una foto, così menu.json non cambia di un byte; la foto entra nella PR come menus/media/<sha256>.<ext>. */
 export const BLANCH_SLUG = 'trattoria-blanch';
 export const BLANCH_PATHS = { food: 'blanch/data/food.json', wines: 'blanch/data/wines.tsv', menu: 'blanch/data/menu.json' };
 export const BLANCH_FILE_LIST = [BLANCH_PATHS.food, BLANCH_PATHS.wines, BLANCH_PATHS.menu];
@@ -24,6 +28,10 @@ export const WINE_CATEGORIES = {
   'Vini Spumanti': { it: 'Vini spumanti', en: 'Sparkling wines', de: 'Schaumweine' }
 };
 const TSV_HEADER = ['category', 'producer', 'location', 'name', 'details', 'price', 'source'];
+const PHOTO_COLUMN = 'photo';
+// Solo foto servite da Jarvis e pubblicate con il menu (menus/media/<sha256>.<ext>): nessun indirizzo esterno.
+const PHOTO_URL = /^https:\/\/renmenu-jarvis-stage\.pages\.dev\/jarvis-hook\/media\/[a-f0-9]{64}\.(?:jpg|webp|png)$/;
+const checkPhoto = (value, where) => { if (value && !PHOTO_URL.test(value)) fail(`${where}: foto della bottiglia non valida (solo foto confermate in Revisione).`); return value; };
 const INTERNAL_ITEM_KEYS = new Set(['source', 'editorial_note']);
 
 export class BlanchError extends Error {
@@ -71,12 +79,19 @@ export function parseWines(tsvText) {
   if (text.includes('"') || text.includes('\r')) fail('wines.tsv contiene virgolette o ritorni a capo di Windows: non lo modifico.');
   const lines = text.split('\n');
   if (lines.at(-1) === '') lines.pop();
-  if (lines[0] !== TSV_HEADER.join('\t')) fail('Le colonne di wines.tsv non sono quelle attese.');
+  const width = winesWidth(lines[0]);
   return lines.slice(1).map((raw, index) => {
     const cells = raw.split('\t');
-    if (cells.length !== TSV_HEADER.length) fail(`wines.tsv riga ${index + 2}: numero di colonne inatteso.`);
-    return { raw, category: cells[0], producer: cells[1], location: cells[2], name: cells[3], details: cells[4], price: cells[5], source: cells[6] };
+    if (cells.length !== width) fail(`wines.tsv riga ${index + 2}: numero di colonne inatteso.`);
+    return { raw, category: cells[0], producer: cells[1], location: cells[2], name: cells[3], details: cells[4], price: cells[5], source: cells[6],
+      photo: checkPhoto(cells[7] || '', `wines.tsv riga ${index + 2}`) };
   });
+}
+/** 7 colonne (senza foto) o 8 (con la colonna «photo» in fondo). */
+function winesWidth(header) {
+  if (header === TSV_HEADER.join('\t')) return TSV_HEADER.length;
+  if (header === [...TSV_HEADER, PHOTO_COLUMN].join('\t')) return TSV_HEADER.length + 1;
+  return fail('Le colonne di wines.tsv non sono quelle attese.');
 }
 
 /** Equivale a blanch/tools/build_menu.py: stesso risultato, byte per byte. */
@@ -93,6 +108,7 @@ export function compileBlanch(foodText, tsvText) {
     if (row.price.split(',').length !== 2) fail(`wines.tsv: prezzo inatteso «${row.price}».`);
     const item = { name: row.name, producer: row.producer + (row.location ? SEP + row.location : ''), price: `€ ${row.price}` };
     if (row.details) item.detail = row.details;
+    if (row.photo) item.photo = row.photo;
     wines[row.category].items.push(item);
   }
   if (!Object.values(wines).every((section) => section.items.length)) fail('Ogni sezione dei vini deve avere almeno una voce.');
@@ -136,7 +152,8 @@ export function blanchToMenu(compiled) {
       voci: section.items.map((item) => ({
         nome: item.name,
         descrizione: item.producer + (item.detail ? DETAIL_SEP + item.detail : ''),
-        prezzo: fromBlanchPrice(item.price)
+        prezzo: fromBlanchPrice(item.price),
+        ...(item.photo ? { foto: checkPhoto(item.photo, `«${item.name}»`) } : {})
       }))
     });
   }
@@ -149,6 +166,7 @@ export function blanchToMenu(compiled) {
 // ———— Formato RenMenu → Blanch (compilato desiderato) ————
 const SECTION_KEYS = new Set(['nome', 'descrizione', 'voci']);
 const ITEM_KEYS = new Set(['nome', 'descrizione', 'prezzo', 'prezzi']);
+const WINE_ITEM_KEYS = new Set([...ITEM_KEYS, 'foto']);
 const ROOT_KEYS = new Set(['id', 'nome', 'lingue', 'avviso', 'note', 'sezioni']);
 
 /** Campi del menu che il formato Blanch non può contenere: elenco leggibile, vuoto se tutto è esportabile. */
@@ -158,13 +176,17 @@ export function unsupportedFields(menu) {
   for (const key of Object.keys(menu || {})) if (!ROOT_KEYS.has(key) && filled(menu[key])) found.push(key);
   (menu?.sezioni || []).forEach((section, si) => {
     for (const key of Object.keys(section)) if (!SECTION_KEYS.has(key) && filled(section[key])) found.push(`sezione ${si + 1}: ${key}`);
+    // La foto è ammessa solo sui vini in bottiglia (colonna «photo» di wines.tsv).
+    const keys = wineSectionKey(section) ? WINE_ITEM_KEYS : ITEM_KEYS;
     (section.voci || []).forEach((item, vi) => {
-      for (const key of Object.keys(item)) if (!ITEM_KEYS.has(key) && filled(item[key])) found.push(`${itText(item.nome) || `voce ${vi + 1}`}: ${key}`);
+      for (const key of Object.keys(item)) if (!keys.has(key) && filled(item[key])) found.push(`${itText(item.nome) || `voce ${vi + 1}`}: ${key}`);
     });
   });
   return found;
 }
 
+/** Sezione dei vini in bottiglia (le uniche voci di Blanch che possono avere la foto). */
+export const isBlanchBottleSection = (section) => Boolean(wineSectionKey(section));
 const wineSectionKey = (section) => Object.entries(WINE_CATEGORIES).find(([, title]) => title.it.toLowerCase() === itText(section.nome).trim().toLowerCase())?.[0] || null;
 
 export function menuToCompiled(menu) {
@@ -182,6 +204,7 @@ export function menuToCompiled(menu) {
         const [producer, ...rest] = description.split(DETAIL_SEP);
         const entry = { name: itText(item.nome).trim(), producer: producer.trim(), price: toBlanchPrice(item.prezzo) };
         if (rest.length) entry.detail = rest.join(DETAIL_SEP).trim();
+        if (item.foto) entry.photo = checkPhoto(String(item.foto).trim(), `Vino «${entry.name}»`);
         if (!entry.name || !entry.producer) fail(`Vino «${entry.name || '?'}»: servono nome e produttore (nella descrizione).`);
         wines[key].items.push(entry);
       }
@@ -303,6 +326,8 @@ function splitProducer(merged, oldRow) {
 
 function patchWines(tsvText, wantedWine) {
   const rows = parseWines(tsvText);
+  // La colonna delle foto si aggiunge solo quando serve (e resta se c'era già).
+  const withPhoto = winesWidth(String(tsvText).split('\n')[0]) > TSV_HEADER.length || wantedWine.some((section) => section.items.some((item) => item.photo));
   const replace = new Map(); // indice riga originale → riga nuova (null = tolta)
   const before = new Map();
   const after = new Map();
@@ -324,7 +349,8 @@ function patchWines(tsvText, wantedWine) {
     if (freeNew.length && freeNew.length === freeOld.length) freeNew.forEach((n, k) => { matches[n] = freeOld[k]; });
     const lineFor = (item, oldRow) => {
       const { producer, location } = splitProducer(item.producer, oldRow);
-      const row = [category, producer, location, item.name, item.detail || '', item.price.replace(/^€ /, ''), oldRow ? oldRow.source : 'Jarvis'].join('\t');
+      const cells = [category, producer, location, item.name, item.detail || '', item.price.replace(/^€ /, ''), oldRow ? oldRow.source : 'Jarvis'];
+      const row = (withPhoto ? [...cells, item.photo || ''] : cells).join('\t');
       return oldRow && oldRow.raw === row ? oldRow.raw : row;
     };
     wanted.forEach((item, k) => {
@@ -336,7 +362,7 @@ function patchWines(tsvText, wantedWine) {
       else tail.push(lineFor(item, null));
     });
   }
-  const lines = [TSV_HEADER.join('\t')];
+  const lines = [(withPhoto ? [...TSV_HEADER, PHOTO_COLUMN] : TSV_HEADER).join('\t')];
   rows.forEach((_, i) => {
     lines.push(...(before.get(i) || []));
     if (replace.get(i)) lines.push(replace.get(i));

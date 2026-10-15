@@ -14,7 +14,7 @@ import { clientMailConfig, sendClientMail } from './client-mail.js';
 import { briefingDue, buildBriefing, romeDay } from './briefing.js';
 import { COMMANDS, COMMANDS_VERSION, KEYBOARD_VERSION, MENU_BUTTON, answerCallback, clearButtons, downloadTelegramFile, sendDocument, sendMenuKeyboard, sendPhoto, sendTelegram, sendVoice, setMyCommands, telegramReady, TELEGRAM_HOOK_URL } from './telegram.js';
 import { buildMenuQr, menuLink } from './qr.js';
-import { isBlanchSlug, publicMenuJsonUrl, publicMenuPageUrl } from './blanch.js';
+import { isBlanchBottleSection, isBlanchSlug, publicMenuJsonUrl, publicMenuPageUrl } from './blanch.js';
 import { CHAT_MODEL, chat as freeChat, matchVenue, planFromText, speak, transcribe, understand, venueSaid } from './voice.js';
 import { classifyRequest } from './autopilot.js';
 import { editFingerprints, editLogKey, proposeOps, validateOps } from './draft-edit.js';
@@ -25,7 +25,8 @@ import { buildDigest, digestText, recordEvent } from './journal.js';
 import { acceptProposals, askForProposals, decideProposal, pastProposals, proposalButtons, proposalsList, proposalText, reflectionDue, saveProposals, weekOf } from './reflection.js';
 import { slugify } from './menu.js';
 import { DIREZIONI } from './premium.js';
-import { enrollPrep } from './autoprep.js';
+import { MAX_ROUNDS as PREP_MAX_ROUNDS, enrollPrep, parsePrep, PREP_KEY } from './autoprep.js';
+import { PER_ROUND as BOTTLES_PER_ROUND, winesWithoutPhoto } from './bottle-search.js';
 import { claudeKey } from './claude.js';
 import { parseVisit, visitKey, visitStartText } from './visit.js';
 import { pickButton } from './short-reply.js';
@@ -58,6 +59,9 @@ const describeChange = (entry) => entry.type === 'prezzo' ? `${entry.name}: ${en
 const EDIT_WORDS = /(?:\d|\beuro\b|€|\bcost\w*|\bprezz\w*|\baggiung\w*|\btogli\w*|\brimuov\w*|\belimin\w*|\bcancell\w*|\bcambia\w*|\bmetti\w*|\bsposta\w*|\brinomin\w*|\bdescrizion\w*|\bchiam\w*|\bdividi\w*|\bspezza\w*|\bsono\b)/i;
 // Frasi che chiedono di cambiare il menu, non il QR (es. «metti il QR nel menu»): non sono richieste di QR.
 const EDIT_WORDS_STRICT = /\b(?:aggiung\w*|togli\w*|rimuov\w*|prezzo|costa\w*|rinomin\w*)\b/i;
+// «Aggiungi le foto delle bottiglie alla carta dei vini di Blanch», «cerca le immagini delle bottiglie di Al Bakaro».
+const BOTTLE_PHOTOS = /\b(?:foto\w*|immagin\w*)\b[^.?!\n]{0,50}\bbottigli\w*|\bbottigli\w*[^.?!\n]{0,40}\b(?:foto\w*|immagin\w*)\b/i;
+const BOTTLE_ACTION = /\b(?:aggiung\w*|mett\w*|inserisc\w*|inserir\w*|cerc\w*|trov\w*|carica\w*|vorrei|voglio|puoi|potresti|fai|fammi)\b/i;
 const REREAD = /\b(?:rileggi\w*|rilegg\w+|rileggere|rifai la lettura|leggi(?:le|li)? (?:di nuovo|ancora))\b/i;
 // «cosa mi proponi?», «che faccio adesso?»: le proposte di Jarvis (initiative.js).
 const IDEAS_WORDS = /^\W*(?:ok\s+)?(?:jarvis[\s,!.]*)?(?:cosa|che cosa|che)\s+(?:mi\s+)?(?:proponi|suggerisci|consigli|dovrei fare|faccio(?:\s+adesso|\s+ora)?|c[’']?è da fare)[\s?!.]*$/i;
@@ -1239,6 +1243,7 @@ export function createMissions(deps) {
     const planned = intent.intent === 'crea_pratica' ? null : await planForFocus(db, utterance, intent.locale);
     if (planned) { await answer(planned); return; }
     if (REREAD.test(said0)) { await answer(await voiceReread(db, env, intent.locale, utterance)); return; }
+    if (BOTTLE_PHOTOS.test(said0) && BOTTLE_ACTION.test(said0)) { const asked = await voiceBottles(db, env, utterance, intent.locale, clues); await answer(asked.text, asked.buttons || null, { keep: false }); return; }
     if (PREPARE_DRAFT.test(said0) && !EDIT_WORDS.test(said0)) { const prepared = await voicePrepareDraft(db, env, utterance, intent.locale); if (prepared) { await answer(prepared); return; } }
     // Correzione dettata a una bozza aperta («le braciole costano 9»), anche se il modello l'ha presa per una domanda.
     if (['risposta', 'non_chiaro'].includes(intent.intent) && EDIT_WORDS.test(said0)) {
@@ -2088,6 +2093,43 @@ export function createMissions(deps) {
     return `Fatto. Ho preparato l’aggiornamento di «${client.name}» partendo dal menu online. ${done?.summary || ''} Lo trovi in Revisione: niente va online senza il tuo SÌ.${todo ? `\n\n${todo}` : ''}`;
   }
 
+  // «Aggiungi le foto delle bottiglie a Blanch»: Jarvis cerca le bottiglie sui siti delle cantine (3 vini per giro, in
+  // sottofondo), le mette sui vini giusti della bozza e alla fine manda il link. Online non cambia niente senza il SÌ.
+  async function voiceBottles(db, env, utterance, spokenVenue, clues = { locales: [], dishes: [] }) {
+    const clients = await rows(db, "SELECT id,name,menu_id,plan FROM clients WHERE menu_id IS NOT NULL AND menu_id<>''");
+    const { client, candidates } = pickLocale(spokenVenue, clues, clients);
+    let draft = null;
+    if (!client) {
+      // Nessun locale nominato: vale la pratica in primo piano.
+      let focus = null; try { focus = JSON.parse(await setting(db, 'tg_focus') || 'null'); } catch {}
+      if (focus?.requestId && Date.now() - Date.parse(focus.at) < FOCUS_MINUTES * MINUTE) draft = (await openDrafts(db)).find((d) => d.request_id === focus.requestId) || null;
+      if (!draft) return { text: candidates.length > 1 ? `Ho trovato più locali: ${candidates.map((c) => c.name).join(', ')}. Di quale cerco le bottiglie?` : 'Di quale locale cerco le foto delle bottiglie?' };
+    }
+    const name = client?.name || draft.client_name || draft.subject;
+    if (!draft) draft = (await openDrafts(db)).find((d) => d.client_id === client.id) || null;
+    if (!draft) {
+      const jarvis = jarvisDb(db);
+      try {
+        const requestId = (await action(jarvis, 'createRequest', { clientId: client.id, subject: `Foto delle bottiglie · ${client.name}`, sourceText: utterance, sourceChannel: 'altro', category: 'vini_cocktail' })).result.id;
+        await action(jarvis, 'generateDraft', { requestId, baseOnly: true }, env);
+        draft = (await openDrafts(db)).find((d) => d.request_id === requestId) || null;
+      } catch (error) { return { text: `Non sono riuscito a preparare la bozza di «${name}»: ${String(error?.message || 'errore').slice(0, 200)}` }; }
+      if (!draft) return { text: `Ho aperto la pratica per «${name}», ma la bozza non c’è: guardala in Revisione.` };
+    }
+    let menu; try { menu = JSON.parse(draft.menu_json); } catch { return { text: 'La bozza non si legge: aprila in Revisione.' }; }
+    if (!menu.premium && !isBlanchSlug(draft.slug)) return { text: `Le foto delle bottiglie compaiono solo nei menu Premium (e nella carta dei vini di Trattoria Blanch): «${name}» non lo è, quindi non le cerco.` };
+    if (!(await geminiFor(db, env))) return { text: 'Per cercare le bottiglie mi serve la chiave Gemini (Control Room → Lettura dei menu).' };
+    const wines = winesWithoutPhoto(menu, [], isBlanchSlug(draft.slug) ? isBlanchBottleSection : null).length;
+    await putSetting(db, 'tg_focus', JSON.stringify({ requestId: draft.request_id, subject: draft.subject || name, at: now() })).catch(() => {});
+    if (!wines) return { text: `Tutti i vini di «${name}» hanno già la foto della bottiglia.`, buttons: [['Mostrami la bozza', `peek:${draft.id}`]] };
+    // Una preparazione già in corso su questa bozza: si aggiunge alla fine, senza ripartire.
+    const queued = parsePrep(await setting(db, PREP_KEY))[draft.id];
+    if (queued) return { text: `Sto già lavorando sulla bozza di «${name}»: le bottiglie sono tra i passi. Ti scrivo quando ho finito.` };
+    await enrollPrep({ get: setting, put: putSetting }, db, { draftId: draft.id, requestId: draft.request_id, plan: null, steps: ['bottiglie', 'foto', 'pronta'],
+      maxRounds: Math.max(PREP_MAX_ROUNDS, Math.ceil(wines / BOTTLES_PER_ROUND) + 2), notifyOnly: true }, new Date(Date.now() - 10 * 60_000).toISOString());
+    return { text: `D’accordo. Cerco le foto delle bottiglie dei ${wines} vini di «${name}» sui siti delle cantine, ${BOTTLES_PER_ROUND} alla volta, e le metto sui vini giusti della bozza. Con tanti vini ci vuole un po’: ti scrivo quando ho finito, con il link per guardarla. Le foto le controlli tu (Revisione → «Foto»); online non cambia niente finché non pubblichi.` };
+  }
+
   // Foto o PDF mandati da Riccardo al bot: Jarvis chiede a quale pratica collegarli.
   const FILE_TYPES = new Set(['image/jpeg', 'image/png', 'image/webp', 'application/pdf']);
   async function receiveTelegramFile(db, env, chat, message) {
@@ -2460,5 +2502,5 @@ export function createMissions(deps) {
     }
     return out;
   }
-  return { habitOn, readyItems, entrustBrief, runEntrust, alertOnce, announceExternal, replyTick, phoneTick, proposeReply, statusText, initiatives, initiativeTick, ping, entrust, tick, watchTick, watchRegister, reflect, queueOnlineEmail, checkOnlineMails, makeMenuQr, decide, telegramUpdate, probeIntents, setting, putSetting, briefing, notify, visitLink, startChecks, answerCheck, draftAfterChecks, translateAfterEdit, undoDraftEdit, draftTarget, voiceEditDraft, editDraftFromClient };
+  return { peekLink: peekUrl, habitOn, readyItems, entrustBrief, runEntrust, alertOnce, announceExternal, replyTick, phoneTick, proposeReply, statusText, initiatives, initiativeTick, ping, entrust, tick, watchTick, watchRegister, reflect, queueOnlineEmail, checkOnlineMails, makeMenuQr, decide, telegramUpdate, probeIntents, setting, putSetting, briefing, notify, visitLink, startChecks, answerCheck, draftAfterChecks, translateAfterEdit, undoDraftEdit, draftTarget, voiceEditDraft, editDraftFromClient };
 }

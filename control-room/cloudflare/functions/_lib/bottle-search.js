@@ -17,12 +17,13 @@ const norm = (v) => String(v || '').toLowerCase().normalize('NFD').replace(/[̀-
 const words = (v) => norm(v).split(' ').filter((w) => w.length >= 3 && !['doc', 'docg', 'igt', 'vino', 'the', 'and'].includes(w));
 const text = (v) => (v == null ? '' : typeof v === 'string' ? v : v.it || Object.values(v)[0] || '');
 
-/** Vini della bozza ancora senza foto (e non già cercati). */
-export function winesWithoutPhoto(menu, done = []) {
+/** Vini della bozza ancora senza foto (e non già cercati). section: filtro facoltativo sulle sezioni (Blanch: solo le bottiglie). */
+export function winesWithoutPhoto(menu, done = [], section = null) {
   const skip = new Set(done.map(norm));
   return menuSlots(menu).filter((slot) => {
-    if (!slot.wine || skip.has(norm(slot.name))) return false;
+    if (!slot.wine || skip.has(norm(slot.key || slot.name))) return false;
     const m = /^voce:(\d+):(\d+)$/.exec(slot.target);
+    if (section && !section(menu.sezioni[Number(m[1])])) return false;
     return !menu.sezioni[Number(m[1])].voci[Number(m[2])].foto;
   });
 }
@@ -47,7 +48,7 @@ export async function searchWinePages(gemini, slot, options = {}) {
 async function searchPages(gemini, slot, { fetchImpl = globalThis.fetch, timeoutMs = 25_000 } = {}) {
   if (!gemini?.key) return { pages: [], why: 'manca la chiave Gemini' };
   const prompt = [
-    `Cerca sul web la pagina del vino «${slot.name}»${slot.section ? ` (carta dei vini, sezione «${slot.section}»)` : ''} sul sito ufficiale della cantina che lo produce.`,
+    `Cerca sul web la pagina del vino «${slot.name}»${slot.descr ? ` (nella carta: «${String(slot.descr).slice(0, 120)}»)` : ''}${slot.section ? ` (carta dei vini, sezione «${slot.section}»)` : ''} sul sito ufficiale della cantina che lo produce.`,
     'Se il sito della cantina non ha una pagina del vino, va bene la scheda di un\'enoteca online dove si vede la foto della bottiglia.',
     'Rispondi solo con JSON: {"pagine": ["https://…"]}, al massimo 3 indirizzi, il sito della cantina per primo. Non inventare indirizzi: solo pagine trovate con la ricerca.'
   ].join('\n');
@@ -149,6 +150,6 @@ export async function findBottle(gemini, slot, df, { classify, fetchImpl = globa
 }
 
 /** Riga della fonte salvata nel materiale (si mostra in Revisione per il controllo dei diritti). */
-export const sourceNote = (slot, page, image) => `Fonte: ${page} · immagine: ${image} · vino: ${slot.name}`;
+export const sourceNote = (slot, page, image) => `Fonte: ${page} · immagine: ${image} · vino: ${slot.key || slot.name}`;
 export const parseSourceNote = (note) => { const m = /^Fonte: (\S+) · immagine: (\S+) · vino: (.+)$/.exec(String(note || '')); return m ? { page: m[1], image: m[2], wine: m[3] } : null; };
 export { slotFrequencies, text };
