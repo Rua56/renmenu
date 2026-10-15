@@ -905,6 +905,9 @@ export function createMissions(deps) {
     // Sorveglianza dei menu online («sorveglianza», «non sorvegliare …»).
     const guarded = await guardTurn(db, text);
     if (guarded) { await sendTg(db, env, chat, guarded, null, deps.fetchImpl); return; }
+    // «menu da stampare di Al Tralcio»: link alla versione A4 (stessa grafica, QR in fondo).
+    const printable = await printTurn(db, text);
+    if (printable) { await sendTg(db, env, chat, printable, null, deps.fetchImpl); return; }
     // Dubbi aperti: un prezzo scritto («7,50») risponde al dubbio in corso.
     if (normalizePrice(text)) {
       let open = null; try { open = JSON.parse(await setting(db, 'tg_checks') || 'null'); } catch {}
@@ -1145,6 +1148,8 @@ export function createMissions(deps) {
     if (planned) { await reply(db, env, chat, `«${heard.text.trim()}»\n\n${planned}`, true); return; }
     const guarded = await guardTurn(db, heard.text);
     if (guarded) { await reply(db, env, chat, `«${heard.text.trim()}»\n\n${guarded}`, true); return; }
+    const printable = await printTurn(db, heard.text);
+    if (printable) { await reply(db, env, chat, `«${heard.text.trim()}»\n\n${printable}`, true); return; }
     if (STATUS_WORDS.test(heard.text.trim())) { await reply(db, env, chat, `«${heard.text.trim()}»\n\n${await statusText(db)}`, false); return; }
     await converse(db, env, chat, heard.text, true);
   }
@@ -1631,6 +1636,17 @@ export function createMissions(deps) {
     for (const slug of Object.keys(state)) if (!list.includes(slug)) delete state[slug];
     await putSetting(db, GUARD_STATE_KEY, JSON.stringify(state));
     return out;
+  }
+  const PRINT_ASK = /\b(?:men[uù]|carta)\s+(?:da\s+)?stamp(?:are|abile|a)\b|\bversione\s+(?:da\s+)?stamp(?:are|abile|a)\b|\bstampa(?:re)?\s+(?:il\s+)?men[uù]\b/i;
+  async function printTurn(db, text) {
+    const line = String(text || '').trim();
+    if (!PRINT_ASK.test(line) || line.length > 160) return null;
+    const clients = await rows(db, "SELECT id,name,menu_id FROM clients WHERE menu_id IS NOT NULL AND menu_id<>''").catch(() => []);
+    const spoken = line.replace(PRINT_ASK, ' ').replace(/^\s*(?:jarvis[\s,!.]*)?(?:mandami|dammi|fammi|prepara(?:mi)?|voglio|mi\s+serve)?\s*(?:la|il|una|un)?\s*/i, '').replace(/^\s*(?:di|del|della|per|dal|dello)\s+/i, '').replace(/[?.!]+$/, '').trim();
+    const { client, candidates } = spoken ? matchVenue(spoken, clients) : { client: null, candidates: [] };
+    if (!client) return candidates?.length > 1 ? `Di quale locale? ${candidates.map((c) => c.name).join(', ')}.` : `Di quale locale vuoi il menu da stampare? Quelli online: ${clients.map((c) => c.name).slice(0, 12).join(', ') || 'nessuno'}.`;
+    if (isBlanchSlug(client.menu_id)) return `Trattoria Blanch ha un menu in formato proprio: la versione da stampare non c’è ancora.`;
+    return `Menu da stampare di «${client.name}» (A4, stessa grafica del menu online, con il QR in fondo):\n${PUBLIC_ORIGIN}/menu/stampa.html?m=${encodeURIComponent(client.menu_id)}\n\nAprilo, scegli lingua e una o due colonne, poi «Stampa o salva PDF». Si aggiorna da solo quando cambia il menu.`;
   }
   async function guardAdd(db, slug) {
     const list = parseGuardList(await setting(db, GUARD_KEY).catch(() => null));
