@@ -173,6 +173,10 @@ test('una foto con l\'indirizzo vecchio (non più servito) torna a quello della 
 test('Blanch: i nomi dei vini sono nomi propri, non bloccano l’affido per «traduzione mancante»', () => {
   const menu = blanch();
   assert.deepEqual(criticalFields(menu).translationsMissing, []);
+  // Bozza rifatta da Jarvis: i nomi dei vini diventano { it, en } senza tedesco, restano nomi propri.
+  const wines = menu.sezioni.find((s) => isBlanchBottleSection(s));
+  wines.voci = wines.voci.map((v) => ({ ...v, nome: { it: v.nome, en: v.nome } }));
+  assert.deepEqual(criticalFields(menu).translationsMissing, []);
   // Un piatto senza inglese resta da tradurre, e così un vino di un altro menu.
   const food = menu.sezioni.findIndex((s) => !isBlanchBottleSection(s));
   menu.sezioni[food].voci[0].nome = 'Frico';
