@@ -31,7 +31,7 @@
             "it": "LA ZUCCA IN SAOR",
             "en": "SWEET AND SOUR PUMPKIN"
           },
-          "prezzo": "10,00",
+          "prezzo": "11,00",
           "descrizione": {
             "it": "Zucca al forno, cipolla rossa, pinoli e uvetta contiene prodotti naturalmente privi di glutine"
           },
@@ -46,7 +46,8 @@
           },
           "prezzo": "16,00",
           "descrizione": {
-            "it": "Contiene prodotti naturalmente privi di glutine"
+            "it": "Contiene prodotti naturalmente privi di glutine",
+            "en": "Naturally gluten-free"
           },
           "allergeni": [
             "7",
@@ -100,7 +101,8 @@
           },
           "prezzo": "14,00",
           "descrizione": {
-            "it": "Contiene prodotti naturalmente privi di glutine"
+            "it": "Contiene prodotti naturalmente privi di glutine",
+            "en": "Naturally gluten-free"
           },
           "allergeni": [
             "7",
@@ -211,7 +213,8 @@
           },
           "prezzo": "15,00",
           "descrizione": {
-            "it": "Contiene prodotti naturalmente privi di glutine"
+            "it": "Contiene prodotti naturalmente privi di glutine",
+            "en": "Naturally gluten-free"
           },
           "allergeni": [
             "7",
