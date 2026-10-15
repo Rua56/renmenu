@@ -1352,7 +1352,7 @@ async function action(db, type, input, env = {}) {
   } else if (type === 'deleteRequest') {
     // Elimina una pratica di prova o mai pubblicata (e il cliente, se resta senza pratiche e senza menu online).
     assert(p.confirmation === 'ELIMINA PRATICA', 'Conferma mancante.', 403);
-    const plan = await deletionPlan(db, { getOne, rows }, { requestId: p.requestId ? identifier(p.requestId) : null, clientId: !p.requestId && p.clientId ? identifier(p.clientId) : null });
+    const plan = await deletionPlan(db, { getOne, rows }, { requestId: p.requestId ? identifier(p.requestId) : null, clientId: !p.requestId && p.clientId ? identifier(p.clientId) : null, retired: p.retired === true });
     assert(plan.ok, plan.blockers[0] || 'Eliminazione non consentita.', 409);
     const label = plan.request?.subject || plan.client?.name || 'pratica';
     const writes = deletionStatements(db, { ...plan, deleteClient: plan.deleteClient && p.deleteClient !== false });
