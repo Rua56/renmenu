@@ -10,7 +10,7 @@ import { liveAvailable, startLive } from './jarvis-live.js';
 const Recognition = globalThis.SpeechRecognition || globalThis.webkitSpeechRecognition;
 const Synth = globalThis.speechSynthesis;
 const STOP_WORDS = /^(?:ok\s+)?(?:basta|stop|fine|chiudi|grazie(?:\s+jarvis)?(?:,?\s+(?:basta|a dopo|ciao))?|a dopo|ciao jarvis)[.!]?$/i;
-const SUGGESTIONS = ['Fammi il briefing', 'Com’è la situazione?', 'Nel menu di … metti … a … euro', 'Crea una nuova pratica per …', 'Pubblica il menu di …', 'Mostrami l’anteprima di …', 'Elimina la pratica di …', 'Mostrami le pratiche aperte'];
+const SUGGESTIONS = ['Fammi il briefing', 'Com’è la situazione?', 'Le mie regole', 'Nel menu di … metti … a … euro', 'Crea una nuova pratica per …', 'Pubblica il menu di …', 'Mostrami l’anteprima di …', 'Elimina la pratica di …', 'Mostrami le pratiche aperte'];
 // Briefing a voce: Jarvis legge una alla volta le decisioni che ha preparato e Riccardo risponde a voce.
 const BRIEF_WORDS = /^\W*(?:ok\s+)?(?:(?:ehi\s+)?jarvis[\s,!.]*)?(?:(?:fammi|facciamo|dammi)\s+(?:il\s+|un\s+)?(?:briefing|punto)|briefing(?:\s+a\s+voce)?|cosa\s+(?:devo|c[’']?è\s+da)\s+decidere|cosa\s+mi\s+hai\s+preparato|cosa\s+(?:c[’']?è\s+)?(?:di\s+)?pronto(?:\s+per\s+me)?)[\s?!.]*$/i;
 const SKIP_WORDS = /^\W*(?:salta(?:la)?|passa(?:\s+oltre)?|prossim[ao]|avanti|la\s+prossima|dopo|più\s+tardi|ci\s+penso\s+dopo)[\s!.]*$/i;

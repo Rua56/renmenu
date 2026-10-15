@@ -512,6 +512,16 @@ export async function autoPrepareTick(db, env = {}, { budgetMs = 50_000, calmMs 
         const venue = (() => { try { const nome = JSON.parse(draft.menu_json).nome; return typeof nome === 'string' ? nome : nome?.it || ''; } catch { return ''; } })() || 'la pratica';
         const done = (entry.log || []).length ? `Ho preparato da solo:\n${entry.log.map((line) => `• ${line}`).join('\n')}\n\n` : '';
         const ask = (brief.buttons || []).some(([, data]) => String(data).startsWith('aff:')) ? `Anteprima pronta per «${venue}»: la mando al locale?` : `«${venue}»: ho preparato tutto quello che potevo, ma l’anteprima non può ancora partire.`;
+        // Regola di Riccardo («impara da te»): l'anteprima parte da sola, lui riceve l'avviso con quello che ho fatto.
+        const go = (brief.buttons || []).find(([, data]) => String(data).startsWith('aff:'));
+        if (go && await missions.habitOn(db, 'anteprima').catch(() => false)) {
+          const [, id, revision, mode] = String(go[1]).split(':');
+          const out = await missions.runEntrust(db, env, id, Number(revision), mode || 'n').catch((error) => ({ text: `Non sono riuscito ad affidarla: ${String(error?.message || 'errore').slice(0, 160)}` }));
+          const text = `«${venue}»: bozza pronta e controlli passati, quindi per la tua regola l’ho affidata io.\n\n${done}${out.text}\n\nPer togliere la regola scrivimi «le mie regole».`;
+          await missions.ping(db, env, text, null, 'importante', draft.request_id).catch(() => null);
+          sent.push({ draftId, text, buttons: null, auto: true });
+          continue;
+        }
         const text = `${ask}\n\n${done}${brief.text}`;
         await missions.ping(db, env, text, brief.buttons || null, 'importante', draft.request_id).catch(() => null);
         sent.push({ draftId, text, buttons: brief.buttons || null });
