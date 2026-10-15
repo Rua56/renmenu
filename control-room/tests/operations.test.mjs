@@ -489,6 +489,23 @@ describe('private AI + GitHub operations (fakes only)', () => {
       assert.equal(race.calls.length, 0, 'la seconda apertura non scrive su GitHub');
       release();
       assert.equal((await first).status, 'pr_open', 'la prima apertura finisce normalmente');
+
+      // Apertura interrotta a metà (es. tante foto, la richiesta finisce il tempo): riserva senza errore e vecchia.
+      // Non è un esito incerto da riconciliare a mano: si riprende, ogni passo su GitHub è idempotente.
+      const requestId4 = insertRequest(db, { id: 'request-cut', clientId: 'client-4', kind: 'aggiornamento', status: 'approvata', revision: 3 });
+      db.sqlite.prepare('INSERT INTO drafts (id,request_id,slug,menu_json,status,checks_json,revision,created_at,updated_at) VALUES (?,?,?,?,?,?,?,?,?)')
+        .run('draft-cut', requestId4, 'osteria-di-prova', JSON.stringify(menu()), 'pronta_pr', JSON.stringify(checks()), 2, now(), now());
+      await approveSeeded(db, 'draft-cut', requestId4);
+      const cutPayload = { ...payload, draftId: 'draft-cut', revision: 2, requestRevision: 3, operationKey: 'operation-live-cut' };
+      const reserve = githubFetch();
+      let hang; const never = new Promise((resolve) => { hang = resolve; });
+      runPrivateIntegrationAction(context(db, { GITHUB_PROVIDER: 'live', GITHUB_TOKEN: 'test-token', GITHUB_FETCH: async () => never }), 'githubOpenPr', cutPayload).catch(() => {});
+      for (let i = 0; i < 20 && !getOne(db, 'SELECT id FROM live_pr_operations WHERE draft_id=?', 'draft-cut'); i += 1) await new Promise((r) => setTimeout(r, 5));
+      db.sqlite.prepare("UPDATE live_pr_operations SET updated_at='2026-01-01T00:00:00.000Z' WHERE draft_id=?").run('draft-cut');
+      const resumed = await runPrivateIntegrationAction(context(db, { GITHUB_PROVIDER: 'live', GITHUB_TOKEN: 'test-token', GITHUB_FETCH: reserve.fetch }), 'githubOpenPr', cutPayload);
+      assert.equal(resumed.status, 'pr_open', JSON.stringify(resumed));
+      assert.equal(getOne(db, 'SELECT status FROM live_pr_operations WHERE draft_id=?', 'draft-cut').status, 'pr_open');
+      hang(new Response('{}', { status: 500 }));
     } finally { db.close(); }
   });
 

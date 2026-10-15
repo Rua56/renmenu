@@ -150,18 +150,37 @@ export function menuMediaFiles(menu) {
   return [...found.values()];
 }
 
+// Tutte le foto mancanti in un solo commit (blob in parallelo, poi un albero e un commit): con decine di
+// bottiglie (Trattoria Blanch, 60+) un commit per foto superava il tempo di una richiesta e la PR restava a metà.
+const MEDIA_DIR = 'menus/media';
+const BLOBS_AT_ONCE = 6;
 async function writeMediaFiles(env, branch, media, options) {
-  for (const file of media || []) {
-    if (!/^menus\/media\/[a-f0-9]{64}\.(?:jpg|webp|png)$/.test(file?.path || '') || typeof file.base64 !== 'string' || !file.base64.length) fail('INVALID_MEDIA', 'Foto del menu non valida.', { status: 422 });
-    const endpoint = `/contents/${file.path}`;
-    const existing = await githubRequest(env, `${endpoint}?ref=${encodeURIComponent(branch)}`, { ...options, allowStatuses: [404] });
-    if (existing.status === 200) continue; // stesso nome = stesso contenuto (sha256): già presente
-    const put = await githubRequest(env, endpoint, { ...options, method: 'PUT', allowStatuses: [409, 422],
-      body: { message: `Foto del menu ${file.path.slice(13, 25)}`, content: file.base64, branch } });
-    if (put.status === 200 || put.status === 201) continue;
-    const again = await githubRequest(env, `${endpoint}?ref=${encodeURIComponent(branch)}`, { ...options, allowStatuses: [404] });
-    if (again.status !== 200) fail('MEDIA_WRITE_CONFLICT', `GitHub non ha salvato la foto ${file.path}.`, { status: put.status });
+  const files = media || [];
+  for (const file of files) if (!/^menus\/media\/[a-f0-9]{64}\.(?:jpg|webp|png)$/.test(file?.path || '') || typeof file.base64 !== 'string' || !file.base64.length) fail('INVALID_MEDIA', 'Foto del menu non valida.', { status: 422 });
+  if (!files.length) return;
+  const listing = await githubRequest(env, `/contents/${MEDIA_DIR}?ref=${encodeURIComponent(branch)}`, { ...options, allowStatuses: [404] });
+  const present = new Set(listing.status === 200 && Array.isArray(listing.data) ? listing.data.map((entry) => entry?.path) : []);
+  const missing = files.filter((file, i) => !present.has(file.path) && files.findIndex((f) => f.path === file.path) === i); // stesso nome = stesso contenuto (sha256)
+  if (!missing.length) return;
+  const entries = [];
+  for (let i = 0; i < missing.length; i += BLOBS_AT_ONCE) {
+    const chunk = missing.slice(i, i + BLOBS_AT_ONCE);
+    const made = await Promise.all(chunk.map((file) => githubRequest(env, '/git/blobs', { ...options, method: 'POST', body: { content: file.base64, encoding: 'base64' } })));
+    made.forEach((blob, j) => {
+      if (typeof blob.data?.sha !== 'string') fail('GITHUB_BAD_RESPONSE', 'GitHub non ha salvato una foto del menu.');
+      entries.push({ path: chunk[j].path, mode: '100644', type: 'blob', sha: blob.data.sha });
+    });
   }
+  // Il branch è solo della proposta: se nel frattempo è avanzato si riprova una volta sulla nuova punta.
+  for (let attempt = 0; attempt < 2; attempt += 1) {
+    const head = refSha(await getRef(env, branch, options));
+    const parent = await githubRequest(env, `/git/commits/${head}`, options);
+    const tree = await githubRequest(env, '/git/trees', { ...options, method: 'POST', body: { base_tree: parent.data?.tree?.sha, tree: entries } });
+    const commit = await githubRequest(env, '/git/commits', { ...options, method: 'POST', body: { message: `Foto del menu (${entries.length})`, tree: tree.data?.sha, parents: [head] } });
+    const moved = await githubRequest(env, `/git/refs/heads/${branch}`, { ...options, method: 'PATCH', body: { sha: commit.data?.sha, force: false }, allowStatuses: [409, 422] });
+    if (moved.status === 200) return;
+  }
+  fail('MEDIA_WRITE_CONFLICT', 'GitHub non ha salvato le foto del menu sul branch della proposta.', { status: 409 });
 }
 
 function contentPath(slug) {
@@ -527,6 +546,15 @@ export async function openApprovedMenuPr(env, approvedSnapshot, options = {}) {
 
   const mainRef = await getRef(env, BASE_BRANCH, options);
   if (refSha(mainRef) !== baseSha) {
+    // Branch già scritto da un tentativo interrotto (es. a metà delle foto) con questo stesso menu: si riprende da lì,
+    // anche se nel frattempo main è andato avanti (la PR parte dalla base approvata, GitHub la unisce come le altre).
+    const started = await getRef(env, branch, options, true);
+    const onBranch = started ? await readCurrentMenu(env, slug, { ...options, ref: branch }) : null;
+    if (onBranch?.exists && sameMenu(onBranch.menu, local.menu)) {
+      await writeMediaFiles(env, branch, snapshot.media, options);
+      const resumed = await createOrRecoverPr(env, local, branch, options);
+      return { branch, filePath: local.filePath, changes: local.changes, reused: true, wrote: false, pr: prSummary(resumed.pr) };
+    }
     fail('BASE_SHA_CONFLICT', 'Il branch main è cambiato dopo l’approvazione.', { status: 409 });
   }
   // Read from the immutable reviewed commit, not a moving `main` name.
