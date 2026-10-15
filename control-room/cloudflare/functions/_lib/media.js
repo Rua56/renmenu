@@ -302,6 +302,26 @@ export function removeMedia(menu, { target, url }) {
 }
 
 /** Bozza rifatta: rimette le foto già confermate al loro posto (ritrovato per nome). */
+/**
+ * Foto nel menu con un indirizzo che non si apre più (la foto confermata lì ha cambiato indirizzo): si rimette
+ * quello giusto. Tocca solo le voci la cui foto non è di nessuna foto confermata.
+ */
+export function repairBrokenPhotos(menu, mediaRows) {
+  const confirmed = mediaRows.filter((m) => m.status === 'confermata' && m.public_url);
+  const live = new Set(confirmed.map((m) => m.public_url));
+  let next = menu;
+  const fixed = [];
+  for (const media of confirmed) {
+    const target = resolveTarget(next, media.target, media.target_name);
+    const m = /^voce:(\d+):(\d+)$/.exec(String(target || ''));
+    const voce = m && next.sezioni?.[Number(m[1])]?.voci?.[Number(m[2])];
+    if (!voce?.foto || voce.foto === media.public_url || live.has(voce.foto)) continue;
+    if (next === menu) next = structuredClone(menu);
+    next.sezioni[Number(m[1])].voci[Number(m[2])].foto = media.public_url;
+    fixed.push(text(voce.nome) || target);
+  }
+  return { menu: next, fixed };
+}
 export function reapplyConfirmed(menu, mediaRows) {
   let next = menu;
   const applied = [], lost = [];

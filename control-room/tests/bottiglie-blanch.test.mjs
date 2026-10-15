@@ -4,7 +4,7 @@ import { readFileSync, readdirSync } from 'node:fs';
 import { DatabaseSync } from 'node:sqlite';
 import { autoPrepareTick, missions } from '../cloudflare/functions/control-room/api/[[route]].js';
 import { blanchToMenu, compileBlanch, isBlanchBottleSection } from '../cloudflare/functions/_lib/blanch.js';
-import { menuSlots, proposeTargets } from '../cloudflare/functions/_lib/media.js';
+import { menuSlots, proposeTargets, repairBrokenPhotos } from '../cloudflare/functions/_lib/media.js';
 import { winesWithoutPhoto } from '../cloudflare/functions/_lib/bottle-search.js';
 import { previewUrl } from '../cloudflare/functions/_lib/approvals.js';
 import { PREP_KEY, enrollPrep, parsePrep } from '../cloudflare/functions/_lib/autoprep.js';
@@ -149,4 +149,22 @@ test('una nuova ricerca toglie le bottiglie di un\'altra cantina e ricerca i vin
   const entry = parsePrep(await missions.setting(db, PREP_KEY)).db;
   assert.equal(entry.rechecked, true);
   assert.equal(entry.wrong, 1);
+});
+
+test('una foto con l\'indirizzo vecchio (non più servito) torna a quello della foto confermata', () => {
+  const menu = blanch();
+  const [a, b] = menuSlots(menu).filter((s) => s.name === 'Friulano');
+  const at = (slot) => slot.target.split(':').slice(1).map(Number);
+  const url = (c) => `https://renmenu-jarvis-stage.pages.dev/jarvis-hook/media/${c.repeat(64)}.jpg`;
+  menu.sezioni[at(a)[0]].voci[at(a)[1]].foto = url('a');
+  menu.sezioni[at(b)[0]].voci[at(b)[1]].foto = url('c');
+  const rows = [
+    { status: 'confermata', target: a.target, target_name: 'Friulano', public_url: url('b') },
+    { status: 'confermata', target: b.target, target_name: 'Friulano', public_url: url('c') }
+  ];
+  const { menu: fixed, fixed: names } = repairBrokenPhotos(menu, rows);
+  assert.deepEqual(names, ['Friulano']);
+  assert.equal(fixed.sezioni[at(a)[0]].voci[at(a)[1]].foto, url('b'));
+  assert.equal(fixed.sezioni[at(b)[0]].voci[at(b)[1]].foto, url('c'));
+  assert.equal(repairBrokenPhotos(fixed, rows).fixed.length, 0);
 });
