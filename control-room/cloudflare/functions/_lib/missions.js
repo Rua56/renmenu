@@ -876,8 +876,33 @@ export function createMissions(deps) {
     await clear();
     await sendTg(db, env, chat, outcome.text, null, deps.fetchImpl);
   }
+  // Telegram ripete lo stesso aggiornamento finché non riceve risposta: se un messaggio blocca Jarvis
+  // (lavoro troppo lungo, errore a metà) la coda si ferma e i messaggi dopo non arrivano più. Ogni
+  // update_id si lavora una volta sola: alla ripetizione Jarvis lo dice a Riccardo e lascia passare la coda.
+  const SEEN_KEY = 'tg_seen';
+  async function retriedUpdate(db, env, chat, update) {
+    const uid = Number(update?.update_id);
+    if (!Number.isSafeInteger(uid) || !chat) return false;
+    let seen = []; try { seen = JSON.parse(await setting(db, SEEN_KEY) || '[]'); } catch { seen = []; }
+    if (!Array.isArray(seen)) seen = [];
+    const hit = seen.find((e) => e?.id === uid);
+    if (!hit) {
+      seen.push({ id: uid, at: now() });
+      await putSetting(db, SEEN_KEY, JSON.stringify(seen.slice(-60))).catch(() => {});
+      return false;
+    }
+    if (!hit.told) {
+      hit.told = true;
+      await putSetting(db, SEEN_KEY, JSON.stringify(seen)).catch(() => {});
+      const said = String(update.message?.text || update.message?.caption || '').trim().slice(0, 120);
+      await auditedBatch(jarvisDb(db), [], 'jarvis.telegram_retry', `Messaggio ripetuto da Telegram e lasciato passare: ${said || 'senza testo'}`.slice(0, 240), null).catch(() => {});
+      if (update.message) await sendTg(db, env, chat, `Il messaggio${said ? ` «${said}»` : ''} mi ha bloccato a metà e Telegram continuava a rimandarmelo, così lo lascio perdere per non fermare gli altri. Se serve ancora, riscrivimelo in un altro modo.`, null, deps.fetchImpl).catch(() => {});
+    }
+    return true;
+  }
   async function telegramUpdate(db, env, update) {
     const chat = await setting(db, 'telegram_chat_id');
+    if (await retriedUpdate(db, env, chat, update)) return;
     if (update?.callback_query) {
       const query = update.callback_query, from = String(query.message?.chat?.id || '');
       if (!chat || from !== chat) return;
@@ -1697,6 +1722,7 @@ export function createMissions(deps) {
   async function clientPhoneTurn(db, text) {
     const asked = parseClientPhone(text);
     if (!asked) return null;
+    if (!asked.number) return `Dimmi il numero, per esempio: «il numero di ${asked.venue} è 333 1234567». Lo salvo sulla scheda del locale.`;
     const phone = normalizePhone(asked.number);
     if (!phone) return `«${asked.number}» non mi sembra un numero di telefono: scrivilo con tutte le cifre, per esempio 333 1234567.`;
     const clients = await rows(db, 'SELECT id,name,menu_id,phone FROM clients').catch(() => []);
