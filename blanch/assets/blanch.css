@@ -123,6 +123,13 @@ h1, h2, h3, h4, p, figure { margin: 0; }
 .menu-item__variants li { display: flex; justify-content: space-between; align-items: baseline; gap: 16px; color: #536050; font-size: 12px; }
 .menu-item__variants b { color: var(--forest); font-size: 13px; font-weight: 700; white-space: nowrap; font-variant-numeric: tabular-nums; }
 .menu-section--wine .menu-item__name { font-size: 25px; }
+.menu-item--bottle { grid-template-columns: 58px minmax(0,1fr) auto; align-items: center; }
+.menu-item__bottle { width: 58px; height: 92px; padding: 0; border: 0; background: none; cursor: zoom-in; }
+.menu-item__bottle img { width: 100%; height: 100%; object-fit: contain; mix-blend-mode: multiply; filter: drop-shadow(0 6px 8px rgba(39,42,35,.12)); }
+.bottle-zoom { max-width: min(92vw, 520px); max-height: 92vh; padding: 18px; border: 0; background: var(--paper); box-shadow: 0 24px 60px rgba(7,18,12,.35); cursor: zoom-out; }
+.bottle-zoom::backdrop { background: rgba(39,42,35,.6); }
+.bottle-zoom img { display: block; max-width: 100%; max-height: calc(92vh - 36px); margin: auto; object-fit: contain; mix-blend-mode: multiply; }
+.draft-banner { position: sticky; top: 0; z-index: 50; margin: 0; padding: 8px 16px; background: var(--rust); color: var(--paper); text-align: center; font: 600 12px/1.4 var(--sans); letter-spacing: .04em; }
 .menu-section--wine .menu-item__price { color: var(--rust); }
 .is-wine .menu-section h3 { color: var(--rust); }
 .is-wine .menu-section__head { border-color: var(--rust); }
@@ -218,6 +225,8 @@ h1, h2, h3, h4, p, figure { margin: 0; }
   .menu-item__price { min-width: 58px; font-size: 14px; }
   .menu-item__price--double { min-width: 80px; }
   .menu-section--wine .menu-item__name { font-size: 23px; }
+  .menu-item--bottle { grid-template-columns: 46px minmax(0,1fr) auto; }
+  .menu-item__bottle { width: 46px; height: 76px; }
   .editorial-feature { margin: 39px 0 3px; grid-template-columns: 1fr; }
   .editorial-feature img { min-height: 0; height: auto; }
   .editorial-feature__text { padding: 25px; }

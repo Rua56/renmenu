@@ -37,6 +37,7 @@ import { briefLines, briefNotes, creativeBrief, premiumDirections, storyFromSour
 import { SCHEDE_AUTO_SOURCE, applySchede, proposeSchede } from '../../_lib/premium-schede.js';
 import { CANTINA_SOURCE, PER_ROUND as BOTTLES_PER_ROUND, findBottle, parseSourceNote, slotFrequencies, sourceNote, winesWithoutPhoto } from '../../_lib/bottle-search.js';
 import { menuSlots } from '../../_lib/media.js';
+import { isBlanchBottleSection, isBlanchSlug } from '../../_lib/blanch.js';
 import { applyVenueInfo, extractVenueInfo } from '../../_lib/venue-info.js';
 import { applyPriceCorrections } from '../../_lib/corrections.js';
 import { applyOps as applyDraftOps, editLogKey, replayableOps } from '../../_lib/draft-edit.js';
@@ -420,9 +421,9 @@ const SHRINKS_PER_ROUND = 3;
 async function autoPlaceMedia(db, env, draft, noShrink = {}) {
   const jarvis = asJarvis(db);
   let found = [];
-  try { found = await rows(db, 'SELECT m.*, x.filename, x.r2_key, x.mime AS material_mime FROM media_items m JOIN materials x ON x.id=m.material_id WHERE m.request_id=? AND x.archived_at IS NULL ORDER BY m.created_at ASC', draft.request_id); }
+  try { found = await rows(db, 'SELECT m.*, x.filename, x.r2_key, x.mime AS material_mime, x.source AS material_source, x.text_preview AS material_note FROM media_items m JOIN materials x ON x.id=m.material_id WHERE m.request_id=? AND x.archived_at IS NULL ORDER BY m.created_at ASC', draft.request_id); }
   catch (error) { if (/no such table/i.test(String(error?.message))) return { placed: [], heavy: [] }; throw error; }
-  const group = found.map((row) => ({ ...row, label: parseLabel(row.label_json) }));
+  const group = found.map((row) => ({ ...row, label: parseLabel(row.label_json), forWine: row.material_source === CANTINA_SOURCE ? parseSourceNote(row.material_note)?.wine || '' : '' }));
   const proposals = proposeTargets(JSON.parse(draft.menu_json), group);
   const placed = [], heavy = [], unsure = [], shrunk = [];
   let more = false, tried = 0;
@@ -495,8 +496,8 @@ async function prepStep(db, env, draft, step, entry) {
     return { note: `schede: ${done.applied} tra vini e piatti` };
   }
   if (step === 'bottiglie') {
-    if (!menu.premium || !env.BUCKET?.put || typeof env.AI?.run !== 'function') return {};
-    if (entry.rounds >= MAX_ROUNDS) return { note: 'foto delle bottiglie: mi sono fermato dopo troppi giri' };
+    if ((!menu.premium && !isBlanchSlug(draft.slug)) || !env.BUCKET?.put || typeof env.AI?.run !== 'function') return {};
+    if (entry.rounds >= (entry.maxRounds || MAX_ROUNDS)) return { note: 'foto delle bottiglie: mi sono fermato dopo troppi giri' };
     try {
       const out = (await action(jarvis, 'findBottlePhotos', { id: draft.id }, env)).result;
       const found = (entry.bottles || 0) + out.found;
@@ -508,12 +509,12 @@ async function prepStep(db, env, draft, step, entry) {
     }
   }
   if (step === 'foto') {
-    if (!menu.premium) return {};
+    if (!menu.premium && !isBlanchSlug(draft.slug)) return {};
     entry.noShrink = entry.noShrink || {};
     const { placed, heavy, unsure = [], shrunk = [], more = false } = await autoPlaceMedia(db, env, draft, entry.noShrink);
     entry.placed = (entry.placed || 0) + placed.length;
     entry.shrunk = (entry.shrunk || 0) + shrunk.length;
-    if (more && entry.rounds < MAX_ROUNDS) return { again: true };
+    if (more && entry.rounds < (entry.maxRounds || MAX_ROUNDS)) return { again: true };
     const parts = [entry.placed ? `foto messe nel menu: ${entry.placed}` : '', entry.shrunk ? `${entry.shrunk} ridotte da me perché troppo pesanti` : '',
       heavy.length ? `${heavy.length} da sistemare tu in Revisione (${heavy.slice(0, 3).join(', ')})` : '',
       unsure.length ? `${unsure.length} senza un posto sicuro, scegli tu in Revisione (${unsure.slice(0, 3).join(', ')})` : ''].filter(Boolean);
@@ -549,9 +550,17 @@ export async function autoPrepareTick(db, env = {}, { budgetMs = 50_000, calmMs 
       const step = nextStep(entry);
       if (!step || step === 'pronta') {
         await save(null);
-        const brief = await missions.entrustBrief(db, env, draft.id);
         const venue = (() => { try { const nome = JSON.parse(draft.menu_json).nome; return typeof nome === 'string' ? nome : nome?.it || ''; } catch { return ''; } })() || 'la pratica';
         const done = (entry.log || []).length ? `Ho preparato da solo:\n${entry.log.map((line) => `• ${line}`).join('\n')}\n\n` : '';
+        if (entry.notifyOnly) {
+          // Lavoro chiesto da Riccardo su una bozza: solo l'avviso con il link, nessuna domanda e nessuna regola automatica.
+          const link = await missions.peekLink(db, env, draft.id).catch(() => '');
+          const text = `«${venue}»: ho finito.\n\n${done}${link ? `Guarda la bozza: ${link}\n(solo da vedere, vale 24 ore)\n\n` : ''}Le foto le trovi anche in Revisione → «Foto», dove puoi spostarle o toglierle. Online non cambia niente finché non pubblichi tu.`;
+          await missions.ping(db, env, text, [['Affida a Jarvis', `affq:${draft.id}`]], 'importante', draft.request_id).catch(() => null);
+          sent.push({ draftId, text, buttons: null });
+          continue;
+        }
+        const brief = await missions.entrustBrief(db, env, draft.id);
         const ask = (brief.buttons || []).some(([, data]) => String(data).startsWith('aff:')) ? `Anteprima pronta per «${venue}»: la mando al locale?` : `«${venue}»: ho preparato tutto quello che potevo, ma l’anteprima non può ancora partire.`;
         // Regola di Riccardo («impara da te»): l'anteprima parte da sola, lui riceve l'avviso con quello che ho fatto.
         const go = (brief.buttons || []).find(([, data]) => String(data).startsWith('aff:'));
@@ -646,7 +655,7 @@ async function mediaRows(db, rawDrafts) {
   try { list = await rows(db, 'SELECT m.*, x.filename, x.source AS material_source, x.text_preview AS material_note FROM media_items m JOIN materials x ON x.id=m.material_id WHERE x.archived_at IS NULL ORDER BY m.created_at ASC LIMIT 400'); }
   catch { return []; }
   const byRequest = new Map();
-  for (const raw of list) { const row = { ...raw, label: parseLabel(raw.label_json) }; byRequest.set(row.request_id, [...(byRequest.get(row.request_id) || []), row]); }
+  for (const raw of list) { const row = { ...raw, label: parseLabel(raw.label_json), forWine: raw.material_source === CANTINA_SOURCE ? parseSourceNote(raw.material_note)?.wine || '' : '' }; byRequest.set(row.request_id, [...(byRequest.get(row.request_id) || []), row]); }
   const out = [];
   for (const [requestId, group] of byRequest) {
     const draft = rawDrafts.find((d) => d.requestId === requestId);
@@ -1382,7 +1391,7 @@ async function action(db, type, input, env = {}) {
     assert(draft, 'Bozza non trovata.', 404);
     assert(['bozza', 'revisione', 'pronta_pr'].includes(draft.status), 'Bozza già chiusa: apri una nuova pratica.', 409);
     const menu = JSON.parse(draft.menu_json);
-    assert(menu?.premium && typeof menu.premium === 'object', 'Le foto delle cantine sono per il menu Premium.', 422);
+    assert((menu?.premium && typeof menu.premium === 'object') || isBlanchSlug(draft.slug), 'Le foto delle cantine sono per il menu Premium (e per la carta dei vini di Trattoria Blanch).', 422);
     assert(env.BUCKET?.put, 'Archivio privato non configurato.', 503);
     assert(typeof env.AI?.run === 'function', 'Riconoscimento delle foto non disponibile in questo ambiente.', 503);
     const gemini = await geminiConfig(db, env);
@@ -1391,7 +1400,7 @@ async function action(db, type, input, env = {}) {
     const searched = Array.isArray(creative.bottiglie?.cercate) ? creative.bottiglie.cercate : [];
     const media = await rows(db, "SELECT m.status, x.text_preview AS note FROM media_items m JOIN materials x ON x.id=m.material_id WHERE m.request_id=? AND x.source=? AND m.status<>'scartata'", draft.request_id, CANTINA_SOURCE);
     const pending = media.map((m) => parseSourceNote(m.note)?.wine).filter(Boolean);
-    const all = winesWithoutPhoto(menu, [...searched.map((x) => x.name), ...pending]);
+    const all = winesWithoutPhoto(menu, [...searched.map((x) => x.key || x.name), ...pending], isBlanchSlug(draft.slug) ? isBlanchBottleSection : null);
     const round = all.slice(0, BOTTLES_PER_ROUND);
     assert(round.length, all.length === 0 && !searched.length ? 'Tutti i vini hanno già una foto.' : 'Jarvis ha già cercato tutti i vini senza foto.', 422);
     const df = slotFrequencies(menuSlots(menu));
@@ -1401,7 +1410,7 @@ async function action(db, type, input, env = {}) {
       let res;
       try { res = await findBottle(gemini, slot, df, { classify: (bytes, mime) => classifyPhoto(env.AI, bytes, mime) }); }
       catch (error) { res = { reason: `ricerca non riuscita (${String(error?.message || 'errore').slice(0, 80)})` }; }
-      if (!res.found) { outcomes.push({ name: slot.name, found: false, reason: res.reason }); continue; }
+      if (!res.found) { outcomes.push({ name: slot.name, key: slot.key, found: false, reason: res.reason }); continue; }
       const f = res.found, materialId = uid(), key = `private/requests/${draft.request_id}/${materialId}`, stamp = now();
       const host = new URL(f.page).hostname.replace(/^www\./, '');
       await env.BUCKET.put(key, f.bytes, { httpMetadata: { contentType: f.mime } });
@@ -1412,11 +1421,26 @@ async function action(db, type, input, env = {}) {
           .bind(uid(), draft.request_id, materialId, f.seen.description || '', JSON.stringify(f.seen.label || {}), stamp, stamp)
       ], 'media.cantina', `Foto della bottiglia di «${slot.name}» trovata su ${host}: da confermare in Revisione (verifica di poterla usare).`, draft.request_id,
         { sql: 'SELECT 1 FROM materials WHERE id=?', args: [materialId] });
-      outcomes.push({ name: slot.name, found: true, host });
+      outcomes.push({ name: slot.name, key: slot.key, found: true, host });
     }
-    const next = { ...creative, bottiglie: { cercate: [...searched, ...outcomes.map(({ name, found, reason, host }) => ({ name, found, reason: reason || '', host: host || '' }))].slice(-300), at: now() } };
+    const next = { ...creative, bottiglie: { cercate: [...searched, ...outcomes.map(({ name, key, found, reason, host }) => ({ name, ...(key && key !== name ? { key } : {}), found, reason: reason || '', host: host || '' }))].slice(-300), at: now() } };
     await db.prepare('UPDATE drafts SET creative_json=? WHERE id=?').bind(JSON.stringify(next), id).run();
     result = { id, found: outcomes.filter((o) => o.found).length, outcomes, remaining: Math.max(0, all.length - round.length) };
+  } else if (type === 'queueBottleSearch') {
+    // «Cerca tutte le bottiglie»: Jarvis lavora in sottofondo, 3 vini per giro, mette le foto sui vini e alla fine avvisa su Telegram.
+    const id = identifier(p.id);
+    const draft = await getOne(db, 'SELECT * FROM drafts WHERE id=?', id);
+    assert(draft, 'Bozza non trovata.', 404);
+    assert(['bozza', 'revisione', 'pronta_pr'].includes(draft.status), 'Bozza già chiusa: apri una nuova pratica.', 409);
+    const menu = JSON.parse(draft.menu_json);
+    assert((menu?.premium && typeof menu.premium === 'object') || isBlanchSlug(draft.slug), 'Le foto delle cantine sono per il menu Premium (e per la carta dei vini di Trattoria Blanch).', 422);
+    const wines = winesWithoutPhoto(menu, [], isBlanchSlug(draft.slug) ? isBlanchBottleSection : null).length;
+    assert(wines, 'Tutti i vini hanno già una foto.', 422);
+    const queued = await enrollPrep({ get: missions.setting, put: missions.putSetting }, db, { draftId: draft.id, requestId: draft.request_id, plan: null,
+      steps: ['bottiglie', 'foto', 'pronta'], maxRounds: Math.max(MAX_ROUNDS, Math.ceil(wines / BOTTLES_PER_ROUND) + 2), notifyOnly: true }, new Date(Date.now() - 10 * 60_000).toISOString());
+    assert(queued, 'Jarvis sta già lavorando su questa bozza.', 409);
+    await auditedBatch(db, [], 'media.cantina_queue', `Ricerca delle bottiglie in sottofondo: ${wines} vini senza foto.`, draft.request_id);
+    result = { id, wines };
   } else if (type === 'entrustToJarvis') {
     // L'approvazione creativa «col tocco» vale solo dal riepilogo su Telegram, non da qui.
     result = await missions.entrust(db, env, { ...p, creativeEvidence: undefined });
@@ -1969,11 +1993,13 @@ async function action(db, type, input, env = {}) {
       target = resolveTarget(menu, String(p.target || ''), null);
       assert(target, 'Scegli dove mettere la foto.', 422);
       if (target === 'galleria') assert((menu.premium?.galleria || []).length < 8, 'La «Storia» ha già 8 foto: togline una prima.', 422);
+      // Trattoria Blanch (formato proprio): solo le foto delle bottiglie sui vini, senza scheda.
+      if (isBlanchSlug(draft.slug)) assert(/^voce:\d+:\d+$/.test(target) && isBlanchBottleSection(menu.sezioni[Number(target.split(':')[1])]), 'Nel menu di Trattoria Blanch le foto vanno solo sui vini in bottiglia.', 422);
       // Una foto per voce: quella già confermata lì torna «da sistemare».
       const others = await rows(db, "SELECT * FROM media_items WHERE request_id=? AND status='confermata' AND id<>?", media.request_id, media.id);
       const displaced = target === 'galleria' ? [] : others.filter((o) => resolveTarget(menu, o.target, o.target_name) === target);
       for (const o of displaced) menu = removeMedia(menu, { target, url: o.public_url });
-      const withLabel = p.withLabel === true && media.kind === 'bottiglia' && target.startsWith('voce:');
+      const withLabel = p.withLabel === true && media.kind === 'bottiglia' && target.startsWith('voce:') && !isBlanchSlug(draft.slug);
       menu = applyMedia(menu, { target, url: media.public_url, label, withLabel, alt: media.description });
       status = 'confermata';
       summary = `Foto «${material?.filename || 'foto'}» → ${targetLabel(menu, target)}${withLabel ? ' (con i dati dell’etichetta nella scheda)' : ''}.`;

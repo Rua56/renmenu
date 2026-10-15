@@ -16,11 +16,14 @@ export function prepSteps(plan) {
   return plan === 'premium' ? ['lingue', 'schede', 'bottiglie', 'foto', 'pronta'] : ['lingue', 'pronta'];
 }
 /** Mette in coda la preparazione di una bozza fatta da Jarvis (idempotente). */
-export async function enrollPrep({ get, put }, db, { draftId, requestId, plan }, at = new Date().toISOString()) {
+// steps/maxRounds/notifyOnly: preparazioni su richiesta di Riccardo (per esempio «cerca le foto delle bottiglie di Blanch»):
+// solo quei passi, più giri se i vini sono tanti, e alla fine un avviso con il link invece della domanda sull'anteprima.
+export async function enrollPrep({ get, put }, db, { draftId, requestId, plan, steps = null, maxRounds = null, notifyOnly = false }, at = new Date().toISOString()) {
   if (!draftId) return false;
   const state = parsePrep(await get(db, PREP_KEY));
   if (state[draftId]) return false;
-  state[draftId] = { requestId, plan: plan || null, steps: prepSteps(plan), done: [], log: [], at, tries: 0, rounds: 0 };
+  state[draftId] = { requestId, plan: plan || null, steps: steps || prepSteps(plan), done: [], log: [], at, tries: 0, rounds: 0,
+    ...(maxRounds ? { maxRounds } : {}), ...(notifyOnly ? { notifyOnly: true } : {}) };
   await put(db, PREP_KEY, JSON.stringify(state));
   return true;
 }

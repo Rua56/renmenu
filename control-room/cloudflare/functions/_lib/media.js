@@ -106,7 +106,8 @@ const isWineSection = (section) => {
   return section?.tipo !== 'degustazione' && (WINE_SECTION.test(name) || (voci.length > 0 && voci.every((v) => Array.isArray(v.prezzi) && v.prezzi.length)));
 };
 
-/** Voci della bozza a cui si può dare una foto: { target:'voce:s:i', name, section, wine }. */
+/** Voci della bozza a cui si può dare una foto: { target:'voce:s:i', name, section, wine, key }.
+ * key distingue i vini con lo stesso nome (Trattoria Blanch ha 12 «Friulano»): nome · cantina (l'inizio della descrizione). */
 export function menuSlots(menu) {
   const slots = [];
   (menu?.sezioni || []).forEach((section, si) => {
@@ -114,6 +115,12 @@ export function menuSlots(menu) {
     const wine = isWineSection(section);
     (section.voci || []).forEach((voce, vi) => slots.push({ target: `voce:${si}:${vi}`, name: text(voce.nome), descr: text(voce.descrizione), section: text(section.nome), wine }));
   });
+  const names = new Map();
+  for (const slot of slots) if (slot.wine) names.set(norm(slot.name), (names.get(norm(slot.name)) || 0) + 1);
+  for (const slot of slots) {
+    const producer = String(slot.descr || '').split(' — ')[0].trim().slice(0, 80);
+    slot.key = slot.wine && names.get(norm(slot.name)) > 1 && producer ? `${slot.name} · ${producer}` : slot.name;
+  }
   return slots;
 }
 
@@ -179,6 +186,11 @@ export function proposeTargets(menu, mediaRows) {
   const candidates = [], doubtful = [];
   for (const media of mediaRows) {
     if (media.status !== 'proposta') continue;
+    // Foto cercata da Jarvis per un vino preciso (sito della cantina): va su quel vino, non su un omonimo.
+    if (media.kind === 'bottiglia' && media.forWine) {
+      const slot = slots.find((s) => s.wine && norm(s.key) === norm(media.forWine) && !taken.has(s.target));
+      if (slot) { taken.add(slot.target); out.set(media.id, { target: slot.target, score: 0.95, why: `cercata per «${slot.key}»` }); continue; }
+    }
     if (media.kind === 'logo') { out.set(media.id, logoTaken ? { target: 'galleria', score: 0.3, why: 'c\'è già un logo: la propongo tra le foto del locale' } : { target: 'logo', score: 0.9, why: 'logo del locale: va all\'apertura del menu' }); logoTaken = true; continue; }
     if (media.kind === 'locale') { out.set(media.id, { target: 'galleria', score: 0.8, why: 'foto del locale: va nella scheda «La nostra storia»' }); continue; }
     if (media.kind === 'piatto') {
