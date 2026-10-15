@@ -12,6 +12,10 @@ import { validateMenu } from '../cloudflare/functions/_lib/menu.js';
 const dataFile = (name) => readFileSync(new URL(`../../blanch/data/${name}`, import.meta.url), 'utf8');
 const files = { food: dataFile('food.json'), wines: dataFile('wines.tsv'), menu: dataFile('menu.json') };
 const base = () => blanchToMenu(compileBlanch(files.food, files.wines));
+// Gli stessi file senza la colonna «photo» (com'erano prima delle foto delle bottiglie): i test sulle foto partono da qui.
+const withoutPhotos = (tsv) => (tsv.split('\n')[0].endsWith('\tphoto') ? tsv.split('\n').map((line) => (line ? line.split('\t').slice(0, 7).join('\t') : line)).join('\n') : tsv);
+const bare = (() => { const wines = withoutPhotos(files.wines); return { food: files.food, wines, menu: serializeCompiled(compileBlanch(files.food, wines)) }; })();
+const bareBase = () => blanchToMenu(compileBlanch(bare.food, bare.wines));
 const lines = (text) => text.split('\n');
 const diffLines = (a, b) => { const x = lines(a), y = lines(b); return x.length === y.length ? x.map((l, i) => (l === y[i] ? null : i)).filter((i) => i !== null).length : null; };
 
@@ -113,12 +117,12 @@ describe('Trattoria Blanch: lettura, scrittura e controllo', () => {
 
   it('foto delle bottiglie: colonna «photo» in wines.tsv solo quando serve, menu.json con «photo» solo su quei vini', () => {
     const url = `https://renmenu-jarvis-stage.pages.dev/jarvis-hook/media/${'a'.repeat(64)}.webp`;
-    const menu = base();
+    const menu = bareBase();
     const bianchi = menu.sezioni.find((s) => s.nome.it === 'Vini bianchi');
     bianchi.voci[1].foto = url;
     assert.deepEqual(unsupportedFields(menu), []);
-    const out = exportBlanchFiles(menu, files);
-    assert.equal(out.food, files.food);
+    const out = exportBlanchFiles(menu, bare);
+    assert.equal(out.food, bare.food);
     const [header, , second] = lines(out.wines);
     assert.equal(header, 'category\tproducer\tlocation\tname\tdetails\tprice\tsource\tphoto');
     assert.ok(second.endsWith(`\t${url}`));
@@ -131,19 +135,19 @@ describe('Trattoria Blanch: lettura, scrittura e controllo', () => {
     assert.equal(again.sezioni.find((s) => s.nome.it === 'Vini bianchi').voci[1].foto, url);
     delete again.sezioni.find((s) => s.nome.it === 'Vini bianchi').voci[1].foto;
     const back = exportBlanchFiles(again, { food: out.food, wines: out.wines, menu: out.menu });
-    assert.equal(back.menu, files.menu);
+    assert.equal(back.menu, bare.menu);
   });
 
   it('foto ammesse solo sui vini e solo se confermate in Revisione (servite da Jarvis)', () => {
-    const food = base();
+    const food = bareBase();
     food.sezioni[0].voci[0].foto = `https://renmenu-jarvis-stage.pages.dev/jarvis-hook/media/${'b'.repeat(64)}.jpg`;
     assert.match(unsupportedFields(food).join(), /foto/);
-    const outside = base();
+    const outside = bareBase();
     outside.sezioni.find((s) => s.nome.it === 'Vini rossi').voci[0].foto = 'https://example.com/bottiglia.jpg';
-    assert.throws(() => exportBlanchFiles(outside, files), /foto della bottiglia non valida/);
-    const bad = files.wines.replace('category\tproducer\tlocation\tname\tdetails\tprice\tsource', 'category\tproducer\tlocation\tname\tdetails\tprice\tsource\tphoto')
+    assert.throws(() => exportBlanchFiles(outside, bare), /foto della bottiglia non valida/);
+    const bad = bare.wines.replace('category\tproducer\tlocation\tname\tdetails\tprice\tsource', 'category\tproducer\tlocation\tname\tdetails\tprice\tsource\tphoto')
       .split('\n').map((line, i) => (i === 0 || !line ? line : `${line}\t${i === 1 ? 'http://x.it/a.jpg' : ''}`)).join('\n');
-    assert.throws(() => compileBlanch(files.food, bad), /foto della bottiglia non valida/);
+    assert.throws(() => compileBlanch(bare.food, bad), /foto della bottiglia non valida/);
   });
 
   it('non pubblica se il menu compilato online non coincide con le sorgenti', () => {

@@ -4,6 +4,7 @@ Si aggiunge una voce a ogni pull request che cambia un comportamento di Jarvis o
 
 ## 15 ottobre 2026
 
+- **Telefono del locale sulla scheda cliente.** Su Telegram, a voce o nella chat della Control Room: «il numero di Trattoria Blanch è 333 1234567» (oppure «aggiungi il telefono 333… a …»). Jarvis lo salva come +39… sulla scheda (`_lib/phone-number.js`, `clientPhoneTurn`), così i messaggi WhatsApp da quel numero entrano subito tra le pratiche del locale senza la domanda «è un locale?». Anche il campo Telefono della Control Room ora salva sempre il formato +39…, qualunque spaziatura si scriva. Rifiuta un numero già su un altro cliente. «metti il whatsapp … al menu di …» resta il pulsante «Prenota su WhatsApp» del menu Premium.
 - Pubblicazione con tante foto (Trattoria Blanch, 63 bottiglie): le foto vanno sul branch della PR tutte insieme in un solo commit invece di una alla volta (prima la richiesta finiva il tempo a metà e la PR non si apriva). Un'apertura interrotta a metà ora riprende da dove era rimasta, anche se main è andato avanti, invece di bloccarsi con «Operazione PR non coerente con la bozza revisionata».
 
 - **Locali di prova, cancellazione più sicura da far funzionare**: «togli i locali di prova» non dipende più dalla lettura del sito pubblico (i menu tolti sono quelli cancellati dal repository) e, se qualcosa non va, il motivo resta nel registro (`jarvis.test_clean`). Anche «elimina Osteria Al Tralcio» ora cancella le pratiche chiuse di un locale di prova col menu tolto.

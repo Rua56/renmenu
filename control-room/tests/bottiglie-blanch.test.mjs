@@ -12,7 +12,9 @@ import { PREP_KEY, enrollPrep, parsePrep } from '../cloudflare/functions/_lib/au
 
 // Foto delle bottiglie sulla carta dei vini di Trattoria Blanch (menu nel formato proprio, non Premium).
 const dataFile = (name) => readFileSync(new URL(`../../blanch/data/${name}`, import.meta.url), 'utf8');
-const blanch = () => blanchToMenu(compileBlanch(dataFile('food.json'), dataFile('wines.tsv')));
+// Senza la colonna «photo»: la carta com'era prima delle foto (74 bottiglie da cercare).
+const withoutPhotos = (tsv) => (tsv.split('\n')[0].endsWith('\tphoto') ? tsv.split('\n').map((line) => (line ? line.split('\t').slice(0, 7).join('\t') : line)).join('\n') : tsv);
+const blanch = () => blanchToMenu(compileBlanch(dataFile('food.json'), withoutPhotos(dataFile('wines.tsv'))));
 
 function database() {
   const sqlite = new DatabaseSync(':memory:');

@@ -9,6 +9,7 @@ import { shrinkPhoto } from '../../_lib/shrink.js';
 import { MEDIA_KINDS, PUBLIC_EXT, applyMedia, classifyPhoto, isMenuPhotoKind, parseLabel, proposeTargets, publicImageOk, reapplyConfirmed, removeMedia, repairBrokenPhotos, resolveTarget, targetLabel } from '../../_lib/media.js';
 import { speak, transcribe } from '../../_lib/voice.js';
 import { ensureLiveAgent, liveSignedUrl } from '../../_lib/phone.js';
+import { normalizePhone } from '../../_lib/phone-number.js';
 import { OWNER_REVIEW } from '../../_lib/missions.js';
 import { readCurrentMenu } from '../../_lib/github-live.js';
 import { isSameOriginWrite, verifyOwner } from '../../_lib/auth.js';
@@ -940,7 +941,8 @@ async function action(db, type, input, env = {}) {
   if (type === 'createClient') {
     const name = clean(p.name, 140, 'Nome cliente');
     const email = p.email ? clean(p.email, 254, 'Email') : null;
-    const phone = p.phone ? clean(p.phone, 40, 'Telefono') : null;
+    const phone = p.phone ? normalizePhone(clean(p.phone, 40, 'Telefono')) : null;
+    assert(!p.phone || phone, 'Telefono non valido: scrivi tutte le cifre, per esempio 333 1234567.');
     assert(!email || /^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(email), 'Email non valida.');
     const plan = p.plan || 'da_definire';
     assert(plans.has(plan), 'Piano non valido.');
@@ -963,7 +965,9 @@ async function action(db, type, input, env = {}) {
     const value = (key, old, limit, label) => key in patch ? optional(patch[key], limit, label) : old;
     const name = 'name' in patch ? clean(patch.name, 140, 'Nome locale') : current.name;
     const email = value('email', current.email, 254, 'Email');
-    const phone = value('phone', current.phone, 40, 'Telefono');
+    const typedPhone = value('phone', current.phone, 40, 'Telefono');
+    const phone = 'phone' in patch && typedPhone ? normalizePhone(typedPhone) : typedPhone;
+    assert(!typedPhone || phone, 'Telefono non valido: scrivi tutte le cifre, per esempio 333 1234567.');
     const plan = 'plan' in patch ? patch.plan : current.plan;
     const paymentStatus = value('paymentStatus', current.payment_status, 30, 'Stato pagamento');
     assert(!email || /^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(email), 'Email non valida.');
