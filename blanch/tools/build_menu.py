@@ -9,6 +9,7 @@ from __future__ import annotations
 
 import csv
 import json
+import re
 from collections import Counter
 from pathlib import Path
 
@@ -21,6 +22,8 @@ CATEGORIES = {
     "Vini Dolci": {"it": "Vini dolci", "en": "Dessert wines", "de": "Dessertweine"},
     "Vini Spumanti": {"it": "Vini spumanti", "en": "Sparkling wines", "de": "Schaumweine"},
 }
+
+PHOTO_URL = re.compile(r"^https://renmenu-jarvis-stage\.pages\.dev/jarvis-hook/media/[a-f0-9]{64}\.(?:jpg|webp|png)$")
 
 
 def clean_item(item: dict) -> dict:
@@ -65,7 +68,8 @@ def main() -> None:
     with (DATA / "wines.tsv").open(encoding="utf-8", newline="") as source_file:
         reader = csv.DictReader(source_file, delimiter="\t")
         expected = {"category", "producer", "location", "name", "details", "price", "source"}
-        if set(reader.fieldnames or []) != expected:
+        # "photo" (facoltativa, in fondo): foto della bottiglia confermata in Revisione da Jarvis.
+        if set(reader.fieldnames or []) not in (expected, expected | {"photo"}):
             raise ValueError("Unexpected wines.tsv columns")
         for number, row in enumerate(reader, 2):
             if row["category"] not in wines:
@@ -78,6 +82,10 @@ def main() -> None:
             item = {"name": row["name"], "producer": producer, "price": "€ " + row["price"]}
             if row["details"]:
                 item["detail"] = row["details"]
+            if row.get("photo"):
+                if not PHOTO_URL.match(row["photo"]):
+                    raise ValueError(f"Invalid bottle photo on row {number}")
+                item["photo"] = row["photo"]
             wines[row["category"]]["items"].append(item)
     if not all(section["items"] for section in wines.values()):
         raise ValueError("All four wine sections must have entries")

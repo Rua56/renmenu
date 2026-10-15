@@ -685,9 +685,12 @@ async function mergeLivePr(context, p) {
   // Oltre al menu, solo le foto che il menu approvato usa (menus/media/<sha256>.<ext>), aggiunte e mai modificate.
   const allowedMedia = new Set(menuMediaFiles(JSON.parse(record.draft_menu_json)).map((f) => f.path));
   if (legacy) {
-    // Blanch: solo i suoi tre file (food.json, wines.tsv, menu.json), ognuno al massimo una volta, nessun'altra modifica.
-    assert(files.length > 0 && files.every((f) => BLANCH_FILE_LIST.includes(f.filename) && f.status === 'modified') && new Set(files.map((f) => f.filename)).size === files.length,
-      'La PR deve modificare solo i file di Trattoria Blanch (food.json, wines.tsv, menu.json).', 409);
+    // Blanch: solo i suoi tre file (food.json, wines.tsv, menu.json), ognuno al massimo una volta, più le foto delle bottiglie
+    // che il menu approvato usa (aggiunte, mai modificate). Nessun'altra modifica.
+    const own = files.filter((f) => BLANCH_FILE_LIST.includes(f.filename));
+    assert(own.length > 0 && own.every((f) => f.status === 'modified') && new Set(own.map((f) => f.filename)).size === own.length
+      && files.every((f) => BLANCH_FILE_LIST.includes(f.filename) || (allowedMedia.has(f.filename) && f.status === 'added')),
+    'La PR deve modificare solo i file di Trattoria Blanch (food.json, wines.tsv, menu.json) e aggiungere le foto delle bottiglie approvate.', 409);
   } else {
     assert(files.filter((f) => f.filename === filePath).length === 1
       && files.every((f) => f.filename === filePath || (allowedMedia.has(f.filename) && f.status === 'added')),

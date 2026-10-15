@@ -8,6 +8,7 @@ import { extractPdfText } from './material-extract.js';
 import { announce, briefing, chatIn, closeChat, onJarvisReply, onUserSays, openChat, refreshChat } from './jarvis-chat.js';
 import { attachHolo, focusVenue, holoOn, setHolo } from './jarvis-holo.js';
 import { venuesFor } from './jarvis-places.js';
+import { cutoutAll } from './cutout.js';
 import { logLines, markFresh } from './jarvis-log.js';
 import { play, setSounds, soundsAvailable, soundsOn } from './jarvis-sound.js';
 import { greetOnce, greetingFor, lastVisit, markVisit } from './jarvis-greet.js';
@@ -105,7 +106,8 @@ function draftForRequest(id = selectedRequestId) { return state?.drafts.find((dr
 function requestForDraft(draft) { return draft ? requestById(draft.requestId) : null; }
 function requestOptions(selected = selectedRequestId, includeEmpty = false) {
   const empty = includeEmpty ? '<option value="">Nessuna pratica</option>' : '';
-  return `${empty}${visibleRequests().map((request) => `<option value="${escapeHtml(request.id)}" ${request.id === selected ? 'selected' : ''}>${escapeHtml(request.subject)}</option>`).join('')}`;
+  // Pratiche con lo stesso nome (per esempio un messaggio ripetuto): si distingue quella che ha la bozza.
+  return `${empty}${visibleRequests().map((request) => `<option value="${escapeHtml(request.id)}" ${request.id === selected ? 'selected' : ''}>${escapeHtml(request.subject)}${draftForRequest(request.id) ? '' : ' · senza bozza'}</option>`).join('')}`;
 }
 function clientOptions(selected = '') { return (state?.clients || []).map((client) => `<option value="${escapeHtml(client.id)}" ${client.id === selected ? 'selected' : ''}>${escapeHtml(client.name)}</option>`).join(''); }
 function categoryOptions(selected = 'nuovo_standard', legacyKind = '') {
@@ -619,7 +621,7 @@ function renderReview() {
   const tabs = {
     dafare: `${sourceExtrasPanel(draft)}${rebuildPanel(draft)}${jarvisMissionPanel(draft)}${notesPanel(draft)}`,
     menu: `<div class="grid grid-2 spaced-top-small"><section class="panel"><div class="editor-toolbar"><div><p class="eyebrow">BOZZA ${escapeHtml(draft.slug)}</p><h2>Bozza · revisione ${draft.revision}</h2></div>${status(draft.status)}</div><details class="details-more"><summary>Modifica avanzata (JSON)</summary><textarea class="json-editor" id="menu-editor" spellcheck="false" aria-label="Editor JSON del menu">${escapeHtml(JSON.stringify(draft.menu, null, 2))}</textarea><div class="button-row spaced-top-tight"><button class="button secondary" type="button" data-action="validate-editor">Valida JSON</button><button class="button" type="button" data-action="save-editor" data-draft="${draft.id}" data-revision="${draft.revision}">Salva revisione</button>${missingEnglish(draft.menu) && ['bozza', 'revisione', 'pronta_pr'].includes(draft.status) ? `<button class="button secondary" type="button" data-action="translate-draft" data-draft="${draft.id}" data-revision="${draft.revision}">Traduci in inglese (Jarvis)</button>` : ''}</div></details>${renderEnglishPreview(draft)}<div id="editor-validation">${renderValidation(validation)}</div></section><aside class="panel"><p class="eyebrow">PROVENIENZA</p><h2>Campi leggibili</h2><div class="provenance">${(draft.provenance || []).length ? draft.provenance.map((entry) => `<div class="provenance-row"><code>${escapeHtml(entry.path)}</code><span class="status ${entry.status === 'confermato' ? 'good' : 'wait'}">${escapeHtml(entry.status.replace('_', ' '))}</span><small>${escapeHtml(entry.source)} · ${escapeHtml(entry.value)}</small></div>`).join('') : empty('Nessuna provenienza registrata.')}</div><hr class="divider"><p class="notice warning"><strong>Dati inferiti bloccati.</strong> Aggiungi prezzo, allergeni o traduzioni solo da una fonte confermata.</p></aside></div><div class="grid grid-equal spaced-top"><section class="panel tight"><p class="eyebrow">ORDINE SEZIONI</p><h2>Riordina senza riscrivere</h2><div id="reorder-list" class="reorder-list">${renderReorder(draft.menu)}</div><form data-form="add-section" class="inline-form spaced-top"><label class="field">Nuova sezione<input name="sectionName" required maxlength="80" placeholder="Nome esplicito dalla fonte"></label><button class="button secondary" type="submit">Aggiungi sezione</button></form></section><section class="panel tight"><p class="eyebrow">NUOVA VOCE</p><h2>Aggiungi con fonte</h2><form data-form="add-item"><div class="form-grid"><label class="field">Sezione<select name="sectionIndex">${draft.menu.sezioni.map((section, index) => `<option value="${index}">${escapeHtml(section.nome?.it || '')}</option>`).join('')}</select></label><label class="field">Prezzo esplicito<input name="price" inputmode="decimal" placeholder="es. 12,00"></label><label class="field full">Nome voce<input name="itemName" required maxlength="120" placeholder="Nome esplicito dalla fonte"></label></div><div class="form-actions"><button class="button secondary" type="submit">Aggiungi nell'editor</button></div></form></section></div>`,
-    premium: `${premiumPanel(draft)}${schedePanel(draft)}${mediaPanel(draft)}`,
+    premium: `${premiumPanel(draft)}${schedePanel(draft)}${blanchBottlesPanel(draft)}${mediaPanel(draft)}`,
     aspetto: `${themePicker(draft)}`,
     fonti: `${request ? `<section class="panel spaced-top"><div class="panel-heading"><div><p class="eyebrow">FONTE ORIGINALE</p><h2>Materiali privati della pratica</h2></div><span class="capsule">${state.materials.filter((item) => item.requestId === request.id && !item.archivedAt).length} attivi</span></div><div class="stack">${materialListRows(state.materials.filter((item) => item.requestId === request.id && !item.archivedAt), { allowArchive: false, emptyText: 'Nessun materiale attivo; usa la sezione Materiali per associare una fonte.' })}</div><p class="muted small spaced-top-small">In area privata il viewer usa Blob same-origin e non espone URL R2. In demo restano metadati, salvo la fixture PDF fittizia.</p></section>` : ''}`,
     controlli: `${request ? `<section class="panel"><p class="eyebrow">CHECKLIST</p><h2>Controlli visibili</h2><form data-form="review-draft"><input type="hidden" name="id" value="${draft.id}"><input type="hidden" name="revision" value="${draft.revision}"><div class="checklist">${checkRows(draft.checks)}</div>${criticalFields(draft.menu).allergensMissing.length ? `<div class="notice danger spaced-top-small"><strong>ALLERGENI NON CONFERMATI DAL LOCALE</strong><br>Non aggiungere tag o deduzioni: registra un riferimento scritto del locale anche quando l’informazione resta assente.</div><label class="check-row spaced-top-small"><input type="checkbox" name="allergenOmissionConfirmed" ${draft.checks?.allergenOmissionConfirmed ? "checked" : ""}><span><strong>Omissione esplicitamente autorizzata dal locale (solo mock)</strong><small>Attiva solo dopo conferma scritta: il menù non mostrerà numeri allergeni mancanti. Non equivale a una dichiarazione di assenza di allergeni.</small></span></label>` : `<div class="notice spaced-top-small"><strong>Numeri allergeni presenti.</strong> Verifica che ogni valore sia supportato dalla fonte originale.</div>`}${evidenceSuggestionNotice(draft, suggestion)}<div class="form-grid spaced-top-small"><label class="field">Evidenza prezzi (min. 12 caratteri)<textarea name="fieldEvidence-prices" maxlength="500" placeholder="Fonte controllabile per ogni prezzo verificato.">${escapeHtml(draft.fieldEvidence?.prices || draft.checks?.fieldEvidence?.prices || suggestion.prices || '')}</textarea></label><label class="field">Evidenza allergeni (min. 12 caratteri)<textarea name="fieldEvidence-allergens" maxlength="500" placeholder="Riferimento scritto del locale, anche per omissioni.">${escapeHtml(draft.fieldEvidence?.allergens || draft.checks?.fieldEvidence?.allergens || suggestion.allergens || '')}</textarea></label><label class="field full">Evidenza lingue (min. 12 caratteri)<textarea name="fieldEvidence-languages" maxlength="500" placeholder="Fonte per lingue e traduzioni dichiarate.">${escapeHtml(draft.fieldEvidence?.languages || draft.checks?.fieldEvidence?.languages || suggestion.languages || '')}</textarea></label></div><label class="field spaced-top-small">Evidenza approvazione scritta (se disponibile)<textarea name="approvalEvidence" maxlength="500" placeholder="Riferimento interno, senza inventare dati.">${escapeHtml(draft.checks?.clientApprovalEvidence || draft.approvalEvidence || '')}</textarea></label>${PLAN_RULES[request.plan]?.creativeApproval ? `<label class="check-row spaced-top-small"><input type="checkbox" name="creativeApproval" ${draft.checks?.creativeApproval ? 'checked' : ''}><span><strong>Approvazione creativa Premium (Riccardo)</strong><small>Obbligatoria per il piano Premium: confermi grafica, struttura e materiali autorizzati.</small></span></label><label class="field spaced-top-small">Riferimento approvazione creativa (min. 12 caratteri)<textarea name="creativeApprovalEvidence" maxlength="500" placeholder="Es. proposta grafica v2 approvata il …">${escapeHtml(draft.checks?.creativeApprovalEvidence || '')}</textarea></label>` : ''}<p class="notice warning">Le checkbox non bastano: per prezzi, allergeni e lingue serve una fonte controllabile. Prezzi assenti restano bloccanti finché non corretti.</p><div class="form-actions"><button class="button" type="submit">Registra checklist</button><button class="button secondary" type="button" data-route="approvazioni">Vai alle approvazioni</button></div></form></section>` : ''}`
@@ -679,12 +681,32 @@ function schedePanel(draft) {
     ${open.length ? `<div class="schede-grid">${open.map(card).join('')}</div>` : ''}
     ${skipped.length ? `<details class="details-more spaced-top-small"><summary>${skipped.length} voci lasciate al cliente</summary><ul class="small">${skipped.slice(-40).map((x) => `<li>${escapeHtml(x.name)}: ${escapeHtml(x.reason)}</li>`).join('')}</ul></details>` : ''}</section>`;
 }
+// Trattoria Blanch (formato proprio, non Premium): solo le foto delle bottiglie sulla carta dei vini.
+function blanchBottlesPanel(draft) {
+  if (!draft || draft.menu?.premium || draft.slug !== 'trattoria-blanch') return '';
+  const editable = ['bozza', 'revisione', 'pronta_pr'].includes(draft.status);
+  const wineSection = (sez) => /^vini (bianchi|rossi|dolci|spumanti)$/i.test(String(sez.nome?.it || sez.nome || '').trim());
+  const wines = (draft.menu.sezioni || []).filter(wineSection).flatMap((sez) => sez.voci || []);
+  const withPhoto = wines.filter((v) => v.foto).length;
+  const cercate = Array.isArray(draft.creative?.bottiglie?.cercate) ? draft.creative.bottiglie.cercate : [];
+  const missed = cercate.filter((x) => !x.found);
+  return `<section class="panel spaced-top-small" aria-labelledby="blanch-bottles-title"><div class="panel-heading"><div><p class="eyebrow">CARTA DEI VINI</p><h2 id="blanch-bottles-title">Foto delle bottiglie</h2></div><span class="capsule">${withPhoto} su ${wines.length} con foto</span></div>
+    <p class="muted small">Jarvis cerca la bottiglia di ogni vino sul sito della cantina e la mette sul vino giusto della bozza (tre vini per giro, in sottofondo; alla fine ti scrive su Telegram). Nella pagina di Blanch compare una piccola bottiglia accanto al vino, che si ingrandisce col tocco. Prima di pubblicare controlla di poter usare le foto.</p>
+    ${editable && withPhoto < wines.length ? `<div class="button-row spaced-top-tight"><button class="button" type="button" data-action="bottles-queue" data-draft="${draft.id}">Fai cercare tutte le bottiglie a Jarvis (${wines.length - withPhoto})</button><button class="button secondary" type="button" data-action="bottles-find" data-draft="${draft.id}">Cerca le prossime ${Math.min(3, wines.length - withPhoto)} adesso</button></div>` : ''}
+    ${cercate.length ? `<p class="muted small spaced-top-tight">Cercate finora: ${cercate.length - missed.length} trovate${missed.length ? `, ${missed.length} non trovate: ${escapeHtml(missed.slice(-12).map((x) => x.key || x.name).join(', '))}` : ''}.</p>` : ''}</section>`;
+}
 // Foto per il menu (Premium): Jarvis propone il posto, Riccardo conferma, sposta o scarta.
 const MEDIA_KIND = { logo: 'Logo', bottiglia: 'Bottiglia', piatto: 'Piatto', locale: 'Locale', altro: 'Altro' };
 const MEDIA_LABEL_NAMES = { nome: 'nome', cantina: 'cantina', annata: 'annata', vitigno: 'vitigno', denominazione: 'zona', gradazione: 'gradazione' };
 function mediaTargets(menu, kind) {
   const voci = [];
-  (menu?.sezioni || []).forEach((section, si) => { if (section?.tipo === 'degustazione') return; (section.voci || []).forEach((voce, vi) => voci.push({ value: `voce:${si}:${vi}`, label: `${section.nome?.it || section.nome || ''} › ${voce.nome?.it || voce.nome || ''}` })); });
+  // Voci con lo stesso nome nella stessa sezione (i dodici «Friulano» di Blanch): si distinguono con l'inizio della descrizione.
+  const nameOf = (voce) => String(voce.nome?.it || voce.nome || '');
+  (menu?.sezioni || []).forEach((section, si) => { if (section?.tipo === 'degustazione') return; (section.voci || []).forEach((voce, vi) => {
+    const twin = (section.voci || []).some((other, oi) => oi !== vi && nameOf(other).trim().toLowerCase() === nameOf(voce).trim().toLowerCase());
+    const hint = twin ? String(voce.descrizione?.it || voce.descrizione || '').split(' — ')[0].trim().slice(0, 40) : '';
+    voci.push({ value: `voce:${si}:${vi}`, label: `${section.nome?.it || section.nome || ''} › ${nameOf(voce)}${hint ? ` (${hint})` : ''}` });
+  }); });
   return [{ value: 'logo', label: 'Logo all’apertura' }, { value: 'galleria', label: 'Foto del locale («La nostra storia»)' }, ...voci];
 }
 function mediaPanel(draft) {
@@ -700,7 +722,7 @@ function mediaPanel(draft) {
     const where = m.status === 'confermata'
       ? `<p class="small"><span class="status good">nel menu</span> ${escapeHtml(m.targetLabel || '')}</p>`
       : m.proposal?.target ? `<p class="small"><strong>Jarvis propone:</strong> ${escapeHtml(m.proposal.label)} <span class="muted">(${escapeHtml(m.proposal.why)})</span></p>` : `<p class="small notice warning">${escapeHtml(m.proposal?.why || 'Scegli tu dove metterla.')}</p>`;
-    return `<article class="media-card" data-media-card="${escapeHtml(m.id)}"><img class="media-thumb${m.kind === 'logo' || m.kind === 'bottiglia' ? ' is-contain' : ''}" src="${escapeHtml(getMaterialUrl(m.materialId) || '')}" alt="${escapeHtml(m.description || m.filename)}" loading="lazy">
+    return `<article class="media-card" data-media-card="${escapeHtml(m.id)}"><img class="media-thumb${m.kind === 'logo' || m.kind === 'bottiglia' ? ' is-contain' : ''}"${m.kind === 'bottiglia' ? ' data-bottle' : ''} src="${escapeHtml(getMaterialUrl(m.materialId) || '')}" alt="${escapeHtml(m.description || m.filename)}" loading="lazy">
       <div class="media-body"><p class="eyebrow">${escapeHtml(MEDIA_KIND[m.kind] || m.kind)} · ${escapeHtml(m.filename)}</p>${m.description ? `<p class="small">${escapeHtml(m.description)}</p>` : ''}${label ? `<p class="small muted">Etichetta letta: ${escapeHtml(label)}</p>` : ''}${m.cantina ? `<p class="small notice warning">Dal web, per «${escapeHtml(m.cantina.wine)}»: <a href="${escapeHtml(m.cantina.page)}" target="_blank" rel="noopener">pagina della fonte</a>. Confermala solo se puoi usarla (sito della cantina o permesso del locale).</p>` : ''}${where}</div>
       ${editable ? `<div class="media-actions"><label class="field">Dove la metto<select name="target"><option value="">— scegli —</option>${options}</select></label>${m.kind === 'bottiglia' && label ? `<label class="check-row"><input type="checkbox" name="withLabel" ${m.status !== 'confermata' || m.withLabel ? 'checked' : ''}><span><small>Aggiungi i dati dell’etichetta alla scheda del vino (solo i campi vuoti)</small></span></label>` : ''}
       <div class="button-row spaced-top-tight"><button class="button small-button" type="button" data-action="media-place" data-media-id="${escapeHtml(m.id)}" data-revision="${draft.revision}">${m.status === 'confermata' ? 'Sposta qui' : 'Conferma'}</button>${m.status === 'confermata' ? `<button class="button secondary small-button" type="button" data-action="media-remove" data-media-id="${escapeHtml(m.id)}" data-revision="${draft.revision}">Togli dal menu</button>` : `<button class="button secondary small-button" type="button" data-action="media-read-menu" data-material-id="${escapeHtml(m.materialId)}">È una pagina di menu</button>`}<button class="button secondary small-button" type="button" data-action="media-discard" data-media-id="${escapeHtml(m.id)}" data-revision="${draft.revision}">Scarta</button></div></div>` : ''}</article>`;
@@ -1601,6 +1623,7 @@ function render() {
   modeBadge.textContent = isDemoMode ? 'DEMO LOCALE · OFFLINE' : 'STAGING PRIVATO';
   renderNavigation();
   renderView();
+  cutoutAll(document, 'img[data-bottle]');
 }
 function routeFromHash() {
   const target = location.hash.replace(/^#/, '');
@@ -1909,6 +1932,12 @@ async function handleClick(event) {
   if (action === 'client-reply-changes') {
     if (!window.confirm('Il locale chiede modifiche? La bozza torna in revisione e servirà una nuova anteprima.')) return;
     await doAction('decideClientReply', { id: trigger.dataset.id, revision: Number(trigger.dataset.revision), decision: 'modifiche' }, 'Bozza riaperta in revisione: correggi e prepara una nuova anteprima.');
+    return;
+  }
+  if (action === 'bottles-queue') {
+    trigger.disabled = true;
+    const out = await doAction('queueBottleSearch', { id: trigger.dataset.draft });
+    if (out) toast(`Jarvis cerca le bottiglie di ${out.wines} vini in sottofondo: ti scrive su Telegram quando ha finito.`);
     return;
   }
   if (action === 'bottles-find') {

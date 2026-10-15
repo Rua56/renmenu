@@ -111,6 +111,41 @@ describe('Trattoria Blanch: lettura, scrittura e controllo', () => {
     assert.throws(() => exportBlanchFiles(notes, files), /Gli avvisi su coperto e allergie/);
   });
 
+  it('foto delle bottiglie: colonna «photo» in wines.tsv solo quando serve, menu.json con «photo» solo su quei vini', () => {
+    const url = `https://renmenu-jarvis-stage.pages.dev/jarvis-hook/media/${'a'.repeat(64)}.webp`;
+    const menu = base();
+    const bianchi = menu.sezioni.find((s) => s.nome.it === 'Vini bianchi');
+    bianchi.voci[1].foto = url;
+    assert.deepEqual(unsupportedFields(menu), []);
+    const out = exportBlanchFiles(menu, files);
+    assert.equal(out.food, files.food);
+    const [header, , second] = lines(out.wines);
+    assert.equal(header, 'category\tproducer\tlocation\tname\tdetails\tprice\tsource\tphoto');
+    assert.ok(second.endsWith(`\t${url}`));
+    assert.ok(lines(out.wines).slice(1, -1).every((line) => line.split('\t').length === 8));
+    const compiled = JSON.parse(out.menu);
+    assert.equal(compiled.wine[0].items[1].photo, url);
+    assert.equal(compiled.wine.flatMap((s) => s.items).filter((i) => i.photo).length, 1);
+    // Riletto, il vino ha ancora la sua foto; togliendola si torna alle stesse righe (con la colonna vuota).
+    const again = blanchToMenu(compileBlanch(out.food, out.wines));
+    assert.equal(again.sezioni.find((s) => s.nome.it === 'Vini bianchi').voci[1].foto, url);
+    delete again.sezioni.find((s) => s.nome.it === 'Vini bianchi').voci[1].foto;
+    const back = exportBlanchFiles(again, { food: out.food, wines: out.wines, menu: out.menu });
+    assert.equal(back.menu, files.menu);
+  });
+
+  it('foto ammesse solo sui vini e solo se confermate in Revisione (servite da Jarvis)', () => {
+    const food = base();
+    food.sezioni[0].voci[0].foto = `https://renmenu-jarvis-stage.pages.dev/jarvis-hook/media/${'b'.repeat(64)}.jpg`;
+    assert.match(unsupportedFields(food).join(), /foto/);
+    const outside = base();
+    outside.sezioni.find((s) => s.nome.it === 'Vini rossi').voci[0].foto = 'https://example.com/bottiglia.jpg';
+    assert.throws(() => exportBlanchFiles(outside, files), /foto della bottiglia non valida/);
+    const bad = files.wines.replace('category\tproducer\tlocation\tname\tdetails\tprice\tsource', 'category\tproducer\tlocation\tname\tdetails\tprice\tsource\tphoto')
+      .split('\n').map((line, i) => (i === 0 || !line ? line : `${line}\t${i === 1 ? 'http://x.it/a.jpg' : ''}`)).join('\n');
+    assert.throws(() => compileBlanch(files.food, bad), /foto della bottiglia non valida/);
+  });
+
   it('non pubblica se il menu compilato online non coincide con le sorgenti', () => {
     assert.throws(() => exportBlanchFiles(base(), { ...files, menu: `${files.menu} ` }), /non coincide con food\.json e wines\.tsv/);
   });

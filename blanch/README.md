@@ -13,7 +13,7 @@ Nel restyling editoriale, `assets/blecs.webp` riprende il piatto dalla [galleria
 ## Aggiornare
 
 1. **Piatti e bevande:** modificare `data/food.json` (nome e prezzo; mantenere le chiavi `it`, `en`, `de`). Sono presenti il coperto e l'avviso allergie in `notes`.
-2. **Bottiglie:** modificare `data/wines.tsv`, una riga per vino. Prezzi nel formato `25,00`, senza simbolo `€`. La colonna `source` è un riferimento interno e può essere adattata ai nuovi materiali.
+2. **Bottiglie:** modificare `data/wines.tsv`, una riga per vino. Prezzi nel formato `25,00`, senza simbolo `€`. La colonna `source` è un riferimento interno e può essere adattata ai nuovi materiali. La colonna facoltativa `photo` (in fondo, la aggiunge Jarvis) contiene la foto della bottiglia confermata in Revisione; il file della foto è in `menus/media/`.
 3. **Compilazione:** dalla root del repository eseguire `python3 blanch/tools/build_menu.py` e controllare il numero di voci e il diff di `blanch/data/menu.json`. Il compilatore genera i prezzi in euro e non include nel JSON pubblico i commenti editoriali interni del file `food.json`.
 4. **Verifica e pubblicazione:** confrontare i prezzi con l'ultima carta del ristorante, poi fare commit/push sul branch servito da GitHub Pages; attendere il completamento della build e aprire l'URL pubblico con `?lang=en` e `?lang=de` e `?view=wine`.
 
