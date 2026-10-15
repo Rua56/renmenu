@@ -225,7 +225,7 @@
     // Caratteri e colori
     const font = CARATTERI[style.caratteri];
     const link = document.createElement('link');
-    link.rel = 'stylesheet'; link.href = `https://fonts.googleapis.com/css2?${font.css}&display=swap`;
+    link.rel = 'stylesheet'; link.href = new URL(`../assets/fonts/premium-${style.caratteri}.css`, location.href).href; // copia locale: nessun IP dei clienti a Google
     document.head.appendChild(link);
     document.documentElement.removeAttribute('data-theme');
     const body = document.body;
