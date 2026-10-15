@@ -4,6 +4,7 @@ Si aggiunge una voce a ogni pull request che cambia un comportamento di Jarvis o
 
 ## 15 ottobre 2026
 
+- **Menu Standard meno basico**: voci in elenco come in un menu stampato (nome, puntini, prezzo), allergeni come numeretti accanto al nome, titoli delle sezioni con ornamento, monogramma del locale nella copertina e fascia «Consigliati dalla casa» con i piatti segnati come consigliati. Stessi dati: vale per tutti i menu Standard.
 - **Ricerca delle bottiglie più ampia**: la cantina si riconosce anche quando la carta la scrive diversamente (doppie o una lettera, es. «Schioppetto» per Schiopetto); la ricerca indica anche le foto dirette della bottiglia, provate per prime; sul sito della cantina valgono anche le foto senza nome nel file, più srcset e schede prodotto dei negozi. Quando i siti bloccano i programmi Jarvis lo dice.
 - **Jarvis sorveglia i menu dei clienti veri**: ogni 15 minuti controlla che i menu di Al Bakaro e Trattoria Blanch (e di ogni menu che pubblicherà) si aprano. Se un menu non si apre per due controlli di fila, avvisa subito Riccardo; quando torna online glielo dice. Su Telegram: «sorveglianza», «sorveglia …», «non sorvegliare …».
 - **Bottiglie che sparivano dal menu**: una foto già nel menu non cambia più indirizzo se il telefono ne ricarica una copia (succedeva aprendo «Foto» con una schermata vecchia: nel menu restava un indirizzo che non si apriva più). Sulla pagina di Trattoria Blanch, aprendo la foto della bottiglia non compare più il contorno blu del browser.
