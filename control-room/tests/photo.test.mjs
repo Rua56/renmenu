@@ -154,6 +154,15 @@ describe('Foto del menu nella pratica', () => {
       await db.prepare("UPDATE publication_approvals SET recipient='telegram:riccardo' WHERE id='ap1'").bind().run();
       await db.prepare("INSERT INTO jarvis_settings (key,value,updated_at) VALUES (?,?,?)").bind(`edits_${requestId}`, JSON.stringify([
         { at: t, ops: [{ tipo: 'prezzo', si: 1, vi: 0, prezzo: '6,00' }, { tipo: 'prezzo', si: 0, vi: 0, prezzo: '13,00' }], fp: [{ n: 'gubana', s: 'dolci', a: null }, { n: 'altro piatto', s: 'antipasti', a: null }] }]), t).run();
+      // Bozza che non si rifà (nessun materiale leggibile): quella di prima resta com'era, mai la pratica senza bozza.
+      const before = await db.prepare('SELECT * FROM drafts WHERE id=?').bind(draft.id).first();
+      const versions = (await db.prepare('SELECT COUNT(*) AS n FROM draft_versions WHERE draft_id=?').bind(draft.id).first()).n;
+      await db.prepare('UPDATE materials SET archived_at=? WHERE request_id=?').bind(t, requestId).run();
+      const failed = await act(db, 'rebuildDraft', { draftId: draft.id, confirmation: 'RIFAI BOZZA' });
+      assert.equal(failed.status, 422, JSON.stringify(failed.body));
+      assert.deepEqual(await db.prepare('SELECT * FROM drafts WHERE id=?').bind(draft.id).first(), before, 'la bozza torna identica');
+      assert.equal((await db.prepare('SELECT COUNT(*) AS n FROM draft_versions WHERE draft_id=?').bind(draft.id).first()).n, versions);
+      await db.prepare('UPDATE materials SET archived_at=NULL WHERE request_id=?').bind(requestId).run();
       const rebuilt = await act(db, 'rebuildDraft', { draftId: draft.id, confirmation: 'RIFAI BOZZA' });
       assert.equal(rebuilt.status, 200, JSON.stringify(rebuilt.body));
       const after = JSON.parse((await db.prepare('SELECT menu_json FROM drafts WHERE request_id=?').bind(requestId).first()).menu_json);

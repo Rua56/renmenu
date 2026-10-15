@@ -7,6 +7,7 @@ import { blanchToMenu, compileBlanch, isBlanchBottleSection } from '../cloudflar
 import { menuSlots, proposeTargets, repairBrokenPhotos } from '../cloudflare/functions/_lib/media.js';
 import { winesWithoutPhoto } from '../cloudflare/functions/_lib/bottle-search.js';
 import { previewUrl } from '../cloudflare/functions/_lib/approvals.js';
+import { criticalFields } from '../cloudflare/functions/_lib/editorial.js';
 import { PREP_KEY, enrollPrep, parsePrep } from '../cloudflare/functions/_lib/autoprep.js';
 
 // Foto delle bottiglie sulla carta dei vini di Trattoria Blanch (menu nel formato proprio, non Premium).
@@ -167,4 +168,14 @@ test('una foto con l\'indirizzo vecchio (non più servito) torna a quello della 
   assert.equal(fixed.sezioni[at(a)[0]].voci[at(a)[1]].foto, url('b'));
   assert.equal(fixed.sezioni[at(b)[0]].voci[at(b)[1]].foto, url('c'));
   assert.equal(repairBrokenPhotos(fixed, rows).fixed.length, 0);
+});
+
+test('Blanch: i nomi dei vini sono nomi propri, non bloccano l’affido per «traduzione mancante»', () => {
+  const menu = blanch();
+  assert.deepEqual(criticalFields(menu).translationsMissing, []);
+  // Un piatto senza inglese resta da tradurre, e così un vino di un altro menu.
+  const food = menu.sezioni.findIndex((s) => !isBlanchBottleSection(s));
+  menu.sezioni[food].voci[0].nome = 'Frico';
+  assert.ok(criticalFields(menu).translationsMissing.some((p) => p.startsWith(`sezioni.${food}.voci.0.nome`)));
+  assert.ok(criticalFields({ ...blanch(), id: 'altro-locale' }).translationsMissing.length > 0);
 });
