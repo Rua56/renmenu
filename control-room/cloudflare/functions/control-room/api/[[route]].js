@@ -893,6 +893,12 @@ async function missionRows(db) {
   catch (error) { if (/no such table/i.test(String(error?.message))) return []; throw error; }
 }
 export const textOf = (value) => (typeof value === 'string' ? value : value && typeof value === 'object' ? value.it || '' : '').trim();
+// «Rifai la bozza» non riuscito: si rimettono la bozza e le sue versioni esattamente come erano.
+async function restoreDraft(db, saved) {
+  if (!saved?.draft) return;
+  const insert = (table, row) => { const cols = Object.keys(row); return db.prepare(`INSERT OR IGNORE INTO ${table} (${cols.join(',')}) VALUES (${cols.map(() => '?').join(',')})`).bind(...cols.map((c) => row[c])); };
+  await db.batch([insert('drafts', saved.draft), ...saved.versions.map((v) => insert('draft_versions', v))]);
+}
 async function restoreAfterRebuild(db, env, requestId, newId, oldJson) {
   if (!newId || !oldJson) return { restored: 0, skipped: 0 };
   let old; try { old = JSON.parse(oldJson); } catch { return { restored: 0, skipped: 0 }; }
@@ -1322,11 +1328,22 @@ async function action(db, type, input, env = {}) {
     const unread = await getOne(db, "SELECT COUNT(*) AS n FROM materials WHERE request_id=? AND processing_status='da_trascrivere' AND archived_at IS NULL", draft.request_id);
     assert(!Number(unread?.n), 'Jarvis sta ancora leggendo dei file di questa pratica: riprova tra un minuto.', 409);
     const before = await getOne(db, 'SELECT menu_json FROM drafts WHERE id=?', draft.id);
+    const saved = { draft: await getOne(db, 'SELECT * FROM drafts WHERE id=?', draft.id), versions: await rows(db, 'SELECT * FROM draft_versions WHERE draft_id=?', draft.id) };
     await auditedBatch(db, [db.prepare('DELETE FROM jarvis_outbox WHERE mission_id IN (SELECT id FROM jarvis_missions WHERE draft_id=?)').bind(draft.id),
       db.prepare('DELETE FROM jarvis_missions WHERE draft_id=?').bind(draft.id), db.prepare('DELETE FROM publication_approvals WHERE draft_id=?').bind(draft.id),
       db.prepare('DELETE FROM draft_versions WHERE draft_id=?').bind(draft.id), db.prepare('DELETE FROM drafts WHERE id=?').bind(draft.id)],
       'draft.rebuild', 'Bozza rifatta da capo con tutti i materiali della pratica, su richiesta di Riccardo.', draft.request_id);
-    const rebuilt = await action(db, 'generateDraft', { requestId: draft.request_id }, env);
+    // Pratica senza menu nel testo (es. «aggiungi le foto delle bottiglie»): la bozza riparte dal menu online,
+    // come quando è nata. Se non si rifà in nessun modo, la bozza di prima torna com'era (mai lasciare la pratica senza).
+    let rebuilt;
+    try { rebuilt = await action(db, 'generateDraft', { requestId: draft.request_id }, env); }
+    catch (error) {
+      try { rebuilt = await action(db, 'generateDraft', { requestId: draft.request_id, baseOnly: true }, env); }
+      catch {
+        await restoreDraft(db, saved);
+        throw error;
+      }
+    }
     // Le decisioni già prese non tornano indietro: aspetto, frase d'apertura, storia, dati del locale
     // e le correzioni dettate a Jarvis si rimettono sulla bozza nuova (solo dove la voce è la stessa).
     let kept = { restored: 0, skipped: 0 };
