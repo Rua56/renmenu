@@ -6,8 +6,7 @@
 <title>Menù</title>
 <meta name="description" content="Menù digitale del locale, sempre aggiornato.">
 <meta name="robots" content="noindex">
-<link rel="preconnect" href="https://fonts.googleapis.com">
-<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,400;9..144,500;9..144,600&family=Instrument+Sans:wght@400;500;600&display=swap">
+<link rel="stylesheet" href="../assets/fonts/g-24982ecdaf.css">
 <link rel="stylesheet" href="../assets/style.css">
 <meta name="theme-color" content="#7a1f2b" media="(prefers-color-scheme: light)">
 <meta name="theme-color" content="#1c1512" media="(prefers-color-scheme: dark)">
@@ -229,7 +228,7 @@
   if (menu.premium && typeof menu.premium === 'object' && params.get('standard') !== '1') {
     const load = (tag, attrs) => new Promise((ok, ko) => { const el = Object.assign(document.createElement(tag), attrs); el.onload = ok; el.onerror = ko; document.head.appendChild(el); });
     try {
-      await Promise.all([load('link', { rel: 'stylesheet', href: 'premium.css?v=6' }), load('script', { src: 'premium.js?v=8' })]);
+      await Promise.all([load('link', { rel: 'stylesheet', href: 'premium.css?v=6' }), load('script', { src: 'premium.js?v=9' })]);
       window.RenMenuPremium.render(menu, { lang, R, params });
       return;
     } catch (e) { /* se il Premium non si carica, resta la versione Standard */ }
