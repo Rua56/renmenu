@@ -11,6 +11,7 @@ import { previewUrl } from '../_lib/approvals.js';
 import { dailyBackup } from '../_lib/backup.js';
 import { readingTestStep } from '../_lib/reading-test.js';
 import { MAX_RAW_BYTES, importIncomingMail } from '../_lib/mail-in.js';
+import { visitReadyText } from '../_lib/visit.js';
 
 const reply = (body, status = 200) => new Response(JSON.stringify(body), { status, headers: { 'Content-Type': 'application/json', 'Cache-Control': 'no-store' } });
 
@@ -110,6 +111,8 @@ export async function onRequest(context) {
           if (outcome.deferred.n === 1) await missions.notify(env.DB, env, material.request_id, 'foto in attesa', `Google è lento e non ha risposto alla lettura di «${material.filename}». Non ripiego su modelli più deboli: riprovo tra ${outcome.deferred.minutes} minuti (fino a ${outcome.deferred.of} tentativi) e ti scrivo appena ho il risultato.`);
           continue;
         }
+        // Visita: un solo messaggio con il link da mostrare al titolare (niente avviso importante né telefonata).
+        if (outcome?.visit?.link) { await missions.notify(env.DB, env, material.request_id, 'anteprima per la visita', visitReadyText(outcome.visit.venue, outcome.visit.link, outcome.visit)); continue; }
         const many = (outcome?.files || []).length > 1;
         const head = many
           ? `Ho letto ${outcome.files.length} file${request?.subject ? ` della pratica «${String(request.subject).slice(0, 60)}»` : ''}, uno alla volta:\n${outcome.files.map((f, i) => `${i + 1}. «${f.filename}»: ${String(f.note).slice(0, 160)}`).join('\n')}\n`

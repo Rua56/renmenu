@@ -4,6 +4,8 @@ Si aggiunge una voce a ogni pull request che cambia un comportamento di Jarvis o
 
 ## 15 ottobre 2026
 
+- **Modalità visita:** sei nel locale, scrivi o detti a Jarvis «visita Bar Centrale» (o mandi la foto del menù con quella didascalia) e poi le foto. Jarvis le legge dopo 15 secondi invece di 40, non fa domande sui prezzi in dubbio (quelle voci restano fuori, da sistemare dopo) e ti rimanda il link dell'anteprima da mostrare al titolare, valido 24 ore. Niente preparazione automatica, niente invio al locale, niente pubblicazione. Nuovo comando «/visita» nel menu di Telegram (`_lib/visit.js`).
+
 - Microfono: nella home l'ascolto di «Ehi Jarvis» restava acceso mentre toccavi il microfono della chat, e i due si rubavano il microfono (sul telefono ascolto che si interrompe o non parte, «microfono in pausa»). Ora la sveglia si ferma mentre Jarvis ascolta, pensa o parla, e riparte da sola quando la conversazione torna a riposo (`shareMic` in `site/jarvis-chat.js`).
 
 - Control Room cinematografica (tema scuro): nuovo `site/jarvis-cinema.css` dopo `jarvis-hud.css`. Pannelli di vetro scuro con bordo sottile e due angoli tagliati al posto delle schede tonde, sfondo nero con anelli e radar che ruota, righelli sui bordi, titoli larghi in maiuscolo, pulsanti a contorno luminoso, barra della chat e microfono squadrati, pannelli che si aprono come proiezioni e fluttuano appena. Tema chiaro invariato; con «riduci movimento» resta tutto fermo.
