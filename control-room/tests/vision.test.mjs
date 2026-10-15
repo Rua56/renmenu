@@ -105,6 +105,18 @@ describe('Lettura con Gemini', () => {
     assert.equal(seen[0].body.generationConfig.thinkingConfig.thinkingBudget, 0);
     assert.equal(seen[0].body.contents[0].parts[1].inline_data.mime_type, 'image/jpeg');
   });
+  it('lettura interrotta al limite di lunghezza: l’avviso che possono mancare voci viene per primo', async () => {
+    const fetchImpl = async () => Response.json({ candidates: [{ finishReason: 'MAX_TOKENS', content: { parts: [{ text: menuText }] } }] });
+    const ai = { run: async () => { throw new Error('Cloudflare non dovrebbe servire'); } };
+    const r = await readMenuPhoto(ai, new Uint8Array([255, 216, 255, 1]), 'image/jpeg', { gemini: { key: 'k'.repeat(39), models: ['gemini-2.5-flash', 'gemini-3.1-flash-lite'], fetchImpl } });
+    assert.equal(r.ok, true);
+    assert.equal(r.partial, true);
+    assert.match(r.warnings[0], /^Lettura interrotta: .*Potrebbero mancare le ultime voci/);
+    const whole = await readMenuPhoto(ai, new Uint8Array([255, 216, 255, 1]), 'image/jpeg', { gemini: { key: 'k'.repeat(39), models: ['gemini-2.5-flash', 'gemini-3.1-flash-lite'],
+      fetchImpl: async () => Response.json({ candidates: [{ finishReason: 'STOP', content: { parts: [{ text: menuText }] } }] }) } });
+    assert.equal(whole.partial, false);
+    assert.ok(!whole.warnings.some((w) => /interrotta|incompleta/.test(w)));
+  });
   it('quota Gemini finita (429): Jarvis torna da solo ai modelli di Cloudflare', async () => {
     const fetchImpl = async () => Response.json({ error: { status: 'RESOURCE_EXHAUSTED' } }, { status: 429 });
     const ai = { run: async () => ({ response: menuText }) };

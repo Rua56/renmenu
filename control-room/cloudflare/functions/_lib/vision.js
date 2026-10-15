@@ -68,7 +68,7 @@ function toBase64(bytes) {
   return btoa(binary);
 }
 
-async function transcribe(ai, model, dataUrl, timeoutMs) {
+async function transcribe(ai, model, dataUrl, timeoutMs, meta = null) {
   const payload = { messages: [{ role: 'user', content: [{ type: 'text', text: PROMPT }, { type: 'image_url', image_url: { url: dataUrl } }] }], temperature: 0, max_tokens: 3500 };
   // Gemma 4 ragiona prima di rispondere: senza questo spende i token nel ragionamento e la trascrizione resta vuota.
   if (model.includes('gemma')) Object.assign(payload, { max_completion_tokens: 4000, chat_template_kwargs: { enable_thinking: false } });
@@ -77,6 +77,9 @@ async function transcribe(ai, model, dataUrl, timeoutMs) {
   try {
     const result = await Promise.race([Promise.resolve().then(() => ai.run(model, payload)), timeout]);
     const text = result?.response ?? result?.choices?.[0]?.message?.content ?? '';
+    // Risposta tagliata al limite dei token: le ultime voci del menu possono mancare.
+    const used = Number(result?.usage?.completion_tokens) || 0;
+    if (meta && (result?.choices?.[0]?.finish_reason === 'length' || used >= payload.max_tokens - 5)) meta.truncated = true;
     return String(typeof text === 'string' ? text : JSON.stringify(text)).replace(/<think>[\s\S]*?<\/think>/gi, '').replace(/```[a-z]*\n?|```/g, '').trim();
   } finally { clearTimeout(timer); }
 }
@@ -464,7 +467,7 @@ export function combineReadings(first, second, third = '', { strict = false } = 
 // Se la chiave c'è, due modelli Gemini diversi leggono la foto e uno di Cloudflare fa da arbitro; se Gemini non
 // risponde (quota finita, errore), Jarvis torna da solo ai modelli di Cloudflare.
 export const GEMINI_PREFERRED = ['gemini-2.5-flash', 'gemini-3-flash-preview', 'gemini-3.5-flash', 'gemini-3.1-flash-lite', 'gemini-2.5-flash-lite', 'gemini-3.5-flash-lite'];
-export async function transcribeGemini({ key, model, fetchImpl = globalThis.fetch }, bytes, mime, timeoutMs = 110_000) {
+export async function transcribeGemini({ key, model, fetchImpl = globalThis.fetch }, bytes, mime, timeoutMs = 110_000, meta = null) {
   // Trascrivere non richiede ragionamento lungo: pensiero al minimo (nomi dei campi cambiati tra 2.5 e 3).
   // Se Google rifiuta l'impostazione del pensiero (400), si riprova senza: mai una lettura persa per questo.
   const thinking = /^gemini-2\.5/.test(model) ? { thinkingBudget: 0 } : { thinkingLevel: 'low' };
@@ -488,6 +491,7 @@ export async function transcribeGemini({ key, model, fetchImpl = globalThis.fetc
   const candidate = data?.candidates?.[0];
   const text = (candidate?.content?.parts || []).filter((part) => !part.thought).map((part) => part.text || '').join('');
   if (!text && candidate?.finishReason) throw new Error(`Gemini senza testo (${candidate.finishReason})`);
+  if (meta && candidate?.finishReason === 'MAX_TOKENS') meta.truncated = true;
   return String(text).replace(/```[a-z]*\n?|```/g, '').trim();
 }
 
@@ -515,9 +519,12 @@ export async function readMenuPhoto(ai, bytes, mime, { timeoutMs = 110_000, gemi
   if (bytes.length > MAX_IMAGE_BYTES) return { ok: false, reason: 'foto troppo grande (oltre 9 MB): fai uno screenshot della foto e manda quello' };
   const dataUrl = `data:${mime};base64,${toBase64(bytes)}`;
   // Un errore passeggero del servizio (es. codice 5026) non deve lasciare la foto con una sola lettura: un secondo tentativo.
-  const once = (model) => transcribe(ai, model, dataUrl, timeoutMs).catch((error) => (/tempo scaduto/.test(String(error?.message)) ? Promise.reject(error) : transcribe(ai, model, dataUrl, timeoutMs)));
+  // Letture interrotte al limite di lunghezza (menu molto lunghi): il testo che torna è a metà.
+  const truncated = new Set();
+  const mark = (meta, text) => { if (meta.truncated && text) truncated.add(text); return text; };
+  const once = (model) => { const meta = {}; return transcribe(ai, model, dataUrl, timeoutMs, meta).catch((error) => (/tempo scaduto/.test(String(error?.message)) ? Promise.reject(error) : transcribe(ai, model, dataUrl, timeoutMs, meta))).then((text) => mark(meta, text)); };
   const cf = (model) => ({ label: model, run: () => once(model) });
-  const gm = (model) => ({ label: model, gemini: true, run: () => transcribeGemini({ ...gemini, model }, bytes, mime, timeoutMs) });
+  const gm = (model) => ({ label: model, gemini: true, run: () => { const meta = {}; return transcribeGemini({ ...gemini, model }, bytes, mime, timeoutMs, meta).then((text) => mark(meta, text)); } });
   // Catena Gemini: i modelli scelti alla prova della chiave, poi gli altri gratuiti. Un modello che risponde
   // «404» (non disponibile per questa chiave) o resta sovraccarico cede il posto al successivo.
   const chain = geminiReady ? [...new Set([...gemini.models, ...GEMINI_PREFERRED])] : [];
@@ -579,8 +586,15 @@ export async function readMenuPhoto(ai, bytes, mime, { timeoutMs = 110_000, gemi
     ? `Foto letta da Jarvis ${thirdText ? 'tre volte con tre modelli diversi' : 'due volte con modelli diversi'}${withGemini ? ' (Gemini)' : ''}${fallbackUsed ? ' (uno di riserva, il primo non rispondeva)' : ''}: ${combined.agreed} voci concordi${thirdText && combined.byThird ? ` (${combined.byThird} confermate dalla terza lettura)` : ''}${combined.doubts ? `, ${combined.doubts} righe da verificare sulla foto` : ''}.`
     : 'Foto letta una sola volta (il secondo modello non ha risposto): tutte le voci restano da verificare sulla foto.'];
   if (good.length === 2 && weakSections.length) warnings.push(`Sezioni meno sicure: ${weakSections.join(', ')}.`);
+  // Lettura a metà: la più completa si è interrotta, oppure una delle due ha visto molte meno voci dell'altra.
+  // L'interruzione va detta per prima (è la riga che Riccardo vede nel riepilogo su Telegram): potrebbero mancare dei piatti.
+  const baseCut = truncated.has(good[0]) && (!good[1] || truncated.has(good[1]));
+  const [many, few] = [readingItems(good[0]).length, good[1] ? readingItems(good[1]).length : 0];
+  const lopsided = good.length === 2 && many >= 8 && few < many * 0.6;
+  if (baseCut) warnings.unshift('Lettura interrotta: il menu in questa foto è molto lungo e la trascrizione si è fermata prima della fine. Potrebbero mancare le ultime voci: controlla la foto o mandala in due metà.');
+  else if (lopsided) warnings.push(`Lettura forse incompleta: una lettura ha trovato ${many} voci, l’altra solo ${few}. Controlla sulla foto che non manchi nessun piatto.`);
   if (small) warnings.push(`Foto piccola (${size.width}×${size.height}): i prezzi in dubbio sono segnalati, ma conviene chiedere al locale una foto più grande o il PDF.`);
-  return { ok: true, geminiStats, text: combined.text, agreed: combined.agreed, doubts: combined.doubts, checks: combined.checks || [], models: used,
+  return { ok: true, geminiStats, partial: baseCut, text: combined.text, agreed: combined.agreed, doubts: combined.doubts, checks: combined.checks || [], models: used,
     method: good.length === 2 ? (thirdText ? 'jarvis_foto_tripla_lettura' : 'jarvis_foto_doppia_lettura') : 'jarvis_foto_lettura_singola', warnings,
     raw: [...(thirdText ? [...texts, thirdText] : texts), ...notes.map((n) => `[nota] ${n}`)] };
 }

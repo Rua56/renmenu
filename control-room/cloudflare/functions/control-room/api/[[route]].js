@@ -5,6 +5,7 @@ import { prepareBaseUpdate, prepareUpdate } from '../../_lib/update.js';
 import { GEMINI_PREFERRED, PHOTO_TYPES, readMenuPdf, readMenuPhoto } from '../../_lib/vision.js';
 import { linkMailFiles, receiveMailFiles } from '../../_lib/mail-files.js';
 import { deletionPlan, deletionStatements } from '../../_lib/delete-request.js';
+import { shrinkPhoto } from '../../_lib/shrink.js';
 import { MEDIA_KINDS, PUBLIC_EXT, applyMedia, classifyPhoto, isMenuPhotoKind, parseLabel, proposeTargets, publicImageOk, reapplyConfirmed, removeMedia, resolveTarget, targetLabel } from '../../_lib/media.js';
 import { speak, transcribe } from '../../_lib/voice.js';
 import { ensureLiveAgent, liveSignedUrl } from '../../_lib/phone.js';
@@ -397,15 +398,18 @@ export async function enrollIdleDrafts(db, at = Date.now()) {
   return ok ? next.id : null;
 }
 // Foto del cliente e delle cantine al posto proposto (stessa scelta che Riccardo vede in Revisione).
-// Solo quelle già leggere (fino a 900 KB): le più grandi le riduce il telefono di Riccardo in Revisione.
-async function autoPlaceMedia(db, env, draft) {
+// Quelle oltre 900 KB Jarvis le riduce da solo (JPEG ≤1600 px, raddrizzato); restano a Riccardo
+// solo i PNG trasparenti, i WebP e i file che non si leggono. Al massimo 3 riduzioni per giro.
+const SHRINKS_PER_ROUND = 3;
+async function autoPlaceMedia(db, env, draft, noShrink = {}) {
   const jarvis = asJarvis(db);
   let found = [];
   try { found = await rows(db, 'SELECT m.*, x.filename, x.r2_key, x.mime AS material_mime FROM media_items m JOIN materials x ON x.id=m.material_id WHERE m.request_id=? AND x.archived_at IS NULL ORDER BY m.created_at ASC', draft.request_id); }
   catch (error) { if (/no such table/i.test(String(error?.message))) return { placed: [], heavy: [] }; throw error; }
   const group = found.map((row) => ({ ...row, label: parseLabel(row.label_json) }));
   const proposals = proposeTargets(JSON.parse(draft.menu_json), group);
-  const placed = [], heavy = [], unsure = [];
+  const placed = [], heavy = [], unsure = [], shrunk = [];
+  let more = false, tried = 0;
   for (const media of group) {
     const proposal = proposals.get(media.id);
     if (media.status !== 'proposta') continue;
@@ -414,8 +418,24 @@ async function autoPlaceMedia(db, env, draft) {
     if (!media.public_url) {
       if (!env.BUCKET?.get || !env.BUCKET?.put) break;
       const object = await env.BUCKET.get(media.r2_key);
-      const bytes = object ? new Uint8Array(await object.arrayBuffer()) : null;
-      const mime = String(media.material_mime || '');
+      let bytes = object ? new Uint8Array(await object.arrayBuffer()) : null;
+      let mime = String(media.material_mime || '');
+      if (bytes && (!PUBLIC_EXT[mime] || !publicImageOk(bytes, mime))) {
+        // Una foto che non si riduce non si riprova a ogni giro (costa CPU): resta a Riccardo.
+        if (noShrink[media.id]) { heavy.push(`${media.filename} (${noShrink[media.id]})`); continue; }
+        if (tried >= SHRINKS_PER_ROUND) { more = true; continue; }
+        tried += 1;
+        // Segno prima di ridurre: se il Worker finisse la memoria, al giro dopo questa foto non si riprova.
+        const mark = `shrink_try_${media.id}`;
+        const safely = (fn) => Promise.resolve().then(fn).catch(() => null);
+        if (await safely(() => getOne(db, 'SELECT 1 AS x FROM jarvis_settings WHERE key=?', mark))) { noShrink[media.id] = 'troppo pesante da ridurre qui'; heavy.push(`${media.filename} (${noShrink[media.id]})`); continue; }
+        await safely(() => db.prepare('INSERT OR REPLACE INTO jarvis_settings (key,value,updated_at) VALUES (?,?,?)').bind(mark, '1', now()).run());
+        const small = await shrinkPhoto(bytes, mime);
+        await safely(() => db.prepare('DELETE FROM jarvis_settings WHERE key=?').bind(mark).run());
+        if (!small.ok) { noShrink[media.id] = small.reason; heavy.push(`${media.filename} (${small.reason})`); continue; }
+        shrunk.push(media.filename);
+        bytes = small.bytes; mime = small.mime;
+      }
       if (!bytes || !PUBLIC_EXT[mime] || !publicImageOk(bytes, mime)) { heavy.push(media.filename); continue; }
       const sha = [...new Uint8Array(await crypto.subtle.digest('SHA-256', bytes))].map((b) => b.toString(16).padStart(2, '0')).join('');
       const key = `public/media/${sha}.${PUBLIC_EXT[mime]}`;
@@ -429,7 +449,7 @@ async function autoPlaceMedia(db, env, draft) {
       placed.push(media.filename);
     } catch { heavy.push(media.filename); }
   }
-  return { placed, heavy, unsure };
+  return { placed, heavy, unsure, shrunk, more };
 }
 async function prepStep(db, env, draft, step, entry) {
   const jarvis = asJarvis(db);
@@ -473,8 +493,13 @@ async function prepStep(db, env, draft, step, entry) {
   }
   if (step === 'foto') {
     if (!menu.premium) return {};
-    const { placed, heavy, unsure = [] } = await autoPlaceMedia(db, env, draft);
-    const parts = [placed.length ? `foto messe nel menu: ${placed.length}` : '', heavy.length ? `${heavy.length} troppo grandi da sistemare tu in Revisione (${heavy.slice(0, 3).join(', ')})` : '',
+    entry.noShrink = entry.noShrink || {};
+    const { placed, heavy, unsure = [], shrunk = [], more = false } = await autoPlaceMedia(db, env, draft, entry.noShrink);
+    entry.placed = (entry.placed || 0) + placed.length;
+    entry.shrunk = (entry.shrunk || 0) + shrunk.length;
+    if (more && entry.rounds < MAX_ROUNDS) return { again: true };
+    const parts = [entry.placed ? `foto messe nel menu: ${entry.placed}` : '', entry.shrunk ? `${entry.shrunk} ridotte da me perché troppo pesanti` : '',
+      heavy.length ? `${heavy.length} da sistemare tu in Revisione (${heavy.slice(0, 3).join(', ')})` : '',
       unsure.length ? `${unsure.length} senza un posto sicuro, scegli tu in Revisione (${unsure.slice(0, 3).join(', ')})` : ''].filter(Boolean);
     return { note: parts.join('; ') };
   }
