@@ -60,6 +60,7 @@ const EDIT_WORDS = /(?:\d|\beuro\b|€|\bcost\w*|\bprezz\w*|\baggiung\w*|\btogli
 // Frasi che chiedono di cambiare il menu, non il QR (es. «metti il QR nel menu»): non sono richieste di QR.
 const EDIT_WORDS_STRICT = /\b(?:aggiung\w*|togli\w*|rimuov\w*|prezzo|costa\w*|rinomin\w*)\b/i;
 // «Aggiungi le foto delle bottiglie alla carta dei vini di Blanch», «cerca le immagini delle bottiglie di Al Bakaro».
+export const BOTTLE_QUEUE = 'bottle_queue';
 const BOTTLE_PHOTOS = /\b(?:foto\w*|immagin\w*)\b[^.?!\n]{0,50}\bbottigli\w*|\bbottigli\w*[^.?!\n]{0,40}\b(?:foto\w*|immagin\w*)\b/i;
 const BOTTLE_ACTION = /\b(?:aggiung\w*|mett\w*|inserisc\w*|inserir\w*|cerc\w*|trov\w*|carica\w*|vorrei|voglio|puoi|potresti|fai|fammi)\b/i;
 const REREAD = /\b(?:rileggi\w*|rilegg\w+|rileggere|rifai la lettura|leggi(?:le|li)? (?:di nuovo|ancora))\b/i;
@@ -2108,13 +2109,19 @@ export function createMissions(deps) {
     const name = client?.name || draft.client_name || draft.subject;
     if (!draft) draft = (await openDrafts(db)).find((d) => d.client_id === client.id) || null;
     if (!draft) {
-      const jarvis = jarvisDb(db);
+      // La bozza (dal menu online su GitHub) richiede tempo: Telegram non aspetta e ripete il messaggio. La prepara
+      // il giro dell'orologio, che poi fa partire la ricerca; qui si risponde subito.
+      if (!(await geminiFor(db, env))) return { text: 'Per cercare le bottiglie mi serve la chiave Gemini (Control Room → Lettura dei menu).' };
+      const waiting = await rows(db, "SELECT r.id FROM requests r LEFT JOIN drafts d ON d.request_id=r.id WHERE r.client_id=? AND d.id IS NULL AND r.subject LIKE 'Foto delle bottiglie%' AND r.status NOT IN ('completata','archiviata','chiusa') ORDER BY r.created_at DESC LIMIT 1", client.id);
+      let requestId = waiting[0]?.id;
       try {
-        const requestId = (await action(jarvis, 'createRequest', { clientId: client.id, subject: `Foto delle bottiglie · ${client.name}`, sourceText: utterance, sourceChannel: 'altro', category: 'vini_cocktail' })).result.id;
-        await action(jarvis, 'generateDraft', { requestId, baseOnly: true }, env);
-        draft = (await openDrafts(db)).find((d) => d.request_id === requestId) || null;
-      } catch (error) { return { text: `Non sono riuscito a preparare la bozza di «${name}»: ${String(error?.message || 'errore').slice(0, 200)}` }; }
-      if (!draft) return { text: `Ho aperto la pratica per «${name}», ma la bozza non c’è: guardala in Revisione.` };
+        if (!requestId) requestId = (await action(jarvisDb(db), 'createRequest', { clientId: client.id, subject: `Foto delle bottiglie · ${client.name}`, sourceText: utterance, sourceChannel: 'altro', category: 'vini_cocktail' })).result.id;
+      } catch (error) { return { text: `Non sono riuscito ad aprire la pratica di «${name}»: ${String(error?.message || 'errore').slice(0, 200)}` }; }
+      let queue = {}; try { queue = JSON.parse(await setting(db, BOTTLE_QUEUE) || '{}') || {}; } catch { queue = {}; }
+      queue[requestId] = { name, at: now(), tries: 0 };
+      await putSetting(db, BOTTLE_QUEUE, JSON.stringify(queue));
+      await putSetting(db, 'tg_focus', JSON.stringify({ requestId, subject: `Foto delle bottiglie · ${name}`, at: now() })).catch(() => {});
+      return { text: `D’accordo. Preparo la bozza di «${name}» partendo dal menu online, poi cerco le foto delle bottiglie sui siti delle cantine, ${BOTTLES_PER_ROUND} vini alla volta, e le metto sui vini giusti. Con tanti vini ci vuole un po’: ti scrivo quando ho finito, con il link per guardarla. Online non cambia niente finché non pubblichi.` };
     }
     let menu; try { menu = JSON.parse(draft.menu_json); } catch { return { text: 'La bozza non si legge: aprila in Revisione.' }; }
     if (!menu.premium && !isBlanchSlug(draft.slug)) return { text: `Le foto delle bottiglie compaiono solo nei menu Premium (e nella carta dei vini di Trattoria Blanch): «${name}» non lo è, quindi non le cerco.` };
