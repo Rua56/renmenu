@@ -6,7 +6,7 @@ export const VISIT_CALM_MS = 15_000;
 export const visitKey = (requestId) => `visit_${requestId}`;
 
 // Parole che rendono «al/alla/allo» una preposizione e non parte del nome («visita al bar Centrale»).
-const PLACE = /^(?:bar|caff[eè]|osteria|trattoria|ristorante|pizzeria|enoteca|locale|pub|birreria|gelateria|pasticceria|agriturismo|hotel|albergo|bistrot|bistr[oò]|braceria|paninoteca|chiosco|tavern\w*|spaghetteria|wine\s*bar|cocktail\s*bar)(?=\s|$)/i;
+export const PLACE = /^(?:bar|caff[eè]|osteria|trattoria|ristorante|pizzeria|enoteca|locale|pub|birreria|gelateria|pasticceria|agriturismo|hotel|albergo|bistrot|bistr[oò]|braceria|paninoteca|chiosco|tavern\w*|spaghetteria|wine\s*bar|cocktail\s*bar)(?=\s|$)/i;
 const COMMAND = /^\s*(?:jarvis[\s,!.]*)?(?:\/visita\b|(?:modalit[aà]|sono\s+in|in)\s+visita\b|visita\b)\s*(.*)$/i;
 
 /**

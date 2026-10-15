@@ -4,6 +4,8 @@ Si aggiunge una voce a ogni pull request che cambia un comportamento di Jarvis o
 
 ## 15 ottobre 2026
 
+- **Agenda delle visite:** detti o scrivi a Jarvis «questa settimana devo visitare 8 locali: …», poi «ho visitato …» (anche con una nota dopo i due punti), oppure usi «visita …» nel locale. «agenda» o «chi mi manca?» mostra la lista. Dopo un giorno senza notizie Jarvis ti ricorda i locali che mancano, di giorno e una volta sola. Nuovo comando «/agenda» (`_lib/agenda.js`).
+
 - **Modalità visita:** sei nel locale, scrivi o detti a Jarvis «visita Bar Centrale» (o mandi la foto del menù con quella didascalia) e poi le foto. Jarvis le legge dopo 15 secondi invece di 40, non fa domande sui prezzi in dubbio (quelle voci restano fuori, da sistemare dopo) e ti rimanda il link dell'anteprima da mostrare al titolare, valido 24 ore. Niente preparazione automatica, niente invio al locale, niente pubblicazione. Nuovo comando «/visita» nel menu di Telegram (`_lib/visit.js`).
 
 - Microfono: nella home l'ascolto di «Ehi Jarvis» restava acceso mentre toccavi il microfono della chat, e i due si rubavano il microfono (sul telefono ascolto che si interrompe o non parte, «microfono in pausa»). Ora la sveglia si ferma mentre Jarvis ascolta, pensa o parla, e riparte da sola quando la conversazione torna a riposo (`shareMic` in `site/jarvis-chat.js`).

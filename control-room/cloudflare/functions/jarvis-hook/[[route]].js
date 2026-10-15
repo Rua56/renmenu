@@ -136,6 +136,7 @@ export async function onRequest(context) {
       await missions.watchTick(env.DB, env).catch(() => null);
       const briefed = await missions.briefing(env.DB, env).catch(() => null);
       await missions.initiativeTick(env.DB, env).catch(() => null);
+      await missions.agendaTick(env.DB, env).catch(() => null);
       await missions.replyTick(env.DB, env).catch(() => null);
       await missions.phoneTick(env.DB, env).catch(() => null);
       const backup = await dailyBackup(env.DB, env.BUCKET).catch(() => null);
