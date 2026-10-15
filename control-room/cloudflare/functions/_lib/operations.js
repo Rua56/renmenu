@@ -454,8 +454,20 @@ async function openLivePr(context, p) {
   const prepared = await loadPrContext(context, p);
   let operation = await context.getOne(context.db, 'SELECT * FROM live_pr_operations WHERE draft_id=?', prepared.draft.id);
   if (operation) {
-    assert(operation.revision === prepared.revision && operation.snapshot_sha === prepared.snapshotSha && operation.base_sha === prepared.baseSha,
+    assert(operation.revision === prepared.revision && operation.snapshot_sha === prepared.snapshotSha,
       'Operazione PR non coerente con la bozza revisionata.', 409);
+    // main è andato avanti dopo la riserva (altre PR unite): stesso menu, stessa bozza.
+    if (operation.base_sha !== prepared.baseSha) {
+      if (operation.status === 'reserved' && RETRYABLE_WITHOUT_WRITE.has(operation.last_error || '')) {
+        // Nulla scritto su GitHub: la riserva passa alla base nuova.
+        await context.db.prepare("UPDATE live_pr_operations SET base_sha=?,updated_at=? WHERE id=? AND status='reserved'")
+          .bind(prepared.baseSha, context.now(), operation.id).run();
+        operation = { ...operation, base_sha: prepared.baseSha };
+      } else {
+        // Branch già avviato dalla base riservata (tentativo interrotto): si riprende da lì.
+        prepared.baseSha = operation.base_sha;
+      }
+    }
     assert(operation.branch_name === prepared.branchName, 'Chiave idempotente già associata a un branch differente.', 409);
     if (operation.status === 'pr_open') {
       await auditOnly({ ...context, requestId: prepared.draft.request_id, revision: prepared.draft.request_revision,
@@ -467,7 +479,10 @@ async function openLivePr(context, p) {
     if (operation.status === 'reserved' && !operation.last_error
       && Date.parse(context.now()) - Date.parse(operation.updated_at || operation.created_at || 0) < OPENING_GRACE_MS)
       fail('Apertura della PR già in corso: riprovo fra poco.', 409);
-    if (operation.status !== 'reserved' || !RETRYABLE_WITHOUT_WRITE.has(operation.last_error || '')) {
+    // Riserva senza errore e più vecchia dell'attesa: il tentativo si è interrotto a metà (es. tante foto da caricare).
+    // Si riprende: ogni passo su GitHub è idempotente (branch con lo stesso menu, foto per sha, PR cercata sul branch).
+    const interrupted = operation.status === 'reserved' && !operation.last_error;
+    if (operation.status !== 'reserved' || !(interrupted || RETRYABLE_WITHOUT_WRITE.has(operation.last_error || ''))) {
       if (operation.status !== 'needs_reconciliation')
         await markReconciliation(context, operation, prepared.draft.request_id, operation.last_error || 'UNKNOWN');
       return { operationId: operation.id, status: 'needs_reconciliation', needsReconciliation: true, reused: true };

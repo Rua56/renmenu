@@ -229,6 +229,7 @@ describe('GitHub live adapter (fake fetch only)', () => {
     const stale = fakeFetch((url, init) => {
       if (url.pathname.endsWith('/pulls') && init.method === 'GET') return json([]);
       if (url.pathname.endsWith('/git/ref/heads/main')) return json({ object: { sha: 'new-main-commit' } });
+      if (url.pathname.includes('/git/ref/heads/control-room/')) return json({ message: 'Not Found' }, 404);
       throw new Error(`Chiamata inattesa: ${init.method} ${url}`);
     });
     await rejectsCode(() => openApprovedMenuPr(env(stale.fetch), approved({ idempotencyKey: 'operation-stale-sha' })), 'BASE_SHA_CONFLICT');
@@ -271,27 +272,68 @@ describe('Fase 2c: foto del menu Premium nella stessa PR', () => {
     const m = { ...menu(), premium: { logo: url, galleria: [{ src: url }, { src: 'https://esempio.it/x.jpg' }] } };
     assert.deepEqual(menuMediaFiles(m), [{ sha, ext: 'jpg', path: `menus/media/${sha}.jpg` }]);
   });
-  it('scrive la foto sul branch della PR (mai su main) e non la riscrive se c’è già', async () => {
-    const puts = [];
-    let mediaExists = false;
+  // Un ramo finto con commit, alberi e blob: abbastanza per seguire le chiamate Git di GitHub.
+  const gitRemote = ({ mainSha = baseSha, branchMenu = null, branchMedia = [] } = {}) => {
+    const state = { branchSha: null, media: new Set(branchMedia), blobs: [], commits: [], prs: [] };
     const remote = fakeFetch((u, init) => {
-      if (u.pathname.endsWith('/pulls') && init.method === 'GET') return json([]);
-      if (u.pathname.endsWith('/git/ref/heads/main')) return json({ object: { sha: baseSha } });
-      if (u.pathname.endsWith('/contents/menus/trattoria-test.json') && init.method === 'GET') return json(file(menu('9,00')));
-      if (u.pathname.includes('/git/ref/heads/control-room/menu-trattoria-test-')) return json({ message: 'Not Found' }, 404);
-      if (u.pathname.endsWith('/git/refs') && init.method === 'POST') return json({ ref: JSON.parse(init.body).ref, object: { sha: baseSha } }, 201);
-      if (u.pathname.endsWith('/contents/menus/trattoria-test.json') && init.method === 'PUT') return json({ content: { sha: 'n' } }, 200);
-      if (u.pathname.endsWith(`/contents/menus/media/${sha}.jpg`)) {
-        if (init.method === 'PUT') { puts.push(JSON.parse(init.body)); mediaExists = true; return json({ content: { sha: 'm' } }, 201); }
-        return mediaExists ? json({ sha: 'm' }) : json({ message: 'Not Found' }, 404);
+      const branchRef = u.pathname.includes('/git/ref/heads/control-room/menu-trattoria-test-');
+      if (u.pathname.endsWith('/pulls') && init.method === 'GET') return json(state.prs);
+      if (u.pathname.endsWith('/git/ref/heads/main')) return json({ object: { sha: mainSha } });
+      if (branchRef) return state.branchSha ? json({ object: { sha: state.branchSha } }) : json({ message: 'Not Found' }, 404);
+      if (u.pathname.endsWith('/contents/menus/trattoria-test.json') && init.method === 'GET') {
+        const ref = u.searchParams.get('ref') || '';
+        return json(file(ref.startsWith('control-room/') && branchMenu ? branchMenu : menu('9,00')));
       }
-      if (u.pathname.endsWith('/pulls') && init.method === 'POST') return json({ number: 18, html_url: 'https://github.com/Rua56/renmenu/pull/18', head: { ref: JSON.parse(init.body).head, sha: 'h' }, base: { ref: 'main' }, state: 'open', draft: false }, 201);
+      if (u.pathname.endsWith('/git/refs') && init.method === 'POST') { state.branchSha = baseSha; return json({ ref: JSON.parse(init.body).ref, object: { sha: baseSha } }, 201); }
+      if (u.pathname.endsWith('/contents/menus/trattoria-test.json') && init.method === 'PUT') { state.branchSha = 'menu-commit'; return json({ content: { sha: 'n' } }, 200); }
+      if (u.pathname.endsWith('/contents/menus/media')) return state.media.size ? json([...state.media].map((path) => ({ path }))) : json({ message: 'Not Found' }, 404);
+      if (u.pathname.endsWith('/git/blobs')) { const body = JSON.parse(init.body); state.blobs.push(body); return json({ sha: `blob-${state.blobs.length}` }, 201); }
+      if (/\/git\/commits\/[^/]+$/.test(u.pathname) && init.method === 'GET') return json({ sha: u.pathname.split('/').pop(), tree: { sha: 'tree-0' } });
+      if (u.pathname.endsWith('/git/trees')) return json({ sha: 'tree-1', tree: JSON.parse(init.body).tree }, 201);
+      if (u.pathname.endsWith('/git/commits') && init.method === 'POST') { const body = JSON.parse(init.body); state.commits.push(body); return json({ sha: `media-commit-${state.commits.length}` }, 201); }
+      if (u.pathname.includes('/git/refs/heads/control-room/') && init.method === 'PATCH') {
+        state.branchSha = JSON.parse(init.body).sha;
+        for (const c of state.commits) for (const e of c.files || []) state.media.add(e);
+        return json({ object: { sha: state.branchSha } });
+      }
+      if (u.pathname.endsWith('/pulls') && init.method === 'POST') {
+        const pr = { number: 18, html_url: 'https://github.com/Rua56/renmenu/pull/18', head: { ref: JSON.parse(init.body).head, sha: 'h' }, base: { ref: 'main' }, state: 'open', draft: false };
+        state.prs.push(pr); return json(pr, 201);
+      }
       throw new Error(`Chiamata inattesa: ${init.method} ${u}`);
     });
-    await openApprovedMenuPr(env(remote.fetch), approved({ menu: { ...menu('10,00'), premium: { logo: url } }, media: [{ path: `menus/media/${sha}.jpg`, base64: 'AAEC' }] }));
-    assert.equal(puts.length, 1);
-    assert.match(puts[0].branch, /^control-room\/menu-trattoria-test-/);
-    assert.equal(puts[0].content, 'AAEC');
+    return { remote, state };
+  };
+  it('scrive tutte le foto sul branch della PR (mai su main) in un solo commit e salta quelle già presenti', async () => {
+    const other = 'b'.repeat(64);
+    const { remote, state } = gitRemote();
+    await openApprovedMenuPr(env(remote.fetch), approved({ menu: { ...menu('10,00'), premium: { logo: url, galleria: [{ src: url.replace(sha, other) }] } },
+      media: [{ path: `menus/media/${sha}.jpg`, base64: 'AAEC' }, { path: `menus/media/${other}.jpg`, base64: 'AAED' }] }));
+    assert.deepEqual(state.blobs.map((b) => b.content), ['AAEC', 'AAED']);
+    assert.equal(state.commits.length, 1, 'un commit per tutte le foto');
+    assert.deepEqual(state.commits[0].parents, ['menu-commit']);
+    const patch = remote.calls.find(({ url: u, init }) => init.method === 'PATCH');
+    assert.match(patch.url.pathname, /\/git\/refs\/heads\/control-room\/menu-trattoria-test-/);
+    assert.equal(remote.calls.some(({ url: u, init }) => init.method !== 'GET' && /heads\/main/.test(u.pathname)), false, 'main non si tocca');
+    // Già sul branch: nessun blob nuovo.
+    const again = gitRemote({ branchMedia: [`menus/media/${sha}.jpg`] });
+    await openApprovedMenuPr(env(again.remote.fetch), approved({ menu: { ...menu('10,00'), premium: { logo: url } }, media: [{ path: `menus/media/${sha}.jpg`, base64: 'AAEC' }] }));
+    assert.equal(again.state.blobs.length, 0);
+    assert.equal(again.state.commits.length, 0);
+  });
+  it('riprende un branch interrotto a metà anche se main è andato avanti, e apre la PR', async () => {
+    const approvedMenu = { ...menu('10,00'), premium: { logo: url } };
+    const { remote, state } = gitRemote({ mainSha: 'main-moved-on', branchMenu: approvedMenu });
+    state.branchSha = 'half-done';
+    const out = await openApprovedMenuPr(env(remote.fetch), approved({ menu: approvedMenu, media: [{ path: `menus/media/${sha}.jpg`, base64: 'AAEC' }] }));
+    assert.equal(out.pr.number, 18);
+    assert.equal(state.commits.length, 1);
+    assert.deepEqual(state.commits[0].parents, ['half-done']);
+    // Branch con un menu diverso: resta il conflitto di base, nessuna scrittura.
+    const other = gitRemote({ mainSha: 'main-moved-on', branchMenu: menu('11,00') });
+    other.state.branchSha = 'x';
+    await assert.rejects(() => openApprovedMenuPr(env(other.remote.fetch), approved({ menu: approvedMenu, media: [] })), (e) => e.code === 'BASE_SHA_CONFLICT');
+    assert.equal(other.remote.calls.some(({ init }) => init.method !== 'GET'), false);
   });
   it('rifiuta percorsi che non sono foto del menu', async () => {
     const remote = fakeFetch((u, init) => {
