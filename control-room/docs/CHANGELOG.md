@@ -4,6 +4,8 @@ Si aggiunge una voce a ogni pull request che cambia un comportamento di Jarvis o
 
 ## 15 ottobre 2026
 
+- Control Room: nel menu «Pratica» le pratiche senza bozza hanno accanto «senza bozza». Con cinque pratiche «Foto delle bottiglie · Trattoria Blanch» (una sola con la bozza) Riccardo non trovava la scheda «Foto»: aveva aperto una di quelle vuote.
+
 - Foto delle bottiglie: Jarvis risponde subito anche quando deve prima preparare la bozza. Alla prima prova su Telegram (09:46) Jarvis preparava la bozza di Blanch dal menu online dentro la risposta: ci voleva troppo, Telegram ha chiuso la connessione e ripetuto il messaggio, e Riccardo non ha ricevuto nulla (due pratiche aperte, nessuna bozza). Ora apre la pratica, risponde, e la bozza la prepara il giro dell’orologio, che poi avvia la ricerca; un messaggio ripetuto non apre una seconda pratica.
 
 - Trattoria Blanch: la carta dei vini può avere le foto delle bottiglie. Prima Jarvis rispondeva che non poteva aggiungerle, perché il menu di Blanch è nel formato proprio e non è Premium. Ora wines.tsv ha una colonna facoltativa «photo» (menu.json cambia solo per i vini con la foto), la pagina /blanch/ mostra una piccola bottiglia accanto al vino che si ingrandisce col tocco, e basta dire a Jarvis «aggiungi le foto delle bottiglie a Trattoria Blanch»: cerca le bottiglie sui siti delle cantine tre vini per giro, le mette sul vino giusto (i dodici «Friulano» restano distinti per cantina) e alla fine manda il link. In Revisione → «Foto» c’è anche «Fai cercare tutte le bottiglie a Jarvis». L’anteprima di una bozza di Blanch ora apre la pagina vera di Blanch. Pubblicazione sempre con il SÌ di Riccardo; la PR aggiunge le foto in menus/media/.
