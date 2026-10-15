@@ -165,3 +165,41 @@ html[data-theme="dark"] .hud-chart::before { content: ''; position: absolute; in
 @media (prefers-reduced-motion: reduce) { html[data-theme="dark"] .hud-chart::before { animation: none; display: none; } }
 html[data-theme="dark"] .hud-log { background: linear-gradient(180deg, rgba(4, 14, 22, .94), rgba(6, 16, 28, .94)); border-color: var(--hud-line); box-shadow: inset 0 0 30px rgba(70, 214, 255, .06); }
 html[data-theme="dark"] .log-line span { color: #b9e9f7; text-shadow: 0 0 6px rgba(70, 214, 255, .25); }
+
+/* ——— Strumenti in stile HUD (15 ott): le schermate complete parlano la stessa lingua della home ——— */
+html[data-theme="dark"] .view-header { margin-top: 14px; }
+html[data-theme="dark"] .view-header .eyebrow { color: var(--teal-soft); letter-spacing: .2em; }
+html[data-theme="dark"] .view-header .eyebrow::before { color: var(--hud); content: "▸ "; }
+html[data-theme="dark"] .panel { border-color: rgba(70, 214, 255, .16); background: linear-gradient(180deg, rgba(16, 28, 45, .94), rgba(10, 19, 32, .94)); }
+html[data-theme="dark"] .panel h2 { letter-spacing: -.005em; }
+html[data-theme="dark"] .panel .eyebrow { color: var(--teal-soft); letter-spacing: .16em; }
+/* avvisi: niente più rosa e bordeaux, solo ambra (attenzione) e rosso HUD (blocco) */
+html[data-theme="dark"] .notice { border-color: rgba(70, 214, 255, .2); border-left: 2px solid var(--hud); border-radius: 6px; background: linear-gradient(90deg, rgba(70, 214, 255, .07), rgba(70, 214, 255, .015)); }
+html[data-theme="dark"] .notice.warning { border-color: rgba(255, 179, 71, .25); border-left-color: var(--am); background: linear-gradient(90deg, rgba(255, 179, 71, .09), rgba(255, 179, 71, .015)); }
+html[data-theme="dark"] .notice.warning strong { color: var(--am); }
+html[data-theme="dark"] .notice.danger { border-color: rgba(255, 107, 122, .3); border-left-color: #ff6b7a; background: linear-gradient(90deg, rgba(255, 107, 122, .1), rgba(255, 107, 122, .015)); }
+html[data-theme="dark"] .notice.danger strong { color: #ff8f9b; }
+/* etichette di stato come spie del cruscotto */
+html[data-theme="dark"] :is(.status, .capsule) { border-radius: 4px; font-family: var(--mono); font-weight: 600; letter-spacing: .1em; }
+html[data-theme="dark"] .status.good { border-color: rgba(91, 227, 162, .4); background: rgba(91, 227, 162, .08); color: var(--gr); }
+html[data-theme="dark"] .status.info { border-color: rgba(70, 214, 255, .35); background: rgba(70, 214, 255, .07); color: var(--teal-soft); }
+html[data-theme="dark"] .status.wait { border-color: rgba(255, 179, 71, .4); background: rgba(255, 179, 71, .08); color: var(--am); }
+html[data-theme="dark"] .status.alert { border-color: rgba(255, 107, 122, .45); background: rgba(255, 107, 122, .09); color: #ff8f9b; }
+html[data-theme="dark"] .capsule { border-color: var(--hud-line); background: transparent; color: var(--teal-soft); }
+/* campi: etichetta tecnica, bordo sottile che si accende */
+html[data-theme="dark"] .field { color: var(--muted-strong); font: 500 10.5px var(--mono); letter-spacing: .08em; text-transform: uppercase; }
+html[data-theme="dark"] .field :is(input, select, textarea) { border-color: rgba(70, 214, 255, .2); border-radius: 8px; background: rgba(5, 12, 21, .85); font: 500 15px var(--sans); letter-spacing: 0; text-transform: none; }
+html[data-theme="dark"] .field :is(input, select, textarea):focus { border-color: var(--hud); background: rgba(5, 12, 21, .95); box-shadow: 0 0 0 3px var(--hud-dim), 0 0 18px var(--hud-dim); }
+html[data-theme="dark"] .button.secondary { border-color: var(--hud-line); border-radius: 8px; background: rgba(70, 214, 255, .04); }
+html[data-theme="dark"] .button:not(.secondary):not(.danger) { border-radius: 10px; }
+/* strumenti manuali chiusi: si aprono solo quando servono */
+.manual-tool > summary, .manual-tools > summary { min-height: 48px; padding: 14px 4px; color: var(--teal); cursor: pointer; font: 600 12px var(--mono); letter-spacing: .1em; text-transform: uppercase; list-style: none; }
+.manual-tool > summary::before, .manual-tools > summary::before { display: inline-block; width: 1.2em; content: "+"; }
+.manual-tool[open] > summary::before, .manual-tools[open] > summary::before { content: "−"; }
+.manual-tool > summary::-webkit-details-marker, .manual-tools > summary::-webkit-details-marker { display: none; }
+.manual-tools { margin-top: 18px; }
+.grid > details.manual-tool { order: 2; align-self: start; }
+/* registro come la registrazione della scatola nera */
+.audit-log .timeline { margin: 6px 0 0 4px; border-left-color: var(--hud-line, rgba(70, 214, 255, .28)); }
+html[data-theme="dark"] .audit-log .timeline-item::before { border-color: var(--bg); background: var(--hud); box-shadow: 0 0 8px var(--hud-glow); }
+html[data-theme="dark"] .audit-log .timeline-item p strong { color: #b9e9f7; font-weight: 500; }

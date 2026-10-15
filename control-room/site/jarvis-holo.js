@@ -17,6 +17,7 @@ let mapCanvas = null, specCanvas = null, panel = null;
 let venues = [];
 let focus = null; // id del locale agganciato
 let onOpen = null;
+let showPanel = true; // false nel dossier del locale: la scheda è già la pagina
 let cam = { yaw: 0.6, zoom: 1, cx: 0, cy: 0, shift: 0 };
 let goal = { zoom: 1, cx: 0, cy: 0, shift: 0 };
 let raf = 0, last = 0, lockAt = 0;
@@ -40,10 +41,11 @@ function fit(el) {
 }
 
 /** Rimette le tele olografiche nei segnaposto della home appena ridisegnata. */
-export function attachHolo(list, { open = null } = {}) {
+export function attachHolo(list, { open = null, panel: withPanel = true } = {}) {
   if (!globalThis.document) return;
   venues = Array.isArray(list) ? list : [];
   onOpen = open;
+  showPanel = withPanel;
   const mapSlot = document.querySelector('[data-holo-map]');
   const specSlot = document.querySelector('[data-holo-spectrum]');
   if (!holoOn()) { mapSlot?.closest('.holo-map')?.setAttribute('hidden', ''); return; }
@@ -68,13 +70,20 @@ export function attachHolo(list, { open = null } = {}) {
   if (venues.length && !goal.set) { frame(); goal.set = true; }
   wake();
 }
+/** Lo spettro della voce attorno a un altro reattore (il foglio «Parla con Jarvis» fuori dalla home). */
+export function attachSpectrum(slot) {
+  if (!globalThis.document || !slot || !holoOn()) return;
+  if (!specCanvas) specCanvas = canvas('holo-spectrum-canvas');
+  slot.replaceChildren(specCanvas);
+  wake();
+}
 /** Aggancia un locale (nominato in chat o toccato). null = torna alla vista d'insieme. */
 export function focusVenue(id) {
   const venue = venues.find((v) => v.id === id);
   focus = venue ? venue.id : null;
   lockAt = performance.now();
   // Il locale agganciato va a sinistra: a destra c'è la sua scheda.
-  if (venue) Object.assign(goal, { zoom: Math.max(goal.zoom * 1.6, 3.4), cx: venue.x, cy: venue.y, shift: -0.24 });
+  if (venue) Object.assign(goal, { zoom: Math.max(goal.zoom * 1.6, 3.4), cx: venue.x, cy: venue.y, shift: showPanel ? -0.24 : 0 });
   else frame();
   renderPanel();
   wake();
@@ -89,7 +98,7 @@ const PLAN_LABEL = { standard: 'Standard', annuale: 'Annuale', premium: 'Premium
 function renderPanel() {
   if (!panel) return;
   const venue = venues.find((v) => v.id === focus);
-  panel.hidden = !venue;
+  panel.hidden = !venue || !showPanel;
   panel.closest('.holo-map')?.classList.toggle('locked', Boolean(venue));
   if (!venue) return;
   const esc = (s) => String(s ?? '').replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[c]);
@@ -146,7 +155,7 @@ function drawMap(t) {
   const pins = venues.map((v) => ({ v, p: project(v.x, v.y, 0, w, h) })).sort((a, b) => a.p.d - b.p.d);
   const tallOf = (v, p) => (v.state === 'decide' ? 34 : v.state === 'online' ? 24 : 16) * p.d;
   for (const { v, p } of pins) {
-    if (v.id === focus) label.reserve(p.x - 32, p.y - 50, 64, 64); // il mirino: il nome è già nella scheda
+    if (v.id === focus && showPanel) label.reserve(p.x - 32, p.y - 50, 64, 64); // il mirino: il nome è già nella scheda
     else label.reserve(p.x - 4, p.y - tallOf(v, p) - 4, 8, 8);
   }
   // Anelli di distanza (5, 10, 20, 40 km) e raggi.
@@ -182,7 +191,7 @@ function drawMap(t) {
     ctx.fillStyle = grad; ctx.fillRect(p.x - 1.5, p.y - tall, 3, tall);
     ctx.strokeStyle = `rgba(${r},${g},${b},${0.7 * pulse})`; ctx.beginPath(); ctx.ellipse(p.x, p.y, 6, 2.6, 0, 0, Math.PI * 2); ctx.stroke();
     ctx.fillStyle = `rgba(${r},${g},${b},1)`; ctx.beginPath(); ctx.arc(p.x, p.y - tall, 2.4, 0, Math.PI * 2); ctx.fill();
-    if (focus !== v.id && (focus || cam.zoom > 1.8 || venues.length <= 6)) { ctx.fillStyle = `rgba(${r},${g},${b},.9)`; ctx.font = '600 10px "JetBrains Mono", monospace'; label(v.name.slice(0, 22), p.x + 7, p.y - tall + 3, 14); }
+    if ((focus !== v.id || !showPanel) && (focus || cam.zoom > 1.8 || venues.length <= 6)) { ctx.fillStyle = `rgba(${r},${g},${b},.9)`; ctx.font = '600 10px "JetBrains Mono", monospace'; label(v.name.slice(0, 22), p.x + 7, p.y - tall + 3, 14); }
   }
   // Mirino sul locale agganciato: quattro angoli che si stringono e ruotano.
   const locked = venues.find((v) => v.id === focus);
