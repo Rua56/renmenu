@@ -475,3 +475,75 @@ html:not([data-theme="dark"]) .holo-map { background: radial-gradient(120% 90% a
 .holo-panel[hidden] { display: none; }
 .holo-panel small { padding-right: 16px; }
 .jarvis-hero .reactor-main:has(.holo-spec canvas) { margin: 44px auto 40px; }
+
+/* ——— Rifinitura grafica (15 ott): intestazione, mappa, reattore compatto, schermo HUD sul computer ——— */
+/* Intestazione: l'etichetta di stato si accorcia invece di finire sopra «J.A.R.V.I.S.». */
+.topbar { gap: 10px; }
+.brand { flex: none; }
+.topbar-actions { min-width: 0; justify-content: flex-end; }
+.mode-badge { display: inline-block; min-width: 0; overflow: hidden; line-height: 20px; text-overflow: ellipsis; white-space: nowrap; }
+@media (max-width: 560px) { .mode-badge { max-width: calc(100vw - 300px); font-size: .56rem; } }
+/* Mappa: legenda ordinata, scritta d'aiuto su una riga sua. */
+.holo-legend { display: flex; flex-wrap: wrap; justify-content: center; gap: 2px 12px; }
+.holo-legend span { white-space: nowrap; }
+.holo-legend i { margin: 0 5px 0 0; }
+.holo-legend small { flex-basis: 100%; font-size: 9.5px; letter-spacing: .04em; opacity: .7; }
+/* Telefono: reattore un po' più raccolto e mappa più bassa, così la conversazione comincia nella prima schermata. */
+@media (max-width: 560px) {
+  .jarvis-hero .reactor-main:has(.holo-spec canvas) { zoom: .8; margin: 34px auto 26px; }
+  .jarvis-hero { padding-top: 0; }
+  .holo-frame { height: 190px; }
+}
+/* Quando scrivi a Jarvis il reattore si fa piccolo accanto al saluto e la mappa si chiude
+   (si riapre da sola quando nomini un locale). */
+@media (max-width: 1099px) {
+  html[data-chat-on] .jarvis-hero { display: grid; grid-template-columns: auto minmax(0, 1fr); align-items: center; gap: 4px; padding-top: 0; text-align: left; }
+  html[data-chat-on] .jarvis-hero .reactor-main, html[data-chat-on] .jarvis-hero .reactor-main:has(.holo-spec canvas) { zoom: .34; margin: 44px; }
+  html[data-chat-on] .jarvis-hero :is(.core-hint, .eyebrow) { display: none; }
+  html[data-chat-on] .jarvis-hero h1 { margin: 0; font-size: 20px; text-align: left; }
+  html[data-chat-on] .jarvis-hero .jarvis-says { margin: 2px 0 0; font-size: 14px; text-align: left; }
+  html[data-chat-on] .holo-map:not(.locked) { display: none; }
+  html[data-chat-on] .holo-map .holo-frame { height: 170px; }
+}
+:is(.sheet, .jarvis-talk) .chat-quick { -webkit-mask-image: linear-gradient(90deg, #000 82%, transparent); mask-image: linear-gradient(90deg, #000 82%, transparent); }
+/* Sul computer: schermo HUD. Reattore e mappa a sinistra (restano fermi), conversazione a destra, menu in alto. */
+@media (min-width: 1100px) {
+  html[data-theme] .app-shell { max-width: 1360px; }
+  .main-content { padding-bottom: 40px; }
+  body[data-view="command"] .main-content { display: grid; grid-template-columns: minmax(400px, 480px) minmax(0, 1fr); gap: 0 40px; align-items: start; padding: 8px 32px 32px; }
+  body[data-view="command"] #view { position: sticky; top: 16px; }
+  body[data-view="command"] .holo-frame { height: 280px; }
+  body[data-view="command"] .jarvis-talk { width: 100%; max-width: 780px; min-height: calc(100dvh - 110px); margin: 0; padding: 14px 0 0 32px; border-left: 1px solid rgba(70, 214, 255, .16); }
+  body[data-view="command"] .jarvis-talk .chat-bar { bottom: 20px; }
+  body[data-view="command"] .jarvis-talk .msg { scroll-margin-bottom: 110px; }
+  html[data-theme] body .bottom-nav { position: absolute; top: calc(12px + env(safe-area-inset-top)); bottom: auto; left: 50%; display: flex; align-items: center; gap: 14px; width: auto; max-width: none; padding: 0; background: none; transform: translateX(-50%); }
+  .bottom-nav .tabs { display: flex; gap: 4px; margin: 0; }
+  .bottom-nav .tabs > .nav-link { flex-direction: row; gap: 8px; min-height: 40px; padding: 6px 14px; font-size: 13px; }
+  .bottom-nav .tabs > .nav-link svg { width: 18px; height: 18px; }
+  .bottom-nav .tabs .nav-hint { position: static; margin-left: 2px; }
+  .bottom-nav .ask { width: 250px; min-height: 40px; padding: 3px 3px 3px 14px; box-shadow: none; font-size: 13px; }
+  .bottom-nav .ask b { width: 32px; height: 32px; }
+  .bottom-nav .ask b svg { width: 18px; height: 18px; }
+  .toast-region { bottom: 24px; }
+}
+/* Il contenuto riceve il fuoco a ogni cambio di schermata (per i lettori di schermo): niente cornice attorno. */
+#main-content:focus, #main-content:focus-visible { outline: none; box-shadow: none; }
+html[data-theme="dark"] .jarvis-talk .chat-bar { background: #08121e; }
+.bottom-nav.on-home { background: linear-gradient(180deg, transparent, var(--bg) 12px); }
+@media (min-width: 1100px) {
+  .bottom-nav .ask { width: 290px; white-space: nowrap; }
+  .bottom-nav .ask span { overflow: hidden; text-overflow: ellipsis; }
+  html[data-theme] body .bottom-nav.on-home { background: none; }
+}
+@media (max-width: 1099px) {
+  html[data-chat-on] .holo-map.locked .holo-frame { height: 220px; }
+  html[data-chat-on] .holo-map.locked .holo-legend { display: none; }
+}
+@media (min-width: 1100px) {
+  body[data-view="command"] #view { max-height: calc(100dvh - 90px); overflow-y: auto; scrollbar-width: none; }
+}
+/* Telefono: la casella «Scrivi a Jarvis» resta sempre in fondo allo schermo, sopra il menu, anche quando
+   la conversazione comincia più in basso (prima finiva sopra il menu). */
+@media (max-width: 1099px) {
+  .jarvis-talk .chat-bar { position: fixed; left: 50%; bottom: calc(84px + env(safe-area-inset-bottom)); width: calc(100% - 32px); max-width: 448px; transform: translateX(-50%); }
+}

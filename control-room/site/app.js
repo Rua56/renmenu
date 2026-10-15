@@ -317,6 +317,8 @@ function renderNavigation() {
   const link = ([id, , label]) => `<a class="nav-link" href="#${id}" aria-current="${tab === id ? 'page' : 'false'}">${TAB_ICONS[id]}<span>${label}</span>${hint(id)}</a>`;
   primaryNav.innerHTML = '';
   bottomNav.classList.toggle('on-home', activeView === 'command');
+  document.body.dataset.view = activeView;
+  if (activeView !== 'command') delete document.documentElement.dataset.chatOn;
   bottomNav.innerHTML = `<button class="ask" type="button" data-action="ask-open" aria-label="Scrivi o parla a Jarvis"><span>Scrivi o parla a Jarvis…</span><b data-action="ask-voice" aria-hidden="true"><svg viewBox="0 0 24 24"><rect x="9" y="3" width="6" height="11" rx="3" fill="none" stroke="currentColor" stroke-width="1.8"/><path d="M5.5 11.5a6.5 6.5 0 0 0 13 0M12 18v3" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></svg></b></button><div class="tabs">${navItems.filter(([id]) => MAIN_TABS.includes(id)).map(link).join('')}</div>`;
 }
 function renderUnavailable() {
@@ -1102,7 +1104,7 @@ function renderCommand() {
 // Mappa olografica dei locali (jarvis-holo.js): si disegna nel segnaposto dopo ogni ridisegno della home.
 function holoMap() {
   if (!holoOn() || !state.clients.length) return '';
-  return `<section class="holo-map" aria-label="Mappa dei locali"><div class="holo-head"><span>MAPPA LOCALI · GORIZIA E DINTORNI</span><span>${state.clients.length} ${state.clients.length === 1 ? 'LOCALE' : 'LOCALI'}</span></div><div class="holo-frame" data-holo-map></div><p class="holo-legend"><i class="l-decide"></i>da decidere <i class="l-online"></i>online <i class="l-lavoro"></i>in corso · tocca un punto o nomina un locale</p></section>`;
+  return `<section class="holo-map" aria-label="Mappa dei locali"><div class="holo-head"><span>MAPPA LOCALI · GORIZIA E DINTORNI</span><span>${state.clients.length} ${state.clients.length === 1 ? 'LOCALE' : 'LOCALI'}</span></div><div class="holo-frame" data-holo-map></div><p class="holo-legend"><span><i class="l-decide"></i>da decidere</span><span><i class="l-online"></i>online</span><span><i class="l-lavoro"></i>in corso</span><small>tocca un punto o nomina un locale</small></p></section>`;
 }
 function decideClients() {
   return new Set(allPratiche().filter((info) => info.group === 'decidere').map((info) => info.request.clientId).filter(Boolean));
