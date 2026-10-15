@@ -142,6 +142,7 @@ export async function onRequest(context) {
       await autoPrepareTick(env.DB, env).catch(() => null);
       const done = await missions.tick(env.DB, env);
       await missions.watchTick(env.DB, env).catch(() => null);
+      await missions.guardTick(env.DB, env).catch(() => null);
       const briefed = await missions.briefing(env.DB, env).catch(() => null);
       await missions.initiativeTick(env.DB, env).catch(() => null);
       await missions.agendaTick(env.DB, env).catch(() => null);
