@@ -554,7 +554,7 @@ export function createMissions(deps) {
   }
   async function queueOnlineEmail(db, env, { mission, request, draft, menu, qr }) {
     const to = String(request.client_email || '').trim();
-    if (!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(to) || (INTERNAL_MAIL.test(to) && !directMail(env))) return { queued: false, why: 'il locale non ha un’email' };
+    if (!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(to) || INTERNAL_MAIL.test(to)) return { queued: false, why: 'il locale non ha un’email' };
     const approval = await getOne(db, 'SELECT id FROM publication_approvals WHERE draft_id=?', mission.draft_id);
     if (!approval) return { queued: false, why: 'approvazione non trovata' };
     const code = referenceCode(), stamp = now();

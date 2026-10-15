@@ -17,7 +17,6 @@ import { reviewIssues, EVIDENCE_LABELS } from '../../_lib/editorial.js';
 import { runPrivateIntegrationAction } from '../../_lib/operations.js';
 import { sendOwnerNotification, OWNER_NOTIFICATION_RECIPIENT } from '../../_lib/owner-notifications.js';
 import { purgePublishedEmail } from '../../_lib/email-retention.js';
-import { clientMailConfig } from '../../_lib/client-mail.js';
 import { resolveCategory, draftBlocker, PLAN_RULES } from '../../_lib/service-rules.js';
 import { TRANSLATION_LANGS, translateMenu, translationEntries, translationSummary } from '../../_lib/translate.js';
 import { allExtras, applyExtras, proposeSourceExtras } from '../../_lib/extras.js';
@@ -1064,9 +1063,7 @@ async function action(db, type, input, env = {}) {
     const ownerReview = p.ownerReview === true && !request.client_email;
     const recipient = ownerReview ? OWNER_REVIEW : String(p.recipient || request.client_email || '').trim().toLowerCase();
     assert(ownerReview || (/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(recipient) && recipient.length <= 254), 'Indica l’email del locale (scheda cliente o campo destinatario).', 422);
-    // La casella RenMenu come «cliente» va bene solo per le prove, quando Jarvis spedisce da renmenu.com:
-    // col vecchio ponte Gmail l'anteprima partirebbe da renmenu1569 verso sé stessa.
-    assert(recipient !== OWNER_NOTIFICATION_RECIPIENT || clientMailConfig(env).ok, 'Il destinatario non può essere la casella RenMenu: serve l’email del locale.', 422);
+    assert(recipient !== OWNER_NOTIFICATION_RECIPIENT, 'Il destinatario non può essere la casella RenMenu: serve l’email del locale.', 422);
     const sha = await sha256Hex(draft.menu_json);
     const existing = await getOne(db, 'SELECT * FROM publication_approvals WHERE draft_id=?', draftId);
     assert(!(existing?.status === 'approvata_cliente' && existing.snapshot_sha === sha), 'Il cliente ha già approvato questa versione: non serve una nuova anteprima.', 409);
