@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <meta name="google-site-verification" content="yF-pLgLP4lhzAUhJ0W40VZMvP1EuRFwh-Rjn6MalNEU">
-<title>RenMenu — Il menù digitale QR per bar e ristoranti, pronto in 10 minuti</title>
+<title>RenMenu — Il menù digitale QR per bar e ristoranti, pronto in 24 ore</title>
 <meta name="description" content="Menù digitale con QR code per bar, osterie e ristoranti, dal Friuli Venezia Giulia a tutta Italia. Aggiornabile con un messaggio WhatsApp, multilingua, allergeni a norma. Da 25 € al mese, nessuna app.">
 <meta property="og:title" content="RenMenu — Il menù digitale del tuo locale">
 <meta property="og:description" content="QR sul tavolo, menù sul telefono dei clienti. Aggiornato con un messaggio. Da 25 € al mese.">
@@ -85,7 +85,7 @@
   .plan__price { font-family: var(--font-display); font-size: var(--text-2xl); margin-top: var(--space-3); line-height: 1; }
   .plan__price small { font-family: var(--font-body); font-size: var(--text-sm); color: var(--color-text-muted); }
   .plan__sub { margin-top: var(--space-2); font-size: var(--text-sm); color: var(--color-text-muted); }
-  .plan ul { margin-top: var(--space-6); display: grid; gap: var(--space-2); font-size: var(--text-sm); flex: 1; }
+  .plan ul { margin-top: var(--space-6); display: grid; gap: var(--space-2); align-content: start; font-size: var(--text-sm); flex: 1; }
   .plan li { display: flex; gap: var(--space-2); }
   .plan li::before { content: '✓'; color: var(--color-primary); font-weight: 700; }
   .plan__cta { margin-top: var(--space-8); display: grid; gap: var(--space-2); }
@@ -156,8 +156,8 @@
       <p class="hero__note">Pronto in 24 ore · Da 25 € al mese · Tutto via WhatsApp, in tutta Italia</p>
     </div>
     <div class="phone" aria-label="Anteprima del menù digitale su smartphone">
-      <div class="phone__screen"><iframe src="https://rua56.github.io/Al.bakaro.menu/" title="Menù di Al Bakaro, Gorizia" loading="eager" allow="geolocation"></iframe></div>
-      <div class="phone__badge"><i></i> Dal vivo: Al Bakaro, Gorizia · 4 lingue</div>
+      <div class="phone__screen"><iframe src="menu/index.html?m=demo-premium&lang=it" title="Esempio di menù Premium RenMenu" loading="eager"></iframe></div>
+      <div class="phone__badge"><i></i> Esempio Premium · prova a toccarlo</div>
     </div>
   </section>
 
