@@ -1,0 +1,138 @@
+/* RenMenu Control Room · strato «cinematografico» di J.A.R.V.I.S. (solo tema scuro).
+   Toglie l'aspetto da app: niente schede tonde ma pannelli olografici sottili con gli angoli
+   tagliati, sfondo nero profondo con anelli e un radar che gira piano, titoli larghi in
+   maiuscolo, pulsanti a contorno luminoso e pannelli che fluttuano appena. Con «riduci movimento»
+   resta tutto fermo. Si appoggia a jarvis-ui.css e jarvis-hud.css senza cambiare le schermate. */
+html[data-theme="dark"] {
+  --bg: #02050a; --bg-deep: #010307;
+  --cut: 12px;
+  --glass: linear-gradient(160deg, rgba(14, 34, 54, .62), rgba(4, 10, 18, .72));
+  --hair: rgba(70, 214, 255, .22);
+  --radius: 3px; --radius-sm: 2px;
+}
+
+/* ——— sfondo: nero profondo, anelli concentrici attorno al reattore e radar che ruota ——— */
+html[data-theme="dark"] body {
+  background:
+    radial-gradient(60vmax 60vmax at 50% 18%, rgba(16, 52, 82, .42) 0%, transparent 62%),
+    repeating-radial-gradient(circle at 50% 18%, transparent 0 79px, rgba(70, 214, 255, .055) 79px 80px),
+    linear-gradient(rgba(70, 214, 255, .025) 1px, transparent 1px) 0 0 / 40px 40px,
+    linear-gradient(90deg, rgba(70, 214, 255, .025) 1px, transparent 1px) 0 0 / 40px 40px,
+    var(--bg);
+  background-attachment: fixed;
+}
+html[data-theme="dark"] body::before {
+  position: fixed; z-index: 0; left: 50%; top: 18vh; width: 220vmax; height: 220vmax; margin: -110vmax 0 0 -110vmax;
+  border-radius: 50%; pointer-events: none; content: "";
+  background: conic-gradient(from 0deg, rgba(70, 214, 255, .09), rgba(70, 214, 255, .025) 16deg, transparent 52deg, transparent 360deg);
+  animation: cine-sweep 14s linear infinite;
+}
+/* righelli sui bordi dello schermo, come un visore */
+html[data-theme="dark"] body::after {
+  position: fixed; z-index: 0; inset: 0; pointer-events: none; content: "";
+  background:
+    repeating-linear-gradient(180deg, rgba(70, 214, 255, .35) 0 1px, transparent 1px 24px) 6px 0 / 6px 100% no-repeat,
+    repeating-linear-gradient(180deg, rgba(70, 214, 255, .35) 0 1px, transparent 1px 24px) calc(100% - 6px) 0 / 6px 100% no-repeat,
+    repeating-linear-gradient(180deg, rgba(70, 214, 255, .5) 0 1px, transparent 1px 120px) 4px 0 / 10px 100% no-repeat,
+    repeating-linear-gradient(180deg, rgba(70, 214, 255, .5) 0 1px, transparent 1px 120px) calc(100% - 4px) 0 / 10px 100% no-repeat;
+  opacity: .5;
+}
+html[data-theme="dark"] .app-shell::before { background: radial-gradient(130% 90% at 50% 35%, transparent 50%, rgba(0, 0, 0, .7) 100%); }
+@keyframes cine-sweep { to { transform: rotate(360deg); } }
+
+/* ——— pannelli: vetro scuro, bordo sottile, due angoli tagliati (gli angoli HUD restano sugli altri due) ——— */
+html[data-theme="dark"] :is(.oggi-card, .panel, .sys-list, .locale, .fact, .oggi-calm, .notice, .hud-readout, .hud-display, .hud-log, .tool-tile, .dossier-head, .pratica-head, .find-bar) {
+  border: 1px solid var(--hair); border-radius: 0; background: var(--glass);
+  box-shadow: inset 0 0 0 1px rgba(255, 255, 255, .015), inset 0 1px 0 rgba(169, 236, 255, .07);
+  clip-path: polygon(0 0, calc(100% - var(--cut)) 0, 100% var(--cut), 100% 100%, var(--cut) 100%, 0 calc(100% - var(--cut)));
+  backdrop-filter: blur(3px);
+}
+/* la linea del taglio, perché il bordo non resti aperto */
+html[data-theme="dark"] :is(.oggi-card, .sys-list, .locale, .fact, .oggi-calm, .notice, .hud-readout, .hud-display, .hud-log, .tool-tile, .find-bar)::before,
+html[data-theme="dark"] .panel::before {
+  position: absolute; inset: 0; z-index: 1; display: block; width: auto; height: auto; border: 0; border-radius: 0; pointer-events: none; content: "";
+  background:
+    linear-gradient(225deg, transparent calc(var(--cut) * .7 - .5px), var(--hair) calc(var(--cut) * .7 - .5px) calc(var(--cut) * .7 + .5px), transparent calc(var(--cut) * .7 + .5px)) 100% 0 / var(--cut) var(--cut) no-repeat,
+    linear-gradient(45deg, transparent calc(var(--cut) * .7 - .5px), var(--hair) calc(var(--cut) * .7 - .5px) calc(var(--cut) * .7 + .5px), transparent calc(var(--cut) * .7 + .5px)) 0 100% / var(--cut) var(--cut) no-repeat;
+}
+html[data-theme="dark"] :is(.oggi-card, .locale, .tool-tile, .sys-row):hover { border-color: rgba(70, 214, 255, .5); background: linear-gradient(160deg, rgba(20, 52, 80, .7), rgba(6, 14, 24, .78)); box-shadow: inset 0 0 28px rgba(70, 214, 255, .08); }
+html[data-theme="dark"] :is(.oggi-card.hot, .oggi-card.alert) { border-color: rgba(255, 179, 71, .35); }
+html[data-theme="dark"] :is(.dossier-head, .pratica-head) { padding: 16px 16px 14px; }
+html[data-theme="dark"] .pratica-head:has(.gauge) { padding-right: 88px; }
+html[data-theme="dark"] .pratica-head .gauge { top: 14px; right: 14px; }
+html[data-theme="dark"] .locale .av { border-radius: 0; clip-path: polygon(0 0, calc(100% - 8px) 0, 100% 8px, 100% 100%, 8px 100%, 0 calc(100% - 8px)); }
+html[data-theme="dark"] :is(.sheet, .jarvis-talk) .quick button { border-color: var(--hair); border-radius: 0; background: rgba(70, 214, 255, .04); font: 500 .72rem var(--mono); letter-spacing: .06em; }
+html[data-theme="dark"] :is(.sheet, .jarvis-talk) .quick button:hover { border-color: var(--hud); box-shadow: 0 0 14px var(--hud-dim); }
+html[data-theme="dark"] input.search { border-radius: 0; border-color: var(--hair); background: rgba(3, 10, 18, .7); }
+html[data-theme="dark"] .oggi-card { border-left: 2px solid var(--hud); }
+html[data-theme="dark"] :is(.oggi-card.hot, .oggi-card.alert) { border-left-color: var(--am); }
+html[data-theme="dark"] .holo-map { border-radius: 0; border-color: var(--hair); background: rgba(2, 8, 14, .55); }
+html[data-theme="dark"] .msg.j { border-radius: 0; clip-path: polygon(0 0, calc(100% - 10px) 0, 100% 10px, 100% 100%, 0 100%); }
+html[data-theme="dark"] .msg.u { border-radius: 0; clip-path: polygon(10px 0, 100% 0, 100% 100%, 0 100%, 0 10px); }
+html[data-theme="dark"] :is(.seg, .seg button, .chip, .chips button, .capsule, .status, .badge, .oggi-tag, .mode-badge, .rev-tabs button, .hud-rows > *, .sys-row, input, select, textarea) { border-radius: 2px; }
+
+/* ——— barra «chiedi a Jarvis» e casella della chat: linea di comando, non pillola ——— */
+html[data-theme="dark"] :is(.ask, .chat-bar) {
+  border-radius: 0; border-color: rgba(70, 214, 255, .4); background: rgba(3, 10, 18, .82);
+  box-shadow: 0 0 0 1px rgba(70, 214, 255, .06), 0 0 30px rgba(70, 214, 255, .1), 0 10px 30px rgba(0, 0, 0, .6);
+  clip-path: polygon(0 0, calc(100% - 10px) 0, 100% 10px, 100% 100%, 10px 100%, 0 calc(100% - 10px));
+}
+html[data-theme="dark"] .ask { font-family: var(--mono); font-size: .78rem; letter-spacing: .12em; text-transform: uppercase; color: var(--teal-soft); }
+html[data-theme="dark"] .ask b { border-radius: 0; background: transparent; color: var(--hud); border: 1px solid var(--hud); box-shadow: 0 0 14px var(--hud-glow), inset 0 0 10px var(--hud-dim); clip-path: polygon(0 0, 100% 0, 100% 100%, 0 100%); }
+html[data-theme="dark"] .ask b::after { border-radius: 0; }
+html[data-theme="dark"] .chat-mic { border: 1px solid var(--hud); border-radius: 0; background: rgba(70, 214, 255, .1); color: var(--hud); box-shadow: 0 0 14px var(--hud-dim), inset 0 0 10px var(--hud-dim); }
+html[data-theme="dark"] .chat-mic[aria-pressed="true"] { border-color: var(--am); background: rgba(255, 179, 71, .16); color: var(--am); box-shadow: 0 0 18px rgba(255, 179, 71, .4); }
+html[data-theme="dark"] .chat-send { border-radius: 0; }
+
+/* ——— pulsanti: contorno luminoso e scritte da strumento ——— */
+html[data-theme="dark"] :is(.button, .mini-button, .chat-btns button, .oggi-cta, .back-bar) {
+  border-radius: 0; font-family: var(--mono); font-weight: 500; letter-spacing: .1em; text-transform: uppercase; font-size: .72rem;
+}
+html[data-theme="dark"] .button:not(.secondary):not(.danger), html[data-theme="dark"] .chat-btns button.brief-go {
+  border: 1px solid var(--am); border-radius: 0; background: rgba(255, 179, 71, .08); color: var(--am);
+  box-shadow: 0 0 16px rgba(255, 179, 71, .18), inset 0 0 12px rgba(255, 179, 71, .08); text-shadow: 0 0 8px rgba(255, 179, 71, .45);
+}
+html[data-theme="dark"] .button:not(.secondary):not(.danger):hover:not(:disabled), html[data-theme="dark"] .chat-btns button.brief-go:hover {
+  background: rgba(255, 179, 71, .18); color: #ffd79b; box-shadow: 0 0 26px rgba(255, 179, 71, .32), inset 0 0 14px rgba(255, 179, 71, .14); transform: none;
+}
+html[data-theme="dark"] .button.secondary { border-color: var(--hair); border-radius: 0; color: var(--teal-soft); background: rgba(70, 214, 255, .04); }
+html[data-theme="dark"] .button.secondary:hover:not(:disabled) { border-color: var(--hud); background: rgba(70, 214, 255, .1); box-shadow: 0 0 16px var(--hud-dim); transform: none; }
+html[data-theme="dark"] .button.danger { border-radius: 0; border: 1px solid var(--bordeaux); background: rgba(255, 107, 122, .08); color: var(--bordeaux-soft); }
+
+/* ——— titoli: larghi, sottili, in maiuscolo ——— */
+html[data-theme="dark"] :is(.jarvis-hero h1, .view-header h1, .view-header h2, h1.page-title, .dossier-head h1, .pratica-head h1) {
+  font-weight: 300; letter-spacing: .16em; text-transform: uppercase; color: var(--ink-strong);
+  text-shadow: 0 0 18px rgba(70, 214, 255, .35);
+}
+html[data-theme="dark"] .jarvis-hero h1 { font-size: clamp(1.15rem, 5vw, 1.6rem); }
+html[data-theme="dark"] :is(.view-header h1, .view-header h2, h1.page-title, .dossier-head h1, .pratica-head h1) { font-size: clamp(1.05rem, 4.4vw, 1.4rem); line-height: 1.3; }
+html[data-theme="dark"] :is(.oggi-card strong, .locale strong, .fact strong) { letter-spacing: .02em; }
+html[data-theme="dark"] .eyebrow, html[data-theme="dark"] .lab { letter-spacing: .24em; }
+
+/* ——— navigazione: schede da strumento ——— */
+html[data-theme="dark"] .bottom-nav .tabs > .nav-link { font-family: var(--mono); font-size: .62rem; letter-spacing: .16em; text-transform: uppercase; border-radius: 0; }
+html[data-theme="dark"] .bottom-nav { background: linear-gradient(180deg, transparent, rgba(2, 5, 10, .96) 42%); }
+html[data-theme="dark"] .bottom-nav.on-home { background: linear-gradient(180deg, transparent, rgba(2, 5, 10, .96) 12px); }
+
+/* ——— movimento: i pannelli si aprono come proiezioni e fluttuano appena ——— */
+html[data-theme="dark"] #view.view-enter .view-wrap > * { animation: cine-project .6s cubic-bezier(.2, .8, .2, 1) backwards; }
+html[data-theme="dark"] #view.view-enter .view-wrap > :nth-child(2) { animation-delay: .07s; }
+html[data-theme="dark"] #view.view-enter .view-wrap > :nth-child(3) { animation-delay: .14s; }
+html[data-theme="dark"] #view.view-enter .view-wrap > :nth-child(4) { animation-delay: .21s; }
+html[data-theme="dark"] #view.view-enter .view-wrap > :nth-child(n+5) { animation-delay: .28s; }
+@keyframes cine-project {
+  0% { opacity: 0; transform: perspective(900px) rotateX(14deg) translateY(14px) scaleY(.6); filter: brightness(2.2) saturate(.4); }
+  45% { opacity: .75; filter: brightness(1.5); }
+  100% { opacity: 1; transform: none; filter: none; }
+}
+html[data-theme="dark"] :is(.oggi-cards, .locali-list) > :nth-child(odd) { animation: cine-float 7s ease-in-out infinite; }
+html[data-theme="dark"] :is(.oggi-cards, .locali-list) > :nth-child(even) { animation: cine-float 8s ease-in-out -3s infinite; }
+html[data-theme="dark"] .hud-readout { animation: cine-float 9s ease-in-out -1s infinite; }
+@keyframes cine-float { 0%, 100% { transform: translateY(0); } 50% { transform: translateY(-3px); } }
+
+@media (prefers-reduced-motion: reduce) {
+  html[data-theme="dark"] body::before,
+  html[data-theme="dark"] :is(.oggi-cards, .locali-list) > *,
+  html[data-theme="dark"] .hud-readout,
+  html[data-theme="dark"] #view.view-enter .view-wrap > * { animation: none !important; }
+}
