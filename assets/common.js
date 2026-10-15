@@ -5,6 +5,8 @@ window.RENMENU = {
   tagline: 'Il menù digitale del tuo locale, pronto in 10 minuti.',
   contattoWhatsApp: '393515924327',
   contattoEmail: 'renmenu1569@gmail.com',
+  // Chi gestisce RenMenu: compare nelle pagine legali (privacy, termini, cookie). Da completare prima di pubblicarle.
+  titolare: { nome: '', piva: '', codiceFiscale: '', indirizzo: '', pec: '' },
   logoUrl: new URL('renmenu-mark.png', renmenuAssetBase).href,
   allergeni: {
     '1': { it: 'Glutine', en: 'Gluten' }, '2': { it: 'Crostacei', en: 'Crustaceans' }, '3': { it: 'Uova', en: 'Eggs' },
