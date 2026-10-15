@@ -29,6 +29,7 @@ import { MAX_ROUNDS as PREP_MAX_ROUNDS, enrollPrep, parsePrep, PREP_KEY } from '
 import { PER_ROUND as BOTTLES_PER_ROUND, winesWithoutPhoto } from './bottle-search.js';
 import { claudeKey } from './claude.js';
 import { parseVisit, visitKey, visitStartText } from './visit.js';
+import { GUARD_KEY, GUARD_STATE_KEY, alertText as guardAlertText, dueSlugs, listText as guardListText, parseGuard, parseList as parseGuardList, parseState as parseGuardState, problemsOf, step as guardStep } from './guard.js';
 import { AGENDA_KEY, AGENDA_WAIT_KEY, AGENDA_WAIT_MS, addItems, agendaText, createdText, doneText, findItem, markDone, newAgenda, parseAgenda, parseStored, remaining, reminderDue, reminderText, splitNames } from './agenda.js';
 import { pickButton } from './short-reply.js';
 import { HABITS, HABITS_KEY, habitOf, isAuto, parseHabits, recordChoice, rulesView, setRule } from './habits.js';
@@ -627,6 +628,7 @@ export function createMissions(deps) {
       await syncClientAfterPublish(db, draft, request, done.publicUrl);
       const next = await move(db, mission, 'completata', `Menu online e verificato: ${done.publicUrl}`);
       await watchRegister(db, mission, draft.slug, menu.nome, done.publicUrl).catch(() => null);
+      await guardAdd(db, draft.slug).catch(() => null);
       await tell(db, env, next, 'menu online', `Fatto: «${menu.nome}» è online e verificato.\n${done.publicUrl}\nPR #${done.prNumber}.`, null, 'importante');
       // Menu nuovo: link e QR su Telegram e, se il locale ha un'email, anche a lui. Per un aggiornamento il QR resta quello già distribuito.
       if (request.kind === 'nuovo') {
@@ -900,6 +902,9 @@ export function createMissions(deps) {
     // Agenda delle visite («questa settimana devo visitare: …», «ho visitato …», «agenda»).
     const planned = await agendaTurn(db, text);
     if (planned) { await sendTg(db, env, chat, planned, null, deps.fetchImpl); return; }
+    // Sorveglianza dei menu online («sorveglianza», «non sorvegliare …»).
+    const guarded = await guardTurn(db, text);
+    if (guarded) { await sendTg(db, env, chat, guarded, null, deps.fetchImpl); return; }
     // Dubbi aperti: un prezzo scritto («7,50») risponde al dubbio in corso.
     if (normalizePrice(text)) {
       let open = null; try { open = JSON.parse(await setting(db, 'tg_checks') || 'null'); } catch {}
@@ -1138,6 +1143,8 @@ export function createMissions(deps) {
     if (visiting) { await reply(db, env, chat, `«${heard.text.trim()}»\n\n${(await startVisit(db, visiting.venue)).text}`, true); return; }
     const planned = await agendaTurn(db, heard.text);
     if (planned) { await reply(db, env, chat, `«${heard.text.trim()}»\n\n${planned}`, true); return; }
+    const guarded = await guardTurn(db, heard.text);
+    if (guarded) { await reply(db, env, chat, `«${heard.text.trim()}»\n\n${guarded}`, true); return; }
     if (STATUS_WORDS.test(heard.text.trim())) { await reply(db, env, chat, `«${heard.text.trim()}»\n\n${await statusText(db)}`, false); return; }
     await converse(db, env, chat, heard.text, true);
   }
@@ -1599,6 +1606,57 @@ export function createMissions(deps) {
       out.push({ watch: watch.slug, ok: true, last: step >= WATCH_AFTER_HOURS.length });
     }
     return out;
+  }
+  // ——— Sorveglianza continua dei menu dei clienti (vedi _lib/guard.js): ogni 15 minuti, avviso se non si aprono ———
+  async function guardNames(db, slugs) {
+    const found = await rows(db, "SELECT name,menu_id FROM clients WHERE menu_id IS NOT NULL AND menu_id<>''").catch(() => []);
+    const names = {};
+    for (const slug of slugs) names[slug] = found.find((c) => c.menu_id === slug)?.name || (isBlanchSlug(slug) ? 'Trattoria Blanch' : slug === 'bakaro' ? 'Al Bakaro' : slug);
+    return names;
+  }
+  async function guardTick(db, env, { at = Date.now() } = {}) {
+    const list = parseGuardList(await setting(db, GUARD_KEY).catch(() => null));
+    const state = parseGuardState(await setting(db, GUARD_STATE_KEY).catch(() => null));
+    const due = dueSlugs(list, state, at);
+    if (!due.length) return [];
+    const names = await guardNames(db, due);
+    const out = [];
+    for (const slug of due) {
+      const seen = await readPublic(slug);
+      const { entry, alert } = guardStep(state[slug], problemsOf(seen, slug), at);
+      state[slug] = entry;
+      if (alert) await tell(db, env, null, alert === 'su' ? 'menu di nuovo online' : 'menu non raggiungibile', guardAlertText(alert, names[slug], entry.why, publicMenuPageUrl(PUBLIC_ORIGIN, slug)), null, alert === 'su' ? 'normale' : 'importante');
+      out.push({ slug, ok: !entry.fails, alert });
+    }
+    for (const slug of Object.keys(state)) if (!list.includes(slug)) delete state[slug];
+    await putSetting(db, GUARD_STATE_KEY, JSON.stringify(state));
+    return out;
+  }
+  async function guardAdd(db, slug) {
+    const list = parseGuardList(await setting(db, GUARD_KEY).catch(() => null));
+    if (list.includes(slug)) return false;
+    await putSetting(db, GUARD_KEY, JSON.stringify([...list, slug]));
+    return true;
+  }
+  async function guardTurn(db, text) {
+    const asked = parseGuard(text);
+    if (!asked) return null;
+    const list = parseGuardList(await setting(db, GUARD_KEY).catch(() => null));
+    if (asked.kind === 'show') {
+      const state = parseGuardState(await setting(db, GUARD_STATE_KEY).catch(() => null));
+      const names = await guardNames(db, list);
+      return guardListText(list.map((slug) => ({ name: names[slug], state: state[slug] })));
+    }
+    const clients = await rows(db, "SELECT id,name,menu_id FROM clients WHERE menu_id IS NOT NULL AND menu_id<>''").catch(() => []);
+    const names = await guardNames(db, list);
+    const pool = asked.kind === 'off' ? list.map((slug) => ({ id: slug, name: names[slug], menu_id: slug })) : clients;
+    const { client, candidates } = matchVenue(asked.venue, pool);
+    if (!client) return candidates?.length > 1 ? `Quale intendi? ${candidates.map((c) => c.name).join(', ')}.` : asked.kind === 'off' ? `«${asked.venue}» non è tra i menu che sorveglio. Scrivimi «sorveglianza» per vedere l’elenco.` : `Non trovo un locale con il menu online che si chiami «${asked.venue}».`;
+    if (asked.kind === 'off') {
+      await putSetting(db, GUARD_KEY, JSON.stringify(list.filter((slug) => slug !== client.menu_id)));
+      return `Fatto: non controllo più il menu di «${client.name}». Se vuoi riprendere, scrivimi «sorveglia ${client.name}».`;
+    }
+    return (await guardAdd(db, client.menu_id)) ? `D’accordo: da ora controllo il menu di «${client.name}» ogni 15 minuti e ti avviso se non si apre.` : `Il menu di «${client.name}» lo sto già sorvegliando.`;
   }
   // ——— Giro mattutino con proposte (dopo il briefing delle 8) e solleciti: Jarvis propone, tu tocchi ———
   const DAY_MS = 86_400_000;
@@ -2579,5 +2637,5 @@ export function createMissions(deps) {
     }
     return out;
   }
-  return { peekLink: peekUrl, habitOn, readyItems, entrustBrief, runEntrust, alertOnce, announceExternal, replyTick, phoneTick, proposeReply, statusText, initiatives, initiativeTick, ping, entrust, tick, watchTick, watchRegister, reflect, queueOnlineEmail, checkOnlineMails, makeMenuQr, decide, telegramUpdate, probeIntents, setting, putSetting, briefing, notify, visitLink, agendaTick, startChecks, answerCheck, draftAfterChecks, translateAfterEdit, undoDraftEdit, draftTarget, voiceEditDraft, editDraftFromClient };
+  return { peekLink: peekUrl, habitOn, readyItems, entrustBrief, runEntrust, alertOnce, announceExternal, replyTick, phoneTick, proposeReply, statusText, initiatives, initiativeTick, ping, entrust, tick, watchTick, watchRegister, reflect, queueOnlineEmail, checkOnlineMails, makeMenuQr, decide, telegramUpdate, probeIntents, setting, putSetting, briefing, notify, visitLink, agendaTick, guardTick, startChecks, answerCheck, draftAfterChecks, translateAfterEdit, undoDraftEdit, draftTarget, voiceEditDraft, editDraftFromClient };
 }
