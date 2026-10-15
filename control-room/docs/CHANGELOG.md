@@ -4,6 +4,7 @@ Si aggiunge una voce a ogni pull request che cambia un comportamento di Jarvis o
 
 ## 15 ottobre 2026
 
+- **Locali di prova, cancellazione più sicura da far funzionare**: «togli i locali di prova» non dipende più dalla lettura del sito pubblico (i menu tolti sono quelli cancellati dal repository) e, se qualcosa non va, il motivo resta nel registro (`jarvis.test_clean`). Anche «elimina Osteria Al Tralcio» ora cancella le pratiche chiuse di un locale di prova col menu tolto.
 - Trattoria Blanch: i nomi dei vini valgono come nomi propri anche quando la bozza li ha come { it, en } senza tedesco (prima bloccavano ancora l’affido con «74 nomi senza traduzione»).
 
 - **«togli i locali di prova»** su Telegram: Jarvis elenca i clienti di prova il cui menu è già stato tolto dal sito e, col pulsante SÌ, li cancella del tutto (pratiche anche chiuse, bozze, file). Gli altri clienti non si toccano, e un locale il cui menu è ancora online resta.
