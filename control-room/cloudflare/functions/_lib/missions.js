@@ -28,6 +28,7 @@ import { DIREZIONI } from './premium.js';
 import { enrollPrep } from './autoprep.js';
 import { claudeKey } from './claude.js';
 import { pickButton } from './short-reply.js';
+import { HABITS, HABITS_KEY, habitOf, isAuto, parseHabits, recordChoice, rulesView, setRule } from './habits.js';
 import { callOutcome, callOwner, ensureAgent, phoneNumber, twilioNumber } from './phone.js';
 import { approveSender, blockSender, takeUnannouncedHeld } from './whatsapp-in.js';
 import { lastReadingTest, startReadingTest } from './reading-test.js';
@@ -59,6 +60,8 @@ const EDIT_WORDS_STRICT = /\b(?:aggiung\w*|togli\w*|rimuov\w*|prezzo|costa\w*|ri
 const REREAD = /\b(?:rileggi\w*|rilegg\w+|rileggere|rifai la lettura|leggi(?:le|li)? (?:di nuovo|ancora))\b/i;
 // «cosa mi proponi?», «che faccio adesso?»: le proposte di Jarvis (initiative.js).
 const IDEAS_WORDS = /^\W*(?:ok\s+)?(?:jarvis[\s,!.]*)?(?:cosa|che cosa|che)\s+(?:mi\s+)?(?:proponi|suggerisci|consigli|dovrei fare|faccio(?:\s+adesso|\s+ora)?|c[’']?è da fare)[\s?!.]*$/i;
+// «le mie regole», «cosa fai da solo?»: le abitudini che Riccardo ha trasformato in regole (habits.js).
+const RULES_WORDS = /^\W*(?:ok\s+)?(?:jarvis[\s,!.]*)?(?:(?:le\s+)?(?:mie\s+)?regole(?:\s+imparate)?|cosa\s+(?:fai|puoi\s+fare)\s+da\s+solo|cosa\s+hai\s+imparato)[\s?!.]*$/i;
 const STATUS_WORDS = /^\W*(?:ok\s+)?(?:jarvis[\s,!.]*)?(?:\/)?stato[\s?!.]*$/i;
 
 export function createMissions(deps) {
@@ -703,7 +706,31 @@ export function createMissions(deps) {
   }
 
   // Un pulsante premuto: con un tocco (query) o scelto da una risposta scritta o detta («la seconda», «sì»).
+  // Ogni tocco che insegna qualcosa (anteprima, promemoria, risposta) passa da qui: dopo la risposta, se
+  // Riccardo ha detto sì abbastanza volte di fila, Jarvis chiede una volta se d'ora in poi può farlo da solo.
   async function pressButton(db, env, chat, data, query = null) {
+    await handleButton(db, env, chat, data, query);
+    const habit = habitOf(data);
+    if (habit) await learnChoice(db, env, chat, habit).catch(() => null);
+  }
+  async function habits(db) { return parseHabits(await setting(db, HABITS_KEY).catch(() => null)); }
+  async function learnChoice(db, env, chat, habit) {
+    const { state, ask } = recordChoice(await habits(db), habit, now());
+    await putSetting(db, HABITS_KEY, JSON.stringify(state));
+    if (!ask) return;
+    await sendTg(db, env, chat, HABITS[habit.kind].ask(state[habit.kind].streak), [['Sì, fallo da solo', `hab:on:${habit.kind}`], ['No, chiedimelo sempre', `hab:never:${habit.kind}`]], deps.fetchImpl, { stacked: true });
+  }
+  async function answerHabit(db, choice, kind) {
+    if (!HABITS[kind]) return 'Regola sconosciuta.';
+    await putSetting(db, HABITS_KEY, JSON.stringify(setRule(await habits(db), kind, choice === 'on' ? 'on' : 'off', now())));
+    await auditedBatch(jarvisDb(db), [], 'jarvis.habit', `Regola «${HABITS[kind].title}»: ${choice === 'on' ? 'accesa' : choice === 'off' ? 'tolta' : 'rifiutata'} da Riccardo.`, null).catch(() => {});
+    if (choice === 'on') return `D’accordo: ${HABITS[kind].rule}. Ti avviso ogni volta. Per toglierla scrivimi «le mie regole».`;
+    if (choice === 'off') return `Tolta: per «${HABITS[kind].title}» torno a chiederti prima.`;
+    return 'Va bene, continuo a chiedertelo. Se cambi idea scrivimi «le mie regole».';
+  }
+  /** La regola è accesa? (per l'orologio: anteprime, promemoria, risposte) */
+  async function habitOn(db, kind) { return isAuto(await habits(db), kind); }
+  async function handleButton(db, env, chat, data, query = null) {
     const [verb, missionId, extra, arg4] = String(data || '').split(':');
     const ack = (text) => (query?.id ? answerCallback(env, query.id, text, deps.fetchImpl) : null);
     const clear = () => (query?.message?.message_id ? clearButtons(env, chat, query.message.message_id, deps.fetchImpl) : null);
@@ -714,6 +741,13 @@ export function createMissions(deps) {
       const outcome = missionId === 'end' ? await answerCheck(db, env, chat, -1, 'end') : await answerCheck(db, env, chat, Number(missionId), String(extra || ''));
       await ack(outcome.text);
       if (!outcome.silent) await sendTg(db, env, chat, outcome.text, null, deps.fetchImpl);
+      return;
+    }
+    if (verb === 'hab') {
+      const text = await answerHabit(db, missionId, extra);
+      await ack(missionId === 'on' ? 'Regola accesa' : missionId === 'off' ? 'Regola tolta' : 'Ti chiedo sempre');
+      await clear();
+      await sendTg(db, env, chat, text, null, deps.fetchImpl);
       return;
     }
     if (verb === 'ini') {
@@ -906,6 +940,11 @@ export function createMissions(deps) {
       const on = /^\/idee\s+(?:si|sì|on)\b/i.test(text) ? 'si' : /^\/idee\s+(?:no|off)\b/i.test(text) ? 'no' : null;
       if (on) { await putSetting(db, 'ini_enabled', on); await sendTg(db, env, chat, on === 'si' ? 'Va bene: tra le 11 e le 19 ti propongo io le cose ferme o in scadenza, al massimo due al giorno.' : 'Va bene: durante il giorno non ti propongo più nulla da solo. Restano il giro delle 8 e «/idee» quando vuoi.', null, deps.fetchImpl); return; }
       await ideasText(db, chat, env);
+      return;
+    }
+    if (/^\/regole\b/i.test(text) || RULES_WORDS.test(text)) {
+      const view = rulesView(await habits(db));
+      await sendTg(db, env, chat, view.text, view.buttons.length ? view.buttons : null, deps.fetchImpl, { stacked: true });
       return;
     }
     if (/^\/stato\b/i.test(text) || STATUS_WORDS.test(text)) {
@@ -1595,6 +1634,15 @@ export function createMissions(deps) {
     const chat = await setting(db, 'telegram_chat_id');
     if (!chat || !telegramReady(env)) return [];
     const { items, ideas, missionRows, memory } = await decisionItems(db, env, { mark: true });
+    // Regola di Riccardo: i promemoria partono da soli, e lui riceve l'avviso.
+    if (await habitOn(db, 'promemoria')) {
+      for (const item of items.filter((i) => i.kind === 'promemoria')) {
+        const id = String(item.buttons.find(([, data]) => data.startsWith('soll:'))?.[1] || '').slice(5);
+        const out = id ? await runReminder(db, env, id).catch((error) => ({ text: `Promemoria non partito: ${String(error?.message || 'errore').slice(0, 160)}` })) : null;
+        if (out) await sendTg(db, env, chat, `${out.text} (regola tua: i promemoria li mando io)`, null, deps.fetchImpl);
+      }
+      items.splice(0, items.length, ...items.filter((i) => i.kind !== 'promemoria'));
+    }
     const sent = [...items.filter((i) => i.kind !== 'risposta').slice(0, 5), ...ideas];
     const total = items.filter((i) => i.kind !== 'risposta').length + ideas.length;
     for (const [i, item] of sent.entries()) await sendTg(db, env, chat, `${i === 0 ? `Da decidere stamattina (${sent.length}${total > sent.length ? ` di ${total}` : ''}):\n\n` : ''}${item.text}`, item.buttons, deps.fetchImpl, { stacked: true });
@@ -2192,6 +2240,12 @@ export function createMissions(deps) {
     const saved = { id: requestId, name: ctx.clientName, channel: ctx.channel, to: ctx.to, subject: ctx.subject, lastInboundAt: ctx.lastInboundAt,
       message: ctx.message, text: draft.text, model: draft.model, at: now() };
     await putSetting(db, `reply_${requestId}`, JSON.stringify(saved));
+    // Regola di Riccardo: la risposta parte da sola e lui riceve il testo mandato.
+    if (await habitOn(db, 'risposta')) {
+      const out = await answerReply(db, env, 'send', requestId);
+      await sendTg(db, env, chat, out.ok ? `${out.text} (regola tua: rispondo io)\n\n«${saved.text}»` : `${out.text}`, out.ok ? null : replyButtons(requestId), deps.fetchImpl, { stacked: true });
+      return saved;
+    }
     const shown = replyShown(saved, `«${saved.name}» ha scritto: «${ctx.message.slice(0, 300)}${ctx.message.length > 300 ? '…' : ''}»\n\nTi propongo questa risposta`);
     await sendTg(db, env, chat, shown.text, shown.buttons, deps.fetchImpl, { stacked: true });
     return saved;
@@ -2343,5 +2397,5 @@ export function createMissions(deps) {
     }
     return out;
   }
-  return { readyItems, entrustBrief, runEntrust, alertOnce, announceExternal, replyTick, phoneTick, proposeReply, statusText, initiatives, initiativeTick, ping, entrust, tick, watchTick, watchRegister, reflect, queueOnlineEmail, checkOnlineMails, makeMenuQr, decide, telegramUpdate, probeIntents, setting, putSetting, briefing, notify, startChecks, answerCheck, draftAfterChecks, translateAfterEdit, undoDraftEdit, draftTarget, voiceEditDraft, editDraftFromClient };
+  return { habitOn, readyItems, entrustBrief, runEntrust, alertOnce, announceExternal, replyTick, phoneTick, proposeReply, statusText, initiatives, initiativeTick, ping, entrust, tick, watchTick, watchRegister, reflect, queueOnlineEmail, checkOnlineMails, makeMenuQr, decide, telegramUpdate, probeIntents, setting, putSetting, briefing, notify, startChecks, answerCheck, draftAfterChecks, translateAfterEdit, undoDraftEdit, draftTarget, voiceEditDraft, editDraftFromClient };
 }
