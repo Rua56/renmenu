@@ -6,7 +6,7 @@ import { GEMINI_PREFERRED, PHOTO_TYPES, readMenuPdf, readMenuPhoto } from '../..
 import { linkMailFiles, receiveMailFiles } from '../../_lib/mail-files.js';
 import { deletionPlan, deletionStatements } from '../../_lib/delete-request.js';
 import { shrinkPhoto } from '../../_lib/shrink.js';
-import { MEDIA_KINDS, PUBLIC_EXT, applyMedia, classifyPhoto, isMenuPhotoKind, parseLabel, proposeTargets, publicImageOk, reapplyConfirmed, removeMedia, resolveTarget, targetLabel } from '../../_lib/media.js';
+import { MEDIA_KINDS, PUBLIC_EXT, applyMedia, classifyPhoto, isMenuPhotoKind, parseLabel, proposeTargets, publicImageOk, reapplyConfirmed, removeMedia, repairBrokenPhotos, resolveTarget, targetLabel } from '../../_lib/media.js';
 import { speak, transcribe } from '../../_lib/voice.js';
 import { ensureLiveAgent, liveSignedUrl } from '../../_lib/phone.js';
 import { OWNER_REVIEW } from '../../_lib/missions.js';
@@ -424,6 +424,18 @@ async function autoPlaceMedia(db, env, draft, noShrink = {}) {
   let found = [];
   try { found = await rows(db, 'SELECT m.*, x.filename, x.r2_key, x.mime AS material_mime, x.source AS material_source, x.text_preview AS material_note FROM media_items m JOIN materials x ON x.id=m.material_id WHERE m.request_id=? AND x.archived_at IS NULL ORDER BY m.created_at ASC', draft.request_id); }
   catch (error) { if (/no such table/i.test(String(error?.message))) return { placed: [], heavy: [] }; throw error; }
+  // Foto confermate il cui indirizzo nel menu non si apre più (copia ricaricata dopo la conferma): si rimette quello giusto.
+  const repaired = repairBrokenPhotos(JSON.parse(draft.menu_json), found);
+  if (repaired.fixed.length) {
+    const stamp = now(), menuJson = JSON.stringify(repaired.menu);
+    await auditedBatch(db, [
+      db.prepare('UPDATE drafts SET menu_json=?,provenance_json=?,revision=revision+1,updated_at=? WHERE id=? AND revision=?')
+        .bind(menuJson, JSON.stringify(keepProvenance(parseList(draft.provenance_json), repaired.menu)), stamp, draft.id, draft.revision),
+      db.prepare('INSERT INTO draft_versions (id,draft_id,revision,menu_json,actor,created_at) SELECT ?,id,?,?,?,? FROM drafts WHERE id=? AND revision=?')
+        .bind(uid(), draft.revision + 1, menuJson, 'jarvis_foto', stamp, draft.id, draft.revision + 1)
+    ], 'media.repair', `Jarvis (preparazione automatica): ripristinate ${repaired.fixed.length} foto che non si aprivano (${repaired.fixed.slice(0, 4).join(', ')}).`, draft.request_id);
+    draft = await getOne(db, 'SELECT * FROM drafts WHERE id=?', draft.id);
+  }
   const group = found.map((row) => ({ ...row, label: parseLabel(row.label_json), forWine: row.material_source === CANTINA_SOURCE ? parseSourceNote(row.material_note)?.wine || '' : '' }));
   const proposals = proposeTargets(JSON.parse(draft.menu_json), group);
   const placed = [], heavy = [], unsure = [], shrunk = [];

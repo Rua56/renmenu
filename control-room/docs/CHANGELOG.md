@@ -4,6 +4,7 @@ Si aggiunge una voce a ogni pull request che cambia un comportamento di Jarvis o
 
 ## 15 ottobre 2026
 
+- **Bottiglie col punto di domanda riparate da sole**: quando Jarvis mette le foto nel menu, rimette l'indirizzo giusto alle foto confermate rimaste con un indirizzo che non si apre più.
 - **Menu Premium da stampare**: nuova pagina `menu/stampa.html?m=<menu>` con il menu in A4 (una o due colonne, con o senza descrizioni, nella lingua scelta), stessi colori e caratteri del Premium, e un QR in fondo che porta al menu online. «Stampa o salva PDF» dal browser. Su Telegram: «menu da stampare di …».
 - **Premium: pulsanti «Prenota su WhatsApp» e «Lascia una recensione»** nella parte «Ti aspettiamo»: il primo apre WhatsApp con un messaggio di prenotazione già scritto nella lingua del cliente, il secondo il link delle recensioni (per esempio Google). Compaiono solo se impostati (`premium.whatsapp`, `premium.recensioni`). A Jarvis: «metti il whatsapp +39 … al menu di …», «il link delle recensioni di … è https://…».
 - **Menu Standard meno basico**: voci in elenco come in un menu stampato (nome, puntini, prezzo), allergeni come numeretti accanto al nome, titoli delle sezioni con ornamento, monogramma del locale nella copertina e fascia «Consigliati dalla casa» con i piatti segnati come consigliati. Stessi dati: vale per tutti i menu Standard.
