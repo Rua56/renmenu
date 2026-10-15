@@ -11,9 +11,31 @@ export const AGENT_PROMPT = [
   'Parli in italiano, con frasi brevi e naturali, tono calmo e un po’ ironico, come il Jarvis di Tony Stark. Dai del tu a Riccardo.',
   'Ecco la situazione di RenMenu in questo momento (dati veri dalla Control Room):\n{{situazione}}',
   'Motivo della chiamata: {{motivo}}',
-  'Rispondi solo con ciò che sai dalla situazione. Se Riccardo ti chiede di fare qualcosa (pubblicare, modificare un menu, scrivere a un cliente), digli che glielo prepari su Telegram, dove lo conferma lui: al telefono non esegui azioni.',
-  'Non leggere link, codici o numeri lunghi. Quando Riccardo saluta, saluta e chiudi.'
+  'Per ogni domanda che va oltre la situazione e per ogni azione (modificare un menu, mandare un’anteprima o una risposta a un cliente, creare o eliminare una pratica, cambiare un’impostazione) usa lo strumento chiedi_a_jarvis con la richiesta di Riccardo detta in modo chiaro: risponde il Jarvis vero, lo stesso di Telegram, e tu riferisci la risposta in breve.',
+  'Quando il Jarvis vero chiede una conferma, ripeti a Riccardo cosa farai e con quale locale, aspetta che risponda, poi passa a chiedi_a_jarvis la sua risposta così com’è («sì», «no», «la seconda»). Non dare mai una conferma al posto suo e non confermare se la risposta non è chiara: in quel caso richiedi.',
+  'Pubblicare un menu al telefono non si può: la pubblicazione Riccardo la conferma toccando il pulsante su Telegram. Se te lo chiede, passa comunque la richiesta a chiedi_a_jarvis e digli che il pulsante lo trova su Telegram.',
+  'Non inventare dati né esiti: dici che una cosa è fatta solo se il Jarvis vero lo dice. Non leggere link, codici o numeri lunghi. Quando Riccardo saluta, saluta e chiudi.'
 ].join('\n\n');
+// Versione dell'agente: quando cambiano istruzioni o strumenti se ne crea uno nuovo (quello vecchio resta su ElevenLabs, inutilizzato).
+export const AGENT_VERSION = '2';
+// Lo strumento con cui l'agente al telefono parla con il Jarvis vero: ElevenLabs chiama /jarvis-hook/telefono
+// con la frase e la chiave di quella telefonata (variabile della chiamata, non la sceglie il modello).
+export function phoneTool(hookUrl) {
+  return {
+    type: 'webhook', name: 'chiedi_a_jarvis', response_timeout_secs: 60,
+    description: 'Passa una richiesta o una risposta di Riccardo al Jarvis di RenMenu (lo stesso di Telegram) e restituisce la sua risposta. Da usare per ogni domanda o azione su pratiche, menu, locali, bozze, anteprime, QR e impostazioni, e per le risposte di Riccardo alle conferme («sì», «no»).',
+    api_schema: {
+      url: hookUrl, method: 'POST',
+      request_body_schema: {
+        type: 'object', required: ['richiesta', 'chiave'],
+        properties: {
+          richiesta: { type: 'string', description: 'La richiesta o la risposta di Riccardo, in italiano, chiara e completa (nome del locale compreso).' },
+          chiave: { type: 'string', dynamic_variable: 'chiave_chiamata' }
+        }
+      }
+    }
+  };
+}
 
 /** Numero in formato internazionale (+39…), da quello scritto da Riccardo. null se non valido. */
 export function phoneNumber(said) {
@@ -35,16 +57,34 @@ async function call(fetchImpl, key, path, { method = 'GET', body } = {}) {
   return data;
 }
 
-/** Agente «Jarvis» con la voce scelta: lo crea la prima volta, poi riusa l'id salvato. */
-export async function ensureAgent(fetchImpl, key, { agentId = '', voiceId = '' } = {}) {
+/** Agente «Jarvis» con la voce scelta e lo strumento per agire: lo crea la prima volta, poi riusa l'id salvato. */
+export async function ensureAgent(fetchImpl, key, { agentId = '', voiceId = '', hookUrl = '', onToolError = () => {} } = {}) {
   if (agentId) return agentId;
-  const created = await call(fetchImpl, key, '/agents/create', { method: 'POST', body: {
+  const config = (prompt) => ({
     name: AGENT_NAME,
     conversation_config: {
-      agent: { prompt: { prompt: AGENT_PROMPT }, first_message: 'Ciao Riccardo, sono Jarvis. {{motivo}}', language: 'it' },
+      agent: { prompt: { prompt: AGENT_PROMPT, ...prompt }, first_message: 'Ciao Riccardo, sono Jarvis. {{motivo}}', language: 'it' },
       tts: { model_id: 'eleven_flash_v2_5', ...(/^[A-Za-z0-9]{10,40}$/.test(voiceId) ? { voice_id: voiceId } : {}) }
     }
-  } });
+  });
+  let created = null;
+  if (hookUrl) {
+    // Strumento come oggetto a sé (il modo attuale di ElevenLabs); se non va, dentro l'agente (il modo vecchio).
+    try {
+      const tool = await call(fetchImpl, key, '/tools', { method: 'POST', body: { tool_config: phoneTool(hookUrl) } });
+      if (!tool?.id) throw new Error('ElevenLabs non ha restituito lo strumento.');
+      created = await call(fetchImpl, key, '/agents/create', { method: 'POST', body: config({ tool_ids: [tool.id] }) });
+    } catch (error) {
+      if (error?.status === 401) throw error;
+      try { created = await call(fetchImpl, key, '/agents/create', { method: 'POST', body: config({ tools: [phoneTool(hookUrl)] }) }); }
+      catch (again) {
+        if (again?.status === 401) throw again;
+        // ElevenLabs non accetta lo strumento: meglio un Jarvis che parla soltanto che nessuna telefonata.
+        onToolError(again);
+        created = await call(fetchImpl, key, '/agents/create', { method: 'POST', body: config({}) });
+      }
+    }
+  } else created = await call(fetchImpl, key, '/agents/create', { method: 'POST', body: config({}) });
   if (!created?.agent_id) throw new Error('ElevenLabs non ha restituito l’agente.');
   return created.agent_id;
 }
@@ -58,12 +98,13 @@ export async function twilioNumber(fetchImpl, key) {
 }
 
 /** Fa partire la chiamata. Restituisce { conversationId, callSid }. */
-export async function callOwner(fetchImpl, key, { agentId, phoneNumberId, to, situation, reason }) {
+export async function callOwner(fetchImpl, key, { agentId, phoneNumberId, to, situation, reason, callKey = '' }) {
   const out = await call(fetchImpl, key, '/twilio/outbound-call', { method: 'POST', body: {
     agent_id: agentId, agent_phone_number_id: phoneNumberId, to_number: to,
     conversation_initiation_client_data: { dynamic_variables: {
       situazione: String(situation || 'Nessuna novità.').slice(0, 3000),
-      motivo: String(reason || 'Mi hai chiesto di chiamarti: dimmi pure.').slice(0, 300)
+      motivo: String(reason || 'Mi hai chiesto di chiamarti: dimmi pure.').slice(0, 300),
+      chiave_chiamata: String(callKey || 'nessuna')
     } }
   } });
   if (out && out.success === false) throw new Error(`ElevenLabs: ${String(out.message || 'chiamata non partita').slice(0, 160)}`);

@@ -2,7 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync, readdirSync } from 'node:fs';
 import { DatabaseSync } from 'node:sqlite';
-import { missions } from '../cloudflare/functions/control-room/api/[[route]].js';
+import { jarvisPhone, missions } from '../cloudflare/functions/control-room/api/[[route]].js';
 import { phoneNumber } from '../cloudflare/functions/_lib/phone.js';
 
 const TOKEN = '123456789:AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA';
@@ -32,6 +32,7 @@ async function withServices({ numbers = [{ phone_number_id: 'pn_1', phone_number
     const href = String(url);
     calls.push({ href, method: options.method || 'GET', body: typeof options.body === 'string' ? JSON.parse(options.body) : options.body });
     if (href.endsWith('/v1/convai/phone-numbers')) return Response.json(numbers);
+    if (href.endsWith('/v1/convai/tools')) return Response.json({ id: 'tool_jarvis' });
     if (href.endsWith('/v1/convai/agents/create')) return Response.json({ agent_id: 'agent_jarvis' });
     if (href.endsWith('/v1/convai/conversations/conv_1')) return Response.json({ status: 'failed', transcript: [], metadata: { call_duration_secs: 2, termination_reason: 'Missing required dynamic variables' } });
     if (href.endsWith('/v1/convai/twilio/outbound-call')) return Response.json({ success: true, message: 'ok', conversation_id: 'conv_1', callSid: 'CA123' });
@@ -123,5 +124,52 @@ test('chiamata automatica per gli avvisi importanti: accesa di base, senza limit
     t.mock.timers.setTime(Date.parse('2026-10-15T08:00:00Z'));
     await missions.ping(db, env, 'Nuovo messaggio.', null, 'importante', 'r8');
     assert.equal(dials().length, 3, 'spenta resta spenta');
+  });
+});
+
+test('telefonata che agisce: l’agente ha lo strumento chiedi_a_jarvis con la chiave della chiamata', async () => {
+  await withServices({}, async (calls) => {
+    const db = database(), env = await linked(db);
+    await missions.putSetting(db, 'phone_agent_id', 'agent_vecchio'); // agente di prima, che sapeva solo parlare
+    await send(db, env, '/chiamami +39 333 123 4567');
+    const tool = calls.find((c) => c.href.endsWith('/v1/convai/tools'));
+    assert.equal(tool.body.tool_config.type, 'webhook');
+    assert.equal(tool.body.tool_config.api_schema.url, 'https://renmenu-jarvis-stage.pages.dev/jarvis-hook/telefono');
+    assert.equal(tool.body.tool_config.api_schema.request_body_schema.properties.chiave.dynamic_variable, 'chiave_chiamata');
+    const create = calls.find((c) => c.href.endsWith('/agents/create'));
+    assert.deepEqual(create.body.conversation_config.agent.prompt.tool_ids, ['tool_jarvis']);
+    assert.match(create.body.conversation_config.agent.prompt.prompt, /chiedi_a_jarvis/);
+    const dial = calls.find((c) => c.href.endsWith('/twilio/outbound-call'));
+    assert.equal(dial.body.agent_id, 'agent_jarvis', 'l’agente vecchio viene sostituito');
+    const key = dial.body.conversation_initiation_client_data.dynamic_variables.chiave_chiamata;
+    assert.match(key, /^[a-f0-9]{64}$/);
+    await send(db, env, 'chiamami');
+    assert.equal(calls.filter((c) => c.href.endsWith('/agents/create')).length, 1, 'il nuovo agente si riusa');
+    const second = calls.filter((c) => c.href.endsWith('/twilio/outbound-call')).at(-1).body.conversation_initiation_client_data.dynamic_variables.chiave_chiamata;
+    assert.notEqual(second, key, 'ogni telefonata ha la sua chiave');
+    // Chiave sbagliata o della chiamata prima: niente azioni.
+    assert.equal((await jarvisPhone(env, { richiesta: '/stato', chiave: key })).status, 403);
+    assert.equal((await jarvisPhone(env, { richiesta: '/stato', chiave: '' })).status, 403);
+    const out = await jarvisPhone(env, { richiesta: '/stato', chiave: second });
+    assert.equal(out.ok, true);
+    assert.ok(out.risposta.length > 0);
+  });
+});
+
+test('telefonata: «sì» preme il pulsante offerto, ma la pubblicazione arriva su Telegram da toccare', async () => {
+  await withServices({}, async (calls) => {
+    const db = database(), env = await linked(db);
+    await missions.putSetting(db, 'phone_call_key', JSON.stringify({ key: 'k'.repeat(64), at: new Date().toISOString() }));
+    const buttons = [['Sì, pubblica', 'pub:m1'], ['No', 'pubno:m1']];
+    await missions.putSetting(db, 'phone_buttons', JSON.stringify(buttons));
+    await missions.putSetting(db, 'cr_buttons', JSON.stringify(buttons.map(([, d]) => d)));
+    const out = await jarvisPhone(env, { richiesta: 'sì', chiave: 'k'.repeat(64) });
+    assert.match(out.risposta, /toccando il pulsante che ho appena mandato su Telegram/);
+    const tg = calls.filter((c) => c.href.endsWith('/sendMessage')).at(-1);
+    assert.equal(tg.body.chat_id, '42');
+    assert.deepEqual(tg.body.reply_markup.inline_keyboard.flat().map((b) => b.callback_data), ['pub:m1', 'pubno:m1']);
+    // Scaduta dopo mezz'ora.
+    await missions.putSetting(db, 'phone_call_key', JSON.stringify({ key: 'k'.repeat(64), at: new Date(Date.now() - 31 * 60_000).toISOString() }));
+    assert.equal((await jarvisPhone(env, { richiesta: 'sì', chiave: 'k'.repeat(64) })).status, 403);
   });
 });
