@@ -6,6 +6,7 @@ import { autoPrepareTick, onRequest } from "../cloudflare/functions/control-room
 import { onRequest as publicHook } from "../cloudflare/functions/jarvis-hook/[[route]].js";
 import { applyMedia, parseClassification, proposeTargets, reapplyConfirmed, removeMedia } from "../cloudflare/functions/_lib/media.js";
 import { validateMenu } from "../cloudflare/functions/_lib/menu.js";
+import { encode as encodeJpeg } from "../cloudflare/functions/_lib/vendor/jpeg-encode.js";
 
 const domain = 'https://team-api-test.cloudflareaccess.com';
 const accessEnv = { TEAM_DOMAIN: domain, POLICY_AUD: 'api-test-owner-only', OWNER_EMAIL: 'renmenu1569@gmail.com' };
@@ -260,27 +261,39 @@ describe('Foto per il menu · flusso nella Control Room', () => {
     } finally { db.close(); }
   });
 
-  it('preparazione automatica: Jarvis mette da solo le foto leggere al loro posto, le grandi restano a Riccardo', async () => {
+  it('preparazione automatica: Jarvis mette da solo le foto al loro posto, riduce quelle pesanti, i file rovinati restano a Riccardo', async () => {
     const db = await setup();
     try {
       const big = new Uint8Array(1_000_000); big.set([255, 216, 255, 224]);
-      const store = new Map([['private/mail/x/1', JPEG], ['private/mail/x/2', big]]);
+      // Foto vera da telefono, oltre 900 KB (rumore: si comprime male).
+      const side = 1400, pixels = new Uint8Array(side * side * 4);
+      let seed = 7; for (let i = 0; i < pixels.length; i += 1) { seed = (seed * 1103515245 + 12345) & 0x7fffffff; pixels[i] = i % 4 === 3 ? 255 : seed >> 23; }
+      const heavy = new Uint8Array(encodeJpeg({ width: side, height: side, data: pixels }, 95).data);
+      assert.ok(heavy.length > 900_000, `foto di prova pesante (${heavy.length})`);
+      const store = new Map([['private/mail/x/1', JPEG], ['private/mail/x/2', big], ['private/mail/x/3', heavy]]);
       const ai = { run: async () => ({ response: '{"tipo":"bottiglia","descrizione":"bottiglia di Ribolla Gialla","etichetta":{"nome":"Ribolla Gialla","denominazione":"Collio","annata":"2024","cantina":"Cantina Prova"}}' }) };
       const env = { BUCKET: bucket(store), AI: ai };
       assert.equal((await act(db, 'readMaterial', { materialId: 'm1' }, env)).status, 200);
       await db.prepare("INSERT INTO materials (id,request_id,r2_key,filename,mime,size,source,processing_status,created_at) VALUES ('m2','r1','private/mail/x/2','frico.jpg','image/jpeg',1000000,'email','foto_per_il_menu','2026-10-04')").bind().run();
       await db.prepare("INSERT INTO media_items (id,request_id,material_id,kind,description,label_json,status,created_at,updated_at) VALUES ('x2','r1','m2','piatto','frico con polenta','{}','proposta','2026-10-04','2026-10-04')").bind().run();
+      await db.prepare("INSERT INTO materials (id,request_id,r2_key,filename,mime,size,source,processing_status,created_at) VALUES ('m3','r1','private/mail/x/3','tiramisu.jpg','image/jpeg',?,'email','foto_per_il_menu','2026-10-04')").bind(heavy.length).run();
+      await db.prepare("INSERT INTO media_items (id,request_id,material_id,kind,description,label_json,status,created_at,updated_at) VALUES ('x3','r1','m3','piatto','tiramisù','{}','proposta','2026-10-04','2026-10-04')").bind().run();
       // In coda, con lingue, schede e bottiglie già fatte: resta il passo delle foto, poi la domanda.
       const entry = { requestId: 'r1', plan: 'premium', steps: ['lingue', 'schede', 'bottiglie', 'foto', 'pronta'], done: ['lingue', 'schede', 'bottiglie'], log: [], at: '2026-10-04', tries: 0, rounds: 0 };
       await db.prepare("INSERT INTO jarvis_settings (key,value,updated_at) VALUES ('auto_prep',?,'x')").bind(JSON.stringify({ d1: entry })).run();
       const sent = await autoPrepareTick(db, { DB: db, ...accessEnv, ...env, JARVIS_ORIGIN: 'https://stage.example' });
-      assert.equal(sent.length, 1);
+      assert.equal(sent.length, 1, JSON.stringify((await db.prepare("SELECT value FROM jarvis_settings WHERE key='auto_prep'").bind().first())?.value));
       assert.match(sent[0].text, /^Anteprima pronta per «Enoteca Foto Test»: la mando al locale\?/);
-      assert.match(sent[0].text, /foto messe nel menu: 1; 1 troppo grandi da sistemare tu in Revisione \(frico\.jpg\)/);
+      assert.match(sent[0].text, /foto messe nel menu: 2; 1 ridotte da me perché troppo pesanti; 1 da sistemare tu in Revisione \(frico\.jpg \(foto che non riesco a leggere\)\)/);
       const draft = await db.prepare("SELECT * FROM drafts WHERE id='d1'").bind().first();
       const menu = JSON.parse(draft.menu_json);
       assert.match(menu.sezioni[1].voci[0].foto, /^https:\/\/stage\.example\/jarvis-hook\/media\/[0-9a-f]{64}\.jpg$/);
-      assert.equal(menu.sezioni[0].voci[0].foto, undefined, 'la foto troppo grande non entra da sola');
+      assert.equal(menu.sezioni[0].voci[0].foto, undefined, 'il file rovinato non entra da solo');
+      const reduced = menu.sezioni[0].voci[1].foto;
+      assert.match(reduced, /^https:\/\/stage\.example\/jarvis-hook\/media\/[0-9a-f]{64}\.jpg$/, 'la foto pesante, ridotta, entra al suo posto');
+      const object = store.get(`public/media/${reduced.split('/').pop()}`);
+      const size = (object?.bytes || object)?.length ?? object?.byteLength;
+      assert.ok(size > 0 && size <= 900_000, `copia pubblica sotto i 900 KB (${size})`);
       assert.deepEqual(validateMenu(menu).errors, []);
       const placed = await db.prepare("SELECT status FROM media_items WHERE material_id='m1'").bind().first();
       assert.equal(placed.status, 'confermata');
