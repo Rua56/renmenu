@@ -5,6 +5,8 @@ window.RENMENU = {
   tagline: 'Il menù digitale del tuo locale, pronto in 10 minuti.',
   contattoWhatsApp: '393515924327',
   contattoEmail: 'renmenu1569@gmail.com',
+  // Chi gestisce RenMenu: compare nelle pagine legali (privacy, termini, cookie). Quando arriva la partita IVA va aggiunta in `piva`.
+  titolare: { nome: 'Riccardo Iuran', piva: '', codiceFiscale: 'RNIRCR96H23E098J', indirizzo: 'Località Piuma 38, 34170 Gorizia (GO)', pec: '' },
   logoUrl: new URL('renmenu-mark.png', renmenuAssetBase).href,
   allergeni: {
     '1': { it: 'Glutine', en: 'Gluten' }, '2': { it: 'Crostacei', en: 'Crustaceans' }, '3': { it: 'Uova', en: 'Eggs' },
