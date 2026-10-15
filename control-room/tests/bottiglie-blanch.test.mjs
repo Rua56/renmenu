@@ -88,3 +88,27 @@ test('Jarvis: «aggiungi le foto delle bottiglie a Trattoria Blanch» mette in c
   assert.equal(entry.notifyOnly, true);
   assert.ok(entry.maxRounds >= 26);
 });
+
+test('Jarvis: senza bozza aperta risponde subito e lascia la bozza al giro dell’orologio (Telegram non aspetta)', async () => {
+  const db = database();
+  db.raw.prepare("INSERT INTO clients (id,name,plan,menu_id,menu_url,internal_notes,revision,created_at,updated_at) VALUES ('cb','Trattoria Blanch','premium','trattoria-blanch','https://renmenu.pages.dev/blanch/','',1,'2026-10-05','2026-10-05')").run();
+  await db.prepare("INSERT INTO jarvis_settings (key,value,updated_at) VALUES ('gemini_api_key','gem-test','x'),('gemini_models','[\"gemini-2.5-flash\"]','x')").bind().run();
+  await missions.putSetting(db, 'telegram_chat_id', '42');
+  const calls = [];
+  const previous = globalThis.fetch;
+  globalThis.fetch = async (url, options = {}) => {
+    calls.push({ href: String(url), body: typeof options.body === 'string' ? JSON.parse(options.body) : options.body });
+    return Response.json({ ok: true, result: { message_id: calls.length } });
+  };
+  const say = (text) => missions.telegramUpdate(db, { DB: db, TELEGRAM_BOT_TOKEN: '123456789:AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA' }, { message: { chat: { id: 42, type: 'private' }, text } });
+  try {
+    await say('Aggiungi le foto delle bottiglie della carta dei vini di Trattoria Blanch');
+    await say('Aggiungi le foto delle bottiglie della carta dei vini di Trattoria Blanch');
+  } finally { globalThis.fetch = previous; }
+  const text = calls.filter((c) => c.href.endsWith('/sendMessage')).map((c) => c.body.text).join('\n');
+  assert.match(text, /Preparo la bozza di «Trattoria Blanch» partendo dal menu online/);
+  // Il messaggio ripetuto non apre una seconda pratica.
+  const opened = db.raw.prepare("SELECT id FROM requests WHERE subject LIKE 'Foto delle bottiglie%'").all();
+  assert.equal(opened.length, 1);
+  assert.deepEqual(Object.keys(JSON.parse(await missions.setting(db, 'bottle_queue'))), [opened[0].id]);
+});

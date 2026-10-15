@@ -26,7 +26,7 @@ import { autopilotMessage, autopilotPreview, classifyRequest } from '../../_lib/
 import { MAX_ROUNDS, MAX_TRIES, PREP_KEY, PREP_STEPS, enrollPrep, nextStep, parsePrep } from '../../_lib/autoprep.js';
 import { VISIT_CALM_MS, visitKey } from '../../_lib/visit.js';
 import { understandClientRequest } from '../../_lib/request-ai.js';
-import { createMissions } from '../../_lib/missions.js';
+import { BOTTLE_QUEUE, createMissions } from '../../_lib/missions.js';
 import { spokenText, telegramCapture } from '../../_lib/cr-chat.js';
 import { previewCard } from '../../_lib/menu-diff.js';
 import { pickButton } from '../../_lib/short-reply.js';
@@ -522,6 +522,40 @@ async function prepStep(db, env, draft, step, entry) {
   }
   return {};
 }
+// «Aggiungi le foto delle bottiglie a X» senza bozza aperta: Jarvis su Telegram ha solo aperto la pratica (la bozza dal menu
+// online richiede tempo e Telegram non aspetta). Qui si prepara la bozza e si mette in coda la ricerca. Una pratica per giro.
+async function startQueuedBottles(db, env) {
+  let queue = {};
+  try { queue = JSON.parse(await missions.setting(db, BOTTLE_QUEUE) || '{}') || {}; } catch { return; }
+  const [requestId, item] = Object.entries(queue)[0] || [];
+  if (!requestId) return;
+  const store = async (next) => {
+    let fresh = {}; try { fresh = JSON.parse(await missions.setting(db, BOTTLE_QUEUE) || '{}') || {}; } catch { fresh = {}; }
+    if (next) fresh[requestId] = next; else delete fresh[requestId];
+    await missions.putSetting(db, BOTTLE_QUEUE, JSON.stringify(fresh));
+  };
+  const name = item?.name || 'il locale';
+  try {
+    let draft = await getOne(db, 'SELECT * FROM drafts WHERE request_id=?', requestId);
+    if (!draft) {
+      await action(asJarvis(db), 'generateDraft', { requestId, baseOnly: true }, env);
+      draft = await getOne(db, 'SELECT * FROM drafts WHERE request_id=?', requestId);
+    }
+    assert(draft, 'la bozza non è stata creata', 500);
+    await store(null);
+    const menu = JSON.parse(draft.menu_json);
+    const wines = winesWithoutPhoto(menu, [], isBlanchSlug(draft.slug) ? isBlanchBottleSection : null).length;
+    if (!wines) { await missions.ping(db, env, `«${name}»: tutti i vini hanno già la foto della bottiglia.`, null, 'normale', requestId).catch(() => null); return; }
+    await enrollPrep({ get: missions.setting, put: missions.putSetting }, db, { draftId: draft.id, requestId, plan: null, steps: ['bottiglie', 'foto', 'pronta'],
+      maxRounds: Math.max(MAX_ROUNDS, Math.ceil(wines / BOTTLES_PER_ROUND) + 2), notifyOnly: true }, new Date(Date.now() - 10 * 60_000).toISOString());
+    await auditedBatch(db, [], 'media.cantina_queue', `Ricerca delle bottiglie in sottofondo: ${wines} vini senza foto.`, requestId).catch(() => null);
+  } catch (error) {
+    const tries = Number(item?.tries || 0) + 1;
+    if (tries < 3) { await store({ ...item, tries }); return; }
+    await store(null);
+    await missions.ping(db, env, `«${name}»: non sono riuscito a preparare la bozza per cercare le bottiglie (${String(error?.message || 'errore').slice(0, 160)}). La pratica è in Revisione: riprova da lì o richiedimelo.`, null, 'importante', requestId).catch(() => null);
+  }
+}
 /** Un giro: porta avanti la preparazione delle bozze in coda e, alla fine, chiede a Riccardo il SÌ per l'anteprima. */
 export async function autoPrepareTick(db, env = {}, { budgetMs = 50_000, calmMs = 90_000 } = {}) {
   const started = Date.now();
@@ -534,6 +568,7 @@ export async function autoPrepareTick(db, env = {}, { budgetMs = 50_000, calmMs 
   } catch { /* tabella assente nei test vecchi */ }
   const sent = [], waiting = new Set();
   try {
+    await startQueuedBottles(db, env).catch(() => null);
     while (Date.now() - started < budgetMs) {
       const all = parsePrep(await missions.setting(db, PREP_KEY));
       const calm = new Date(Date.now() - calmMs).toISOString();
