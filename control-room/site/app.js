@@ -105,7 +105,8 @@ function draftForRequest(id = selectedRequestId) { return state?.drafts.find((dr
 function requestForDraft(draft) { return draft ? requestById(draft.requestId) : null; }
 function requestOptions(selected = selectedRequestId, includeEmpty = false) {
   const empty = includeEmpty ? '<option value="">Nessuna pratica</option>' : '';
-  return `${empty}${visibleRequests().map((request) => `<option value="${escapeHtml(request.id)}" ${request.id === selected ? 'selected' : ''}>${escapeHtml(request.subject)}</option>`).join('')}`;
+  // Pratiche con lo stesso nome (per esempio un messaggio ripetuto): si distingue quella che ha la bozza.
+  return `${empty}${visibleRequests().map((request) => `<option value="${escapeHtml(request.id)}" ${request.id === selected ? 'selected' : ''}>${escapeHtml(request.subject)}${draftForRequest(request.id) ? '' : ' · senza bozza'}</option>`).join('')}`;
 }
 function clientOptions(selected = '') { return (state?.clients || []).map((client) => `<option value="${escapeHtml(client.id)}" ${client.id === selected ? 'selected' : ''}>${escapeHtml(client.name)}</option>`).join(''); }
 function categoryOptions(selected = 'nuovo_standard', legacyKind = '') {
