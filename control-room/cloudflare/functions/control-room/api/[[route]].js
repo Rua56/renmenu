@@ -36,7 +36,7 @@ import { THEMES, proposeTheme, themeFromText } from '../../_lib/themes.js';
 import { dropRepeatedPages, notesSummary, reviewNotes, structureNotes } from '../../_lib/notes.js';
 import { briefLines, briefNotes, creativeBrief, premiumDirections, storyFromSource } from '../../_lib/premium.js';
 import { SCHEDE_AUTO_SOURCE, applySchede, proposeSchede } from '../../_lib/premium-schede.js';
-import { CANTINA_SOURCE, PER_ROUND as BOTTLES_PER_ROUND, findBottle, parseSourceNote, slotFrequencies, sourceNote, winesWithoutPhoto } from '../../_lib/bottle-search.js';
+import { CANTINA_SOURCE, PER_ROUND as BOTTLES_PER_ROUND, blanchProducers, findBottle, parseSourceNote, producerMatch, slotFrequencies, sourceNote, winesWithoutPhoto } from '../../_lib/bottle-search.js';
 import { menuSlots } from '../../_lib/media.js';
 import { isBlanchBottleSection, isBlanchSlug } from '../../_lib/blanch.js';
 import { applyVenueInfo, extractVenueInfo } from '../../_lib/venue-info.js';
@@ -499,13 +499,20 @@ async function prepStep(db, env, draft, step, entry) {
   if (step === 'bottiglie') {
     if ((!menu.premium && !isBlanchSlug(draft.slug)) || !env.BUCKET?.put || typeof env.AI?.run !== 'function') return {};
     if (entry.rounds >= (entry.maxRounds || MAX_ROUNDS)) return { note: 'foto delle bottiglie: mi sono fermato dopo troppi giri' };
+    // Ogni nuova ricerca ricomincia: via le foto della cantina sbagliata, di nuovo i vini non trovati.
+    if (!entry.rechecked) {
+      entry.wrong = (await action(jarvis, 'recheckBottlePhotos', { id: draft.id }, env)).result.discarded.length;
+      entry.rechecked = true;
+      return { again: true };
+    }
+    const wrong = entry.wrong ? `; tolte ${entry.wrong} foto sbagliate (cantina diversa)` : '';
     try {
       const out = (await action(jarvis, 'findBottlePhotos', { id: draft.id }, env)).result;
       const found = (entry.bottles || 0) + out.found;
       entry.bottles = found;
-      return out.remaining > 0 ? { again: true } : { note: `foto delle bottiglie dai siti delle cantine: ${found}` };
+      return out.remaining > 0 ? { again: true } : { note: `foto delle bottiglie dai siti delle cantine: ${found}${wrong}` };
     } catch (error) {
-      if (/già una foto|già cercato/.test(String(error?.message || ''))) return entry.bottles ? { note: `foto delle bottiglie dai siti delle cantine: ${entry.bottles}` } : {};
+      if (/già una foto|già cercato/.test(String(error?.message || ''))) return entry.bottles || wrong ? { note: `foto delle bottiglie dai siti delle cantine: ${entry.bottles || 0}${wrong}` } : {};
       throw error;
     }
   }
@@ -1438,6 +1445,7 @@ async function action(db, type, input, env = {}) {
     const media = await rows(db, "SELECT m.status, x.text_preview AS note FROM media_items m JOIN materials x ON x.id=m.material_id WHERE m.request_id=? AND x.source=? AND m.status<>'scartata'", draft.request_id, CANTINA_SOURCE);
     const pending = media.map((m) => parseSourceNote(m.note)?.wine).filter(Boolean);
     const all = winesWithoutPhoto(menu, [...searched.map((x) => x.key || x.name), ...pending], isBlanchSlug(draft.slug) ? isBlanchBottleSection : null);
+    if (isBlanchSlug(draft.slug)) blanchProducers(all);
     const round = all.slice(0, BOTTLES_PER_ROUND);
     assert(round.length, all.length === 0 && !searched.length ? 'Tutti i vini hanno già una foto.' : 'Jarvis ha già cercato tutti i vini senza foto.', 422);
     const df = slotFrequencies(menuSlots(menu));
@@ -1463,6 +1471,30 @@ async function action(db, type, input, env = {}) {
     const next = { ...creative, bottiglie: { cercate: [...searched, ...outcomes.map(({ name, key, found, reason, host }) => ({ name, ...(key && key !== name ? { key } : {}), found, reason: reason || '', host: host || '' }))].slice(-300), at: now() } };
     await db.prepare('UPDATE drafts SET creative_json=? WHERE id=?').bind(JSON.stringify(next), id).run();
     result = { id, found: outcomes.filter((o) => o.found).length, outcomes, remaining: Math.max(0, all.length - round.length) };
+  } else if (type === 'recheckBottlePhotos') {
+    // Inizio di ogni ricerca delle bottiglie: le foto prese dai siti con il produttore sbagliato (un «Friulano» di
+    // un'altra cantina) si tolgono dal menu e si scartano; i vini non trovati la volta prima si cercano di nuovo.
+    const id = identifier(p.id);
+    const draft = await getOne(db, 'SELECT * FROM drafts WHERE id=?', id);
+    assert(draft, 'Bozza non trovata.', 404);
+    const discarded = [];
+    if (isBlanchSlug(draft.slug)) {
+      const slots = blanchProducers(menuSlots(JSON.parse(draft.menu_json)));
+      const found = await rows(db, "SELECT m.id, m.description, m.label_json, x.text_preview AS note FROM media_items m JOIN materials x ON x.id=m.material_id WHERE m.request_id=? AND x.source=? AND m.status IN ('proposta','confermata')", draft.request_id, CANTINA_SOURCE);
+      for (const media of found) {
+        const src = parseSourceNote(media.note);
+        const slot = src && slots.find((s) => s.wine && (s.key || s.name) === src.wine);
+        if (!slot || producerMatch(slot, { label: parseLabel(media.label_json), description: media.description || '', page: src.page, image: src.image })) continue;
+        const fresh = await getOne(db, 'SELECT revision FROM drafts WHERE id=?', draft.id);
+        await action(asJarvis(db), 'mediaRemove', { mediaId: media.id, revision: fresh.revision, discard: true, auto: true }, env);
+        discarded.push(src.wine);
+      }
+    }
+    const latest = await getOne(db, 'SELECT creative_json FROM drafts WHERE id=?', draft.id);
+    const creative = parseCreative(latest.creative_json) || {};
+    if (creative.bottiglie) await db.prepare('UPDATE drafts SET creative_json=? WHERE id=?').bind(JSON.stringify({ ...creative, bottiglie: { cercate: [], at: now() } }), draft.id).run();
+    if (discarded.length) await auditedBatch(db, [], 'media.cantina_recheck', `Tolte ${discarded.length} foto di bottiglie di un'altra cantina: ${discarded.slice(0, 5).join(', ')}${discarded.length > 5 ? '…' : ''}.`, draft.request_id);
+    result = { id, discarded };
   } else if (type === 'queueBottleSearch') {
     // «Cerca tutte le bottiglie»: Jarvis lavora in sottofondo, 3 vini per giro, mette le foto sui vini e alla fine avvisa su Telegram.
     const id = identifier(p.id);
@@ -2229,6 +2261,9 @@ async function uploadMediaImage(context, id) {
   const media = await getOne(db, 'SELECT m.*, r.status AS request_status FROM media_items m JOIN requests r ON r.id=m.request_id WHERE m.id=?', identifier(id));
   assert(media, 'Foto non trovata.', 404);
   assert(!['completata', 'archiviata', 'chiusa'].includes(media.request_status), 'Pratica chiusa.', 409);
+  // Foto già nel menu: il menu punta al suo indirizzo. Una nuova copia (schermata vecchia del telefono) lo cambierebbe
+  // e nel menu resterebbe un indirizzo che non si apre più: si tiene quella che c'è.
+  if (media.status === 'confermata' && media.public_url) return { id: media.id, publicUrl: media.public_url, size: 0 };
   const mime = String(request.headers.get('content-type') || '').split(';')[0].trim();
   assert(PUBLIC_EXT[mime], 'Serve una foto JPG, PNG o WebP.', 415);
   assert(Number(request.headers.get('content-length') || 0) <= 900_000, 'Foto ridotta ancora troppo grande (oltre 900 KB).', 413);

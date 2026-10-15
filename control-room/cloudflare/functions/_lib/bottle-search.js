@@ -7,7 +7,7 @@ import { menuSlots, slotFrequencies, slotScore } from './media.js';
 
 export const CANTINA_SOURCE = 'sito_cantina';
 export const PER_ROUND = 3;
-const MAX_PAGES = 3, MAX_IMAGES = 2, MAX_BYTES = 4_000_000, MAX_HTML = 1_500_000;
+const MAX_PAGES = 3, MAX_IMAGES = 3, MAX_TRIES = 6, MAX_BYTES = 4_000_000, MAX_HTML = 1_500_000;
 const TYPES = new Set(['image/jpeg', 'image/png', 'image/webp']);
 const SKIP_IMG = /logo|icon|sprite|banner|placeholder|avatar|flag|bandier|social|facebook|instagram|payment|pagament|cookie|loader|spinner|header|footer|bg[-_]|background|award|medaglia|premio/i;
 const SEARCH_MODELS = ['gemini-2.5-flash', 'gemini-2.5-flash-lite', 'gemini-2.0-flash'];
@@ -16,6 +16,31 @@ const SEARCH_TRIES = 3;
 const norm = (v) => String(v || '').toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g, '').replace(/[^a-z0-9]+/g, ' ').trim();
 const words = (v) => norm(v).split(' ').filter((w) => w.length >= 3 && !['doc', 'docg', 'igt', 'vino', 'the', 'and'].includes(w));
 const text = (v) => (v == null ? '' : typeof v === 'string' ? v : v.it || Object.values(v)[0] || '');
+const GENERIC = new Set(['azienda', 'agricola', 'agricole', 'cantina', 'cantine', 'vini', 'vigneti', 'societa', 'fratelli', 'family', 'winery', 'estate', 'wines']);
+
+/**
+ * Produttore di un vino, quando la carta lo dà in modo sicuro (slot.producer). Trattoria Blanch: la descrizione
+ * è «Produttore · luogo — dettagli», vedi blanchProducers. Le altre carte non lo hanno separato: niente controllo.
+ */
+export const producerOf = (slot) => (slot?.wine ? String(slot.producer || '').trim().slice(0, 80) : '');
+/** Trattoria Blanch: il produttore di ogni vino è la prima parte della descrizione. */
+export function blanchProducers(slots) {
+  for (const slot of slots) if (slot.wine) slot.producer = String(slot.descr || '').split(/ · | — /)[0].trim();
+  return slots;
+}
+/**
+ * La foto è del produttore giusto? Un «Friulano» qualsiasi non basta: con il produttore in carta serve ritrovarlo
+ * sull'etichetta letta, nella descrizione della foto o nell'indirizzo del sito/immagine (es. borgotrevisan.it).
+ * Senza produttore (o con un nome fatto solo di parole generiche o corte) non si può controllare e vale il nome del vino.
+ */
+export function producerMatch(slot, { label = {}, description = '', page = '', image = '' } = {}) {
+  const want = words(producerOf(slot)).filter((w) => w.length >= 4 && !GENERIC.has(w));
+  if (!want.length) return true;
+  const said = ` ${norm([label.cantina, label.nome, label.denominazione, description].filter(Boolean).join(' '))} `;
+  const where = norm(`${page} ${safeDecode(String(image || ''))}`).replace(/ /g, '');
+  // Tutte le parole del nome: «Borgo» da solo è di troppe cantine.
+  return want.every((w) => said.includes(` ${w} `) || (w.length >= 5 && said.includes(w)) || where.includes(w));
+}
 
 /** Vini della bozza ancora senza foto (e non già cercati). section: filtro facoltativo sulle sezioni (Blanch: solo le bottiglie). */
 export function winesWithoutPhoto(menu, done = [], section = null) {
@@ -47,11 +72,14 @@ export async function searchWinePages(gemini, slot, options = {}) {
 // poi quelli adatti alla ricerca. I 2.5 «pensano» e il pensiero consuma i token della risposta: lo si spegne.
 async function searchPages(gemini, slot, { fetchImpl = globalThis.fetch, timeoutMs = 25_000 } = {}) {
   if (!gemini?.key) return { pages: [], why: 'manca la chiave Gemini' };
+  const producer = producerOf(slot);
   const prompt = [
-    `Cerca sul web la pagina del vino «${slot.name}»${slot.descr ? ` (nella carta: «${String(slot.descr).slice(0, 120)}»)` : ''}${slot.section ? ` (carta dei vini, sezione «${slot.section}»)` : ''} sul sito ufficiale della cantina che lo produce.`,
+    producer ? `Cerca sul web la pagina del vino «${slot.name}» prodotto da «${producer}»${slot.section ? ` (carta dei vini, sezione «${slot.section}»)` : ''} sul sito ufficiale di quella cantina.`
+      : `Cerca sul web la pagina del vino «${slot.name}»${slot.descr ? ` (nella carta: «${String(slot.descr).slice(0, 120)}»)` : ''}${slot.section ? ` (carta dei vini, sezione «${slot.section}»)` : ''} sul sito ufficiale della cantina che lo produce.`,
+    producer ? `Deve essere proprio il vino di «${producer}»: lo stesso vitigno di un'altra cantina è sbagliato.` : '',
     'Se il sito della cantina non ha una pagina del vino, va bene la scheda di un\'enoteca online dove si vede la foto della bottiglia.',
     'Rispondi solo con JSON: {"pagine": ["https://…"]}, al massimo 3 indirizzi, il sito della cantina per primo. Non inventare indirizzi: solo pagine trovate con la ricerca.'
-  ].join('\n');
+  ].filter(Boolean).join('\n');
   const models = [...new Set([...(gemini.models || []), ...SEARCH_MODELS])].slice(0, SEARCH_TRIES);
   const failures = [];
   for (const model of models) {
@@ -131,9 +159,9 @@ export async function findBottle(gemini, slot, df, { classify, fetchImpl = globa
     try { html = await fetchLimited(page, fetchImpl, MAX_HTML, 'text/html'); } catch { html = null; }
     if (!html || !/html/.test(html.type)) continue;
     const pageUrl = publicHttps(html.finalUrl) || page;
-    const images = imageCandidates(new TextDecoder().decode(html.bytes), pageUrl, slot.name);
+    const images = imageCandidates(new TextDecoder().decode(html.bytes), pageUrl, `${slot.name} ${producerOf(slot)}`);
     for (const image of images) {
-      if (tried >= 4) break;
+      if (tried >= MAX_TRIES) break;
       tried += 1;
       let file;
       try { file = await fetchLimited(image, fetchImpl, MAX_BYTES, 'image/webp,image/jpeg,image/png'); } catch { file = null; }
@@ -143,10 +171,10 @@ export async function findBottle(gemini, slot, df, { classify, fetchImpl = globa
       if (!seen?.ok || seen.kind !== 'bottiglia') continue;
       // Stesso controllo delle foto del cliente: l'etichetta letta deve corrispondere al vino.
       const score = slotScore({ kind: 'bottiglia', label: seen.label || {}, description: seen.description || '', filename: '' }, slot, df);
-      if (score >= 0.5) return { found: { bytes: file.bytes, mime, page: pageUrl, image, seen, score } };
+      if (score >= 0.5 && producerMatch(slot, { label: seen.label || {}, description: seen.description || '', page: pageUrl, image })) return { found: { bytes: file.bytes, mime, page: pageUrl, image, seen, score } };
     }
   }
-  return { reason: tried ? 'nessuna foto con l\'etichetta di questo vino' : 'nessuna immagine adatta sulle pagine trovate' };
+  return { reason: tried ? 'nessuna foto con l\'etichetta di questo vino (e di questa cantina)' : 'nessuna immagine adatta sulle pagine trovate' };
 }
 
 /** Riga della fonte salvata nel materiale (si mostra in Revisione per il controllo dei diritti). */
