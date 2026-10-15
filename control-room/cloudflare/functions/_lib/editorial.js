@@ -17,7 +17,7 @@ export function criticalFields(menu) {
     // Trattoria Blanch: i nomi dei vini in bottiglia sono nomi propri (come sul menu stampato), una sola scritta per tutte le lingue.
     const properNames = isBlanchSlug(menu?.id) && isBlanchBottleSection(section);
     for (const [nameIndex, name] of names.entries()) {
-      if (properNames && nameIndex > 0 && typeof name === 'string' && name.trim()) continue;
+      if (properNames && nameIndex > 0 && (typeof name === 'string' ? name : name?.it || '').trim()) continue;
       for (const lang of languages) {
         if (!localized(name, lang, languages[0])) translationsMissing.push(`sezioni.${sectionIndex}.${nameIndex === 0 ? 'nome' : `voci.${nameIndex - 1}.nome`}.${lang}`);
       }
