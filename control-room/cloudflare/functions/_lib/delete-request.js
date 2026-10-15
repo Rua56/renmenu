@@ -19,10 +19,9 @@ export async function deletionPlan(db, { getOne, rows }, { requestId = null, cli
   }
   plan.client = clientId ? await getOne(db, 'SELECT id,name,menu_id FROM clients WHERE id=?', clientId) : null;
   if (!requestId && !plan.client) { plan.blockers.push('Non trovo il cliente.'); return plan; }
-  if (retired) {
-    if (!RETIRED_MENUS.has(plan.client?.menu_id)) { plan.blockers.push('Non è un locale di prova con il menu già tolto dal sito.'); return plan; }
-    plan.retired = true;
-  }
+  // Un locale di prova col menu già tolto dal sito si cancella del tutto, da qualunque strada (anche «elimina …»).
+  plan.retired = RETIRED_MENUS.has(plan.client?.menu_id);
+  if (retired && !plan.retired) { plan.blockers.push('Non è un locale di prova con il menu già tolto dal sito.'); return plan; }
   if (requestId) {
     if (!plan.retired && OPEN_BLOCKED.has(plan.request.status)) plan.blockers.push('La pratica è chiusa: il menu risulta già pubblicato.');
     plan.drafts = await rows(db, 'SELECT id,status,revision,menu_json FROM drafts WHERE request_id=?', requestId);

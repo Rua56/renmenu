@@ -1668,8 +1668,7 @@ export function createMissions(deps) {
     if (!list.length) return { text: 'Non ci sono più locali di prova da cancellare.' };
     const done = [], kept = [];
     for (const client of list) {
-      // Solo se il menu non è davvero più online: un QR che funziona non si tocca.
-      if ((await readPublic(client.menu_id)).menuJson.ok) { kept.push(`${client.name}: il suo menu è ancora online`); continue; }
+      // RETIRED_MENUS elenca solo menu già tolti dal sito (file cancellati dal repository): il QR non porta più a niente.
       const requests = await rows(db, 'SELECT id FROM requests WHERE client_id=? ORDER BY created_at ASC', client.id).catch(() => []);
       let failed = null;
       for (const r of requests) {
@@ -1683,6 +1682,8 @@ export function createMissions(deps) {
       if (failed) kept.push(`${client.name}: ${failed}`); else done.push(client.name);
     }
     if (done.length) for (const key of ['tg_focus', 'tg_checks', 'draft_undo', 'draft_translate']) await putSetting(db, key, 'null').catch(() => null);
+    // Nel registro anche quello che non è andato, per capire il perché senza chiederlo a Riccardo.
+    if (kept.length) await auditedBatch(jarvisDb(db), [], 'jarvis.test_clean', `Locali di prova non cancellati: ${kept.join('; ')}`.slice(0, 240), null).catch(() => null);
     return { text: `${done.length ? `Fatto, Riccardo: ho cancellato ${done.map((n) => `«${n}»`).join(', ')} con tutte le pratiche, le bozze e i file.` : 'Non ho cancellato niente.'}${kept.length ? `\nRestano: ${kept.join('; ')}.` : ''}` };
   }
   const PRINT_ASK = /\b(?:men[uù]|carta)\s+(?:da\s+)?stamp(?:are|abile|a)\b|\bversione\s+(?:da\s+)?stamp(?:are|abile|a)\b|\bstampa(?:re)?\s+(?:il\s+)?men[uù]\b/i;
@@ -1931,7 +1932,7 @@ export function createMissions(deps) {
   async function deleteOffer(db, clientId, utterance) {
     const client = await getOne(db, 'SELECT id,name,menu_id FROM clients WHERE id=?', clientId);
     if (!client) return { text: 'Quel cliente non c’è più.' };
-    const requests = await rows(db, "SELECT id,subject,status,created_at FROM requests WHERE client_id=? AND status<>'completata' ORDER BY created_at ASC", client.id).catch(() => []);
+    const requests = await rows(db, "SELECT id,subject,status,created_at FROM requests WHERE client_id=? AND (status<>'completata' OR ?=1) ORDER BY created_at ASC", client.id, RETIRED_MENUS.has(client.menu_id) ? 1 : 0).catch(() => []);
     const said = String(utterance || '').split('\n').at(-1);
     let chosen = requests;
     if (requests.length > 1 && !ALL_WORDS.test(said)) {
@@ -1987,9 +1988,9 @@ export function createMissions(deps) {
   }
   // «Elimina tutte»: una pratica alla volta, con gli stessi controlli; l'ultima porta via anche il cliente se non resta altro.
   async function runDeleteAll(db, env, clientId) {
-    const client = await getOne(db, 'SELECT id,name FROM clients WHERE id=?', clientId);
+    const client = await getOne(db, 'SELECT id,name,menu_id FROM clients WHERE id=?', clientId);
     if (!client) return { text: 'Quel cliente non c’è più: niente da eliminare.' };
-    const open = await rows(db, "SELECT id FROM requests WHERE client_id=? AND status<>'completata' ORDER BY created_at ASC", clientId).catch(() => []);
+    const open = await rows(db, "SELECT id FROM requests WHERE client_id=? AND (status<>'completata' OR ?=1) ORDER BY created_at ASC", clientId, RETIRED_MENUS.has(client.menu_id) ? 1 : 0).catch(() => []);
     if (!open.length) return { text: `«${client.name}» non ha pratiche aperte.` };
     const results = [];
     for (const r of open) results.push(await deleteOne(db, env, { requestId: r.id }));

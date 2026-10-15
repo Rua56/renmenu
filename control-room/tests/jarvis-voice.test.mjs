@@ -22,8 +22,9 @@ const jwt = `${head}.${body}.${Buffer.from(signature).toString('base64url')}`;
 const credentials = { 'Cf-Access-Jwt-Assertion': jwt };
 const testEnv = (db, extra = {}) => ({ DB: db, ...accessEnv, ...extra });
 
-function database({ withCategory = true } = {}) {
+function database({ withCategory = true, foreignKeys = false } = {}) {
   const sqlite = new DatabaseSync(':memory:');
+  if (foreignKeys) sqlite.exec('PRAGMA foreign_keys = ON'); // come D1 in produzione
   sqlite.exec(readFileSync(new URL('../cloudflare/migrations/0001_initial.sql', import.meta.url), 'utf8'));
   sqlite.exec(readFileSync(new URL('../cloudflare/migrations/0002_integrations.sql', import.meta.url), 'utf8'));
   sqlite.exec(readFileSync(new URL('../cloudflare/migrations/0003_ai_free_scope.sql', import.meta.url), 'utf8'));
@@ -500,16 +501,26 @@ describe('Comandi vocali di Jarvis', () => {
     } finally { globalThis.fetch = previous; db.close(); }
   });
   it('«togli i locali di prova»: elenco, pulsante e cancellazione completa dei soli locali col menu tolto', async () => {
-    const db = database();
+    const db = database({ foreignKeys: true });
     const previous = globalThis.fetch;
     globalThis.fetch = previousFetch;
     try {
       const stamp = '2026-10-13T12:00:00.000Z';
       for (const [id, name, menu] of [['ct', 'Osteria Al Tralcio', 'osteria-al-tralcio'], ['cv', 'Trattoria Vera', 'trattoria-vera']]) await db.prepare("INSERT INTO clients (id,name,email,plan,menu_id,internal_notes,revision,created_at,updated_at) VALUES (?,?,NULL,'premium',?,'',1,?,?)").bind(id, name, menu, stamp, stamp).run();
+      let n = 0;
       for (const clientId of ['ct', 'ct', 'cv']) {
-        const out = await action(db, 'createRequest', { clientId, subject: 'Menu', sourceChannel: 'email', sourceText: 'Menu di prova', kind: 'altro', plan: 'standard' });
-        const id = out.body.id || out.body.result?.id || out.body.data?.id;
+        const id = `r${n++}-${clientId}`;
+        await db.prepare("INSERT INTO requests (id,client_id,subject,source_channel,source_text,kind,status,plan,revision,created_at,updated_at) VALUES (?,?,?,?,?,?,?,?,1,?,?)").bind(id, clientId, 'Menu', 'email', 'Menu di prova', 'altro', 'nuova', 'standard', stamp, stamp).run();
         await db.prepare("UPDATE requests SET status='completata' WHERE id=?").bind(id).run();
+        if (clientId !== 'ct') continue;
+        // Come le prove vere: bozza pubblicata, anteprima approvata, missione completata, email inviate, PR unita.
+        const d = `d-${id}`, a = `a-${id}`, m = `m-${id}`;
+        await db.prepare("INSERT INTO drafts (id,request_id,slug,menu_json,status,checks_json,revision,created_at,updated_at) VALUES (?,?,?,?,?,?,?,?,?)").bind(d, id, 'osteria-al-tralcio', '{}', 'pronta_pr', '{}', 3, stamp, stamp).run();
+        await db.prepare("INSERT INTO draft_versions (id,draft_id,revision,menu_json,actor,created_at) VALUES (?,?,?,?,?,?)").bind(`v-${id}`, d, 2, '{}', 'owner', stamp).run();
+        await db.prepare("INSERT INTO live_pr_operations (id,draft_id,revision,snapshot_sha,base_sha,branch_name,status,created_at,updated_at) VALUES (?,?,?,?,?,?,?,?,?)").bind(`l-${id}`, d, 3, 'x', 'y', `b-${id}`, 'merged', stamp, stamp).run();
+        await db.prepare("INSERT INTO publication_approvals (id,draft_id,request_id,reference_code,snapshot_sha,status,recipient,preview_url,email_subject,email_body,prepared_at,sent_at,approved_at,created_at,updated_at) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)").bind(a, d, id, `RM-${id.slice(0, 6)}`, 'x', 'approvata_cliente', 'prova@example.com', 'https://x', 's', 'b', stamp, stamp, stamp, stamp, stamp).run();
+        await db.prepare("INSERT INTO jarvis_missions (id,request_id,draft_id,status,step_started_at,created_at,updated_at) VALUES (?,?,?,?,?,?,?)").bind(m, id, d, 'completata', stamp, stamp, stamp).run();
+        await db.prepare("INSERT INTO jarvis_outbox (id,mission_id,request_id,approval_id,reference_code,recipient,subject,body,status,created_at,updated_at) VALUES (?,?,?,?,?,?,?,?,?,?,?)").bind(`o-${id}`, m, id, a, `RM-o-${id.slice(0, 6)}`, 'prova@example.com', 's', 'b', 'inviata', stamp, stamp).run();
       }
       globalThis.fetch = fakeFetch;
       calls.length = 0;
@@ -529,8 +540,12 @@ describe('Comandi vocali di Jarvis', () => {
       assert.equal((await db.prepare("SELECT COUNT(*) n FROM requests WHERE client_id='cv'").bind().first()).n, 1, 'il cliente vero resta');
       // Un cliente vero non si cancella con questa strada, nemmeno chiamando l'azione a mano.
       const vera = (await db.prepare("SELECT id FROM requests WHERE client_id='cv'").bind().first()).id;
-      const refused = await action(db, 'deleteRequest', { requestId: vera, retired: true, confirmation: 'ELIMINA PRATICA' });
-      assert.equal(refused.status, 409);
+      const { deletionPlan } = await import('../cloudflare/functions/_lib/delete-request.js');
+      const sql = { getOne: (d, q, ...a) => d.prepare(q).bind(...a).first(), rows: async (d, q, ...a) => (await d.prepare(q).bind(...a).all()).results };
+      const refused = await deletionPlan(db, sql, { requestId: vera, retired: true });
+      assert.equal(refused.ok, false);
+      assert.match(refused.blockers[0], /Non è un locale di prova/);
+      for (const table of ['drafts', 'draft_versions', 'live_pr_operations', 'publication_approvals', 'jarvis_missions', 'jarvis_outbox']) assert.equal((await db.prepare(`SELECT COUNT(*) n FROM ${table}`).bind().first()).n, 0, `${table} vuota`);
     } finally { globalThis.fetch = previous; db.close(); }
   });
   it('non elimina una pratica pubblicata né un cliente con menu online', async () => {
