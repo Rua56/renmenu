@@ -44,7 +44,7 @@ async function draftNotes(db, requestId) {
   try { return parseList((await getOne(db, 'SELECT review_notes_json AS n FROM drafts WHERE request_id=? ORDER BY created_at DESC LIMIT 1', requestId))?.n); }
   catch { return []; }
 }
-import { getMe, randomToken, sameSecret, sendTelegram, sendVoice, setWebhook, telegramReady } from '../../_lib/telegram.js';
+import { getMe, randomToken, sameSecret, sendDocument, sendPhoto, sendTelegram, sendVoice, setWebhook, telegramReady } from '../../_lib/telegram.js';
 import { ACTIVATIONS, approvalEvidence, approvalState, assessReply, previewEmail, previewUrl, proposeReplyChanges, referenceCode, sha256Hex } from '../../_lib/approvals.js';
 
 // Nome pubblico del bot (serve solo a «Apri Telegram» nella Control Room): letto una volta e ricordato.
@@ -726,17 +726,29 @@ export async function jarvisPhone(env, input = {}) {
   const out = await jarvisAsk(env, { text, choose: Array.isArray(buttons) ? buttons : [] });
   const asked = out.messages.filter((m) => m.buttons?.length).at(-1)?.buttons || [];
   await missions.putSetting(db, 'phone_buttons', JSON.stringify(asked.filter(([, data]) => String(data).split(':')[0] !== 'pub')));
-  // La pubblicazione si conferma toccando: la domanda con il pulsante arriva davvero su Telegram.
+  // Su Telegram arriva quello che al telefono non si può dire: link (anteprime, menu), foto (QR), file e la
+  // domanda con il pulsante di pubblicazione, che si conferma solo toccando.
   const chat = await missions.setting(db, 'telegram_chat_id');
-  let sentToTelegram = false;
-  for (const m of out.messages) {
-    if (!tapOnTelegram(m.buttons) || !chat || !telegramReady(env)) continue;
-    await sendTelegram(env, chat, m.picked === 'tap' ? 'Dalla telefonata: tocca qui per confermare.' : m.text, m.buttons).catch(() => null);
-    sentToTelegram = true;
+  let sentToTelegram = false, sentPublish = false;
+  if (chat && telegramReady(env)) {
+    for (const m of out.messages) {
+      const publish = tapOnTelegram(m.buttons);
+      try {
+        if ((m.kind === 'image' || m.kind === 'file') && String(m.src || '').startsWith('data:')) {
+          const bytes = Uint8Array.from(atob(m.src.split(',')[1] || ''), (c) => c.charCodeAt(0));
+          if (m.kind === 'image') await sendPhoto(env, chat, bytes, m.text || 'Dalla telefonata.');
+          else await sendDocument(env, chat, bytes, m.name || 'file', m.src.slice(5, m.src.indexOf(';')) || 'application/octet-stream', m.text || 'Dalla telefonata.');
+          sentToTelegram = true;
+        } else if (publish || /https?:\/\//.test(m.text || '')) {
+          await sendTelegram(env, chat, m.picked === 'tap' ? 'Dalla telefonata: tocca qui per confermare.' : `☎️ Dalla telefonata\n\n${m.text}`, m.buttons?.length ? m.buttons : null);
+          sentToTelegram = true; sentPublish ||= publish;
+        }
+      } catch { /* la telefonata continua lo stesso */ }
+    }
   }
   const said = out.messages.map((m) => (m.picked === 'tap' ? '' : m.say)).filter(Boolean).join(' ');
   const options = asked.filter(([, data]) => String(data).split(':')[0] !== 'pub').map(([label]) => label);
-  const risposta = [said, options.length ? `Riccardo può rispondere: ${options.join(', ')}.` : '', sentToTelegram ? 'La pubblicazione si conferma solo toccando il pulsante che ho appena mandato su Telegram.' : ''].filter(Boolean).join(' ');
+  const risposta = [said, options.length ? `Riccardo può rispondere: ${options.join(', ')}.` : '', sentPublish ? 'La pubblicazione si conferma solo toccando il pulsante che ho appena mandato su Telegram.' : sentToTelegram ? 'Link e immagini li ho appena mandati su Telegram.' : ''].filter(Boolean).join(' ');
   return { ok: true, risposta: risposta.slice(0, 1500) || 'Fatto.' };
 }
 // «Pronto per te» e briefing a voce: le decisioni che Jarvis ha già preparato, ognuna con i suoi pulsanti.

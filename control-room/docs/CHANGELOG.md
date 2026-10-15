@@ -4,6 +4,8 @@ Si aggiunge una voce a ogni pull request che cambia un comportamento di Jarvis o
 
 ## 15 ottobre 2026
 
+- Telefonata: quello che al telefono non si può dire (link delle anteprime e dei menu, QR, file) arriva subito su Telegram con «☎️ Dalla telefonata», e Jarvis lo dice a voce. Prima restava solo nella risposta interna della chiamata: Riccardo aveva chiesto di vedere un menu al telefono e su Telegram non era arrivato nulla (tre anteprime preparate alle 09:07, nessun messaggio).
+
 - Jarvis agisce durante la telefonata: l'agente vocale di ElevenLabs ha lo strumento `chiedi_a_jarvis`, che chiama `/jarvis-hook/telefono` e passa le frasi di Riccardo allo stesso cervello di Telegram (`jarvisPhone`). «Sì», «no», «la seconda» premono i pulsanti dell'ultima risposta. Ogni telefonata ha una chiave sua (variabile `chiave_chiamata`, valida 30 minuti): senza quella chiave non si esegue nulla. Pubblicare resta un tocco, scelta di Riccardo: la domanda con il pulsante arriva su Telegram. L'agente vecchio viene sostituito alla prima chiamata (`phone_agent_v` = 2). Se ElevenLabs rifiuta lo strumento, la chiamata parte lo stesso, ma Jarvis può solo parlare.
 
 - **Modalità visita:** sei nel locale, scrivi o detti a Jarvis «visita Bar Centrale» (o mandi la foto del menù con quella didascalia) e poi le foto. Jarvis le legge dopo 15 secondi invece di 40, non fa domande sui prezzi in dubbio (quelle voci restano fuori, da sistemare dopo) e ti rimanda il link dell'anteprima da mostrare al titolare, valido 24 ore. Niente preparazione automatica, niente invio al locale, niente pubblicazione. Nuovo comando «/visita» nel menu di Telegram (`_lib/visit.js`).
