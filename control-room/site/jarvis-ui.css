@@ -439,3 +439,39 @@ html[data-jarvis="speaking"] .reactor .r3 { border-color: rgba(255, 255, 255, .5
 .chat-btns button.quiet { border-color: var(--line-strong); color: var(--muted-strong); }
 .chat-btns button.brief-go { border-color: var(--am); background: var(--am); color: #1a1000; }
 .chat-btns button.brief-go:hover { background: transparent; color: var(--am); }
+
+/* ——— Effetti olografici (jarvis-holo.js): mappa 3D dei locali e spettro della voce ——— */
+.reactor-main .holo-spec { inset: -34px; border-radius: 0; }
+.holo-spectrum-canvas { display: block; width: 100%; height: 100%; }
+.holo-map { position: relative; margin: 4px 0 14px; padding: 10px 10px 8px; border: 1px solid rgba(70, 214, 255, .22); border-radius: 18px; background: radial-gradient(120% 90% at 50% 60%, rgba(18, 48, 74, .55), rgba(6, 10, 17, .2) 70%); overflow: hidden; }
+.holo-map::before, .holo-map::after { position: absolute; width: 14px; height: 14px; border: 2px solid var(--teal); content: ""; opacity: .8; pointer-events: none; }
+.holo-map::before { top: 6px; left: 6px; border-right: 0; border-bottom: 0; }
+.holo-map::after { right: 6px; bottom: 6px; border-top: 0; border-left: 0; }
+.holo-head { display: flex; justify-content: space-between; gap: 8px; padding: 2px 8px 0; color: var(--teal); font: 600 9.5px var(--mono); letter-spacing: .12em; opacity: .85; }
+.holo-frame { position: relative; height: 240px; }
+.holo-canvas { display: block; width: 100%; height: 100%; touch-action: pan-y; cursor: grab; }
+.holo-legend { margin: 2px 0 0; color: var(--muted); font: 500 10.5px var(--mono); text-align: center; }
+.holo-legend i { display: inline-block; width: 7px; height: 7px; margin: 0 4px 0 8px; border-radius: 50%; vertical-align: 0; }
+.holo-legend .l-decide { background: #ffb347; box-shadow: 0 0 6px #ffb347; } .holo-legend .l-online { background: #46d6ff; } .holo-legend .l-lavoro { background: #a9ecff; }
+.holo-panel { font-size: 11.5px; position: absolute; right: 4px; top: 4px; display: grid; gap: 2px; width: min(200px, 50%); padding: 8px 10px; border: 1px solid rgba(255, 179, 71, .7); border-radius: 12px; background: rgba(6, 12, 20, .86); color: #e9f1fc; font-size: 12.5px; text-align: left; animation: holo-panel-in .45s ease-out; backdrop-filter: blur(3px); }
+.holo-panel small { color: #ffb347; font: 700 9.5px var(--mono); letter-spacing: .14em; }
+.holo-panel strong { font-size: 14px; line-height: 1.2; }
+.holo-panel span { color: #a9bfd6; }
+.holo-panel .st { color: #ffb347; }
+.holo-panel.s-online .st { color: #46d6ff; }
+.holo-panel button { margin-top: 6px; min-height: 36px; border: 1px solid #46d6ff; border-radius: 10px; background: transparent; color: #46d6ff; font: 700 13px var(--sans); cursor: pointer; }
+.holo-panel button.x { position: absolute; top: 2px; right: 4px; min-height: 0; margin: 0; padding: 2px 8px; border: 0; color: #a9bfd6; font-size: 18px; }
+@keyframes holo-panel-in { from { opacity: 0; transform: translateX(14px) scale(.96); clip-path: inset(0 0 100% 0); } to { opacity: 1; transform: none; clip-path: inset(0); } }
+html:not([data-theme="dark"]) .holo-map { background: radial-gradient(120% 90% at 50% 60%, #0f2338, #060a11 75%); }
+
+/* Risposte di Jarvis come pannelli olografici: si montano dall'alto con una linea di scansione e un timbro orario. */
+.jarvis-talk .msg.j, .sheet .msg.j { position: relative; }
+.msg.j[data-stamp]::before { display: block; margin: -2px 0 4px; color: var(--teal); content: attr(data-stamp); font: 600 9px var(--mono); letter-spacing: .14em; opacity: .55; }
+.msg.j.holo-in { animation: holo-msg-in .6s cubic-bezier(.2, .75, .3, 1) both; }
+.msg.j.holo-in::after { position: absolute; left: 0; right: 0; top: 0; height: 2px; background: linear-gradient(90deg, transparent, var(--teal), transparent); box-shadow: 0 0 12px var(--teal); content: ""; animation: holo-scan .6s ease-out both; pointer-events: none; }
+@keyframes holo-msg-in { from { opacity: 0; clip-path: inset(0 0 100% 0); filter: brightness(1.8); } 60% { opacity: 1; filter: brightness(1.25); } to { opacity: 1; clip-path: inset(0); filter: none; } }
+@keyframes holo-scan { from { top: 0; opacity: 1; } to { top: 100%; opacity: 0; } }
+@media (prefers-reduced-motion: reduce) { .msg.j.holo-in, .msg.j.holo-in::after, .holo-panel { animation: none; } }
+.holo-panel[hidden] { display: none; }
+.holo-panel small { padding-right: 16px; }
+.jarvis-hero .reactor-main:has(.holo-spec canvas) { margin: 44px auto 40px; }
