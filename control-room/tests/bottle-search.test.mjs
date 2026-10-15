@@ -2,7 +2,7 @@
 // in cui il modello riconosce l'etichetta di quel vino.
 import assert from 'node:assert/strict';
 import test from 'node:test';
-import { findBottle, imageCandidates, parseSourceNote, publicHttps, sourceNote, winesWithoutPhoto } from '../cloudflare/functions/_lib/bottle-search.js';
+import { blanchProducers, findBottle, imageCandidates, producerMatch, parseSourceNote, publicHttps, sourceNote, winesWithoutPhoto } from '../cloudflare/functions/_lib/bottle-search.js';
 import { menuSlots, slotFrequencies } from '../cloudflare/functions/_lib/media.js';
 
 const menu = { id: 'x', nome: 'X', premium: {}, sezioni: [
@@ -85,4 +85,21 @@ test('la ricerca usa prima i modelli che stanno rispondendo, senza «pensiero»,
   assert.deepEqual(asked[1][1].thinkingConfig, { thinkingBudget: 0 }, 'il pensiero non consuma la risposta');
   assert.ok(asked[1][1].maxOutputTokens >= 2048);
   assert.equal(res.reason, 'nessuna pagina trovata (gemini-3.1-flash-lite 429, gemini-2.5-flash 404, gemini-2.5-flash-lite 404)');
+});
+
+test('Trattoria Blanch: un vitigno uguale di un\'altra cantina non vale', async () => {
+  const slot = blanchProducers([{ wine: true, name: 'Friulano', descr: 'Borgo Trevisan · Gradisca d’Isonzo', key: 'Friulano · Borgo Trevisan · Gradisca d’Isonzo' }])[0];
+  assert.equal(slot.producer, 'Borgo Trevisan');
+  assert.equal(producerMatch(slot, { label: { nome: 'Friulano', cantina: 'Borgo Trevisan' } }), true);
+  assert.equal(producerMatch(slot, { label: { nome: 'Friulano' }, page: 'https://www.borgotrevisan.it/vini/friulano' }), true);
+  assert.equal(producerMatch(slot, { label: { nome: 'Friulano', cantina: 'Livio Felluga' }, page: 'https://www.liviofelluga.it/friulano' }), false);
+  // «Borgo» da solo è di troppe cantine
+  assert.equal(producerMatch(slot, { label: { nome: 'Friulano', cantina: 'Borgo San Daniele' } }), false);
+  // Senza produttore separato (carte Premium) il controllo non si fa
+  assert.equal(producerMatch({ wine: true, name: 'Friulano', descr: 'Uve friulano, acciaio' }, { label: { cantina: 'Altra' } }), true);
+
+  const pages = { 'https://www.primosic.com/vini/ribolla': '<meta property="og:image" content="https://www.primosic.com/foto/friulano.jpg">' };
+  const wrong = await findBottle({ key: 'k', models: [] }, slot, slotFrequencies([slot]), { classify: async () => ({ ok: true, kind: 'bottiglia', label: { nome: 'Friulano', cantina: 'Primosic' } }), fetchImpl: fakeWeb(pages) });
+  assert.equal(wrong.found, undefined);
+  assert.match(wrong.reason, /cantina/);
 });

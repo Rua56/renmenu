@@ -4,6 +4,7 @@ Si aggiunge una voce a ogni pull request che cambia un comportamento di Jarvis o
 
 ## 15 ottobre 2026
 
+- **Bottiglie della cantina giusta** (Trattoria Blanch): la ricerca chiede a Google il vino di quel produttore e tiene la foto solo se il produttore si ritrova sull'etichetta, nella foto o nell'indirizzo del sito (un «Friulano» di un'altra cantina non vale più). Ogni nuova ricerca toglie dal menu le foto già messe di una cantina diversa e ricerca i vini non trovati la volta prima. Più immagini provate per pagina.
 - **Scheda «Agenda visite» nella Control Room** (Strumenti → Agenda delle visite): la stessa agenda di Telegram, con chi manca e chi è già visitato (con data e nota), un tocco su «Visitato», aggiungi locali, nuova agenda, cancella. I pulsanti mandano a Jarvis la frase corrispondente, così Telegram, voce e Control Room restano allineati.
 
 - **Agenda delle visite:** detti o scrivi a Jarvis «questa settimana devo visitare 8 locali: …», poi «ho visitato …» (anche con una nota dopo i due punti), oppure usi «visita …» nel locale. «agenda» o «chi mi manca?» mostra la lista. Dopo un giorno senza notizie Jarvis ti ricorda i locali che mancano, di giorno e una volta sola. Nuovo comando «/agenda» (`_lib/agenda.js`).
