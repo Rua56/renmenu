@@ -20,6 +20,8 @@ const ASK_IS = new RegExp(String.raw`^\s*(?:jarvis[\s,!.]*)?(?:il\s+)?${KIND}\s+
 const ASK_ADD = new RegExp(String.raw`^\s*(?:jarvis[\s,!.]*)?(?:aggiungi|salva|metti|segna|registra|imposta)\s+(?:il\s+)?${KIND}\s+${NUMBER}\s+(?:alla|allo|all[’']|al|a|per|della|del|di|sul(?:la)?\s+scheda\s+di)\s*(.+?)\s*[.!]*$`, 'i');
 const ASK_ADD_TO = new RegExp(String.raw`^\s*(?:jarvis[\s,!.]*)?(?:aggiungi|salva|metti|segna|registra|imposta)\s+(?:alla|allo|all[’']|al|a|per)\s*(.+?)\s+(?:il\s+)?${KIND}\s+${NUMBER}\s*[.!]*$`, 'i');
 
+const ASK_NO_NUMBER = new RegExp(String.raw`^\s*(?:jarvis[\s,!.]*)?(?:aggiungi|salva|metti|segna|registra|imposta|inserisci)\s+(?:il\s+|un\s+)?${KIND}\s+(?:alla|allo|all[’']|al|a|per|della|del|di|sul(?:la)?\s+scheda\s+di)\s*([^\d]+?)\s*[.!]*$`, 'i');
+
 /**
  * «il numero di Trattoria Blanch è 333 1234567», «aggiungi il telefono 333… a Trattoria Blanch»,
  * «salva a Trattoria Blanch il numero 333…» → { venue, number }. «… al menu di …» resta al pulsante
@@ -34,5 +36,8 @@ export function parseClientPhone(text) {
   if (m) return { venue: m[2].trim(), number: m[1].trim() };
   m = line.match(ASK_ADD_TO);
   if (m) return { venue: m[1].trim(), number: m[2].trim() };
+  // «registra un numero di telefono per Trattoria Blanch»: manca il numero, Jarvis lo chiede.
+  m = line.match(ASK_NO_NUMBER);
+  if (m) return { venue: m[1].trim(), number: null };
   return null;
 }

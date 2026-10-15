@@ -40,6 +40,8 @@ describe('Telefono sulla scheda cliente', () => {
     // Il pulsante «Prenota su WhatsApp» del menu Premium resta un'altra cosa.
     assert.equal(parseClientPhone('metti il whatsapp +39 333 1234567 al menu di Al Bakaro'), null);
     assert.equal(parseClientPhone('il numero di coperti è 40'), null);
+    assert.deepEqual(parseClientPhone('Registra un numero di telefono per trattoria blanch'), { venue: 'trattoria blanch', number: null });
+    assert.equal(parseClientPhone('aggiungi un piatto a trattoria blanch'), null);
   });
 
   it('su Telegram salva il numero e WhatsApp riconosce subito il locale', async () => {
@@ -63,6 +65,33 @@ describe('Telefono sulla scheda cliente', () => {
       assert.equal(db.prepare("SELECT phone FROM clients WHERE id='c1'").bind().first().phone, '+393331234567');
       await say(db, env, 'il numero di Bar Inventato è 333 1234567');
       assert.match(texts().at(-1), /Non trovo un cliente che si chiami «Bar Inventato»/);
+      await say(db, env, 'Registra un numero di telefono per trattoria blanch');
+      assert.match(texts().at(-1), /^Dimmi il numero, per esempio: «il numero di trattoria blanch è 333 1234567»/);
+      assert.equal(db.prepare('SELECT COUNT(*) AS n FROM requests').bind().first().n, 0);
+    } finally { globalThis.fetch = previous; db.close(); }
+  });
+});
+
+describe('Messaggi ripetuti da Telegram', () => {
+  it('lo stesso update_id si lavora una volta: alla ripetizione Jarvis avvisa una volta e lascia passare la coda', async () => {
+    const db = database();
+    const previous = globalThis.fetch;
+    globalThis.fetch = fakeFetch;
+    try {
+      calls.length = 0;
+      await missions.putSetting(db, 'telegram_chat_id', '42');
+      const env = { DB: db, TELEGRAM_BOT_TOKEN: TOKEN, OWNER_EMAIL: 'renmenu1569@gmail.com' };
+      const update = { update_id: 777, message: { chat: { id: 42, type: 'private' }, text: 'Registra un numero di telefono per trattoria blanch' } };
+      await missions.telegramUpdate(db, env, update);
+      const first = texts().length;
+      assert.match(texts().at(-1), /^Dimmi il numero/);
+      await missions.telegramUpdate(db, env, update);
+      assert.equal(texts().length, first + 1);
+      assert.match(texts().at(-1), /mi ha bloccato a metà e Telegram continuava a rimandarmelo/);
+      await missions.telegramUpdate(db, env, update);
+      assert.equal(texts().length, first + 1);
+      await missions.telegramUpdate(db, env, { ...update, update_id: 778 });
+      assert.match(texts().at(-1), /^Dimmi il numero/);
     } finally { globalThis.fetch = previous; db.close(); }
   });
 });
