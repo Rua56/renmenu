@@ -7,6 +7,7 @@ import { askJarvis, isDemoMode, jarvisLiveSession, jarvisReady, jarvisVoiceAudio
 import { earAvailable, hear, stopHearing, unlockEar } from './jarvis-ear.js';
 import { liveAvailable, startLive } from './jarvis-live.js';
 import { attachSpectrum } from './jarvis-holo.js';
+import { pauseWake, resumeWake } from './jarvis-wake.js';
 
 const Recognition = globalThis.SpeechRecognition || globalThis.webkitSpeechRecognition;
 const Synth = globalThis.speechSynthesis;
@@ -68,8 +69,18 @@ function setOutLevel(value) {
   root.dataset.jarvisOut = '1';
   root.style.setProperty('--jv-out', Number(value).toFixed(2));
 }
+// Il microfono è uno solo: mentre Jarvis ascolta, pensa o parla, l'ascolto di «Ehi Jarvis» si ferma (sul
+// telefono i due si rubavano il microfono, e Jarvis poteva svegliarsi sentendo il proprio nome). Nella home,
+// tornata a riposo, la sveglia riparte da sola dopo un attimo; il foglio la riaccende quando si chiude.
+let wakeTimer = 0;
+function shareMic(next) {
+  clearTimeout(wakeTimer);
+  if (next !== 'idle') { pauseWake(); return; }
+  if (inline && !handsFree && !live) wakeTimer = setTimeout(() => { if (phase === 'idle' && !handsFree && !live) resumeWake(); }, 1200);
+}
 function setPhase(next, note = '') {
   phase = next;
+  shareMic(next);
   if (root) { if (next === 'idle') delete root.dataset.jarvis; else root.dataset.jarvis = next; }
   if (next !== 'listening') setLevel(0);
   if (next !== 'speaking') setOutLevel(null);
@@ -235,6 +246,7 @@ function quiet(note) {
 }
 function listen() {
   if (busy) return;
+  clearTimeout(wakeTimer); pauseWake();
   stopSpeaking(); stopListening();
   if (earAvailable && !isDemoMode) { listenWithEar(); return; }
   listenWithBrowser();
@@ -309,6 +321,7 @@ function liveButton() {
 function startLiveDialog() {
   if (live || busy) return;
   handsFree = false; syncToggles();
+  clearTimeout(wakeTimer); pauseWake();
   stopListening(); stopSpeaking();
   const LIVE_NOTES = { connecting: 'Collego Jarvis dal vivo…', listening: 'Dal vivo: parla pure', speaking: 'Jarvis parla… interrompilo quando vuoi' };
   live = startLive({
