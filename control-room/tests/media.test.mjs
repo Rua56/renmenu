@@ -227,6 +227,11 @@ describe('Foto per il menu · flusso nella Control Room', () => {
       const served = await pub(file);
       assert.equal(served.status, 200);
       assert.equal(served.headers.get('content-type'), 'image/jpeg');
+      // Una seconda copia dal telefono (schermata vecchia) non cambia l'indirizzo di una foto già nel menu.
+      const JPEG2 = new Uint8Array(JPEG); JPEG2[JPEG2.length - 3] ^= 1;
+      const again = await onRequest({ request: new Request(`${base}media/${media.id}`, { method: 'POST', headers: { ...credentials, Origin: 'https://renmenu.pages.dev', 'Content-Type': 'image/jpeg', 'Content-Length': String(JPEG2.length) }, body: JPEG2 }), env: testEnv(db, env), params: { route: ['media', media.id] } });
+      assert.equal((await again.json()).result.publicUrl, upBody.result.publicUrl);
+      assert.equal((await pub(file)).status, 200);
       assert.equal((await pub('..%2Fprivate.jpg')).status, 404);
       assert.equal((await pub(file.replace('.jpg', '.png'))).status, 404, 'estensione diversa: non trovata');
       // Sposta su un altro vino, poi togli: torna da sistemare e non è più pubblica.
