@@ -4,7 +4,8 @@ window.RENMENU = {
   brand: 'RenMenu',
   tagline: 'Il menù digitale del tuo locale, pronto in 10 minuti.',
   contattoWhatsApp: '393515924327',
-  contattoEmail: 'renmenu1569@gmail.com',
+  // Arriva a Jarvis (Email Routing → pratica, copia a renmenu1569@gmail.com), come le risposte dei locali.
+  contattoEmail: 'menu@renmenu.com',
   // Chi gestisce RenMenu: compare nelle pagine legali (privacy, termini, cookie). Quando arriva la partita IVA va aggiunta in `piva`.
   titolare: { nome: 'Riccardo Iuran', piva: '', codiceFiscale: 'RNIRCR96H23E098J', indirizzo: 'Località Piuma 38, 34170 Gorizia (GO)', pec: '' },
   logoUrl: new URL('renmenu-mark.png', renmenuAssetBase).href,
