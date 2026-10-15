@@ -39,6 +39,9 @@ import { lastReadingTest, startReadingTest } from './reading-test.js';
 import { LATER_MS, MUTE_MS, REPEAT_MS, activeInitiatives, loadInitiatives } from './initiative.js';
 import { draftClientReply, lastMessage, originalSubject, sendWhatsAppReply } from './client-reply.js';
 
+// Menu di prova tolti dal sito il 15 ottobre 2026 su richiesta di Riccardo: se il file non c'è più, nessun avviso.
+const RETIRED_MENUS = new Set(['al-chiostro-bistrot', 'buffet-alla-valletta', 'caffe-bon-bon', 'demo', 'demo-premium', 'enoteca-il-calice-storto', 'la-chincaglieria-gastronomica', 'osteria-al-tralcio', 'pub-underground']);
+
 export const PARTIAL_MARK = '[Testo parziale: leggi l’email completa in Gmail prima di decidere]';
 export const OWNER_REVIEW = 'telegram:riccardo';
 const ACTIVE = ['affidata', 'attesa_invio', 'attesa_cliente', 'attesa_si', 'pubblicazione', 'verifica'];
@@ -1591,6 +1594,8 @@ export function createMissions(deps) {
       if (!watch?.next || Date.parse(watch.next) > Date.now()) continue;
       if (out.length >= 2) break;
       const seen = await readPublic(watch.slug);
+      // Menu di prova tolti apposta dal sito: il controllo finisce senza avvisi.
+      if (RETIRED_MENUS.has(watch.slug) && !seen.menuJson.ok) { await db.prepare('DELETE FROM jarvis_settings WHERE key=?').bind(row.key).run(); out.push({ watch: watch.slug, ok: true, retired: true }); continue; }
       const problems = [];
       if (!seen.menuJson.ok) problems.push(`il file del menu ${seen.menuJson.why}`);
       else if (seen.id !== watch.slug) problems.push('il file del menu non ha più l’identificativo giusto');

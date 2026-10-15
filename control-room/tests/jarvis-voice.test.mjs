@@ -90,6 +90,8 @@ const fakeFetch = async (url, options = {}) => {
   const href = String(url);
   if (href.startsWith('https://renmenu.com/menus/prova.json')) return publicState === 'ok' ? Response.json({ id: 'prova', nome: 'Prova' }) : new Response('x', { status: 404 });
   if (href.startsWith('https://renmenu.com/menu/?m=prova')) return new Response('<html></html>', { status: publicState === 'pagina' ? 500 : 200 });
+  if (href.startsWith('https://renmenu.com/menus/osteria-al-tralcio.json')) return new Response('x', { status: 404 });
+  if (href.startsWith('https://renmenu.com/menu/?m=osteria-al-tralcio')) return new Response('<html></html>', { status: 200 });
   if (href.includes('/contents/menus/osteria-viva.json')) return Response.json({ type: 'file', sha: 'abc1234def', content: Buffer.from(JSON.stringify(LIVE)).toString('base64') });
   if (href.includes('/contents/menus/')) return Response.json({ message: 'Not Found' }, { status: 404 });
   if (href.startsWith('https://api.elevenlabs.io/')) { calls.push({ method: 'tts', url: href, body: JSON.parse(options.body), headers: options.headers }); return new Response(new Uint8Array(2000), { status: 200 }); }
@@ -602,6 +604,13 @@ describe('Comandi vocali di Jarvis', () => {
       publicState = 'ok';
       await set({ step: 2, sha: first.sha === null ? undefined : first.sha });
       await missions.watchTick(db, env);
+      assert.equal(await read(), null);
+      // un menu di prova tolto apposta dal sito: il controllo finisce in silenzio
+      publicState = 'rotto';
+      const before = calls.filter((c) => c.method === 'sendMessage').length;
+      await set({ slug: 'osteria-al-tralcio', name: 'Osteria Al Tralcio', fails: 1 });
+      await missions.watchTick(db, env);
+      assert.equal(calls.filter((c) => c.method === 'sendMessage').length, before, 'nessun avviso');
       assert.equal(await read(), null);
     } finally { publicState = 'ok'; globalThis.fetch = previous; db.close(); }
   });
