@@ -2,7 +2,7 @@
 const renmenuAssetBase = document.currentScript?.src || location.href;
 window.RENMENU = {
   brand: 'RenMenu',
-  tagline: 'Il menù digitale del tuo locale, pronto in 10 minuti.',
+  tagline: 'Il menù digitale del tuo locale, pronto in 24 ore.',
   contattoWhatsApp: '393515924327',
   // Arriva a Jarvis (Email Routing → pratica, copia a renmenu1569@gmail.com), come le risposte dei locali.
   contattoEmail: 'menu@renmenu.com',

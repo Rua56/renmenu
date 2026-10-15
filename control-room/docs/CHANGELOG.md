@@ -4,6 +4,7 @@ Si aggiunge una voce a ogni pull request che cambia un comportamento di Jarvis o
 
 ## 15 ottobre 2026
 
+- **Home del sito più curata:** il telefono in cima mostra un menù Premium nel nuovo stile (esempio «Osteria del Castello», servito da renmenu.com) al posto del vecchio menù di Al Bakaro su github.io; le voci del piano Annuale non sono più spaziate in modo strano; titolo e slogan dicono «pronto in 24 ore» come il resto del sito.
 - **Email del sito su renmenu.com:** il sito, le pagine legali, l'anteprima e la pagina di pagamento mostrano menu@renmenu.com invece della Gmail. Le email arrivano a Jarvis come quelle dei locali (pratica o messaggio da verificare, con copia in renmenu1569@gmail.com).
 - **Pagine legali del sito:** `legale/privacy.html`, `legale/termini.html` e `legale/cookie.html` (informativa privacy GDPR, condizioni generali del servizio per i locali, cookie solo tecnici), collegate dal piè di pagina del sito, dalla pagina di pagamento e dal fondo di ogni menu. I dati di chi gestisce RenMenu stanno in un solo punto, `titolare` in `assets/common.js`. Bozza da far controllare a un professionista.
 - **Caratteri in casa, nessun dato a Google:** le pagine pubbliche (sito, menu Standard e Premium, pagamento, anteprime) non caricano più i caratteri da Google Fonts: le copie (licenza SIL OFL, solo alfabeti latini, 888 KB in tutto) stanno in `assets/fonts/`, generate da `scripts/self-host-fonts.py`. Così chi apre un menu dal QR non manda il suo indirizzo IP a Google, e il sito non ha bisogno di un banner dei cookie. L'aspetto non cambia.
