@@ -51,7 +51,7 @@ Ingressi e uscite:
 
 - **Visualizzatore** `menu/index.html`: legge `menus/<id>.json`, supporta temi Standard (sei palette), lingue, allergeni UE 1-14, prezzi doppi calice/bottiglia e percorsi degustazione.
 - **Premium** `menu/premium.js` e `premium.css`: stesso JSON, ma il blocco `premium` decide l'aspetto (direzioni grafiche, logo in apertura, storia, galleria, firma, schede apribili di piatti e vini, bottiglie scontornate, abbinamenti vino-piatto ricavati dalle schede, «La tua selezione» del cliente, animazioni che rispettano «riduci movimento»).
-- **Menu online:** `bakaro`, `buffet-alla-valletta`, `caffe-bon-bon`, `pub-underground`, `demo`, `demo-premium`.
+- **Menu online:** `bakaro` (in `menus/`) e Trattoria Blanch (`blanch/`). I menu di prova (Al Chiostro, Buffet alla Valletta, Caffè Bon Bon, La Chincaglieria, Pub Underground, Al Tralcio, Calice Storto, `demo`, `demo-premium`) sono stati tolti il 15 ottobre 2026 con le loro foto; se Jarvis aveva ancora un controllo dopo la pubblicazione su uno di questi, lo chiude in silenzio.
 - **Vendita e pagamenti:** `crea/`, `paga/`, link Stripe e bonifico. Jarvis non li tocca mai.
 - **Controllo:** `scripts/validate-menus.py` è l'autorità di pubblicazione; Jarvis ne applica le stesse regole in `_lib/menu.js`.
 - **Indirizzo stabile:** dal 13 ottobre 2026 i link e i QR che Jarvis manda puntano a `https://renmenu.com/menu/?m=<id>`. I QR già stampati con `renmenu.pages.dev` o `rua56.github.io` continuano a funzionare: stesso sito, stesso file. Si aggiornano i dati, il QR non cambia.

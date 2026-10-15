@@ -4,6 +4,7 @@ Si aggiunge una voce a ogni pull request che cambia un comportamento di Jarvis o
 
 ## 15 ottobre 2026
 
+- **Tolti i menu di prova** dal sito, su richiesta di Riccardo: restano online solo Al Bakaro e Trattoria Blanch (Codelli 23 arriverà). Via anche le loro foto. Jarvis non manda avvisi per i menu tolti.
 - **Bottiglie col punto di domanda riparate da sole**: quando Jarvis mette le foto nel menu, rimette l'indirizzo giusto alle foto confermate rimaste con un indirizzo che non si apre più.
 - **Menu Premium da stampare**: nuova pagina `menu/stampa.html?m=<menu>` con il menu in A4 (una o due colonne, con o senza descrizioni, nella lingua scelta), stessi colori e caratteri del Premium, e un QR in fondo che porta al menu online. «Stampa o salva PDF» dal browser. Su Telegram: «menu da stampare di …».
 - **Premium: pulsanti «Prenota su WhatsApp» e «Lascia una recensione»** nella parte «Ti aspettiamo»: il primo apre WhatsApp con un messaggio di prenotazione già scritto nella lingua del cliente, il secondo il link delle recensioni (per esempio Google). Compaiono solo se impostati (`premium.whatsapp`, `premium.recensioni`). A Jarvis: «metti il whatsapp +39 … al menu di …», «il link delle recensioni di … è https://…».
