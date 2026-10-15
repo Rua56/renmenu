@@ -8,6 +8,7 @@ import { extractPdfText } from './material-extract.js';
 import { announce, briefing, chatIn, closeChat, onJarvisReply, onUserSays, openChat, refreshChat } from './jarvis-chat.js';
 import { attachHolo, focusVenue, holoOn, setHolo } from './jarvis-holo.js';
 import { venuesFor } from './jarvis-places.js';
+import { cutoutAll } from './cutout.js';
 import { logLines, markFresh } from './jarvis-log.js';
 import { play, setSounds, soundsAvailable, soundsOn } from './jarvis-sound.js';
 import { greetOnce, greetingFor, lastVisit, markVisit } from './jarvis-greet.js';
@@ -721,7 +722,7 @@ function mediaPanel(draft) {
     const where = m.status === 'confermata'
       ? `<p class="small"><span class="status good">nel menu</span> ${escapeHtml(m.targetLabel || '')}</p>`
       : m.proposal?.target ? `<p class="small"><strong>Jarvis propone:</strong> ${escapeHtml(m.proposal.label)} <span class="muted">(${escapeHtml(m.proposal.why)})</span></p>` : `<p class="small notice warning">${escapeHtml(m.proposal?.why || 'Scegli tu dove metterla.')}</p>`;
-    return `<article class="media-card" data-media-card="${escapeHtml(m.id)}"><img class="media-thumb${m.kind === 'logo' || m.kind === 'bottiglia' ? ' is-contain' : ''}" src="${escapeHtml(getMaterialUrl(m.materialId) || '')}" alt="${escapeHtml(m.description || m.filename)}" loading="lazy">
+    return `<article class="media-card" data-media-card="${escapeHtml(m.id)}"><img class="media-thumb${m.kind === 'logo' || m.kind === 'bottiglia' ? ' is-contain' : ''}"${m.kind === 'bottiglia' ? ' data-bottle' : ''} src="${escapeHtml(getMaterialUrl(m.materialId) || '')}" alt="${escapeHtml(m.description || m.filename)}" loading="lazy">
       <div class="media-body"><p class="eyebrow">${escapeHtml(MEDIA_KIND[m.kind] || m.kind)} · ${escapeHtml(m.filename)}</p>${m.description ? `<p class="small">${escapeHtml(m.description)}</p>` : ''}${label ? `<p class="small muted">Etichetta letta: ${escapeHtml(label)}</p>` : ''}${m.cantina ? `<p class="small notice warning">Dal web, per «${escapeHtml(m.cantina.wine)}»: <a href="${escapeHtml(m.cantina.page)}" target="_blank" rel="noopener">pagina della fonte</a>. Confermala solo se puoi usarla (sito della cantina o permesso del locale).</p>` : ''}${where}</div>
       ${editable ? `<div class="media-actions"><label class="field">Dove la metto<select name="target"><option value="">— scegli —</option>${options}</select></label>${m.kind === 'bottiglia' && label ? `<label class="check-row"><input type="checkbox" name="withLabel" ${m.status !== 'confermata' || m.withLabel ? 'checked' : ''}><span><small>Aggiungi i dati dell’etichetta alla scheda del vino (solo i campi vuoti)</small></span></label>` : ''}
       <div class="button-row spaced-top-tight"><button class="button small-button" type="button" data-action="media-place" data-media-id="${escapeHtml(m.id)}" data-revision="${draft.revision}">${m.status === 'confermata' ? 'Sposta qui' : 'Conferma'}</button>${m.status === 'confermata' ? `<button class="button secondary small-button" type="button" data-action="media-remove" data-media-id="${escapeHtml(m.id)}" data-revision="${draft.revision}">Togli dal menu</button>` : `<button class="button secondary small-button" type="button" data-action="media-read-menu" data-material-id="${escapeHtml(m.materialId)}">È una pagina di menu</button>`}<button class="button secondary small-button" type="button" data-action="media-discard" data-media-id="${escapeHtml(m.id)}" data-revision="${draft.revision}">Scarta</button></div></div>` : ''}</article>`;
@@ -1622,6 +1623,7 @@ function render() {
   modeBadge.textContent = isDemoMode ? 'DEMO LOCALE · OFFLINE' : 'STAGING PRIVATO';
   renderNavigation();
   renderView();
+  cutoutAll(document, 'img[data-bottle]');
 }
 function routeFromHash() {
   const target = location.hash.replace(/^#/, '');

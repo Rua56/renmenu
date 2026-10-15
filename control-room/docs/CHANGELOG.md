@@ -4,6 +4,8 @@ Si aggiunge una voce a ogni pull request che cambia un comportamento di Jarvis o
 
 ## 15 ottobre 2026
 
+- Foto delle bottiglie senza sfondo: nella pagina di Trattoria Blanch e nelle schede «Foto» della Control Room le bottiglie su fondo bianco, grigio chiaro o crema (foto dai siti delle cantine) diventano scontornate e ritagliate sulla bottiglia, come nel menu Premium. Riccardo: «con lo sfondo bianco è proprio brutto da vedere». L’ingrandimento col tocco mostra la bottiglia sola, senza riquadro.
+
 - Control Room: nel menu «Pratica» le pratiche senza bozza hanno accanto «senza bozza». Con cinque pratiche «Foto delle bottiglie · Trattoria Blanch» (una sola con la bozza) Riccardo non trovava la scheda «Foto»: aveva aperto una di quelle vuote.
 
 - Foto delle bottiglie: Jarvis risponde subito anche quando deve prima preparare la bozza. Alla prima prova su Telegram (09:46) Jarvis preparava la bozza di Blanch dal menu online dentro la risposta: ci voleva troppo, Telegram ha chiuso la connessione e ripetuto il messaggio, e Riccardo non ha ricevuto nulla (due pratiche aperte, nessuna bozza). Ora apre la pratica, risponde, e la bozza la prepara il giro dell’orologio, che poi avvia la ricerca; un messaggio ripetuto non apre una seconda pratica.
