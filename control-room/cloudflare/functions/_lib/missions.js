@@ -27,6 +27,7 @@ import { slugify } from './menu.js';
 import { DIREZIONI } from './premium.js';
 import { enrollPrep } from './autoprep.js';
 import { claudeKey } from './claude.js';
+import { parseVisit, visitKey, visitStartText } from './visit.js';
 import { pickButton } from './short-reply.js';
 import { HABITS, HABITS_KEY, habitOf, isAuto, parseHabits, recordChoice, rulesView, setRule } from './habits.js';
 import { callOutcome, callOwner, ensureAgent, phoneNumber, twilioNumber } from './phone.js';
@@ -887,6 +888,9 @@ export function createMissions(deps) {
     // Solo «/menu» o «comandi»: «menu» da solo può essere la risposta a un pulsante (titolo di una pratica).
     if (/^\/menu\b/i.test(text) || text === MENU_BUTTON || /^☰\s*menu$/i.test(text) || /^\W*(?:jarvis[\s,!.]*)?(?:i\s+)?comandi[\s?!.]*$/i.test(text)) { await commandsMenu(db, env, chat); return; }
     if (await replyEditTurn(db, env, chat, text)) return;
+    // Modalità visita («visita Bar Centrale»): Riccardo è nel locale e manda subito le foto del menù.
+    const visiting = parseVisit(text);
+    if (visiting) { await sendTg(db, env, chat, (await startVisit(db, visiting.venue)).text, null, deps.fetchImpl); return; }
     // Dubbi aperti: un prezzo scritto («7,50») risponde al dubbio in corso.
     if (normalizePrice(text)) {
       let open = null; try { open = JSON.parse(await setting(db, 'tg_checks') || 'null'); } catch {}
@@ -952,7 +956,7 @@ export function createMissions(deps) {
       return;
     }
     if (/^\/aiuto\b|^\/help\b/i.test(text) || text.startsWith('/')) {
-      await commandsMenu(db, env, chat, 'Puoi scrivermi o mandarmi un vocale: «com’è la situazione?», «al Bakaro il frico ora costa 14», «crea una nuova pratica per il locale … con piano Standard», «pubblica il menu di …». Capisco anche le foto e i PDF dei menu. Pubblicare richiede sempre il tuo SÌ col pulsante. Tocca un comando qui sotto.');
+      await commandsMenu(db, env, chat, 'Puoi scrivermi o mandarmi un vocale: «com’è la situazione?», «al Bakaro il frico ora costa 14», «crea una nuova pratica per il locale … con piano Standard», «pubblica il menu di …», «visita Bar Centrale» (sei nel locale: mi mandi le foto del menù e ti torna subito l’anteprima da mostrare). Capisco anche le foto e i PDF dei menu. Pubblicare richiede sempre il tuo SÌ col pulsante. Tocca un comando qui sotto.');
       return;
     }
     await converse(db, env, chat, text, false);
@@ -1110,6 +1114,8 @@ export function createMissions(deps) {
     const heard = await transcribe(env.AI, file.bytes);
     if (!heard.ok) { await sendTg(db, env, chat, `Perdona Riccardo, ${heard.reason}. Puoi ripetere?`, null, deps.fetchImpl); return; }
     if (await replyEditTurn(db, env, chat, heard.text.trim(), true)) return;
+    const visiting = parseVisit(heard.text);
+    if (visiting) { await reply(db, env, chat, `«${heard.text.trim()}»\n\n${(await startVisit(db, visiting.venue)).text}`, true); return; }
     if (STATUS_WORDS.test(heard.text.trim())) { await reply(db, env, chat, `«${heard.text.trim()}»\n\n${await statusText(db)}`, false); return; }
     await converse(db, env, chat, heard.text, true);
   }
@@ -1992,6 +1998,44 @@ export function createMissions(deps) {
     }
   }
 
+  // Modalità visita: cliente «prospect» + pratica Standard segnata come visita (vedi _lib/visit.js).
+  // Le foto che arrivano dopo si collegano qui, si leggono subito e tornano come link dell'anteprima.
+  async function startVisit(db, spokenVenue) {
+    const venue = String(spokenVenue || '').trim();
+    if (!venue || slugify(venue).length < 3) return { ok: false, text: 'Dimmi anche il nome del locale, per esempio «visita Bar Centrale», poi mandami le foto del menù.' };
+    const clients = await rows(db, 'SELECT id,name,menu_id FROM clients');
+    const exact = clients.find((c) => slugify(c.name || '') === slugify(venue)) || null;
+    const online = exact?.menu_id ? exact : matchVenue(venue, clients.filter((c) => c.menu_id)).client;
+    if (online) return { ok: false, text: `«${online.name}» ha già un menu online: niente visita da preparare. Per cambiarlo dimmi le modifiche, per esempio «al ${online.name} il frico costa 14».` };
+    const jarvis = jarvisDb(db);
+    try {
+      if (exact) {
+        const open = await rows(db, "SELECT id,subject FROM requests WHERE client_id=? AND status NOT IN ('completata','archiviata','chiusa') ORDER BY updated_at DESC", exact.id);
+        for (const request of open) {
+          if (!(await setting(db, visitKey(request.id)))) continue;
+          await putSetting(db, 'tg_focus', JSON.stringify({ requestId: request.id, subject: request.subject, at: now() }));
+          return { ok: true, requestId: request.id, text: visitStartText(exact.name, true) };
+        }
+      }
+      const name = exact ? exact.name : venue;
+      const clientId = exact ? exact.id : (await action(jarvis, 'createClient', { name, internalNotes: 'Locale da visita commerciale (prospect): non è ancora cliente. Niente va inviato o pubblicato senza Riccardo.' })).result.id;
+      const subject = `Visita · ${name}`;
+      const requestId = (await action(jarvis, 'createRequest', { clientId, subject, sourceChannel: 'altro', sourceText: `Locale: ${name}`, kind: 'nuovo', category: 'nuovo_standard', plan: 'standard',
+        internalNotes: 'Visita commerciale di Riccardo: anteprima da mostrare al titolare. Non mandare niente al locale e non pubblicare.' })).result.id;
+      await putSetting(db, visitKey(requestId), JSON.stringify({ venue: name, at: now() }));
+      await putSetting(db, 'tg_focus', JSON.stringify({ requestId, subject, at: now() }));
+      await auditedBatch(jarvis, [], 'jarvis.visit', `Modalità visita aperta per «${name}»: le foto si leggono subito e torna il link dell'anteprima.`, requestId).catch(() => {});
+      return { ok: true, requestId, text: visitStartText(name) };
+    } catch (error) {
+      return { ok: false, text: `Non sono riuscito ad aprire la visita: ${String(error?.message || 'errore').slice(0, 200)}` };
+    }
+  }
+  /** Link di sola visione (24 ore) alla bozza della pratica: per l'anteprima della visita. */
+  async function visitLink(db, env, requestId) {
+    const draft = await getOne(db, 'SELECT id FROM drafts WHERE request_id=? ORDER BY created_at DESC LIMIT 1', requestId);
+    return draft ? peekUrl(db, env, draft.id) : null;
+  }
+
   // Modifica a voce di un menu già online: pratica + bozza dal menu su main, con le sole parole di Riccardo.
   async function voiceUpdate(db, env, utterance, spokenVenue, clues = { locales: [], dishes: [] }) {
     const clients = await rows(db, "SELECT id,name,menu_id,plan FROM clients WHERE menu_id IS NOT NULL AND menu_id<>''");
@@ -2043,6 +2087,12 @@ export function createMissions(deps) {
       await sendTg(db, env, chat, /heic|heif/i.test(mime) ? 'Questa foto è in formato HEIC: mandamela come foto normale (non come file), così Telegram la converte in JPG.' : 'Posso leggere foto (JPG, PNG, WebP) e PDF dei menu.', null, deps.fetchImpl);
       return;
     }
+    // Foto con didascalia «visita Bar Centrale»: apre (o riprende) la visita e collega lì la foto.
+    const visiting = parseVisit(message.caption);
+    if (visiting) {
+      const opened = await startVisit(db, visiting.venue);
+      if (!opened.ok) { await sendTg(db, env, chat, opened.text, null, deps.fetchImpl); return; }
+    }
     const fileId = photo ? photo.file_id : doc.file_id;
     const name = photo ? `foto-telegram-${now().slice(0, 16).replace(/[:T]/g, '-')}.jpg` : String(doc.file_name || 'menu.pdf').slice(0, 120);
     await putSetting(db, 'tg_pending_file', JSON.stringify({ fileId, mime, name, at: now() }));
@@ -2050,7 +2100,9 @@ export function createMissions(deps) {
     try { focus = JSON.parse(await setting(db, 'tg_focus') || 'null'); } catch {}
     if (focus?.requestId && Date.now() - Date.parse(focus.at) < FOCUS_MINUTES * MINUTE) {
       const outcome = await attachTelegramFile(db, env, focus.requestId);
-      await sendTg(db, env, chat, outcome.text.startsWith('Collegato') ? `${outcome.text} (è la pratica che mi hai appena fatto aprire).` : outcome.text, null, deps.fetchImpl);
+      const visit = outcome.text.startsWith('Collegato') && await setting(db, visitKey(focus.requestId));
+      await sendTg(db, env, chat, visit ? `Foto ricevuta per la visita a «${String(focus.subject || '').replace(/^Visita · /, '')}». La leggo subito: se ne hai altre mandale adesso, poi ti scrivo il link dell’anteprima.`
+        : outcome.text.startsWith('Collegato') ? `${outcome.text} (è la pratica che mi hai appena fatto aprire).` : outcome.text, null, deps.fetchImpl);
       return;
     }
     const open = await rows(db, "SELECT id,subject FROM requests WHERE status NOT IN ('completata','archiviata','chiusa') ORDER BY updated_at DESC LIMIT 5");
@@ -2397,5 +2449,5 @@ export function createMissions(deps) {
     }
     return out;
   }
-  return { habitOn, readyItems, entrustBrief, runEntrust, alertOnce, announceExternal, replyTick, phoneTick, proposeReply, statusText, initiatives, initiativeTick, ping, entrust, tick, watchTick, watchRegister, reflect, queueOnlineEmail, checkOnlineMails, makeMenuQr, decide, telegramUpdate, probeIntents, setting, putSetting, briefing, notify, startChecks, answerCheck, draftAfterChecks, translateAfterEdit, undoDraftEdit, draftTarget, voiceEditDraft, editDraftFromClient };
+  return { habitOn, readyItems, entrustBrief, runEntrust, alertOnce, announceExternal, replyTick, phoneTick, proposeReply, statusText, initiatives, initiativeTick, ping, entrust, tick, watchTick, watchRegister, reflect, queueOnlineEmail, checkOnlineMails, makeMenuQr, decide, telegramUpdate, probeIntents, setting, putSetting, briefing, notify, visitLink, startChecks, answerCheck, draftAfterChecks, translateAfterEdit, undoDraftEdit, draftTarget, voiceEditDraft, editDraftFromClient };
 }

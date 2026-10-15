@@ -24,6 +24,7 @@ import { allExtras, applyExtras, proposeSourceExtras } from '../../_lib/extras.j
 import { prepareEmailSource } from '../../_lib/email-text.js';
 import { autopilotMessage, autopilotPreview, classifyRequest } from '../../_lib/autopilot.js';
 import { MAX_ROUNDS, MAX_TRIES, PREP_KEY, PREP_STEPS, enrollPrep, nextStep, parsePrep } from '../../_lib/autoprep.js';
+import { VISIT_CALM_MS, visitKey } from '../../_lib/visit.js';
 import { understandClientRequest } from '../../_lib/request-ai.js';
 import { createMissions } from '../../_lib/missions.js';
 import { spokenText, telegramCapture } from '../../_lib/cr-chat.js';
@@ -205,10 +206,12 @@ async function discardUntouchedJarvisDraft(db, requestId) {
   await db.prepare('DELETE FROM drafts WHERE id=?').bind(draft.id).run();
   return true;
 }
-export async function readPendingMaterials(db, env = {}, { calmMs = 40_000 } = {}) {
+export async function readPendingMaterials(db, env = {}, { calmMs = 40_000, visitCalmMs = VISIT_CALM_MS } = {}) {
   // Album da Telegram (più foto insieme): arrivano una alla volta in pochi secondi. Jarvis aspetta
   // 40 secondi di calma sulla pratica, così le legge tutte (fino a 3 per giro) e fa UNA bozza con tutte.
   const calm = new Date(Date.now() - calmMs).toISOString();
+  // Modalità visita (Riccardo è nel locale col titolare): bastano 15 secondi di calma.
+  const quick = new Date(Date.now() - Math.min(calmMs, visitCalmMs)).toISOString();
   // Un giro alla volta: l'orologio bussa ogni minuto, ma una lettura può durare 2-3 minuti. Senza questo
   // blocco due giri leggevano la stessa foto in parallelo (doppio consumo e letture annullate).
   try {
@@ -217,7 +220,7 @@ export async function readPendingMaterials(db, env = {}, { calmMs = 40_000 } = {
     const got = await db.prepare("UPDATE jarvis_settings SET value='busy',updated_at=? WHERE key='read_lock' AND (value<>'busy' OR updated_at<?)").bind(stamp, stale).run();
     if (got?.meta && got.meta.changes === 0) return [];
   } catch { /* tabella assente nei test vecchi: si procede */ }
-  try { return await readPendingInner(db, env, calm); }
+  try { return await readPendingInner(db, env, calm, quick); }
   finally { try { await db.prepare("UPDATE jarvis_settings SET value='',updated_at=? WHERE key='read_lock'").bind(new Date().toISOString()).run(); } catch { /* il blocco scade da solo dopo 6 minuti */ } }
 }
 // Chiave Gemini salvata cifrata da Riccardo (Control Room → Lettura dei menu): lettura foto e traduzioni.
@@ -231,10 +234,13 @@ export async function geminiConfig(db, env) {
   } catch { return null; }
 }
 const READ_BATCH = 3; // file letti insieme a ogni giro dell'orologio (2-3 richieste Gemini ciascuno: dentro la quota gratuita)
-async function readPendingInner(db, env, calm) {
+const visitOf = async (db, requestId) => { try { return JSON.parse(await missions.setting(db, visitKey(requestId)) || 'null'); } catch { return null; } };
+async function readPendingInner(db, env, calm, quick = calm) {
   let pending = [];
-  try { pending = await rows(db, "SELECT id,request_id,filename FROM materials WHERE processing_status='da_trascrivere' AND archived_at IS NULL AND (mime='application/pdf' OR mime IN ('image/jpeg','image/png','image/webp')) AND created_at>'2026-10-02T22:30' AND NOT EXISTS (SELECT 1 FROM materials n WHERE n.request_id=materials.request_id AND n.archived_at IS NULL AND n.created_at>?) ORDER BY created_at ASC LIMIT 12", calm); }
+  try { pending = await rows(db, "SELECT id,request_id,filename,(SELECT MAX(n.created_at) FROM materials n WHERE n.request_id=materials.request_id AND n.archived_at IS NULL) AS last_at FROM materials WHERE processing_status='da_trascrivere' AND archived_at IS NULL AND (mime='application/pdf' OR mime IN ('image/jpeg','image/png','image/webp')) AND created_at>'2026-10-02T22:30' AND NOT EXISTS (SELECT 1 FROM materials n WHERE n.request_id=materials.request_id AND n.archived_at IS NULL AND n.created_at>?) ORDER BY created_at ASC LIMIT 12", quick); }
   catch { return []; }
+  // Calma breve solo per le visite: le altre pratiche aspettano i soliti 40 secondi.
+  if (quick !== calm) pending = (await Promise.all(pending.map(async (m) => (String(m.last_at || '') <= calm || await visitOf(db, m.request_id) ? m : null)))).filter(Boolean);
   // Letture rimandate (Google lento): aspettano il loro turno senza bloccare le altre pratiche.
   try { const waiting = JSON.parse(await missions.setting(db, 'read_retries') || '{}') || {}; pending = pending.filter((m) => !(waiting[m.id]?.next > new Date().toISOString())).slice(0, READ_BATCH); } catch { pending = pending.slice(0, READ_BATCH); }
   // Fino a 3 file per giro, letti insieme (ognuno con le sue due o tre letture, come prima): un album di 3 foto
@@ -254,6 +260,7 @@ async function readPendingInner(db, env, calm) {
       const stillUnread = await getOne(db, "SELECT id FROM materials WHERE request_id=? AND processing_status='da_trascrivere' AND archived_at IS NULL", material.request_id);
       if (stillUnread) { outcome.waiting = true; done.push({ material, request, outcome }); continue; } // bozza dopo l'ultima foto
       handled.add(material.request_id);
+      const visit = await visitOf(db, material.request_id);
       // Riepilogo di TUTTI i file della pratica (album da Telegram): un messaggio solo, foto per foto.
       try {
         const files = await rows(db, "SELECT m.filename, m.processing_status AS st, m.text_preview AS tp, a.warnings_json AS w FROM materials m LEFT JOIN material_analyses a ON a.material_id=m.id WHERE m.request_id=? AND m.archived_at IS NULL AND m.processing_status IN ('letto_da_jarvis','non_leggibile','foto_per_il_menu') ORDER BY m.created_at ASC", material.request_id);
@@ -272,13 +279,21 @@ async function readPendingInner(db, env, calm) {
       // (bastano pochi tocchi). La bozza parte da sola dopo l'ultimo, o subito con «Basta, fai la bozza».
       const openChecks = weakRows.length ? (await rows(db, "SELECT a.provenance_json AS p FROM material_analyses a JOIN materials m ON m.id=a.material_id WHERE a.request_id=? AND m.archived_at IS NULL", material.request_id).catch(() => []))
         .reduce((n, r) => { try { return n + (JSON.parse(r.p || '[]')[0]?.checks || []).filter((c) => c.resolved === undefined).length; } catch { return n; } }, 0) : 0;
-      if (outcome.ok && !hasDraft && openChecks > 0 && env.TELEGRAM_BOT_TOKEN) { outcome.checks = { count: openChecks, sure, unsure }; done.push({ material, request, outcome }); continue; }
+      // In visita niente domande: le voci in dubbio restano fuori dall'anteprima e si sistemano dopo.
+      if (outcome.ok && !hasDraft && openChecks > 0 && env.TELEGRAM_BOT_TOKEN && !visit) { outcome.checks = { count: openChecks, sure, unsure }; done.push({ material, request, outcome }); continue; }
       // Il menu è già scritto nell'email (prova del 14 ottobre): la bozza parte dal testo, le foto deboli non la fermano.
       let writtenMenu = 0;
       try { writtenMenu = extractMenuFromText('x', prepareEmailSource(request?.source_text || ''), 'x').menu.sezioni.reduce((n, sec) => n + sec.voci.length, 0); } catch { writtenMenu = 0; }
       if (outcome.ok && !hasDraft && unsure >= 10 && sure < unsure && writtenMenu < 5) { outcome.weak = { sure, unsure, sections: weakRows.flatMap((r) => { try { return JSON.parse(r.w || '[]'); } catch { return []; } }).filter((w) => /^Sezioni meno sicure: /.test(w)).map((w) => w.replace(/^Sezioni meno sicure: /, '').replace(/\.$/, '')).join(', ') }; done.push({ material, request, outcome }); continue; }
       if (outcome.ok && request?.category && !hasDraft) {
-        try { await action(jarvis, 'generateDraft', { requestId: request.id }, env); outcome.drafted = true; outcome.notesText = notesSummary(await draftNotes(db, request.id)); outcome.prep = await enrollAutoPrep(db, request.id).catch(() => false); }
+        try {
+          await action(jarvis, 'generateDraft', { requestId: request.id }, env); outcome.drafted = true; outcome.notesText = notesSummary(await draftNotes(db, request.id));
+          // Visita: nessuna preparazione automatica (lingue, «la mando al locale?»), solo il link da mostrare.
+          if (visit) {
+            let items = 0; try { items = JSON.parse((await getOne(db, 'SELECT menu_json FROM drafts WHERE request_id=?', request.id))?.menu_json || '{}').sezioni.reduce((n, sec) => n + (sec.voci || []).length, 0); } catch { items = 0; }
+            outcome.visit = { venue: visit.venue || request.subject, link: await missions.visitLink(db, env, request.id).catch(() => null), items, doubts: openChecks };
+          } else outcome.prep = await enrollAutoPrep(db, request.id).catch(() => false);
+        }
         catch (error) { outcome.draftError = String(error?.message || 'errore').slice(0, 240); }
       }
       done.push({ material, request, outcome });
@@ -390,7 +405,8 @@ export async function enrollIdleDrafts(db, at = Date.now()) {
     WHERE d.status IN ('bozza','revisione') AND r.kind='nuovo' AND r.plan IN ('standard','annuale','premium') AND r.status NOT IN ('completata','archiviata','chiusa')
     AND COALESCE(r.is_ai_test_fixture,0)=0 AND d.updated_at<=? AND d.updated_at>=? AND NOT EXISTS (SELECT 1 FROM jarvis_missions m WHERE m.request_id=d.request_id)
     ORDER BY d.updated_at DESC LIMIT 20`, new Date(at - IDLE_PREP_MS).toISOString(), new Date(at - 14 * 86_400_000).toISOString()).catch(() => []);
-  const next = list.find((d) => !seen.includes(d.id) && !queued[d.id]);
+  let next = null;
+  for (const d of list) if (!seen.includes(d.id) && !queued[d.id] && !(await visitOf(db, d.request_id))) { next = d; break; }
   if (!next) return null;
   await missions.putSetting(db, seenKey, JSON.stringify([...seen, next.id].slice(-200)));
   const ok = await enrollPrep({ get: missions.setting, put: missions.putSetting }, db, { draftId: next.id, requestId: next.request_id, plan: next.plan }, new Date(at - 10 * 60_000).toISOString());
