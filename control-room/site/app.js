@@ -1,4 +1,4 @@
-import { fetchMaterialPreview, getMaterialUrl, isAuthorizedHost, isDemoMode, isPreviewableMime, jarvisReady, loadState, modeLabel, performAction, uploadFile, uploadMediaImage } from './api.js';
+import { fetchMaterialPreview, getMaterialUrl, isAuthorizedHost, isDemoMode, isPreviewableMime, askJarvis, jarvisReady, loadState, modeLabel, performAction, uploadFile, uploadMediaImage } from './api.js';
 import { menuDiff, validateMenu } from './model.js';
 import { criticalFields, reviewIssues, suggestedEvidence } from './editorial.js';
 import { PLAN_RULES, REQUEST_CATEGORIES, categoryByCode, draftBlocker, planIssues, planWarnings } from './service-rules.js';
@@ -23,7 +23,7 @@ import { resetDemoState } from './demo-store.js';
 const navItems = [
   ['command', '◉', 'Jarvis', 'Principale'], ['locali', '◆', 'Locali', 'Principale'], ['sistema', '☰', 'Strumenti', 'Principale'],
   ['revisione', '✓', 'Revisione', 'Strumenti'], ['richieste', '✉', 'Richieste', 'Strumenti'], ['approvazioni', '★', 'Approvazioni', 'Strumenti'], ['builder', '✎', 'Builder', 'Strumenti'],
-  ['materiali', '▤', 'Materiali', 'Strumenti'], ['anteprima', '▢', 'Anteprima', 'Strumenti'], ['notifiche', '◔', 'Notifiche', 'Sistema'], ['registro', '≡', 'Registro', 'Sistema'], ['voce', '◖', 'Voce (browser)', 'Sistema'],
+  ['agenda', '◷', 'Agenda visite', 'Strumenti'], ['materiali', '▤', 'Materiali', 'Strumenti'], ['anteprima', '▢', 'Anteprima', 'Strumenti'], ['notifiche', '◔', 'Notifiche', 'Sistema'], ['registro', '≡', 'Registro', 'Sistema'], ['voce', '◖', 'Voce (browser)', 'Sistema'],
   ['clienti', '◆', 'Schede cliente', 'Nascoste'], ['locale', '◆', 'Locale', 'Nascoste'], ['pratica', '◉', 'Pratica', 'Nascoste'], ['pratiche', '◉', 'Tutte le pratiche', 'Nascoste'], ['modifica', '✎', 'Modifica a mano', 'Nascoste']
 ];
 const MAIN_TABS = ['command', 'locali', 'sistema'];
@@ -310,6 +310,7 @@ function navCount(id) {
   if (id === 'revisione') return state.drafts.filter((draft) => ['bozza', 'revisione'].includes(draft.status) && !['completata', 'archiviata', 'chiusa'].includes(requestById(draft.requestId)?.status) && !['affidata', 'attesa_invio', 'attesa_cliente', 'attesa_si', 'pubblicazione', 'verifica'].includes(missionFor(draft)?.status)).length;
   if (id === 'command') return allPratiche().filter((info) => info.group === 'decidere').length;
   if (id === 'richieste') return state.requests.filter((request) => request.status === 'nuova').length;
+  if (id === 'agenda') return agendaItems().filter((item) => !item.done_at).length;
   if (id === 'notifiche') return state.notifications.filter((item) => !item.readAt && /^Jarvis · /.test(item.subject || '')).length;
   return 0;
 }
@@ -1310,7 +1311,7 @@ function praticaTools(request, draft, closed) {
 }
 function renderSistema() {
   const tools = [
-    ['revisione', 'Revisione', 'Controlli e bozza completa', navCount('revisione')], ['richieste', 'Richieste', 'Tutte le richieste arrivate, anche archiviate', navCount('richieste')],
+    ['agenda', 'Agenda delle visite', 'I locali da visitare e quelli già fatti', navCount('agenda')], ['revisione', 'Revisione', 'Controlli e bozza completa', navCount('revisione')], ['richieste', 'Richieste', 'Tutte le richieste arrivate, anche archiviate', navCount('richieste')],
     ['approvazioni', 'Approvazioni', 'PR, pubblicazione e verifica passo per passo', 0], ['builder', 'Builder avanzato', 'Estrazione da testo e modifica JSON', 0],
     ['clienti', 'Schede cliente complete', 'Anagrafiche, contatti, piano, note', 0], ['materiali', 'Materiali', 'File, foto e PDF ricevuti', 0], ['anteprima', 'Anteprima', 'Come appare il menu sul telefono', 0],
     ['notifiche', 'Notifiche', 'Avvisi di Jarvis ed email al proprietario', navCount('notifiche')], ['registro', 'Registro', 'Tutto quello che è successo, con data', 0], ['voce', 'Voce (browser)', 'Prova del microfono', 0]
@@ -1323,6 +1324,46 @@ function renderSistema() {
     <div class="sys-list">${tools.map(([route, label, note, n]) => `<button class="sys-row" type="button" data-route="${route}"><span><strong>${label}</strong><small>${note}</small></span>${n ? `<b class="nav-hint">${n}</b>` : ''}<i aria-hidden="true">›</i></button>`).join('')}</div>
     <details class="details-more"><summary>Tutti i numeri e i dettagli</summary>${commandDetails()}</details></div>`;
 }
+
+// Agenda delle visite: la stessa di Telegram («devo visitare …», «ho visitato …»). I pulsanti mandano
+// a Jarvis la frase corrispondente, così Control Room, Telegram e voce restano una cosa sola.
+const agendaItems = () => (state?.agenda && Array.isArray(state.agenda.items) ? state.agenda.items : []);
+function renderAgenda() {
+  const items = agendaItems();
+  const left = items.filter((item) => !item.done_at);
+  const row = (item) => `<div class="list-row agenda-row${item.done_at ? ' done' : ''}"><div class="list-main"><strong>${item.done_at ? '✅' : '⬜️'} ${escapeHtml(item.name)}</strong><small>${item.done_at ? `Visitato ${time(item.done_at)}` : 'Da visitare'}${item.note ? ` · ${escapeHtml(item.note)}` : ''}</small></div>${item.done_at ? '' : `<div class="list-meta"><button class="button small-button" type="button" data-action="agenda-done" data-name="${escapeHtml(item.name)}">Visitato</button></div>`}</div>`;
+  const intro = items.length ? `${items.length - left.length} su ${items.length} visitati${left.length ? `, ne mancano ${left.length}` : ': tutti fatti'}.` : 'Nessuna agenda: scrivi qui sotto i locali da visitare.';
+  return `<div class="view-wrap agenda-view">${header('AGENDA', 'Agenda delle visite', `${intro} Se per un giorno non dici niente sulle visite, Jarvis ti ricorda su Telegram chi manca.`)}
+    <section class="panel">${items.length ? `<div class="agenda-list">${items.map(row).join('')}</div>
+      <label class="field spaced-top">Nota per la prossima visita che segni (facoltativa)<input id="agenda-note" maxlength="300" placeholder="Es. vuole il Premium, ripassare sabato" autocomplete="off"></label>` : '<p class="muted">L’agenda è vuota.</p>'}</section>
+    <section class="panel"><p class="lab">${items.length ? 'AGGIUNGI LOCALI' : 'NUOVA AGENDA'}</p>
+      <label class="field">Nomi dei locali, separati da virgole o uno per riga<textarea id="agenda-names" rows="3" placeholder="Bar Centrale, Pizzeria Università, Ai Tre Soldi Goriziani"></textarea></label>
+      <div class="form-actions">${items.length ? '<button class="button" type="button" data-action="agenda-add">Aggiungi all’agenda</button><button class="button secondary" type="button" data-action="agenda-new">Nuova agenda con questi</button>' : '<button class="button" type="button" data-action="agenda-new">Prepara l’agenda</button>'}${items.length ? '<button class="button secondary" type="button" data-action="agenda-clear">Cancella l’agenda</button>' : ''}</div>
+      <p class="muted small spaced-top-small">Puoi anche dirlo a Jarvis, scritto o a voce: «questa settimana devo visitare: …», «ho visitato Bar Centrale: vuole il Premium», «chi mi manca?». Jarvis non scrive mai ai locali.</p></section></div>`;
+}
+// Demo: stessa logica, solo nella pagina.
+function demoAgenda(kind, names, note) {
+  const at = new Date().toISOString();
+  const agenda = state.agenda && Array.isArray(state.agenda.items) ? state.agenda : { created_at: at, items: [] };
+  const same = (a, b) => norm(a) === norm(b);
+  if (kind === 'clear') { state.agenda = null; return 'Agenda cancellata.'; }
+  if (kind === 'new') { state.agenda = { created_at: at, last_contact: at, items: names.map((name) => ({ name, done_at: null, note: '' })) }; return `Agenda pronta, ${names.length} locali.`; }
+  if (kind === 'add') names.forEach((name) => { if (!agenda.items.some((i) => same(i.name, name))) agenda.items.push({ name, done_at: null, note: '' }); });
+  if (kind === 'done') names.forEach((name) => { const item = agenda.items.find((i) => same(i.name, name)); if (item) { item.done_at = at; if (note) item.note = note; } });
+  state.agenda = agenda;
+  return kind === 'add' ? 'Aggiunto all’agenda.' : `Segnato: ${names.join(', ')} ✅.`;
+}
+async function agendaAction(kind, names = [], note = '') {
+  const list = names.map((name) => String(name).replace(/[,;\n]+/g, ' ').trim()).filter(Boolean);
+  const phrase = kind === 'done' ? `ho visitato ${list.join(', ')}${note ? `: ${note}` : ''}` : kind === 'add' ? `aggiungi all’agenda ${list.join(', ')}` : kind === 'new' ? `agenda: ${list.join(', ')}` : 'cancella l’agenda';
+  if (isDemoMode) { const text = demoAgenda(kind, list, note); render(); toast(`Demo: ${text}`); return; }
+  try {
+    const result = await askJarvis({ text: phrase });
+    await refresh();
+    toast(String(result?.messages?.[0]?.text || 'Fatto.').split('\n')[0].slice(0, 200));
+  } catch (error) { toast(`L’agenda non si è aggiornata: ${error.message}`, 'error'); }
+}
+const agendaNames = () => String($('#agenda-names')?.value || '').split(/\n|;|,/).map((name) => name.trim()).filter(Boolean);
 
 // Modifica a mano: voci leggibili, un tocco per cambiare nome o prezzo, aggiungere o togliere. Salva come bozza (le conferme si rifanno).
 const PRICE_RE = /^\d+(?:[,.]\d{1,2})?$/;
@@ -1396,6 +1437,14 @@ async function handleOggiAction(action, trigger) {
     return true;
   }
   if (action === 'show') { showOnHome(trigger.dataset.show); return true; }
+  if (action === 'agenda-done') { await agendaAction('done', [trigger.dataset.name], String($('#agenda-note')?.value || '').trim()); return true; }
+  if (action === 'agenda-add' || action === 'agenda-new') {
+    const names = agendaNames();
+    if (!names.length) { toast('Scrivi almeno un nome di locale.', 'error'); return true; }
+    if (action === 'agenda-new' && agendaItems().length && !confirm('La nuova agenda sostituisce quella di adesso. Procedo?')) return true;
+    await agendaAction(action === 'agenda-add' ? 'add' : 'new', names); return true;
+  }
+  if (action === 'agenda-clear') { if (confirm('Cancello l’agenda delle visite? Jarvis smette di ricordarti i locali.')) await agendaAction('clear'); return true; }
   if (action === 'show-close') { display = null; render(); return true; }
   if (action === 'ask-open') { openAsk(); return true; }
   if (action === 'ask-voice') { openAsk(true); return true; }
@@ -1603,7 +1652,7 @@ function toolBackBar() {
 // Cambio schermata: la nuova entra con una scansione HUD (solo quando cambia davvero, non agli aggiornamenti).
 let shownView = '';
 function renderView() {
-  const renderers = { locali: renderLocali, locale: renderLocale, sistema: renderSistema, pratica: renderPratica, pratiche: renderPratiche, modifica: renderModifica, command: renderCommand, richieste: renderRequests, clienti: renderClients, materiali: renderMaterials, builder: renderBuilder, revisione: renderReview, anteprima: renderPreview, approvazioni: renderApprovals, notifiche: renderNotifications, registro: renderAudit, voce: renderVoice };
+  const renderers = { agenda: renderAgenda, locali: renderLocali, locale: renderLocale, sistema: renderSistema, pratica: renderPratica, pratiche: renderPratiche, modifica: renderModifica, command: renderCommand, richieste: renderRequests, clienti: renderClients, materiali: renderMaterials, builder: renderBuilder, revisione: renderReview, anteprima: renderPreview, approvazioni: renderApprovals, notifiche: renderNotifications, registro: renderAudit, voce: renderVoice };
   view.dataset.screen = activeView;
   view.innerHTML = toolBackBar() + renderers[activeView]() + (activeView === 'builder' ? renderAiPanel() : '');
   if (shownView && shownView !== activeView) {
