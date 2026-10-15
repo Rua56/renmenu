@@ -90,6 +90,7 @@ function renderPanel() {
   if (!panel) return;
   const venue = venues.find((v) => v.id === focus);
   panel.hidden = !venue;
+  panel.closest('.holo-map')?.classList.toggle('locked', Boolean(venue));
   if (!venue) return;
   const esc = (s) => String(s ?? '').replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[c]);
   panel.className = `holo-panel s-${venue.state}`;
@@ -107,7 +108,7 @@ function project(x, y, z, w, h) {
   const nx = rx / radius, ny = ry / radius;
   const depth = 1 / (1 + Math.max(-0.6, Math.min(0.6, ny * 0.22)));
   const half = w / 2.15;
-  return { x: w / 2 + cam.shift * w + nx * half * depth, y: h * 0.58 - ny * h * 0.3 * depth - z * depth, d: depth, s: half / radius * depth };
+  return { x: w / 2 + cam.shift * w + nx * half * depth, y: h * 0.54 - ny * h * 0.34 * depth - z * depth, d: depth, s: half / radius * depth };
 }
 function tap(event) {
   if (!mapCanvas) return;
@@ -117,6 +118,21 @@ function tap(event) {
   for (const v of venues) { const p = project(v.x, v.y, 0, rect.width, rect.height); const d = Math.hypot(p.x - x, p.y - y); if (d < 26 && (!best || d < best.d)) best = { v, d }; }
   focusVenue(best ? best.v.id : null);
 }
+// Scritte sulla mappa senza accavallarsi: prova a destra del punto, poi a sinistra, poi una riga sotto o sopra.
+function placer(ctx, width) {
+  const taken = [];
+  const free = (r) => r.x >= 2 && r.x + r.w <= width - 2 && !taken.some((o) => r.x < o.x + o.w && r.x + r.w > o.x && r.y < o.y + o.h && r.y + r.h > o.y);
+  const label = (text, x, y, gap = 0) => {
+    const w = ctx.measureText(text).width + 4, h = 11;
+    const spots = [[x, y], [x - w - gap, y], [x, y + 12], [x - w - gap, y + 12], [x, y - 12], [x - w - gap, y - 12], [x, y + 24]];
+    const spot = spots.find(([sx, sy]) => free({ x: sx, y: sy - 9, w, h }));
+    if (!spot) return; // meglio nessuna scritta che una sopra l'altra
+    taken.push({ x: spot[0], y: spot[1] - 9, w, h });
+    ctx.fillText(text, spot[0], spot[1]);
+  };
+  label.reserve = (x, y, w, h) => taken.push({ x, y, w, h });
+  return label;
+}
 function drawMap(t) {
   const out = mapCanvas && mapCanvas.isConnected ? fit(mapCanvas) : null;
   if (!out) return false;
@@ -124,6 +140,15 @@ function drawMap(t) {
   ctx.clearRect(0, 0, w, h);
   const line = (a, b, alpha) => { ctx.strokeStyle = `rgba(70,214,255,${alpha})`; ctx.beginPath(); ctx.moveTo(a.x, a.y); ctx.lineTo(b.x, b.y); ctx.stroke(); };
   ctx.lineWidth = 1;
+  const label = placer(ctx, w);
+  // Lo spazio della scheda del locale agganciato e le teste delle colonne di luce restano libere dalle scritte.
+  if (focus && panel && !panel.hidden) label.reserve(w - Math.min(200, w / 2) - 8, 0, w, h);
+  const pins = venues.map((v) => ({ v, p: project(v.x, v.y, 0, w, h) })).sort((a, b) => a.p.d - b.p.d);
+  const tallOf = (v, p) => (v.state === 'decide' ? 34 : v.state === 'online' ? 24 : 16) * p.d;
+  for (const { v, p } of pins) {
+    if (v.id === focus) label.reserve(p.x - 32, p.y - 50, 64, 64); // il mirino: il nome è già nella scheda
+    else label.reserve(p.x - 4, p.y - tallOf(v, p) - 4, 8, 8);
+  }
   // Anelli di distanza (5, 10, 20, 40 km) e raggi.
   const reach = 17 / cam.zoom * 1.25;
   for (const km of [2, 5, 10, 20, 40].filter((k) => k <= reach && k >= reach / 12)) {
@@ -132,7 +157,7 @@ function drawMap(t) {
     for (let i = 0; i <= 96; i += 1) { const a = i / 96 * Math.PI * 2; const p = project(Math.cos(a) * km, Math.sin(a) * km, 0, w, h); if (i) ctx.lineTo(p.x, p.y); else ctx.moveTo(p.x, p.y); }
     ctx.stroke();
     const tag = project(km * 0.71, km * 0.71, 0, w, h);
-    ctx.fillStyle = 'rgba(70,214,255,.45)'; ctx.font = '9px "JetBrains Mono", monospace'; ctx.fillText(`${km} KM`, tag.x + 3, tag.y);
+    ctx.fillStyle = 'rgba(70,214,255,.45)'; ctx.font = '9px "JetBrains Mono", monospace'; label(`${km} KM`, tag.x + 3, tag.y);
   }
   for (let i = 0; i < 12; i += 1) { const a = i / 12 * Math.PI * 2; line(project(cam.cx, cam.cy, 0, w, h), project(cam.cx + Math.cos(a) * reach, cam.cy + Math.sin(a) * reach, 0, w, h), 0.07); }
   // Costa del golfo.
@@ -145,20 +170,19 @@ function drawMap(t) {
   for (const town of TOWNS.filter((tw) => towns.has(tw.name))) {
     const k = toKm(town.lat, town.lon); const p = project(k.x, k.y, 0, w, h);
     ctx.fillStyle = 'rgba(169,236,255,.75)'; ctx.fillRect(p.x - 1.5, p.y - 1.5, 3, 3);
-    ctx.fillStyle = 'rgba(169,236,255,.6)'; ctx.fillText(town.name.toUpperCase(), p.x + 5, p.y + 3);
+    ctx.fillStyle = 'rgba(169,236,255,.6)'; label(town.name.toUpperCase(), p.x + 5, p.y + 3);
   }
   // Locali: colonne di luce, le più lontane prima.
-  const pins = venues.map((v) => ({ v, p: project(v.x, v.y, 0, w, h) })).sort((a, b) => a.p.d - b.p.d);
-  for (const [index, { v, p }] of pins.entries()) {
+  for (const { v, p } of pins) {
     const [r, g, b] = COLORS[v.state] || COLORS.nuovo;
     const pulse = v.state === 'decide' ? 0.6 + 0.4 * Math.sin(t / 380) : 1;
-    const tall = (v.state === 'decide' ? 34 : v.state === 'online' ? 24 : 16) * p.d;
+    const tall = tallOf(v, p);
     const grad = ctx.createLinearGradient(p.x, p.y, p.x, p.y - tall);
     grad.addColorStop(0, `rgba(${r},${g},${b},${0.9 * pulse})`); grad.addColorStop(1, `rgba(${r},${g},${b},0)`);
     ctx.fillStyle = grad; ctx.fillRect(p.x - 1.5, p.y - tall, 3, tall);
     ctx.strokeStyle = `rgba(${r},${g},${b},${0.7 * pulse})`; ctx.beginPath(); ctx.ellipse(p.x, p.y, 6, 2.6, 0, 0, Math.PI * 2); ctx.stroke();
     ctx.fillStyle = `rgba(${r},${g},${b},1)`; ctx.beginPath(); ctx.arc(p.x, p.y - tall, 2.4, 0, Math.PI * 2); ctx.fill();
-    if (focus === v.id || cam.zoom > 1.8 || venues.length <= 6) { ctx.fillStyle = `rgba(${r},${g},${b},.9)`; ctx.font = '600 10px "JetBrains Mono", monospace'; ctx.fillText(v.name.slice(0, 22), p.x + 6, p.y - tall + 3 + (index % 2 ? 13 : 0)); }
+    if (focus !== v.id && (focus || cam.zoom > 1.8 || venues.length <= 6)) { ctx.fillStyle = `rgba(${r},${g},${b},.9)`; ctx.font = '600 10px "JetBrains Mono", monospace'; label(v.name.slice(0, 22), p.x + 7, p.y - tall + 3, 14); }
   }
   // Mirino sul locale agganciato: quattro angoli che si stringono e ruotano.
   const locked = venues.find((v) => v.id === focus);
@@ -173,9 +197,11 @@ function drawMap(t) {
     }
     ctx.lineWidth = 1;
   }
-  // Scansione che attraversa la mappa.
-  const sweep = (t / 3200) % 1;
-  ctx.fillStyle = 'rgba(70,214,255,.05)'; ctx.fillRect(0, sweep * h - 18, w, 18);
+  // Scansione che attraversa la mappa: una linea sottile che sfuma ai lati.
+  const sweep = ((t / 4200) % 1) * h;
+  const scan = ctx.createLinearGradient(0, 0, w, 0);
+  scan.addColorStop(0, 'rgba(70,214,255,0)'); scan.addColorStop(0.5, 'rgba(70,214,255,.22)'); scan.addColorStop(1, 'rgba(70,214,255,0)');
+  ctx.fillStyle = scan; ctx.fillRect(0, sweep, w, 1);
   return true;
 }
 

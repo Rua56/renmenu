@@ -361,6 +361,7 @@ async function send(text, { spoken = false } = {}) {
   if (!clean || busy) return;
   const input = sheet?.querySelector('input[name="text"]');
   if (input) input.value = '';
+  if (inline) chatOn();
   try { userSays?.(clean); } catch { /* solo grafica */ }
   if (brief) {
     push({ role: 'user', text: clean });
@@ -505,6 +506,7 @@ export const briefing = () => Boolean(brief);
 export function onJarvisReply(fn) { afterReply = fn; }
 /** La home vuole sapere cosa dice Riccardo (per agganciare il locale sulla mappa). */
 export function onUserSays(fn) { userSays = fn; }
+function chatOn() { if (globalThis.document) document.documentElement.dataset.chatOn = '1'; }
 
 function onClick(event) {
   if (event.target.closest('[data-chat-brief]')) { if (brief) endBriefing('Va bene, chiudo il briefing.'); else startBriefing(); return; }
@@ -554,6 +556,8 @@ export function openChat(element, { voice = false, bot = '', listenNow = false, 
     element.addEventListener('click', onClick);
     element.addEventListener('change', onChange);
     element.addEventListener('submit', onSubmit);
+    // Quando scrivi nella home il reattore si fa piccolo e la conversazione sale (vedi jarvis-hud.css).
+    element.addEventListener('focusin', (event) => { if (inline && event.target.matches?.('input[name="text"]')) chatOn(); });
   }
   voiceReady = Boolean(voice); telegramBot = bot || '';
   render();
