@@ -11,6 +11,7 @@ function database() {
   const dir = new URL('../cloudflare/migrations/', import.meta.url);
   for (const file of readdirSync(dir).filter((f) => f.endsWith('.sql')).sort()) sqlite.exec(readFileSync(new URL(file, dir), 'utf8'));
   return {
+    raw: sqlite,
     prepare(sql) {
       return { bind(...params) {
         const statement = sqlite.prepare(sql);
@@ -171,5 +172,25 @@ test('telefonata: «sì» preme il pulsante offerto, ma la pubblicazione arriva 
     // Scaduta dopo mezz'ora.
     await missions.putSetting(db, 'phone_call_key', JSON.stringify({ key: 'k'.repeat(64), at: new Date(Date.now() - 31 * 60_000).toISOString() }));
     assert.equal((await jarvisPhone(env, { richiesta: 'sì', chiave: 'k'.repeat(64) })).status, 403);
+  });
+});
+
+test('telefonata: l’anteprima chiesta al telefono arriva anche su Telegram con il link', async () => {
+  await withServices({}, async (calls) => {
+    const db = database(), env = await linked(db);
+    const raw = db.raw;
+    raw.prepare("INSERT INTO clients (id,name,plan,internal_notes,revision,created_at,updated_at) VALUES ('c1','Osteria Al Tralcio','standard','',1,'2026-10-05','2026-10-05')").run();
+    raw.prepare("INSERT INTO requests (id,client_id,subject,source_channel,source_text,kind,status,plan,category,internal_notes,revision,created_at,updated_at) VALUES ('r1','c1','Nuovo menu · Al Tralcio','telegram','x','nuovo','in_revisione','standard','nuovo_standard','',1,'2026-10-05','2026-10-05')").run();
+    raw.prepare("INSERT INTO drafts (id,request_id,slug,menu_json,status,created_at,updated_at) VALUES ('d1','r1','al-tralcio',?,'revisione','2026-10-05','2026-10-05')").run(JSON.stringify({ nome: 'Osteria Al Tralcio', lingue: ['it'], sezioni: [{ nome: 'Dolci', voci: [{ nome: 'Strudel', prezzo: '5' }] }] }));
+    await missions.putSetting(db, 'phone_call_key', JSON.stringify({ key: 'k'.repeat(64), at: new Date().toISOString() }));
+    const buttons = [['Vedi la bozza', 'peek:d1'], ['Altro', 'x:1']];
+    await missions.putSetting(db, 'phone_buttons', JSON.stringify(buttons));
+    await missions.putSetting(db, 'cr_buttons', JSON.stringify(buttons.map(([, d]) => d)));
+    const before = calls.filter((c) => c.href.endsWith('/sendMessage')).length;
+    const out = await jarvisPhone(env, { richiesta: 'la prima', chiave: 'k'.repeat(64) });
+    const sent = calls.filter((c) => c.href.endsWith('/sendMessage')).slice(before);
+    assert.ok(sent.some((c) => /Dalla telefonata/.test(c.body.text) && /https:\/\//.test(c.body.text)), 'il link dell’anteprima arriva su Telegram');
+    assert.match(out.risposta, /mandati su Telegram/);
+    assert.doesNotMatch(out.risposta, /https?:/, 'al telefono niente link');
   });
 });
