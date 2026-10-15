@@ -32,6 +32,7 @@ import { parseVisit, visitKey, visitStartText } from './visit.js';
 import { GUARD_KEY, GUARD_STATE_KEY, alertText as guardAlertText, dueSlugs, listText as guardListText, parseGuard, parseList as parseGuardList, parseState as parseGuardState, problemsOf, step as guardStep } from './guard.js';
 import { AGENDA_KEY, AGENDA_WAIT_KEY, AGENDA_WAIT_MS, addItems, agendaText, createdText, doneText, findItem, markDone, newAgenda, parseAgenda, parseStored, remaining, reminderDue, reminderText, splitNames } from './agenda.js';
 import { pickButton } from './short-reply.js';
+import { normalizePhone, parseClientPhone } from './phone-number.js';
 import { HABITS, HABITS_KEY, habitOf, isAuto, parseHabits, recordChoice, rulesView, setRule } from './habits.js';
 import { AGENT_VERSION, callOutcome, callOwner, ensureAgent, phoneNumber, twilioNumber } from './phone.js';
 import { approveSender, blockSender, takeUnannouncedHeld } from './whatsapp-in.js';
@@ -915,6 +916,9 @@ export function createMissions(deps) {
     if (guarded) { await sendTg(db, env, chat, guarded, null, deps.fetchImpl); return; }
     // «togli i locali di prova»: elenco e pulsante di conferma.
     if (TEST_CLEAN.test(text)) { const offer = await testCleanOffer(db); await sendTg(db, env, chat, offer.text, offer.buttons || null, deps.fetchImpl, { stacked: true }); return; }
+    // «il numero di Trattoria Blanch è 333…»: telefono sulla scheda cliente.
+    const phoned = await clientPhoneTurn(db, text);
+    if (phoned) { await sendTg(db, env, chat, phoned, null, deps.fetchImpl); return; }
     // «menu da stampare di Al Tralcio»: link alla versione A4 (stessa grafica, QR in fondo).
     const printable = await printTurn(db, text);
     if (printable) { await sendTg(db, env, chat, printable, null, deps.fetchImpl); return; }
@@ -1159,6 +1163,8 @@ export function createMissions(deps) {
     const guarded = await guardTurn(db, heard.text);
     if (guarded) { await reply(db, env, chat, `«${heard.text.trim()}»\n\n${guarded}`, true); return; }
     if (TEST_CLEAN.test(heard.text)) { const offer = await testCleanOffer(db); await sendTg(db, env, chat, `«${heard.text.trim()}»\n\n${offer.text}`, offer.buttons || null, deps.fetchImpl, { stacked: true }); return; }
+    const phoned = await clientPhoneTurn(db, heard.text);
+    if (phoned) { await reply(db, env, chat, `«${heard.text.trim()}»\n\n${phoned}`, true); return; }
     const printable = await printTurn(db, heard.text);
     if (printable) { await reply(db, env, chat, `«${heard.text.trim()}»\n\n${printable}`, true); return; }
     if (STATUS_WORDS.test(heard.text.trim())) { await reply(db, env, chat, `«${heard.text.trim()}»\n\n${await statusText(db)}`, false); return; }
@@ -1685,6 +1691,24 @@ export function createMissions(deps) {
     // Nel registro anche quello che non è andato, per capire il perché senza chiederlo a Riccardo.
     if (kept.length) await auditedBatch(jarvisDb(db), [], 'jarvis.test_clean', `Locali di prova non cancellati: ${kept.join('; ')}`.slice(0, 240), null).catch(() => null);
     return { text: `${done.length ? `Fatto, Riccardo: ho cancellato ${done.map((n) => `«${n}»`).join(', ')} con tutte le pratiche, le bozze e i file.` : 'Non ho cancellato niente.'}${kept.length ? `\nRestano: ${kept.join('; ')}.` : ''}` };
+  }
+  // «il numero di Trattoria Blanch è 333 1234567»: lo salva sulla scheda cliente (+39…), così i
+  // messaggi WhatsApp da quel numero finiscono subito tra le pratiche del locale giusto.
+  async function clientPhoneTurn(db, text) {
+    const asked = parseClientPhone(text);
+    if (!asked) return null;
+    const phone = normalizePhone(asked.number);
+    if (!phone) return `«${asked.number}» non mi sembra un numero di telefono: scrivilo con tutte le cifre, per esempio 333 1234567.`;
+    const clients = await rows(db, 'SELECT id,name,menu_id,phone FROM clients').catch(() => []);
+    const { client, candidates } = matchVenue(asked.venue, clients.map((c) => ({ ...c, menu_id: c.menu_id || '' })));
+    if (!client) return candidates?.length > 1 ? `Di quale locale? ${candidates.map((c) => c.name).join(', ')}.` : `Non trovo un cliente che si chiami «${asked.venue}».`;
+    const other = clients.find((c) => c.id !== client.id && c.phone && c.phone.replace(/\D/g, '') === phone.slice(1));
+    if (other) return `Il numero ${phone} è già sulla scheda di «${other.name}». Toglilo da lì nella Control Room prima di darlo a «${client.name}».`;
+    const old = clients.find((c) => c.id === client.id)?.phone || null;
+    if (old === phone) return `«${client.name}» ha già il numero ${phone}.`;
+    await auditedBatch(jarvisDb(db), [db.prepare('UPDATE clients SET phone=?,revision=revision+1,updated_at=? WHERE id=?').bind(phone, now(), client.id)],
+      'client.phone', `Telefono di «${client.name}»: ${old ? `${old} → ` : ''}${phone} (detto da Riccardo).`, null);
+    return `Fatto: il numero di «${client.name}» è ${phone}${old ? ` (prima era ${old})` : ''}. Quando scrive su WhatsApp da questo numero, Jarvis riconosce il locale e mette il messaggio tra le sue pratiche.`;
   }
   const PRINT_ASK = /\b(?:men[uù]|carta)\s+(?:da\s+)?stamp(?:are|abile|a)\b|\bversione\s+(?:da\s+)?stamp(?:are|abile|a)\b|\bstampa(?:re)?\s+(?:il\s+)?men[uù]\b/i;
   async function printTurn(db, text) {
