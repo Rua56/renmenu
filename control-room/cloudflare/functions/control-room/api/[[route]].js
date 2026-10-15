@@ -44,7 +44,7 @@ async function draftNotes(db, requestId) {
   try { return parseList((await getOne(db, 'SELECT review_notes_json AS n FROM drafts WHERE request_id=? ORDER BY created_at DESC LIMIT 1', requestId))?.n); }
   catch { return []; }
 }
-import { getMe, randomToken, sendTelegram, sendVoice, setWebhook, telegramReady } from '../../_lib/telegram.js';
+import { getMe, randomToken, sameSecret, sendTelegram, sendVoice, setWebhook, telegramReady } from '../../_lib/telegram.js';
 import { ACTIVATIONS, approvalEvidence, approvalState, assessReply, previewEmail, previewUrl, proposeReplyChanges, referenceCode, sha256Hex } from '../../_lib/approvals.js';
 
 // Nome pubblico del bot (serve solo a «Apri Telegram» nella Control Room): letto una volta e ricordato.
@@ -709,6 +709,35 @@ export async function jarvisAsk(env, input = {}) {
     owner.card = card;
   }
   return { messages, ...(press && input.choose ? { pressed: press } : {}) };
+}
+// Telefonata con Jarvis (vedi _lib/phone.js): l'agente di ElevenLabs passa qui le frasi di Riccardo con la chiave
+// di quella chiamata. Stesso cervello della Control Room; «sì», «no», «la seconda» valgono come il tocco sui
+// pulsanti dell'ultima risposta. Pubblicare resta un tocco: quel pulsante arriva su Telegram.
+const PHONE_KEY_MS = 30 * 60 * 1000;
+const tapOnTelegram = (buttons) => (buttons || []).some(([, data]) => String(data).split(':')[0] === 'pub');
+export async function jarvisPhone(env, input = {}) {
+  const db = env.DB;
+  let saved = null; try { saved = JSON.parse(await missions.setting(db, 'phone_call_key') || 'null'); } catch { saved = null; }
+  const fresh = saved?.key && Date.now() - Date.parse(saved.at || '') < PHONE_KEY_MS;
+  if (!fresh || !sameSecret(String(input.chiave || ''), saved.key)) return { ok: false, status: 403, risposta: 'Questa telefonata non è autorizzata ad agire.' };
+  const text = String(input.richiesta || '').replace(/\s+/g, ' ').trim().slice(0, 1000);
+  if (!text) return { ok: true, risposta: 'Non ho capito la richiesta: ripetila.' };
+  let buttons = []; try { buttons = JSON.parse(await missions.setting(db, 'phone_buttons') || '[]'); } catch { buttons = []; }
+  const out = await jarvisAsk(env, { text, choose: Array.isArray(buttons) ? buttons : [] });
+  const asked = out.messages.filter((m) => m.buttons?.length).at(-1)?.buttons || [];
+  await missions.putSetting(db, 'phone_buttons', JSON.stringify(asked.filter(([, data]) => String(data).split(':')[0] !== 'pub')));
+  // La pubblicazione si conferma toccando: la domanda con il pulsante arriva davvero su Telegram.
+  const chat = await missions.setting(db, 'telegram_chat_id');
+  let sentToTelegram = false;
+  for (const m of out.messages) {
+    if (!tapOnTelegram(m.buttons) || !chat || !telegramReady(env)) continue;
+    await sendTelegram(env, chat, m.picked === 'tap' ? 'Dalla telefonata: tocca qui per confermare.' : m.text, m.buttons).catch(() => null);
+    sentToTelegram = true;
+  }
+  const said = out.messages.map((m) => (m.picked === 'tap' ? '' : m.say)).filter(Boolean).join(' ');
+  const options = asked.filter(([, data]) => String(data).split(':')[0] !== 'pub').map(([label]) => label);
+  const risposta = [said, options.length ? `Riccardo può rispondere: ${options.join(', ')}.` : '', sentToTelegram ? 'La pubblicazione si conferma solo toccando il pulsante che ho appena mandato su Telegram.' : ''].filter(Boolean).join(' ');
+  return { ok: true, risposta: risposta.slice(0, 1500) || 'Fatto.' };
 }
 // «Pronto per te» e briefing a voce: le decisioni che Jarvis ha già preparato, ognuna con i suoi pulsanti.
 // I pulsanti valgono come quelli offerti nella conversazione (stesso elenco cr_buttons).

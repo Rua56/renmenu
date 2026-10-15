@@ -1,9 +1,10 @@
 // Ingressi pubblici di Jarvis, fuori da Cloudflare Access ma protetti da segreti:
 // - /jarvis-hook/telegram: aggiornamenti del bot (header segreto impostato con setWebhook);
 // - /jarvis-hook/tick: l'orologio (Worker con cron) con il segreto JARVIS_CLOCK_SECRET;
-// - /jarvis-hook/mail-in: le email di menu@renmenu.com dal Worker email, con il segreto degli allegati.
+// - /jarvis-hook/mail-in: le email di menu@renmenu.com dal Worker email, con il segreto degli allegati;
+// - /jarvis-hook/telefono: l'agente vocale durante una telefonata, con la chiave valida solo per quella chiamata.
 // Nessun dato viene restituito: solo esiti sintetici.
-import { autoPrepareTick, enrollIdleDrafts, geminiConfig, linkPendingMailFiles, missions, readPendingMaterials, receivePendingMail, runAutopilot } from '../control-room/api/[[route]].js';
+import { autoPrepareTick, enrollIdleDrafts, geminiConfig, jarvisPhone, linkPendingMailFiles, missions, readPendingMaterials, receivePendingMail, runAutopilot } from '../control-room/api/[[route]].js';
 import { sameSecret } from '../_lib/telegram.js';
 import { chat } from '../_lib/voice.js';
 import { serveMedia } from '../_lib/public-media.js';
@@ -52,6 +53,13 @@ export async function onRequest(context) {
       const update = await request.json().catch(() => null);
       if (update) await missions.telegramUpdate(env.DB, env, update);
       return reply({ ok: true });
+    }
+    if (path === '/jarvis-hook/telefono') {
+      // Agente di ElevenLabs durante una telefonata a Riccardo: vale solo con la chiave di quella chiamata.
+      if (Number(request.headers.get('content-length') || 0) > 20_000) return reply({ ok: false }, 413);
+      const body = await request.json().catch(() => null);
+      const out = await jarvisPhone(env, body || {});
+      return reply({ risposta: out.risposta }, out.status || 200);
     }
     if (path === '/jarvis-hook/probe-intent') {
       // Solo diagnostica: stesso segreto del bot; restituisce l'intenzione capita, non esegue nulla.
