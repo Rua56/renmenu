@@ -499,6 +499,40 @@ describe('Comandi vocali di Jarvis', () => {
       assert.equal((await db.prepare("SELECT COUNT(*) n FROM clients WHERE id='cm'").bind().first()).n, 0);
     } finally { globalThis.fetch = previous; db.close(); }
   });
+  it('«togli i locali di prova»: elenco, pulsante e cancellazione completa dei soli locali col menu tolto', async () => {
+    const db = database();
+    const previous = globalThis.fetch;
+    globalThis.fetch = previousFetch;
+    try {
+      const stamp = '2026-10-13T12:00:00.000Z';
+      for (const [id, name, menu] of [['ct', 'Osteria Al Tralcio', 'osteria-al-tralcio'], ['cv', 'Trattoria Vera', 'trattoria-vera']]) await db.prepare("INSERT INTO clients (id,name,email,plan,menu_id,internal_notes,revision,created_at,updated_at) VALUES (?,?,NULL,'premium',?,'',1,?,?)").bind(id, name, menu, stamp, stamp).run();
+      for (const clientId of ['ct', 'ct', 'cv']) {
+        const out = await action(db, 'createRequest', { clientId, subject: 'Menu', sourceChannel: 'email', sourceText: 'Menu di prova', kind: 'altro', plan: 'standard' });
+        const id = out.body.id || out.body.result?.id || out.body.data?.id;
+        await db.prepare("UPDATE requests SET status='completata' WHERE id=?").bind(id).run();
+      }
+      globalThis.fetch = fakeFetch;
+      calls.length = 0;
+      await missions.putSetting(db, 'telegram_chat_id', '42');
+      // Senza pulsante non si tocca niente.
+      const env = testEnv(db, { TELEGRAM_BOT_TOKEN: TOKEN, AI: aiSaying('', { intent: 'non_chiaro', locale: '', risposta: '' }) });
+      await missions.telegramUpdate(db, env, { message: { chat: { id: 42, type: 'private' }, text: 'togli i locali di prova' } });
+      const offer = calls.at(-1).body;
+      assert.match(offer.text, /Osteria Al Tralcio \(2 pratiche\)/);
+      assert.doesNotMatch(offer.text, /Trattoria Vera/);
+      assert.ok(JSON.stringify(offer.reply_markup).includes('delt:all'));
+      assert.equal((await db.prepare('SELECT COUNT(*) n FROM requests').bind().first()).n, 3);
+      await missions.telegramUpdate(db, testEnv(db, { TELEGRAM_BOT_TOKEN: TOKEN }), { callback_query: { id: 'q9', data: 'delt:all', message: { chat: { id: 42 }, message_id: 9 } } });
+      assert.match(calls.at(-1).body.text, /Fatto, Riccardo: ho cancellato «Osteria Al Tralcio»/);
+      assert.equal((await db.prepare("SELECT COUNT(*) n FROM clients WHERE id='ct'").bind().first()).n, 0);
+      assert.equal((await db.prepare("SELECT COUNT(*) n FROM requests WHERE client_id='ct'").bind().first()).n, 0);
+      assert.equal((await db.prepare("SELECT COUNT(*) n FROM requests WHERE client_id='cv'").bind().first()).n, 1, 'il cliente vero resta');
+      // Un cliente vero non si cancella con questa strada, nemmeno chiamando l'azione a mano.
+      const vera = (await db.prepare("SELECT id FROM requests WHERE client_id='cv'").bind().first()).id;
+      const refused = await action(db, 'deleteRequest', { requestId: vera, retired: true, confirmation: 'ELIMINA PRATICA' });
+      assert.equal(refused.status, 409);
+    } finally { globalThis.fetch = previous; db.close(); }
+  });
   it('non elimina una pratica pubblicata né un cliente con menu online', async () => {
     const db = database();
     const previous = globalThis.fetch;

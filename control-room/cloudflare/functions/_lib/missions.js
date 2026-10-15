@@ -5,7 +5,7 @@ import { notesSummary } from './notes.js';
 // controllato la bozza. Jarvis porta la pratica fino alla pubblicazione usando le stesse
 // operazioni (con gli stessi controlli) dell'interfaccia, con «jarvis» come autore nel registro.
 // Si ferma e chiede a Riccardo quando qualcosa non è chiaro; pubblica solo dopo il suo SÌ.
-import { deletionPlan } from './delete-request.js';
+import { RETIRED_MENUS, deletionPlan } from './delete-request.js';
 import { missingPriceNames, reviewIssues } from './editorial.js';
 import { allExtras } from './extras.js';
 import { assessReply, proposeReplyChanges, referenceCode, sha256Hex, stripQuoted } from './approvals.js';
@@ -39,8 +39,6 @@ import { lastReadingTest, startReadingTest } from './reading-test.js';
 import { LATER_MS, MUTE_MS, REPEAT_MS, activeInitiatives, loadInitiatives } from './initiative.js';
 import { draftClientReply, lastMessage, originalSubject, sendWhatsAppReply } from './client-reply.js';
 
-// Menu di prova tolti dal sito il 15 ottobre 2026 su richiesta di Riccardo: se il file non c'è più, nessun avviso.
-const RETIRED_MENUS = new Set(['al-chiostro-bistrot', 'buffet-alla-valletta', 'caffe-bon-bon', 'demo', 'demo-premium', 'enoteca-il-calice-storto', 'la-chincaglieria-gastronomica', 'osteria-al-tralcio', 'pub-underground']);
 
 export const PARTIAL_MARK = '[Testo parziale: leggi l’email completa in Gmail prima di decidere]';
 export const OWNER_REVIEW = 'telegram:riccardo';
@@ -854,6 +852,13 @@ export function createMissions(deps) {
       await sendTg(db, env, chat, out.text, null, deps.fetchImpl);
       return;
     }
+    if (verb === 'delt') {
+      // delt: cancella tutti i locali di prova con il menu già tolto dal sito (clienti, pratiche, bozze, file)
+      await ack('Cancello');
+      await clear();
+      await sendTg(db, env, chat, (await runTestClean(db, env)).text, null, deps.fetchImpl);
+      return;
+    }
     if (['del', 'delc', 'dela', 'delq', 'delno'].includes(verb)) {
       // del: una pratica · delc: un cliente senza pratiche · dela: tutte le pratiche aperte di un cliente · delq: scegli fra le pratiche di un cliente
       const outcome = verb === 'delno' ? { text: 'Va bene, non elimino niente.' } : verb === 'delq' ? await deleteOffer(db, missionId, '')
@@ -908,6 +913,8 @@ export function createMissions(deps) {
     // Sorveglianza dei menu online («sorveglianza», «non sorvegliare …»).
     const guarded = await guardTurn(db, text);
     if (guarded) { await sendTg(db, env, chat, guarded, null, deps.fetchImpl); return; }
+    // «togli i locali di prova»: elenco e pulsante di conferma.
+    if (TEST_CLEAN.test(text)) { const offer = await testCleanOffer(db); await sendTg(db, env, chat, offer.text, offer.buttons || null, deps.fetchImpl, { stacked: true }); return; }
     // «menu da stampare di Al Tralcio»: link alla versione A4 (stessa grafica, QR in fondo).
     const printable = await printTurn(db, text);
     if (printable) { await sendTg(db, env, chat, printable, null, deps.fetchImpl); return; }
@@ -1151,6 +1158,7 @@ export function createMissions(deps) {
     if (planned) { await reply(db, env, chat, `«${heard.text.trim()}»\n\n${planned}`, true); return; }
     const guarded = await guardTurn(db, heard.text);
     if (guarded) { await reply(db, env, chat, `«${heard.text.trim()}»\n\n${guarded}`, true); return; }
+    if (TEST_CLEAN.test(heard.text)) { const offer = await testCleanOffer(db); await sendTg(db, env, chat, `«${heard.text.trim()}»\n\n${offer.text}`, offer.buttons || null, deps.fetchImpl, { stacked: true }); return; }
     const printable = await printTurn(db, heard.text);
     if (printable) { await reply(db, env, chat, `«${heard.text.trim()}»\n\n${printable}`, true); return; }
     if (STATUS_WORDS.test(heard.text.trim())) { await reply(db, env, chat, `«${heard.text.trim()}»\n\n${await statusText(db)}`, false); return; }
@@ -1641,6 +1649,41 @@ export function createMissions(deps) {
     for (const slug of Object.keys(state)) if (!list.includes(slug)) delete state[slug];
     await putSetting(db, GUARD_STATE_KEY, JSON.stringify(state));
     return out;
+  }
+  // ——— Locali di prova con il menu già tolto dal sito: Jarvis li elenca, Riccardo conferma col pulsante, poi li cancella del tutto ———
+  const TEST_CLEAN = /^\s*(?:jarvis[\s,!.]*)?(?:togli|cancella|elimina|rimuovi)\s+(?:tutti\s+)?(?:i\s+)?(?:locali|clienti)\s+di\s+prova\s*[.!]*$/i;
+  async function testClients(db) {
+    const all = await rows(db, "SELECT c.id,c.name,c.menu_id,(SELECT COUNT(*) FROM requests r WHERE r.client_id=c.id) AS n FROM clients c WHERE c.menu_id IS NOT NULL AND c.menu_id<>'' ORDER BY c.name").catch(() => []);
+    return all.filter((c) => RETIRED_MENUS.has(c.menu_id));
+  }
+  async function testCleanOffer(db) {
+    const list = await testClients(db);
+    if (!list.length) return { text: 'Non ci sono più locali di prova da cancellare, Riccardo.' };
+    const cases = list.reduce((t, c) => t + Number(c.n || 0), 0);
+    return { text: `Locali di prova con il menu già tolto dal sito:\n${list.map((c) => `• ${c.name} (${c.n} ${Number(c.n) === 1 ? 'pratica' : 'pratiche'})`).join('\n')}\n\nVuoi che li cancelli del tutto, con ${cases} pratiche, bozze e file? Gli altri clienti restano. Non si può annullare.`,
+      buttons: [[`SÌ, cancella ${list.length === 1 ? 'il locale' : `i ${list.length} locali`} di prova`, 'delt:all'], ['No, tienili', 'delno:x']] };
+  }
+  async function runTestClean(db, env) {
+    const list = await testClients(db);
+    if (!list.length) return { text: 'Non ci sono più locali di prova da cancellare.' };
+    const done = [], kept = [];
+    for (const client of list) {
+      // Solo se il menu non è davvero più online: un QR che funziona non si tocca.
+      if ((await readPublic(client.menu_id)).menuJson.ok) { kept.push(`${client.name}: il suo menu è ancora online`); continue; }
+      const requests = await rows(db, 'SELECT id FROM requests WHERE client_id=? ORDER BY created_at ASC', client.id).catch(() => []);
+      let failed = null;
+      for (const r of requests) {
+        try { await action(jarvisDb(db), 'deleteRequest', { requestId: r.id, retired: true, confirmation: 'ELIMINA PRATICA' }, env); }
+        catch (error) { failed = String(error?.message || 'errore').slice(0, 160); break; }
+      }
+      if (!failed && await getOne(db, 'SELECT id FROM clients WHERE id=?', client.id)) {
+        try { await action(jarvisDb(db), 'deleteRequest', { clientId: client.id, retired: true, confirmation: 'ELIMINA PRATICA' }, env); }
+        catch (error) { failed = String(error?.message || 'errore').slice(0, 160); }
+      }
+      if (failed) kept.push(`${client.name}: ${failed}`); else done.push(client.name);
+    }
+    if (done.length) for (const key of ['tg_focus', 'tg_checks', 'draft_undo', 'draft_translate']) await putSetting(db, key, 'null').catch(() => null);
+    return { text: `${done.length ? `Fatto, Riccardo: ho cancellato ${done.map((n) => `«${n}»`).join(', ')} con tutte le pratiche, le bozze e i file.` : 'Non ho cancellato niente.'}${kept.length ? `\nRestano: ${kept.join('; ')}.` : ''}` };
   }
   const PRINT_ASK = /\b(?:men[uù]|carta)\s+(?:da\s+)?stamp(?:are|abile|a)\b|\bversione\s+(?:da\s+)?stamp(?:are|abile|a)\b|\bstampa(?:re)?\s+(?:il\s+)?men[uù]\b/i;
   async function printTurn(db, text) {
