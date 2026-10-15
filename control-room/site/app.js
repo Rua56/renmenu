@@ -5,7 +5,9 @@ import { PLAN_RULES, REQUEST_CATEGORIES, categoryByCode, draftBlocker, planIssue
 import { provisionalQrSvg, provisionalTarget } from './provisional-qr.js';
 import { mountPdfPreview } from './pdf-preview.js';
 import { extractPdfText } from './material-extract.js';
-import { announce, briefing, chatIn, closeChat, onJarvisReply, openChat, refreshChat } from './jarvis-chat.js';
+import { announce, briefing, chatIn, closeChat, onJarvisReply, onUserSays, openChat, refreshChat } from './jarvis-chat.js';
+import { attachHolo, focusVenue, holoOn, setHolo } from './jarvis-holo.js';
+import { venuesFor } from './jarvis-places.js';
 import { logLines, markFresh } from './jarvis-log.js';
 import { play, setSounds, soundsAvailable, soundsOn } from './jarvis-sound.js';
 import { greetOnce, greetingFor, lastVisit, markVisit } from './jarvis-greet.js';
@@ -350,7 +352,7 @@ function jarvisPanel() {
   const tg = state.telegram || {};
   const telegram = isDemoMode ? '' : !tg.configured ? '' : !tg.linked
     ? `<div class="notice spaced-top-small">${telegramLinkUrl ? `Tocca il link e poi <strong>Avvia</strong> in Telegram (valido 15 minuti): <a href="${escapeHtml(telegramLinkUrl)}" target="_blank" rel="noopener">Apri Jarvis su Telegram</a>` : 'Collega Telegram: Jarvis ti scriverà lì e ti chiederà il SÌ prima di pubblicare.'}</div><div class="button-row spaced-top-small"><button class="button" type="button" data-action="telegram-link">${telegramLinkUrl ? 'Nuovo link' : 'Collega Telegram'}</button></div>`
-    : `<details class="hud-settings"><summary>Collegamenti e voce di Jarvis</summary><div class="button-row spaced-top-small"><span class="status good">Telegram collegato</span><button class="button secondary small-button" type="button" data-action="jarvis-briefing">Briefing ora</button><button class="button secondary small-button" type="button" data-action="telegram-test">Messaggio di prova</button></div>${installed() ? '' : '<div class="button-row spaced-top-small"><button class="button secondary small-button" type="button" data-action="install-app">Installa Jarvis sul telefono</button></div>'}${soundsAvailable ? `<label class="chat-toggle spaced-top-small"><input type="checkbox" id="sounds-enabled" ${soundsOn() ? 'checked' : ''}><span>Suoni di Jarvis<small>bip leggeri sui tocchi, quando ti ascolta e quando arriva una novità</small></span></label>` : ''}${wakeAvailable ? `<label class="chat-toggle spaced-top-small"><input type="checkbox" id="wake-enabled" ${wakeEnabled() ? 'checked' : ''}><span>Sveglia con «Ehi Jarvis»<small>con la Control Room aperta il browser ascolta la parola di sveglia (gratis, riconoscimento del browser)</small></span></label>` : ''}${voiceForm()}${readerForm()}</details>`;
+    : `<details class="hud-settings"><summary>Collegamenti e voce di Jarvis</summary><div class="button-row spaced-top-small"><span class="status good">Telegram collegato</span><button class="button secondary small-button" type="button" data-action="jarvis-briefing">Briefing ora</button><button class="button secondary small-button" type="button" data-action="telegram-test">Messaggio di prova</button></div>${installed() ? '' : '<div class="button-row spaced-top-small"><button class="button secondary small-button" type="button" data-action="install-app">Installa Jarvis sul telefono</button></div>'}<label class="chat-toggle spaced-top-small"><input type="checkbox" id="holo-enabled" ${holoOn() ? 'checked' : ''}><span>Effetti olografici<small>mappa 3D dei locali e spettro della voce nella home; spegnili se il telefono rallenta</small></span></label>${soundsAvailable ? `<label class="chat-toggle spaced-top-small"><input type="checkbox" id="sounds-enabled" ${soundsOn() ? 'checked' : ''}><span>Suoni di Jarvis<small>bip leggeri sui tocchi, quando ti ascolta e quando arriva una novità</small></span></label>` : ''}${wakeAvailable ? `<label class="chat-toggle spaced-top-small"><input type="checkbox" id="wake-enabled" ${wakeEnabled() ? 'checked' : ''}><span>Sveglia con «Ehi Jarvis»<small>con la Control Room aperta il browser ascolta la parola di sveglia (gratis, riconoscimento del browser)</small></span></label>` : ''}${voiceForm()}${readerForm()}</details>`;
   if (!notes.length && !autopilotRunning && !telegram) return '';
   const row = (item) => `<div class="list-row"><div class="list-main"><strong>${escapeHtml(item.subject)}</strong><small>${escapeHtml(item.body)}</small><small>${time(item.createdAt)}</small></div><div class="button-row"><button class="mini-button" type="button" data-select-request="${escapeHtml(item.requestId || '')}" data-route="${item.subject.includes('bozza pronta') ? 'revisione' : 'richieste'}">Apri</button><button class="mini-button" type="button" data-action="mark-notification" data-notification-id="${escapeHtml(item.id)}" data-read="true">Fatto</button></div></div>`;
   return `<section class="panel spaced-top-small"><p class="eyebrow">JARVIS</p>${autopilotRunning ? '<p class="notice">Jarvis sta preparando le nuove richieste…</p>' : ''}<div class="list">${notes.map(row).join('')}</div>${telegram}</section>`;
@@ -439,7 +441,7 @@ function jarvisHero() {
   const greet = welcome && Date.now() < welcome.until ? welcome : null;
   const typed = greet && !welcome.typed;
   if (typed) welcome.typed = true;
-  return `<section class="jarvis-hero" aria-label="Jarvis"><button class="reactor reactor-main${autopilotRunning || active ? ' busy' : ''}${waitingYes ? ' wait' : ''}" type="button" data-action="core-talk" aria-label="Parla con Jarvis"><i class="arc" aria-hidden="true"></i><i class="wave" aria-hidden="true"></i><i class="wave w2" aria-hidden="true"></i><span class="r1"></span><span class="r2"></span><span class="r3"></span><span class="core"></span></button><p class="core-hint" data-wake-hint>${escapeHtml(wakeHint())}</p><div><p class="eyebrow">${new Intl.DateTimeFormat('it-IT', { weekday: 'long', day: 'numeric', month: 'long', timeZone: 'Europe/Rome' }).format(new Date())}</p><h1>${greeting}, Riccardo</h1><p class="jarvis-says${typed ? ' typing' : ''}">${greet?.news ? `${escapeHtml(greet.news)} ` : ''}${says}</p></div></section>`;
+  return `<section class="jarvis-hero" aria-label="Jarvis"><button class="reactor reactor-main${autopilotRunning || active ? ' busy' : ''}${waitingYes ? ' wait' : ''}" type="button" data-action="core-talk" aria-label="Parla con Jarvis"><i class="holo-spec" data-holo-spectrum aria-hidden="true"></i><i class="arc" aria-hidden="true"></i><i class="wave" aria-hidden="true"></i><i class="wave w2" aria-hidden="true"></i><span class="r1"></span><span class="r2"></span><span class="r3"></span><span class="core"></span></button><p class="core-hint" data-wake-hint>${escapeHtml(wakeHint())}</p><div><p class="eyebrow">${new Intl.DateTimeFormat('it-IT', { weekday: 'long', day: 'numeric', month: 'long', timeZone: 'Europe/Rome' }).format(new Date())}</p><h1>${greeting}, Riccardo</h1><p class="jarvis-says${typed ? ' typing' : ''}">${greet?.news ? `${escapeHtml(greet.news)} ` : ''}${says}</p></div></section>`;
 }
 
 function requestOperationalCard(request, compact = false) {
@@ -1095,7 +1097,28 @@ function logBlock() {
   return `<section class="hud-log" aria-label="Registro dal vivo"><div class="hud-log-head"><p class="eyebrow">REGISTRO · DAL VIVO</p><button class="hud-more" type="button" data-route="registro">Tutto →</button></div><ol class="hud-log-lines" aria-live="polite">${lines.map(line).join('')}</ol><p class="hud-log-cursor" aria-hidden="true">&gt; in ascolto<i>▌</i></p></section>`;
 }
 function renderCommand() {
-  return `<div class="view-wrap jarvis-home">${jarvisHero()}${demoNotice()}${hudDisplay()}</div>`;
+  return `<div class="view-wrap jarvis-home">${jarvisHero()}${holoMap()}${demoNotice()}${hudDisplay()}</div>`;
+}
+// Mappa olografica dei locali (jarvis-holo.js): si disegna nel segnaposto dopo ogni ridisegno della home.
+function holoMap() {
+  if (!holoOn() || !state.clients.length) return '';
+  return `<section class="holo-map" aria-label="Mappa dei locali"><div class="holo-head"><span>MAPPA LOCALI · GORIZIA E DINTORNI</span><span>${state.clients.length} ${state.clients.length === 1 ? 'LOCALE' : 'LOCALI'}</span></div><div class="holo-frame" data-holo-map></div><p class="holo-legend"><i class="l-decide"></i>da decidere <i class="l-online"></i>online <i class="l-lavoro"></i>in corso · tocca un punto o nomina un locale</p></section>`;
+}
+function decideClients() {
+  return new Set(allPratiche().filter((info) => info.group === 'decidere').map((info) => info.request.clientId).filter(Boolean));
+}
+function mountHolo() {
+  attachHolo(venuesFor(state, decideClients()), { open: (clientId) => {
+    selectedClientId = clientId;
+    const first = state.requests.find((request) => request.clientId === clientId);
+    if (first) selectedRequestId = first.id;
+    navigate('locale');
+  } });
+}
+// Quando nomini un locale (scritto o a voce) la mappa lo aggancia.
+function lockOnVenue(text) {
+  const found = venueIn(text, state?.clients || []).client;
+  if (found) focusVenue(found.id);
 }
 // La home è la conversazione con Jarvis (stesso cervello di Telegram): in cima, come suoi messaggi, quello che
 // aspetta una tua decisione e quello che propone; sotto, la chat. Numeri, registro e impostazioni sono in Strumenti.
@@ -1543,7 +1566,7 @@ function renderView() {
   }
   shownView = activeView;
   homeTalk.hidden = activeView !== 'command';
-  if (activeView === 'command') mountHome();
+  if (activeView === 'command') { mountHome(); mountHolo(); }
   if (pendingFind) revealFound();
   document.title = `${navItems.find(([id]) => id === activeView)?.[2] || 'Control Room'} · RenMenu`;
 }
@@ -2113,6 +2136,7 @@ function handleInput(event) {
 }
 function handleSelectChange(event) {
   if (event.target.id === 'sounds-enabled') { setSounds(event.target.checked); return; }
+  if (event.target.id === 'holo-enabled') { setHolo(event.target.checked); return; }
   if (event.target.id === 'wake-enabled') { setWakeEnabled(event.target.checked); if (event.target.checked) listenForWake(); showWakeState(wakeState()); return; }
   if (event.target.id === 'voice-enabled') {
     const settings = configureVoice({ enabled: event.target.checked });
@@ -2217,6 +2241,7 @@ async function init() {
   activeView = routeFromHash();
   try { await refresh(); } catch (error) { renderAccessError(error); return; }
   onJarvisReply(() => loadReady());
+  onUserSays(lockOnVenue);
   loadReady();
   prepareGreeting();
   listenForWake();

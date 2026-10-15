@@ -54,7 +54,8 @@ let inline = false; // conversazione dentro la home (non un foglio che si chiude
 let introHtml = null; // la home mette in cima alla conversazione le decisioni che aspettano Riccardo
 const bound = new WeakSet();
 let brief = null; // briefing in corso: { queue, current, n, total, hands }
-let afterReply = null; // la home rilegge «Pronto per te» dopo ogni risposta di Jarvis
+let afterReply = null;
+let userSays = null; // la home aggancia sulla mappa il locale nominato // la home rilegge «Pronto per te» dopo ogni risposta di Jarvis
 
 let lastNote = '';
 // Il reattore (home e foglio della chat) segue Jarvis: html[data-jarvis] e i livelli di voce --jv-lvl / --jv-out.
@@ -90,7 +91,10 @@ function bubble(entry) {
   const buttons = entry.buttons?.length && !entry.used
     ? `<div class="chat-btns">${entry.buttons.map(([label, data]) => `<button type="button" data-chat-press="${escapeHtml(data)}">${escapeHtml(label)}</button>`).join('')}</div>` : '';
   const badge = entry.brief ? `<span class="brief-n">${escapeHtml(entry.brief)}</span>` : '';
-  return `<div class="msg j${entry.kind === 'note' ? ' note' : ''}${entry.card ? ' has-card' : ''}">${badge}${body}${entry.card ? cardHtml(entry.card) : ''}${media}${buttons}</div>`;
+  // Risposta appena arrivata: si monta come un pannello olografico (una volta sola, non a ogni ridisegno).
+  const fresh = entry.at && Date.now() - entry.at < 1500 ? ' holo-in' : '';
+  const stamp = entry.at ? new Date(entry.at).toLocaleTimeString('it-IT', { hour: '2-digit', minute: '2-digit', second: '2-digit' }) : '';
+  return `<div class="msg j${entry.kind === 'note' ? ' note' : ''}${entry.card ? ' has-card' : ''}${fresh}"${stamp ? ` data-stamp="JARVIS · ${stamp}"` : ''}>${badge}${body}${entry.card ? cardHtml(entry.card) : ''}${media}${buttons}</div>`;
 }
 
 // ——— anteprima dal vivo: il menu come lo vede il cliente, con la modifica segnata ———
@@ -149,7 +153,7 @@ function render() {
   else setPhase(phase === 'thinking' ? 'thinking' : 'idle');
 }
 
-function push(entry) { history.push(entry); history = history.slice(-40); saveHistory(history); renderLog(); }
+function push(entry) { entry.at = entry.at || Date.now(); history.push(entry); history = history.slice(-40); saveHistory(history); renderLog(); }
 
 // ——— voce in uscita ———
 function stopSpeaking() {
@@ -357,6 +361,7 @@ async function send(text, { spoken = false } = {}) {
   if (!clean || busy) return;
   const input = sheet?.querySelector('input[name="text"]');
   if (input) input.value = '';
+  try { userSays?.(clean); } catch { /* solo grafica */ }
   if (brief) {
     push({ role: 'user', text: clean });
     if (END_WORDS.test(clean) || STOP_WORDS.test(clean)) { await endBriefing('Va bene, chiudo il briefing. Il resto lo trovi qui in alto quando vuoi.'); return; }
@@ -498,6 +503,8 @@ async function endBriefing(text) {
 export const briefing = () => Boolean(brief);
 /** La home vuole sapere quando Jarvis ha risposto (per rileggere «Pronto per te»). */
 export function onJarvisReply(fn) { afterReply = fn; }
+/** La home vuole sapere cosa dice Riccardo (per agganciare il locale sulla mappa). */
+export function onUserSays(fn) { userSays = fn; }
 
 function onClick(event) {
   if (event.target.closest('[data-chat-brief]')) { if (brief) endBriefing('Va bene, chiudo il briefing.'); else startBriefing(); return; }
