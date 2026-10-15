@@ -29,6 +29,7 @@ import { MAX_ROUNDS as PREP_MAX_ROUNDS, enrollPrep, parsePrep, PREP_KEY } from '
 import { PER_ROUND as BOTTLES_PER_ROUND, winesWithoutPhoto } from './bottle-search.js';
 import { claudeKey } from './claude.js';
 import { parseVisit, visitKey, visitStartText } from './visit.js';
+import { AGENDA_KEY, AGENDA_WAIT_KEY, AGENDA_WAIT_MS, addItems, agendaText, createdText, doneText, findItem, markDone, newAgenda, parseAgenda, parseStored, remaining, reminderDue, reminderText, splitNames } from './agenda.js';
 import { pickButton } from './short-reply.js';
 import { HABITS, HABITS_KEY, habitOf, isAuto, parseHabits, recordChoice, rulesView, setRule } from './habits.js';
 import { AGENT_VERSION, callOutcome, callOwner, ensureAgent, phoneNumber, twilioNumber } from './phone.js';
@@ -896,6 +897,9 @@ export function createMissions(deps) {
     // Modalità visita («visita Bar Centrale»): Riccardo è nel locale e manda subito le foto del menù.
     const visiting = parseVisit(text);
     if (visiting) { await sendTg(db, env, chat, (await startVisit(db, visiting.venue)).text, null, deps.fetchImpl); return; }
+    // Agenda delle visite («questa settimana devo visitare: …», «ho visitato …», «agenda»).
+    const planned = await agendaTurn(db, text);
+    if (planned) { await sendTg(db, env, chat, planned, null, deps.fetchImpl); return; }
     // Dubbi aperti: un prezzo scritto («7,50») risponde al dubbio in corso.
     if (normalizePrice(text)) {
       let open = null; try { open = JSON.parse(await setting(db, 'tg_checks') || 'null'); } catch {}
@@ -961,7 +965,7 @@ export function createMissions(deps) {
       return;
     }
     if (/^\/aiuto\b|^\/help\b/i.test(text) || text.startsWith('/')) {
-      await commandsMenu(db, env, chat, 'Puoi scrivermi o mandarmi un vocale: «com’è la situazione?», «al Bakaro il frico ora costa 14», «crea una nuova pratica per il locale … con piano Standard», «pubblica il menu di …», «visita Bar Centrale» (sei nel locale: mi mandi le foto del menù e ti torna subito l’anteprima da mostrare). Capisco anche le foto e i PDF dei menu. Pubblicare richiede sempre il tuo SÌ col pulsante. Tocca un comando qui sotto.');
+      await commandsMenu(db, env, chat, 'Puoi scrivermi o mandarmi un vocale: «com’è la situazione?», «al Bakaro il frico ora costa 14», «crea una nuova pratica per il locale … con piano Standard», «pubblica il menu di …», «visita Bar Centrale» (sei nel locale: mi mandi le foto del menù e ti torna subito l’anteprima da mostrare), «questa settimana devo visitare: …» e poi «ho visitato …» per l’agenda delle visite. Capisco anche le foto e i PDF dei menu. Pubblicare richiede sempre il tuo SÌ col pulsante. Tocca un comando qui sotto.');
       return;
     }
     await converse(db, env, chat, text, false);
@@ -1132,6 +1136,8 @@ export function createMissions(deps) {
     if (await replyEditTurn(db, env, chat, heard.text.trim(), true)) return;
     const visiting = parseVisit(heard.text);
     if (visiting) { await reply(db, env, chat, `«${heard.text.trim()}»\n\n${(await startVisit(db, visiting.venue)).text}`, true); return; }
+    const planned = await agendaTurn(db, heard.text);
+    if (planned) { await reply(db, env, chat, `«${heard.text.trim()}»\n\n${planned}`, true); return; }
     if (STATUS_WORDS.test(heard.text.trim())) { await reply(db, env, chat, `«${heard.text.trim()}»\n\n${await statusText(db)}`, false); return; }
     await converse(db, env, chat, heard.text, true);
   }
@@ -2031,7 +2037,7 @@ export function createMissions(deps) {
         for (const request of open) {
           if (!(await setting(db, visitKey(request.id)))) continue;
           await putSetting(db, 'tg_focus', JSON.stringify({ requestId: request.id, subject: request.subject, at: now() }));
-          return { ok: true, requestId: request.id, text: visitStartText(exact.name, true) };
+          return { ok: true, requestId: request.id, text: `${visitStartText(exact.name, true)}${await agendaVisited(db, exact.name).catch(() => '')}` };
         }
       }
       const name = exact ? exact.name : venue;
@@ -2042,10 +2048,74 @@ export function createMissions(deps) {
       await putSetting(db, visitKey(requestId), JSON.stringify({ venue: name, at: now() }));
       await putSetting(db, 'tg_focus', JSON.stringify({ requestId, subject, at: now() }));
       await auditedBatch(jarvis, [], 'jarvis.visit', `Modalità visita aperta per «${name}»: le foto si leggono subito e torna il link dell'anteprima.`, requestId).catch(() => {});
-      return { ok: true, requestId, text: visitStartText(name) };
+      return { ok: true, requestId, text: `${visitStartText(name)}${await agendaVisited(db, name).catch(() => '')}` };
     } catch (error) {
       return { ok: false, text: `Non sono riuscito ad aprire la visita: ${String(error?.message || 'errore').slice(0, 200)}` };
     }
+  }
+  // ——— Agenda delle visite (_lib/agenda.js): un promemoria per Riccardo, non scrive a nessun locale ———
+  async function agendaTurn(db, text) {
+    let wait = null; try { wait = JSON.parse(await setting(db, AGENDA_WAIT_KEY) || 'null'); } catch { wait = null; }
+    let asked = parseAgenda(text);
+    // «Devo visitare 8 locali» senza nomi: il messaggio dopo (entro mezz'ora) è l'elenco.
+    if (!asked && wait?.at && Date.now() - Date.parse(wait.at) < AGENDA_WAIT_MS && !String(text).trim().startsWith('/')) { const names = splitNames(text); if ((names.length >= 2 || (names.length === 1 && wait.count === 1)) && !/\d+[,.]\d{2}|€/.test(text)) asked = { kind: 'create', names, count: wait.count || null }; }
+    if (!asked) return null;
+    const agenda = parseStored(await setting(db, AGENDA_KEY));
+    const at = now();
+    const save = async (value, summary) => {
+      await putSetting(db, AGENDA_KEY, value ? JSON.stringify(value) : '');
+      await auditedBatch(jarvisDb(db), [], 'jarvis.agenda', summary, null).catch(() => {});
+    };
+    if (asked.kind === 'create') {
+      if (!asked.names.length) {
+        await putSetting(db, AGENDA_WAIT_KEY, JSON.stringify({ count: asked.count, at }));
+        return `Va bene${asked.count ? `, ${asked.count === 1 ? 'un locale' : `${asked.count} locali`}` : ''}. Dimmi i nomi, separati da virgole o uno per riga, e preparo l’agenda.`;
+      }
+      await putSetting(db, AGENDA_WAIT_KEY, '');
+      const left = remaining(agenda).filter((i) => !asked.names.some((n) => findItem([i], n)));
+      const fresh = newAgenda(asked.names, at);
+      await save(fresh, `Agenda delle visite preparata: ${asked.names.length} locali.`);
+      return `${createdText(fresh, asked.count)}${left.length ? `\n\nHo sostituito l’agenda di prima, dove restavano: ${left.map((i) => i.name).join(', ')}. Se vuoi tenerli dimmi «aggiungi all’agenda …».` : ''}`;
+    }
+    if (asked.kind === 'show') return agendaText(agenda);
+    if (asked.kind === 'clear') { if (!agenda) return 'Non c’è nessuna agenda da cancellare.'; await save(null, 'Agenda delle visite cancellata da Riccardo.'); return 'Fatto, agenda cancellata: niente più promemoria delle visite. Quando vuoi, dettami la prossima.'; }
+    if (asked.kind === 'add') {
+      if (!asked.names.length) return 'Quale locale aggiungo all’agenda?';
+      const target = agenda || newAgenda([], at);
+      const added = addItems(target, asked.names, at);
+      await save(target, `Agenda: aggiunti ${added.length} locali.`);
+      return added.length ? `Aggiunto all’agenda: ${added.join(', ')}. Ora ne restano ${remaining(target).length} da visitare.` : 'Quei locali erano già nell’agenda.';
+    }
+    if (asked.kind === 'done') {
+      if (!agenda) return null; // senza agenda «ho visitato …» resta una frase normale per la conversazione
+      if (!asked.names.length) return 'Quale locale hai visitato?';
+      const outcome = markDone(agenda, asked.names, asked.note, at);
+      await save(agenda, `Agenda: visitati ${[...outcome.marked, ...outcome.extra].join(', ') || 'nessuno di nuovo'}.`);
+      return doneText(agenda, outcome);
+    }
+    return null;
+  }
+  // «visita Bar Centrale» vale anche come visita fatta nell'agenda.
+  async function agendaVisited(db, name) {
+    const agenda = parseStored(await setting(db, AGENDA_KEY).catch(() => null));
+    const item = agenda && findItem(agenda.items, name);
+    if (!item || item.done_at) return '';
+    markDone(agenda, [item.name], '', now());
+    await putSetting(db, AGENDA_KEY, JSON.stringify(agenda)).catch(() => {});
+    const left = remaining(agenda).length;
+    return ` L’ho segnato come visitato nell’agenda (${left ? `ne ${left === 1 ? 'resta uno' : `restano ${left}`}` : 'era l’ultimo'}).`;
+  }
+  /** Promemoria delle visite: un giorno senza notizie, dalle 9 alle 20, al massimo uno al giorno. */
+  async function agendaTick(db, env, { now: at = new Date() } = {}) {
+    const agenda = parseStored(await setting(db, AGENDA_KEY));
+    if (!agenda) return null;
+    const hour = Number(new Intl.DateTimeFormat('en-GB', { timeZone: 'Europe/Rome', hour: '2-digit', hourCycle: 'h23' }).format(at));
+    if (!reminderDue(agenda, at, hour)) return null;
+    agenda.last_reminder = at.toISOString();
+    await putSetting(db, AGENDA_KEY, JSON.stringify(agenda));
+    const text = reminderText(agenda);
+    await ping(db, env, text);
+    return text;
   }
   /** Link di sola visione (24 ore) alla bozza della pratica: per l'anteprima della visita. */
   async function visitLink(db, env, requestId) {
@@ -2509,5 +2579,5 @@ export function createMissions(deps) {
     }
     return out;
   }
-  return { peekLink: peekUrl, habitOn, readyItems, entrustBrief, runEntrust, alertOnce, announceExternal, replyTick, phoneTick, proposeReply, statusText, initiatives, initiativeTick, ping, entrust, tick, watchTick, watchRegister, reflect, queueOnlineEmail, checkOnlineMails, makeMenuQr, decide, telegramUpdate, probeIntents, setting, putSetting, briefing, notify, visitLink, startChecks, answerCheck, draftAfterChecks, translateAfterEdit, undoDraftEdit, draftTarget, voiceEditDraft, editDraftFromClient };
+  return { peekLink: peekUrl, habitOn, readyItems, entrustBrief, runEntrust, alertOnce, announceExternal, replyTick, phoneTick, proposeReply, statusText, initiatives, initiativeTick, ping, entrust, tick, watchTick, watchRegister, reflect, queueOnlineEmail, checkOnlineMails, makeMenuQr, decide, telegramUpdate, probeIntents, setting, putSetting, briefing, notify, visitLink, agendaTick, startChecks, answerCheck, draftAfterChecks, translateAfterEdit, undoDraftEdit, draftTarget, voiceEditDraft, editDraftFromClient };
 }

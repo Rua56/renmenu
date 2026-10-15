@@ -36,6 +36,7 @@ export const COMMANDS = [
   ['menu', 'Tutti i comandi come pulsanti', '☰ Comandi'],
   ['stato', 'La situazione adesso', '📋 Situazione'],
   ['visita', 'Sei in un locale: foto del menù → anteprima', '🚶 Visita a un locale'],
+  ['agenda', 'Agenda delle visite: chi manca', '🗓 Agenda visite'],
   ['idee', 'Cosa ti propongo di fare', '💡 Proposte di oggi'],
   ['briefing', 'Il riepilogo del mattino, adesso', '☀️ Briefing'],
   ['settimana', 'Com’è andata la settimana', '📅 Settimana'],
@@ -49,7 +50,7 @@ export const COMMANDS = [
   ['provalettura', 'Prova di lettura dei menu', '🔬 Prova lettura'],
   ['provaemail', 'Email di prova da renmenu.com', '📧 Email di prova']
 ];
-export const COMMANDS_VERSION = '4';
+export const COMMANDS_VERSION = '5';
 // Pulsante fisso «☰ Menu» sotto il campo di scrittura (tastiera di risposta persistente): toccarlo manda MENU_BUTTON.
 export const MENU_BUTTON = '☰ Menu';
 export const KEYBOARD_VERSION = '1';
