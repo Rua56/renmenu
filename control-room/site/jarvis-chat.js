@@ -6,6 +6,7 @@
 import { askJarvis, isDemoMode, jarvisLiveSession, jarvisReady, jarvisVoiceAudio, transcribeVoice } from './api.js';
 import { earAvailable, hear, stopHearing, unlockEar } from './jarvis-ear.js';
 import { liveAvailable, startLive } from './jarvis-live.js';
+import { attachSpectrum } from './jarvis-holo.js';
 
 const Recognition = globalThis.SpeechRecognition || globalThis.webkitSpeechRecognition;
 const Synth = globalThis.speechSynthesis;
@@ -131,8 +132,8 @@ function renderLog(follow = true) {
 export function refreshChat() { if (sheet && !sheet.hidden) renderLog(false); }
 
 function render() {
-  const head = inline ? '' : `<div class="sheet-head"><strong>Parla con Jarvis</strong><button type="button" data-action="ask-close">Chiudi</button></div>
-    <div class="chat-core reactor" aria-hidden="true"><span class="r1"></span><span class="r2"></span><span class="r3"></span><span class="core"></span></div>`;
+  const head = inline ? '' : `<div class="sheet-head"><strong>J.A.R.V.I.S.<small>Parla con Jarvis</small></strong><button type="button" data-action="ask-close">Chiudi</button></div>
+    <div class="chat-core reactor" aria-hidden="true"><i class="holo-spec" data-holo-spectrum></i><span class="r1"></span><span class="r2"></span><span class="r3"></span><span class="core"></span></div>`;
   sheet.innerHTML = `${head}
     <p class="chat-status" id="chat-status" role="status"></p>
     <div class="log" id="chat-log" aria-live="polite"></div>
@@ -149,6 +150,7 @@ function render() {
     </div>
     ${telegramBot && !isDemoMode ? `<a class="chat-tg" href="https://t.me/${escapeHtml(telegramBot)}" target="_blank" rel="noopener">Apri Telegram</a>` : ''}${inline ? '</details>' : ''}`;
   renderLog(!inline);
+  if (!inline) attachSpectrum(sheet.querySelector('[data-holo-spectrum]'));
   if (live) setPhase(phase, lastNote);
   else setPhase(phase === 'thinking' ? 'thinking' : 'idle');
 }

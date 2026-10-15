@@ -547,3 +547,45 @@ html[data-theme="dark"] .jarvis-talk .chat-bar { background: #08121e; }
 @media (max-width: 1099px) {
   .jarvis-talk .chat-bar { position: fixed; left: 50%; bottom: calc(84px + env(safe-area-inset-bottom)); width: calc(100% - 32px); max-width: 448px; transform: translateX(-50%); }
 }
+
+/* ——— Dossier olografici (15 ott): Locale e Pratica ——— */
+.dossier-head, .pratica-head { position: relative; }
+.dossier-head h1 { margin: 2px 0 6px; font: 800 26px/1.15 var(--sans); }
+.dossier-state { display: inline-flex; align-items: center; gap: 7px; margin: 0; color: var(--teal); font: 600 11px var(--mono); letter-spacing: .12em; text-transform: uppercase; }
+.dossier-state::before { width: 7px; height: 7px; border-radius: 50%; background: currentColor; box-shadow: 0 0 8px currentColor; content: ""; }
+.dossier-head.s-decide .dossier-state { color: var(--am); }
+.dossier-head.s-online .dossier-state { color: var(--gr); }
+.dossier-head.s-nuovo .dossier-state { color: var(--muted); }
+.jarvis-line { margin: 10px 0 0; padding: 9px 12px; border-left: 2px solid var(--teal); background: linear-gradient(90deg, rgba(70, 214, 255, .09), transparent); color: var(--ink); font-size: 14.5px; line-height: 1.45; }
+.jarvis-line b { margin-right: 4px; color: var(--teal); font: 700 10.5px var(--mono); letter-spacing: .14em; }
+.dossier-map { margin: 14px 0 4px; }
+.dossier-map .holo-frame { height: 170px; }
+.pratica-head:has(.gauge) { padding-right: 76px; }
+.gauge { position: absolute; top: 2px; right: 0; width: 64px; height: 64px; }
+.gauge svg { width: 100%; height: 100%; }
+.gauge circle { fill: none; stroke: rgba(70, 214, 255, .16); stroke-width: 4; }
+.gauge circle.done { stroke: var(--teal); filter: drop-shadow(0 0 3px rgba(70, 214, 255, .7)); }
+.gauge circle.now { stroke: var(--am); filter: drop-shadow(0 0 4px rgba(255, 179, 71, .8)); animation: gauge-pulse 1.8s ease-in-out infinite; }
+.gauge b { position: absolute; inset: 0; display: grid; place-items: center; color: var(--ink); font: 700 17px/1 var(--mono); }
+.gauge b small { display: inline; color: var(--muted); font-size: 10px; }
+.gauge b { grid-auto-flow: column; justify-content: center; align-items: baseline; align-content: center; }
+@keyframes gauge-pulse { 50% { opacity: .45; } }
+@media (prefers-reduced-motion: reduce) { .gauge circle.now { animation: none; } }
+html[data-theme="dark"] .facts .fact { border-color: rgba(70, 214, 255, .18); background: linear-gradient(180deg, rgba(70, 214, 255, .06), rgba(70, 214, 255, .01)); }
+html[data-theme="dark"] .facts .fact strong { color: var(--teal-soft); text-shadow: 0 0 10px rgba(70, 214, 255, .25); }
+
+/* ——— Foglio «Parla con Jarvis» fuori dalla home: reattore grande con lo spettro della voce ——— */
+.sheet .chat-core.reactor { width: 148px; height: 148px; margin: 34px auto 30px; }
+.sheet .chat-core.reactor .r2 { inset: 16px; } .sheet .chat-core.reactor .r3 { inset: 34px; } .sheet .chat-core.reactor .core { inset: 54px; }
+.chat-core .holo-spec { position: absolute; inset: -34px; pointer-events: none; }
+.sheet-head strong { display: grid; gap: 2px; color: var(--teal); font: 600 13px var(--mono); letter-spacing: .24em; text-shadow: 0 0 10px rgba(70, 214, 255, .45); }
+.sheet-head strong small { color: var(--muted); font: 500 10px var(--mono); letter-spacing: .14em; text-transform: uppercase; text-shadow: none; }
+/* Cambio schermata: i pannelli si montano uno dopo l'altro, come ologrammi che si accendono. */
+#view.view-enter .view-wrap > * { animation: holo-rise .5s cubic-bezier(.2, .8, .2, 1) backwards; }
+#view.view-enter .view-wrap > :nth-child(2) { animation-delay: .05s; }
+#view.view-enter .view-wrap > :nth-child(3) { animation-delay: .1s; }
+#view.view-enter .view-wrap > :nth-child(4) { animation-delay: .15s; }
+#view.view-enter .view-wrap > :nth-child(5) { animation-delay: .2s; }
+#view.view-enter .view-wrap > :nth-child(n+6) { animation-delay: .25s; }
+@keyframes holo-rise { from { opacity: 0; transform: translateY(10px); clip-path: inset(0 0 100% 0); filter: brightness(1.9) saturate(.3); } 55% { opacity: 1; filter: brightness(1.25); } to { opacity: 1; transform: none; clip-path: inset(0 0 0 0); filter: none; } }
+@media (prefers-reduced-motion: reduce) { #view.view-enter .view-wrap > * { animation: none; } }
