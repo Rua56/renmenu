@@ -103,3 +103,30 @@ test('Trattoria Blanch: un vitigno uguale di un\'altra cantina non vale', async 
   assert.equal(wrong.found, undefined);
   assert.match(wrong.reason, /cantina/);
 });
+
+test('nomi scritti a modo loro nella carta: «Schioppetto» ritrova Schiopetto; le foto indicate dalla ricerca si provano per prime', async () => {
+  const slot = blanchProducers([{ wine: true, name: 'Friulano', descr: 'Schioppetto · Capriva del Friuli', key: 'Friulano · Schioppetto · Capriva del Friuli' }])[0];
+  assert.equal(producerMatch(slot, { label: { nome: 'Friulano', cantina: 'Schiopetto' } }), true);
+  assert.equal(producerMatch(slot, { label: { nome: 'Friulano' }, page: 'https://www.schiopetto.it/vini/friulano' }), true);
+  assert.equal(producerMatch(slot, { label: { nome: 'Friulano', cantina: 'Scolaris' } }), false);
+
+  const fetchImpl = async (url) => {
+    url = String(url);
+    if (url.startsWith('https://generativelanguage.googleapis.com/')) return Response.json({ candidates: [{ content: { parts: [{ text: '{"pagine":["https://shop.example.com/friulano-schiopetto"],"immagini":["https://shop.example.com/img/p123.jpg"]}' }] } }] });
+    if (url === 'https://shop.example.com/img/p123.jpg') return new Response(jpeg, { headers: { 'content-type': 'image/jpeg' } });
+    return new Response('no', { status: 403 });
+  };
+  const res = await findBottle({ key: 'k', models: [] }, slot, slotFrequencies([slot]), { classify: async () => ({ ok: true, kind: 'bottiglia', label: { nome: 'Friulano', cantina: 'Schiopetto' } }), fetchImpl });
+  assert.ok(res.found, JSON.stringify(res));
+  assert.equal(res.found.image, 'https://shop.example.com/img/p123.jpg');
+  assert.equal(res.found.page, 'https://shop.example.com/friulano-schiopetto');
+  // Pagine che non si aprono: lo dice chiaro.
+  const closed = await findBottle({ key: 'k', models: [] }, slot, slotFrequencies([slot]), { classify: async () => null, fetchImpl: async (url) => String(url).startsWith('https://generativelanguage') ? Response.json({ candidates: [{ content: { parts: [{ text: '{"pagine":["https://a.example.com/x"]}' }] } }] }) : new Response('no', { status: 403 }) });
+  assert.match(closed.reason, /non si aprono/);
+});
+
+test('sul sito della cantina vale anche una foto senza il nome del vino nel file', () => {
+  const html = '<img src="/wp-content/uploads/IMG_4471.jpg" alt=""><img srcset="/a-300.jpg 300w, /a-900.jpg 900w">';
+  assert.deepEqual(imageCandidates(html, 'https://www.schiopetto.it/friulano', 'Friulano Schioppetto'), []);
+  assert.deepEqual(imageCandidates(html, 'https://www.schiopetto.it/friulano', 'Friulano Schioppetto', true).sort(), ['https://www.schiopetto.it/a-900.jpg', 'https://www.schiopetto.it/wp-content/uploads/IMG_4471.jpg']);
+});
