@@ -264,3 +264,25 @@ test('coperto: campo scritto male dal modello, l’operazione giusta si ricava d
   const r2 = validateOps([{ tipo: 'locale', campo: 'prezzo del servizio', nome: '3' }], menu(), 'Il coperto è 3 euro a persona');
   assert.deepEqual(r2.problems, []); assert.equal(r2.ops[0].nome, '3,00');
 });
+
+test('Premium: Jarvis imposta il numero WhatsApp e il link delle recensioni', async () => {
+  const { premiumErrors } = await import('../cloudflare/functions/_lib/premium.js');
+  const base = { ...menu(), premium: { direzione: 'editoriale' } };
+  const said = 'metti whatsapp +39 333 1234567 e il link recensioni https://g.page/r/abc123/review';
+  const { ops, problems } = validateOps([
+    { tipo: 'locale', campo: 'whatsapp', nome: '+39 333 1234567' },
+    { tipo: 'locale', campo: 'recensioni', nome: 'https://g.page/r/abc123/review' }
+  ], base, said);
+  assert.deepEqual(problems, []);
+  const { menu: out } = applyOps(base, [], ops, 'test');
+  assert.equal(out.premium.whatsapp, '+39 333 1234567');
+  assert.equal(out.premium.recensioni, 'https://g.page/r/abc123/review');
+  assert.equal(out.whatsapp, undefined);
+  assert.deepEqual(premiumErrors(out.premium), []);
+  assert.ok(premiumErrors({ whatsapp: 'chiamaci' }).length);
+  assert.ok(premiumErrors({ recensioni: 'http://g.page/x' }).length);
+  // Nei menu Standard non c'è il pulsante.
+  const std = validateOps([{ tipo: 'locale', campo: 'whatsapp', nome: '+39 333 1234567' }], menu(), said);
+  assert.equal(std.ops.length, 0);
+  assert.match(std.problems[0], /solo nei menu Premium/);
+});

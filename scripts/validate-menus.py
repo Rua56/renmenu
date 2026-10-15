@@ -23,7 +23,7 @@ SUPPORTED_UI_LANGUAGES = {"it", "en", "de", "fr", "es"}
 PREMIUM_DIRECTIONS = {"editoriale", "bistrot", "moderno"}
 PREMIUM_FONTS = {"classico", "moderno", "artigianale"}
 PREMIUM_COLORS = {"fondo", "testo", "accento", "secondario"}
-PREMIUM_KEYS = {"direzione", "caratteri", "colori", "logo", "copertina", "motto", "storia", "firma", "galleria"}
+PREMIUM_KEYS = {"direzione", "caratteri", "colori", "logo", "copertina", "motto", "storia", "firma", "galleria", "whatsapp", "recensioni"}
 SCHEDA_TEXT_KEYS = {"cantina", "territorio", "vitigno", "annata", "gradazione", "temperatura", "affinamento", "colore", "profumo", "gusto", "abbinamenti", "nota"}
 SCHEDA_PROFILE_KEYS = {"aromi", "struttura", "acidita", "dolcezza", "corpo"}
 HEX_COLOR = re.compile(r"^#[0-9a-fA-F]{6}$")
@@ -271,6 +271,15 @@ def validate_premium(value: object, report: Report) -> None:
                 report.error(f"premium.{key}: serve un indirizzo https o un file immagine del sito.")
     if "firma" in value and not (isinstance(value["firma"], str) and 0 < len(value["firma"].strip()) <= 80):
         report.error("premium.firma: testo breve (massimo 80 caratteri).")
+    if "whatsapp" in value:
+        wa = value["whatsapp"]
+        digits = re.sub(r"\D", "", wa) if isinstance(wa, str) else ""
+        if not (isinstance(wa, str) and re.fullmatch(r"\+?[\d\s./-]{8,20}", wa) and 8 <= len(digits) <= 15):
+            report.error("premium.whatsapp: serve un numero di telefono (con prefisso, es. +39 333 1234567).")
+    if "recensioni" in value:
+        url = value["recensioni"]
+        if not (isinstance(url, str) and re.fullmatch(r'https://[^\s"<>]+', url)):
+            report.error("premium.recensioni: serve un indirizzo https (link per lasciare una recensione).")
     if "galleria" in value:
         gallery = value["galleria"]
         if not isinstance(gallery, list) or len(gallery) > 8:

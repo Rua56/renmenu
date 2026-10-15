@@ -1,0 +1,153 @@
+<!DOCTYPE html>
+<html lang="it">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Menù da stampare</title>
+<meta name="robots" content="noindex">
+<link rel="icon" href="../assets/favicon.png" type="image/png">
+<style>
+  /* Versione stampabile del menu (A4): stessi dati del menu online, stessa grafica del Premium.
+     Si apre con /menu/stampa.html?m=<id> e si stampa o si salva in PDF dal browser. */
+  @page { size: A4; margin: 14mm 14mm 16mm; }
+  :root { --fondo: #fbf7f0; --testo: #2a211b; --accento: #8a5a2b; --secondario: #22352c; --titoli: Georgia, serif; --corpo: system-ui, sans-serif; }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  html { background: #e9e5df; }
+  body { font-family: var(--corpo); color: var(--testo); -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+  .barra { position: sticky; top: 0; z-index: 5; display: flex; gap: 10px; align-items: center; justify-content: center; flex-wrap: wrap; padding: 12px 16px; background: #1f1b16; color: #fff; font: 500 14px/1.3 system-ui, sans-serif; }
+  .barra button, .barra select { font: inherit; padding: 8px 14px; border-radius: 999px; border: 1px solid rgba(255,255,255,.3); background: transparent; color: #fff; cursor: pointer; }
+  .barra button.primo { background: #fff; color: #1f1b16; border-color: #fff; font-weight: 600; }
+  .foglio { width: 210mm; min-height: 297mm; margin: 18px auto; padding: 16mm 15mm 14mm; background: var(--fondo); box-shadow: 0 10px 40px -12px rgba(0,0,0,.35); position: relative; }
+  .foglio::before { content: ''; position: absolute; inset: 7mm; border: 1px solid color-mix(in srgb, var(--accento) 45%, transparent); pointer-events: none; }
+  .foglio::after { content: ''; position: absolute; inset: 8.2mm; border: .5px solid color-mix(in srgb, var(--accento) 25%, transparent); pointer-events: none; }
+  header { text-align: center; padding: 2mm 0 6mm; }
+  .crest { width: 22mm; height: 22mm; margin: 0 auto 3mm; display: grid; place-items: center; border-radius: 50%; border: 1px solid var(--accento); box-shadow: inset 0 0 0 1.4mm var(--fondo), inset 0 0 0 1.6mm color-mix(in srgb, var(--accento) 50%, transparent); font-family: var(--titoli); font-style: italic; font-size: 13mm; color: var(--accento); }
+  .logo { max-width: 46mm; max-height: 24mm; margin: 0 auto 3mm; display: block; object-fit: contain; }
+  .tipo { font-family: var(--titoli); font-style: italic; color: var(--accento); font-size: 13pt; }
+  h1 { font-family: var(--titoli); font-weight: 500; font-size: 30pt; line-height: 1.05; letter-spacing: -.01em; }
+  .motto { margin-top: 2mm; font-family: var(--titoli); font-style: italic; font-size: 11pt; opacity: .8; }
+  .orn { display: flex; align-items: center; justify-content: center; gap: 3mm; margin: 4mm auto 0; color: var(--accento); }
+  .orn::before, .orn::after { content: ''; width: 18mm; height: .3mm; background: currentColor; }
+  .orn i { width: 1.6mm; height: 1.6mm; transform: rotate(45deg); background: currentColor; }
+  .avviso { margin: 0 auto 5mm; max-width: 140mm; text-align: center; font-size: 9.5pt; padding: 2.5mm 4mm; border-top: .3mm solid color-mix(in srgb, var(--accento) 40%, transparent); border-bottom: .3mm solid color-mix(in srgb, var(--accento) 40%, transparent); }
+  .avviso b { font-family: var(--titoli); color: var(--accento); margin-right: 2mm; }
+  main { column-count: 2; column-gap: 11mm; column-rule: .25mm solid color-mix(in srgb, var(--accento) 22%, transparent); }
+  main.una { column-count: 1; max-width: 140mm; margin: 0 auto; }
+  section { break-inside: avoid-column; margin-bottom: 6mm; }
+  section.lunga { break-inside: auto; }
+  h2 { font-family: var(--titoli); font-weight: 500; font-size: 15pt; color: var(--secondario); text-align: center; break-after: avoid; }
+  h2 + .orn { margin: 1.2mm auto 2.5mm; }
+  h2 + .orn::before, h2 + .orn::after { width: 9mm; }
+  .sdesc { text-align: center; font-family: var(--titoli); font-style: italic; font-size: 9pt; opacity: .75; margin-bottom: 2.5mm; }
+  .voce { break-inside: avoid; margin-bottom: 2.4mm; }
+  .riga { display: flex; align-items: baseline; gap: 1.5mm; }
+  .nome { font-weight: 600; font-size: 10pt; line-height: 1.3; }
+  .nome sup { font-size: 6pt; font-weight: 500; opacity: .6; margin-left: .6mm; white-space: nowrap; }
+  .punti { flex: 1 1 6mm; min-width: 4mm; border-bottom: .3mm dotted color-mix(in srgb, var(--testo) 45%, transparent); transform: translateY(-1mm); }
+  .prezzo { font-family: var(--titoli); font-weight: 600; font-size: 10.5pt; color: var(--accento); white-space: nowrap; font-variant-numeric: tabular-nums; }
+  .prezzo small { font-family: var(--corpo); font-weight: 400; font-size: 7.5pt; opacity: .75; margin-right: 1mm; }
+  .var { display: flex; flex-direction: column; align-items: flex-end; }
+  .desc { font-size: 8.5pt; line-height: 1.35; opacity: .78; margin-top: .4mm; padding-right: 8mm; }
+  .tr { font-size: 8pt; font-style: italic; opacity: .6; }
+  footer { margin-top: 6mm; padding-top: 4mm; border-top: .3mm solid color-mix(in srgb, var(--accento) 35%, transparent); display: grid; grid-template-columns: 1fr auto; gap: 6mm; align-items: center; font-size: 7.5pt; line-height: 1.45; break-inside: avoid; }
+  footer .info b { font-family: var(--titoli); font-size: 9pt; }
+  .legenda { margin-top: 1.5mm; opacity: .75; }
+  .qr { text-align: center; font-size: 7pt; }
+  .qr svg { width: 24mm; height: 24mm; display: block; margin: 0 auto 1mm; }
+  .qr b { display: block; font-family: var(--titoli); font-size: 8.5pt; color: var(--accento); }
+  .errore { max-width: 420px; margin: 80px auto; text-align: center; font: 16px/1.5 system-ui, sans-serif; }
+  @media print { html, body { background: none; } .barra { display: none; } .foglio { margin: 0; width: auto; min-height: 0; padding: 0; box-shadow: none; background: none; } .foglio::before, .foglio::after { display: none; } }
+  @media screen and (max-width: 820px) { .foglio { transform-origin: top left; } }
+</style>
+</head>
+<body>
+<div class="barra" id="barra">
+  <span>Versione da stampare</span>
+  <select id="lingua" aria-label="Lingua"></select>
+  <select id="colonne" aria-label="Impaginazione"><option value="2">Due colonne</option><option value="1">Una colonna</option></select>
+  <label><input type="checkbox" id="desc" checked> Descrizioni</label>
+  <button class="primo" type="button" onclick="print()">Stampa o salva PDF</button>
+</div>
+<div class="foglio" id="foglio"><p class="errore">Carico il menu…</p></div>
+<script src="../assets/common.js"></script>
+<script type="module">
+import qrcode from '../assets/qrcode.mjs';
+const params = new URLSearchParams(location.search);
+const id = params.get('m') || '';
+const esc = (s) => String(s ?? '').replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+const foglio = document.getElementById('foglio');
+let menu;
+try {
+  const res = await fetch(`../menus/${encodeURIComponent(id)}.json`, { cache: 'no-cache' });
+  if (!res.ok) throw new Error('404');
+  menu = await res.json();
+} catch { foglio.innerHTML = '<p class="errore">Menù non trovato. Controlla il link.</p>'; throw new Error('menu'); }
+const R = window.RENMENU || { allergeni: {} };
+const langs = menu.lingue || ['it'];
+let lang = langs.includes(params.get('lang')) ? params.get('lang') : langs[0];
+const t = (v, l = lang) => (v == null ? '' : typeof v === 'string' ? v : (v[l] || v.it || Object.values(v)[0] || ''));
+
+// Stile: quello del Premium (colori e caratteri del locale); per gli Standard i colori del loro tema.
+const TEMI = { bordeaux: ['#7a1f2b', '#3f0f17'], trattoria: ['#3d6b3a', '#1f3a1d'], mare: ['#1d5a7a', '#0d2c40'], terracotta: ['#b0522b', '#6b2c12'], notte: ['#8c6a2c', '#2a2420'], sole: ['#9a6512', '#7a4a0c'] };
+let caratteri = 'artigianale';
+if (menu.premium && typeof menu.premium === 'object') {
+  await new Promise((ok) => { const s = document.createElement('script'); s.src = 'premium.js?v=9'; s.onload = ok; s.onerror = ok; document.head.appendChild(s); });
+  const P = window.RenMenuPremium;
+  if (P) { const st = P.resolveStyle(menu.premium); caratteri = st.caratteri; const r = document.documentElement.style; r.setProperty('--fondo', st.colori.fondo); r.setProperty('--testo', st.colori.testo); r.setProperty('--accento', st.accentoForte); r.setProperty('--secondario', st.colori.secondario); }
+} else {
+  const [a, b] = TEMI[menu.tema] || TEMI.bordeaux;
+  document.documentElement.style.setProperty('--accento', a); document.documentElement.style.setProperty('--secondario', b);
+}
+const FONTS = { classico: ["'Cormorant Garamond', Georgia, serif", "'DM Sans', system-ui, sans-serif"], moderno: ["'Bricolage Grotesque', system-ui, sans-serif", "'Manrope', system-ui, sans-serif"], artigianale: ["'Fraunces', Georgia, serif", "'Karla', system-ui, sans-serif"] };
+const link = document.createElement('link'); link.rel = 'stylesheet'; link.href = `../assets/fonts/premium-${caratteri}.css`; document.head.appendChild(link);
+document.documentElement.style.setProperty('--titoli', FONTS[caratteri][0]); document.documentElement.style.setProperty('--corpo', FONTS[caratteri][1]);
+
+const L = { it: ['Oggi', 'Allergeni', 'Coperto', 'Il menu sul telefono', 'in più lingue, sempre aggiornato'], en: ['Today', 'Allergens', 'Cover charge', 'Menu on your phone', 'in several languages, always up to date'], de: ['Heute', 'Allergene', 'Gedeck', 'Die Karte am Handy', 'in mehreren Sprachen, immer aktuell'], fr: ["Aujourd'hui", 'Allergènes', 'Couvert', 'Le menu sur votre téléphone', 'en plusieurs langues, toujours à jour'], es: ['Hoy', 'Alérgenos', 'Cubierto', 'El menú en tu móvil', 'en varios idiomas, siempre actualizado'] };
+const NOMI = { it: 'Italiano', en: 'English', de: 'Deutsch', fr: 'Français', es: 'Español', sl: 'Slovenščina' };
+const sel = document.getElementById('lingua');
+sel.innerHTML = langs.map((l) => `<option value="${l}"${l === lang ? ' selected' : ''}>${NOMI[l] || l}</option>`).join('');
+
+function qrSvg(url) {
+  const code = qrcode(0, 'M'); code.addData(url, 'Byte'); code.make();
+  const n = code.getModuleCount(), q = 2; let d = '';
+  for (let r = 0; r < n; r++) for (let c = 0; c < n; c++) if (code.isDark(r, c)) d += `M${c + q} ${r + q}h1v1h-1z`;
+  return `<svg viewBox="0 0 ${n + q * 2} ${n + q * 2}" shape-rendering="crispEdges" aria-label="QR"><rect width="100%" height="100%" fill="#fff"/><path d="${d}" fill="#111"/></svg>`;
+}
+
+function render() {
+  const S = L[lang] || L.it;
+  const desc = document.getElementById('desc').checked;
+  const una = document.getElementById('colonne').value === '1';
+  const nome = String(menu.nome || '');
+  const tipoMatch = nome.match(/^(osteria|trattoria|ristorante|pizzeria|enoteca|bar|caff[eè]|bistrot|locanda|agriturismo|birreria)\s+(.+)$/i);
+  const tipo = tipoMatch ? tipoMatch[1] : '', proprio = tipoMatch ? tipoMatch[2] : nome;
+  const iniziale = (proprio.replace(/^(?:al|alla|allo|ai|da|il|la|lo|le|i)\s+/i, '').charAt(0) || '·').toUpperCase();
+  const logo = menu.premium && /^https:\/\//.test(menu.premium.logo || '') ? menu.premium.logo : '';
+  const motto = t(menu.premium?.motto) || t(menu.sottotitolo);
+  const usati = new Set();
+  const sezioni = (menu.sezioni || []).map((s) => {
+    const voci = (s.voci || []).map((v) => {
+      (v.allergeni || []).forEach((a) => usati.add(a));
+      const varianti = (v.prezzi || []).filter((p) => p && p.prezzo);
+      const prezzo = varianti.length ? `<span class="prezzo var">${varianti.map((p) => `<span><small>${esc(t(p.etichetta))}</small>€ ${esc(p.prezzo)}</span>`).join('')}</span>` : v.prezzo ? `<span class="prezzo">€ ${esc(v.prezzo)}</span>` : '';
+      const sup = (v.allergeni || []).length ? `<sup>${esc(v.allergeni.join('·'))}</sup>` : '';
+      const d = desc && t(v.descrizione) ? `<p class="desc">${esc(t(v.descrizione))}</p>` : '';
+      return `<div class="voce"><div class="riga"><span class="nome">${esc(t(v.nome))}${sup}</span><span class="punti"></span>${prezzo}</div>${d}</div>`;
+    }).join('');
+    const lunga = (s.voci || []).length > 14;
+    return `<section${lunga ? ' class="lunga"' : ''}><h2>${esc(t(s.nome))}</h2><span class="orn"><i></i></span>${desc && t(s.descrizione) ? `<p class="sdesc">${esc(t(s.descrizione))}</p>` : ''}${voci}</section>`;
+  }).join('');
+  const url = `https://renmenu.com/menu/?m=${encodeURIComponent(id)}`;
+  const legenda = [...usati].sort((a, b) => a - b).map((k) => R.allergeni?.[k] ? `${k} ${esc(R.allergeni[k][lang] || R.allergeni[k].it)}` : '').filter(Boolean).join(' · ');
+  foglio.innerHTML = `<header>${logo ? `<img class="logo" src="${esc(logo)}" alt="">` : `<div class="crest">${esc(iniziale)}</div>`}${tipo ? `<div class="tipo">${esc(tipo)}</div>` : ''}<h1>${esc(proprio)}</h1>${motto ? `<p class="motto">${esc(motto)}</p>` : ''}<span class="orn"><i></i></span></header>
+    ${t(menu.avviso) ? `<p class="avviso"><b>${S[0]}</b>${esc(t(menu.avviso).replace(/^Oggi:\s*|^Today:\s*/i, ''))}</p>` : ''}
+    <main class="${una ? 'una' : ''}">${sezioni}</main>
+    <footer><div class="info"><b>${esc(nome)}</b>${menu.indirizzo ? `<br>${esc(menu.indirizzo)}` : ''}${menu.telefono ? ` · ${esc(menu.telefono)}` : ''}${menu.coperto ? `<br>${S[2]}: € ${esc(menu.coperto)}` : ''}${legenda ? `<div class="legenda">${S[1]}: ${legenda}</div>` : ''}</div>
+    <div class="qr">${qrSvg(url)}<b>${S[3]}</b>${S[4]}</div></footer>`;
+  document.title = `${nome} — menù da stampare`;
+}
+for (const el of ['lingua', 'colonne', 'desc']) document.getElementById(el).addEventListener('change', () => { if (el === 'lingua') lang = sel.value; render(); });
+render();
+</script>
+</body>
+</html>
