@@ -2261,6 +2261,9 @@ async function uploadMediaImage(context, id) {
   const media = await getOne(db, 'SELECT m.*, r.status AS request_status FROM media_items m JOIN requests r ON r.id=m.request_id WHERE m.id=?', identifier(id));
   assert(media, 'Foto non trovata.', 404);
   assert(!['completata', 'archiviata', 'chiusa'].includes(media.request_status), 'Pratica chiusa.', 409);
+  // Foto già nel menu: il menu punta al suo indirizzo. Una nuova copia (schermata vecchia del telefono) lo cambierebbe
+  // e nel menu resterebbe un indirizzo che non si apre più: si tiene quella che c'è.
+  if (media.status === 'confermata' && media.public_url) return { id: media.id, publicUrl: media.public_url, size: 0 };
   const mime = String(request.headers.get('content-type') || '').split(';')[0].trim();
   assert(PUBLIC_EXT[mime], 'Serve una foto JPG, PNG o WebP.', 415);
   assert(Number(request.headers.get('content-length') || 0) <= 900_000, 'Foto ridotta ancora troppo grande (oltre 900 KB).', 413);
