@@ -4,6 +4,7 @@ Si aggiunge una voce a ogni pull request che cambia un comportamento di Jarvis o
 
 ## 16 ottobre 2026
 
+- Traduzione: «Gnocchi di casa» tradotto «Homemade gnocchi» non viene più scartato come «informazione aggiunta» (prima restava un nome senza inglese che bloccava l'affidamento).
 - Menu già bilingui letti dalle foto: l'inglese stampato tra parentesi sotto il piatto («(Potatoes with jowls pork) (3)») diventa la traduzione inglese del nome e non finisce più nella descrizione italiana; i titoli «Contorni / side dishes» si dividono in italiano e inglese; l'inglese tra parentesi nel nome («(only by reservation)») esce dal nome italiano.
 - I numeri degli allergeni scritti senza parentesi sotto il piatto («(Fried potato dough) 1-9», «> 3») non vengono più presi per prezzi o per piatti nuovi.
 - Le descrizioni lunghe stampate sotto il piatto («Il nostro piatto firma: …») restano descrizioni invece di diventare «testo sulla foto da verificare»; anche la traduzione automatica ora accetta testi fino a 900 caratteri.

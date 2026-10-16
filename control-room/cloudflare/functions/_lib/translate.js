@@ -48,7 +48,7 @@ const CLAIMS = [
   [/\bvegan\b/i, /vegan/i],
   [/\bvegetarian\b/i, /vegetarian/i],
   [/\borganic\b/i, /\bbio\b|biologic/i],
-  [/\bhome-?made\b/i, /fatt[oaie] in casa|casalingh|della casa|nostra produzione|nostr[aei] produzion/i],
+  [/\bhome-?made\b/i, /fatt[oaie] in casa|casalingh|della casa|di casa|nostra produzione|nostr[aei] produzion/i],
   [/\bfrozen\b/i, /surgelat|congelat|abbattut/i],
   [/\bspicy\b/i, /piccant|peperoncin|nduja|diavol/i],
   // Tedesco, sloveno, francese, spagnolo: le stesse dichiarazioni nelle altre lingue.

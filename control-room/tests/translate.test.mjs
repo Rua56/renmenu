@@ -37,6 +37,8 @@ describe('traduzione automatica EN (bozza)', () => {
     assert.equal(result.menu.sezioni[0].voci[1].nome.en, undefined);
     assert.equal(checkTranslation('Pizza piccante', 'Spicy pizza'), '');
     assert.equal(checkTranslation('Cioccolata calda', 'Hot chocolate'), '');
+    // «Gnocchi di casa» (16 ottobre): «homemade» è scritto dal locale, non un'aggiunta.
+    assert.equal(checkTranslation('GNOCCHI DI CASA "BARONE" AL RAGÙ DI SALSICCIA', 'Homemade "Barone" gnocchi with sausage ragù'), '');
     assert.match(checkTranslation('Pane', 'Homemade bread'), /informazione aggiunta/);
   });
   it('servizio assente o in errore: nessuna modifica, segnalato come non disponibile', async () => {
