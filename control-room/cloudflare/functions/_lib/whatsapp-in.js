@@ -235,3 +235,34 @@ export async function blockSender(db, waId, deps = {}) {
   await writeJson(db, HELD_KEY, held, stamp);
   return { ok: true, name };
 }
+
+/** Numeri in attesa già annunciati a Riccardo, dal più recente: quelli su cui può dire «è un locale» o «è privato». */
+export async function heldSenders(db) {
+  const held = await readJson(db, HELD_KEY, {});
+  return Object.entries(held).filter(([, e]) => e?.notified)
+    .map(([waId, e]) => ({ waId, name: e.name || '', at: e.at || e.first_at || '' }))
+    .sort((a, b) => String(b.at).localeCompare(String(a.at)));
+}
+
+// Risposta a parole (telefonata, Telegram, Control Room) all'avviso «WhatsApp da un numero che non conosco».
+const SAYS_PRIVATE = /(?:^|[\s,.;:!])(?:è|e'|é)\s+(?:un[ao]?\s+|una\s+)?(?:privat[oa]|chat\s+privata|amic[oa]|parente|conoscente)\b|\bnon\s+(?:è|e')\s+un\s+(?:locale|cliente|ristorante|bar)\b|\bignor(?:al[oa]|are|a\s+(?:quel|il|questo)\s+numero)\b|\b(?:è\s+)?(?:un\s+)?numero\s+privato\b/i;
+const SAYS_VENUE = /(?:^|[\s,.;:!])(?:è|e'|é)\s+(?:un[ao]?\s+)?(?:locale|cliente|ristorante|bar|trattoria|osteria|pizzeria)\b|\bregistr(?:al[oa]|are\s+(?:il\s+)?numero)\b|\bapri(?:gli)?\s+(?:la\s+)?pratica\b(?!\s+(?:di|del|della|dello|dei|per|a|al|alla)\b)/i;
+/** 'private' | 'venue' | null. «non è un locale» vale come privato. */
+export function contactVerdict(text) {
+  const line = String(text || '');
+  // Frase breve: «Blanch è un cliente da tre anni, …» non è la risposta all'avviso.
+  if (line.length > 90) return null;
+  if (SAYS_PRIVATE.test(line)) return 'private';
+  if (SAYS_VENUE.test(line)) return 'venue';
+  return null;
+}
+/** Il numero in attesa di cui parla Riccardo: cifre o nome nella frase, altrimenti l'unico in attesa. */
+export function pickHeld(text, held) {
+  const line = String(text || '').toLowerCase();
+  const digits = line.replace(/[^\d]/g, '');
+  if (digits.length >= 6) { const byNumber = held.filter((h) => h.waId.endsWith(digits.slice(-9)) || digits.endsWith(h.waId.slice(-9))); if (byNumber.length === 1) return { contact: byNumber[0] }; }
+  const byName = held.filter((h) => h.name && h.name.toLowerCase().split(/\s+/).filter((w) => w.length >= 3).some((w) => line.includes(w)));
+  if (byName.length === 1) return { contact: byName[0] };
+  if (held.length === 1) return { contact: held[0] };
+  return { choices: byName.length > 1 ? byName : held };
+}

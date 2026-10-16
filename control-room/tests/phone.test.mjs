@@ -194,3 +194,19 @@ test('telefonata: l’anteprima chiesta al telefono arriva anche su Telegram con
     assert.doesNotMatch(out.risposta, /https?:/, 'al telefono niente link');
   });
 });
+
+test('telefonata: «è un privato, ignoralo» decide sul numero WhatsApp sconosciuto e resta scritto su Telegram', async () => {
+  const { importWhatsAppMessage, takeUnannouncedHeld } = await import('../cloudflare/functions/_lib/whatsapp-in.js');
+  await withServices({}, async (calls) => {
+    const db = database(), env = { ...(await linked(db)), WHATSAPP_PRIVATE_FILTER: 'true' };
+    await importWhatsAppMessage(db, env, { id: 'wamid.p1', waId: '393330000021', profileName: 'Luca', messageType: 'text', content: { text: 'Ci sei stasera?', raw: { type: 'text', text: { body: 'Ci sei stasera?' } } } });
+    await takeUnannouncedHeld(db); // l'avviso è già partito (Telegram + telefonata)
+    await missions.putSetting(db, 'phone_call_key', JSON.stringify({ key: 'k'.repeat(64), at: new Date().toISOString() }));
+    const before = calls.filter((c) => c.href.endsWith('/sendMessage')).length;
+    const out = await jarvisPhone(env, { richiesta: 'È un privato, ignoralo', chiave: 'k'.repeat(64) });
+    assert.match(out.risposta, /Luca è privato/);
+    const tg = calls.filter((c) => c.href.endsWith('/sendMessage')).slice(before).map((c) => c.body.text);
+    assert.ok(tg.some((t) => /^☎️ Dalla telefonata: «È un privato, ignoralo»/.test(t) && /Luca è privato/.test(t)), 'l’azione fatta a voce resta scritta su Telegram');
+    assert.match(db.raw.prepare("SELECT value FROM jarvis_settings WHERE key='wa_block'").get().value, /393330000021/);
+  });
+});
