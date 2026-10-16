@@ -1664,7 +1664,8 @@ export function createMissions(deps) {
     return names;
   }
   async function guardTick(db, env, { at = Date.now() } = {}) {
-    const list = parseGuardList(await setting(db, GUARD_KEY).catch(() => null));
+    // I menu di prova tolti dal sito non si sorvegliano più (sarebbero sempre «offline»).
+    const list = parseGuardList(await setting(db, GUARD_KEY).catch(() => null)).filter((slug) => !RETIRED_MENUS.has(slug));
     const state = parseGuardState(await setting(db, GUARD_STATE_KEY).catch(() => null));
     const due = dueSlugs(list, state, at);
     if (!due.length) return [];
