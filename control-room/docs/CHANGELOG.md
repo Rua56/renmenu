@@ -2,6 +2,12 @@
 
 Si aggiunge una voce a ogni pull request che cambia un comportamento di Jarvis o della Control Room, insieme all'aggiornamento di README, policy e funzionamento quando serve. Le voci più recenti stanno in alto.
 
+## 16 ottobre 2026
+
+- Menu già bilingui letti dalle foto: l'inglese stampato tra parentesi sotto il piatto («(Potatoes with jowls pork) (3)») diventa la traduzione inglese del nome e non finisce più nella descrizione italiana; i titoli «Contorni / side dishes» si dividono in italiano e inglese; l'inglese tra parentesi nel nome («(only by reservation)») esce dal nome italiano.
+- I numeri degli allergeni scritti senza parentesi sotto il piatto («(Fried potato dough) 1-9», «> 3») non vengono più presi per prezzi o per piatti nuovi.
+- Le descrizioni lunghe stampate sotto il piatto («Il nostro piatto firma: …») restano descrizioni invece di diventare «testo sulla foto da verificare»; anche la traduzione automatica ora accetta testi fino a 900 caratteri.
+
 ## 15 ottobre 2026
 
 - **Jarvis non si blocca più su un messaggio di Telegram.** Telegram rimanda lo stesso messaggio finché Jarvis non risponde: «Registra un numero di telefono per trattoria blanch» lo faceva lavorare troppo a lungo, così Telegram lo ripeteva ogni minuto (14 pratiche doppie) e i messaggi dopo non arrivavano. Ora ogni messaggio (update_id, impostazione `tg_seen`) si lavora una volta sola: alla ripetizione Jarvis lo dice a Riccardo e lascia passare gli altri. «registra un numero di telefono per …» senza numero ora chiede il numero.
