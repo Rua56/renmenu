@@ -8,7 +8,7 @@ export const TRANSLATION_SOURCE = 'Traduzione automatica Jarvis (bozza)';
 const BATCH = 20;
 // Workers AI gratuito: 10.000 «neuron» al giorno, poi errore 4006 fino a mezzanotte UTC.
 const QUOTA = /\b4006\b|daily free allocation|neurons?\b.*(?:used up|exceeded)|quota/i;
-const MAX_TEXT = 400;
+const MAX_TEXT = 900; // descrizioni lunghe stampate dal locale («Il nostro piatto firma: …», 16 ottobre)
 const ROOT_FIELDS = ['sottotitolo', 'avviso', 'note', 'orari'];
 
 const italian = (value) => (typeof value === 'string' ? value : value && typeof value === 'object' && !Array.isArray(value) && typeof value.it === 'string' ? value.it : '').trim();

@@ -1,5 +1,5 @@
 import { premiumErrors } from './premium.js';
-import { PAGE_TITLE, WINE_SECTION, allergenNumbers, cleanMeta, degustazioneNote, namelessVariants, columnsHeader, degustazioneHeading, degustazionePrice, descriptionLike, fmt, freeVariants, labelOnlyRow, labelSuffix, labeledVariants, marketPrice, pairingRow, proseLike, splitAvailability, tastingTier, undecidedPrice, unlabeledVariants } from './menu-structure.js';
+import { PAGE_TITLE, WINE_SECTION, allergenNumbers, bilingualTitle, cleanMeta, degustazioneNote, namelessVariants, columnsHeader, degustazioneHeading, degustazionePrice, descriptionLike, englishGloss, withoutEnglishAside, fmt, freeVariants, labelOnlyRow, labelSuffix, labeledVariants, marketPrice, pairingRow, proseLike, splitAvailability, tastingTier, undecidedPrice, unlabeledVariants } from './menu-structure.js';
 // Independent server-side rules. scripts/validate-menus.py remains the publication authority.
 const PRICE = /^\d+(?:[,.]\d{1,2})?$/;
 const TAGS = new Set(['veg', 'vegan', 'spicy', 'gf', 'new', 'top', 'frozen']);
@@ -316,7 +316,9 @@ export function extractMenuFromText(venue, source, requestedSlug) {
   const openSection = (title, lineNumber, extra = {}) => {
     if (!section.voci.length && /\bmescita\b|by the glass|\bal calice\b|\bal bicchiere\b/i.test(section.nome?.it || '')) glassPage = true;
     else if (section.voci.length && !WINE_SECTION.test(section.nome?.it || '')) glassPage = false;
-    section = { nome: { it: DEFAULT_SECTION_RE.test(title.trim()) ? DEFAULT_SECTION : title.slice(0, 100) }, voci: [], line: lineNumber, ...(DEFAULT_SECTION_RE.test(title.trim()) ? { unnamed: true } : {}), ...extra };
+    // «Contorni / side dishes»: menu già bilingue, l'inglese scritto dal locale va nella traduzione, non nel titolo italiano.
+    const both = bilingualTitle(title);
+    section = { nome: DEFAULT_SECTION_RE.test(title.trim()) ? { it: DEFAULT_SECTION } : both ? { it: both.it.slice(0, 100), en: both.en.slice(0, 100) } : { it: title.slice(0, 100) }, voci: [], line: lineNumber, ...(DEFAULT_SECTION_RE.test(title.trim()) ? { unnamed: true } : {}), ...extra };
     if (glassPage && WINE_SECTION.test(title) && !/calice|bicchiere|mescita|bottiglia/i.test(title)) section.descrizione = { it: 'Al calice' };
     else if (glassPage && !WINE_SECTION.test(title)) glassPage = false;
     sections.push(section); last = null; pending = null;
@@ -409,6 +411,19 @@ export function extractMenuFromText(venue, source, requestedSlug) {
     if (/^(?:il\s+)?coperto\b/i.test(row)) { unknown.push(row.slice(0, 700)); last = null; continue; }
     if (/^(?:orari\w*|pranzo|cena|aperti|apertura|chiusi|chiuso|tutti i giorni|dal\s|lun|mar|mer|gio|ven|sab|dom)\b.*\d{1,2}(?:[:.]\d{2})?\s*[-–]\s*\d{1,2}/i.test(row)) { unknown.push(row.slice(0, 700)); last = null; continue; }
     if (row.startsWith('[da verificare]')) { unknown.push(row.slice(0, 700)); last = null; continue; }
+    // «> (Potatoes with jowls pork) (3)» sotto «Patate in tecia»: il locale ha già scritto l'inglese. È la traduzione
+    // del nome (mai una descrizione italiana); restano solo gli allergeni o la nota italiana.
+    const gloss = last && last.line >= lineNumber - 1 && !last.descLocked && !last.item.nome?.en && !last.descLine && /^>?\s*\(/.test(row) ? englishGloss(row) : null;
+    if (gloss) {
+      last.item.nome = { ...last.item.nome, it: withoutEnglishAside(last.item.nome.it), en: gloss.en };
+      last.line = lineNumber; last.entry.descriptionLine = last.entry.descriptionLine || lineNumber;
+      consumed.push(lineNumber);
+      if (gloss.rest) {
+        last.item.descrizione = { it: sentenceCaseIfShouting(gloss.rest) };
+        last.descLine = lineNumber;
+      }
+      continue;
+    }
     if (section.tipo === 'degustazione') {
       // Più formule del percorso, ognuna coi suoi prezzi: «5 portate: 65 € a persona (85 € con abbinamento di 4 calici)».
       const tier = tastingTier(row);
@@ -546,7 +561,10 @@ export function extractMenuFromText(venue, source, requestedSlug) {
     }
     // Descrizione o portata: riga senza prezzo subito sotto una voce (o dentro un percorso).
     const contiguous = last && last.line >= lineNumber - 1;
-    const desc = contiguous && !proseLike(row) ? descriptionLike(row, { wine: isWine() }) : null;
+    // Riga segnata «> » dalla lettura foto: è la descrizione stampata sotto il piatto, anche se lunga e scritta
+    // come una frase («Il nostro piatto firma: …»). Le frasi del cliente nelle email non hanno il «> ».
+    const marked = /^>\s*\S/.test(row);
+    const desc = contiguous && (marked || !proseLike(row)) ? descriptionLike(row, { wine: isWine(), marked }) : null;
     if (desc && last && !last.descLocked) {
       const item = last.item;
       const text = sentenceCaseIfShouting(desc);

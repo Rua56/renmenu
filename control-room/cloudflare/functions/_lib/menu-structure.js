@@ -204,9 +204,9 @@ export function pairingRow(row) {
 const DESC_START = /^(?:>\s*|con\b|al\b|allo\b|alla\b|alle\b|ai\b|agli\b|all'|in\b|su\b|e\b|di\b|del\b|della\b|dei\b|delle\b|servit\w*|accompagnat\w*|ripien\w*|crema\b|salsa\b|fondo\b|emulsion\w*|cotto\b|cotta\b|marinat\w*|affumicat\w*|tartare\b|battuta\b)/i;
 const WINE_DESC = /\b(?:doc|docg|igt|igp|aoc|annata|vitign\w*|uve|uvaggio|barrique|acciaio|affinat\w*|sur lie|metodo|brut|extra dry|dosaggio)\b/i;
 const PROSE = /\b(?:buongiorno|buonasera|salve|ciao|grazie|cordiali|saluti|vorremmo|vorrei|potete|potreste|ci serve|ci piacerebbe|allego|allegato|in allegato|vi mando|vi invio|il nostro locale|siamo)\b/i;
-export function descriptionLike(row, { wine = false } = {}) {
+export function descriptionLike(row, { wine = false, marked = false } = {}) {
   const text = row.trim();
-  if (text.length < 3 || text.length > 260 || PROSE.test(text) || /[?]$/.test(text) || /^#/.test(text)) return null;
+  if (text.length < 3 || text.length > (marked ? 900 : 260) || PROSE.test(text) || /[?]$/.test(text) || /^#/.test(text)) return null;
   const letters = text.replace(/[^A-Za-zÀ-ÿ]/g, '');
   const shouting = letters.length >= 12 && letters === letters.toUpperCase() && /[,]|\b(?:CON|E|AL|ALLA|DI)\b/.test(text);
   if (DESC_START.test(text) || /^[a-zà-ÿ]/.test(text) || shouting || (wine && (WINE_DESC.test(text) || /,/.test(text)))) return text.replace(/^>\s*/, '').trim();
@@ -297,4 +297,37 @@ export function proseLike(row) {
   const words = text.split(/\s+/).length;
   const verb = /\b(?:è|sono|siamo|abbiamo|vorremmo|vorrei|vogliamo|possiamo|dovrei|posso|puoi|potete|vi|ci|mi|mando|allego|scrivo|chiedere|sapere|decidere|pagano|pagare|compreso|compresa|inclus[oa]|escluso|esclusa)\b/i;
   return words >= 6 && verb.test(text) && (/[.?!]$/.test(text) || words >= 9);
+}
+
+/* ——— Menu già bilingui (foto del 16 ottobre 2026: italiano con l'inglese stampato sotto, tra parentesi) ——— */
+
+// Parole inglesi tipiche dei menu: bastano a capire che il testo tra parentesi è la traduzione, non una descrizione.
+const ENGLISH = /\b(?:with|and|of|the|for|by|only|on|in|or|from|our|fried|grilled|roasted|baked|smoked|sweet|sour|mixed|salad|cheeses?|ham|potato(?:es)?|platter|cold cuts|slice|bread|dessert|additions?|service|cover charge|fries|chips|spinach|tomato(?:es)?|meat|beef|pork|chicken|fish|butter|cream|reservation|dough|horseradish|appeti[sz]ers?|apetizers?|starters?|side dishes|first courses|main courses|desserts|drinks|soft drinks|non-alcoholic|coffee|shop|wines?|beers?|water|frozen|product|variable)\b/i;
+const ITALIAN = /\b(?:con|di|del|della|dei|delle|al|alla|alle|ai|agli|allo|il|lo|la|le|gli|e|ed|in|su|per|fatt[oaie]|nostr[oaie])\b/i;
+const looksEnglish = (text) => ENGLISH.test(text) && !ITALIAN.test(text.replace(/\b(?:in|e)\b/gi, ''));
+
+/** «Contorni / side dishes» → { it: 'Contorni', en: 'Side dishes' }. null se la seconda parte non è inglese. */
+export function bilingualTitle(title) {
+  const m = String(title || '').match(/^(.{3,60}?)\s+\/\s+(.{3,60})$/);
+  if (!m || !looksEnglish(m[2]) || looksEnglish(m[1])) return null;
+  const en = m[2].trim();
+  return { it: m[1].trim(), en: en.charAt(0).toUpperCase() + en.slice(1) };
+}
+
+/** «(Potatoes with jowls pork) (3)» sotto «Patate in tecia»: la traduzione inglese del nome, non una descrizione.
+ *  Restituisce { en, rest } (rest = allergeni o nota rimasta, es. «(3)»), o null. */
+export function englishGloss(desc) {
+  const m = String(desc || '').trim().replace(/^>\s*/, '').match(/^\(([^()]*(?:\([^()]*\)[^()]*)*)\)\s*(.*)$/);
+  if (!m || m[1].length < 3 || m[1].length > 160 || !looksEnglish(m[1]) || /^\d/.test(m[1])) return null;
+  const en = m[1].trim();
+  // «(Variabile (Variable))»: la nota italiana resta, la sua traduzione tra parentesi no.
+  const rest = m[2].trim().replace(/^\(\s*([^()]+?)\s*\([^()]*\)\s*\)$/, '$1').replace(/^\(\s*\/?\s*\)$/, '');
+  return { en: en.charAt(0).toUpperCase() + en.slice(1), rest };
+}
+
+/** «Arancine SOLO SU PRENOTAZIONE (only by reservation)»: l'inglese tra parentesi esce dal nome italiano. */
+export function withoutEnglishAside(name) {
+  const text = String(name || '');
+  const out = text.replace(/\s*\(([^()]{3,80})\)/g, (all, inner) => (looksEnglish(inner) ? '' : all)).trim();
+  return out.length >= 3 ? out : text;
 }

@@ -287,6 +287,12 @@ export function tidyReading(text) {
       continue;
     }
     if (/^\s*>/.test(line)) {
+      // «> (Fried potato dough) 1-9», «> 3»: numeri di allergeni senza parentesi, non un prezzo.
+      const loose = line.match(/^(\s*>\s*(?:.*\)\s+)?)(\d{1,2}(?:\s*[-,]\s*\d{1,2})*|\/)\s*$/);
+      if (loose && (loose[2] === '/' || codes(loose[2]))) {
+        out.push(`${loose[1].trimEnd()}${loose[2] === '/' ? '' : ` (${codes(loose[2])})`}`.replace(/^(\s*>)$/, '$1 (/)'));
+        continue;
+      }
       const tail = line.match(ALLERGEN_TAIL);
       out.push(tail ? `${line.slice(0, tail.index).trimEnd()}${codes(tail[1]) ? ` (${codes(tail[1])})` : ''}` : line);
       continue;
@@ -326,8 +332,9 @@ function parse(text) {
   const extraction = extractMenuFromText('x', rows.filter((r) => !r.includes('[?]')).join('\n'), 'x');
   const items = [], sections = [];
   extraction.menu.sezioni.forEach((s, si) => {
-    sections.push({ name: s.nome.it, tipo: s.tipo || '', prezzo: s.prezzo || '', unita: s.unita?.it || '', index: si });
-    s.voci.forEach((v, vi) => items.push({ section: si, index: vi, tipo: s.tipo || '', name: v.nome.it, prezzo: v.prezzo, prezzi: v.prezzi, descr: v.descrizione?.it || '', course: s.tipo === 'degustazione' && !v.prezzo }));
+    // Menu già bilingue: l'inglese scritto dal locale torna nel testo fonte («Contorni / Side dishes», «> (Mixed salad) (3)»).
+    sections.push({ name: s.nome.en ? `${s.nome.it} / ${s.nome.en}` : s.nome.it, tipo: s.tipo || '', prezzo: s.prezzo || '', unita: s.unita?.it || '', index: si });
+    s.voci.forEach((v, vi) => items.push({ section: si, index: vi, tipo: s.tipo || '', name: v.nome.it, prezzo: v.prezzo, prezzi: v.prezzi, descr: [v.nome.en && `(${v.nome.en})`, v.descrizione?.it].filter(Boolean).join(' '), course: s.tipo === 'degustazione' && !v.prezzo }));
   });
   const titles = rows.filter((r) => /^#{1,3}\s*\S/.test(r) && /\bmescita\b|by the glass|\bal calice\b|\bal bicchiere\b/i.test(r)).map((r) => r.replace(/^#{1,3}\s*/, '').trim());
   return { items, sections, doubts, other: extraction.uncertain, titles };
