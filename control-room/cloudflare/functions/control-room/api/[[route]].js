@@ -41,6 +41,7 @@ import { CANTINA_SOURCE, PER_ROUND as BOTTLES_PER_ROUND, blanchProducers, findBo
 import { menuSlots } from '../../_lib/media.js';
 import { isBlanchBottleSection, isBlanchSlug } from '../../_lib/blanch.js';
 import { applyVenueInfo, extractVenueInfo } from '../../_lib/venue-info.js';
+import { labelPhotoSections } from '../../_lib/photo-sections.js';
 import { applyPriceCorrections } from '../../_lib/corrections.js';
 import { applyOps as applyDraftOps, editLogKey, replayableOps } from '../../_lib/draft-edit.js';
 async function draftNotes(db, requestId) {
@@ -1080,13 +1081,16 @@ async function action(db, type, input, env = {}) {
     // Email a capo automatico (~75 caratteri): le righe spezzate si riuniscono, il numero di righe resta uguale.
     const emailSource = prepareEmailSource(request.source_text);
     let combinedSource = emailSource;
-    const segments = [];
+    const segments = [], apartMenus = [];
     for (const analysis of analyses) {
       // Un file che comincia con piatti senza titolo non deve finire nell'ultima sezione del file precedente: apre l'elenco senza titolo.
       const firstLine = String(analysis.text).split(/\r?\n/).find((l) => l.trim());
       if (combinedSource.trim() && firstLine && !/^\s*#/.test(firstLine)) combinedSource += `\n# ${DEFAULT_SECTION}`;
       const start = combinedSource.split(/\r?\n/).length + 1;
-      combinedSource += `\n${analysis.text}`;
+      // Menu a parte in foto (menu-del-pranzo.jpg): sezioni sue, non mescolate a quelle della carta.
+      const apart = labelPhotoSections(analysis.text, analysis.filename);
+      if (apart.label) apartMenus.push({ filename: analysis.filename, label: apart.label });
+      combinedSource += `\n${apart.text}`;
       const method = parseList(analysis.prov)[0]?.method || 'manual';
       segments.push({ start, end: combinedSource.split(/\r?\n/).length, filename: analysis.filename, method });
     }
@@ -1133,6 +1137,7 @@ async function action(db, type, input, env = {}) {
       const doubtful = extraction.uncertain.filter((row) => row.startsWith('[da verificare]')).length;
       if (doubtful) extraction.warnings.push(`${doubtful} voci delle foto lette in modo diverso dalle due letture: le trovi tra le righe da verificare, inseriscile tu dopo aver guardato la foto.`);
     }
+    for (const a of apartMenus) extraction.warnings.push(`«${a.filename}»: è un menu a parte, i suoi piatti sono nelle sezioni «${a.label} · …» (non mescolati alla carta). Se li vuoi altrove, spostali in Revisione.`);
     if (sourceVenue) extraction.warnings.push(`Nome del locale letto dalla riga “Locale:” dell’email (“${sourceVenue}”): confermalo in revisione e aggiorna la scheda cliente.`);
     assert(extraction.extracted.length > 0 && extraction.menu.id, 'Nessun piatto con prezzo leggibile: aggiungi il materiale o trascrivi la fonte.', 422);
     // Tutti i piani includono l'inglese: Jarvis lo prepara subito come bozza da verificare.
@@ -1209,6 +1214,12 @@ async function action(db, type, input, env = {}) {
         .bind(inheritedPlan, timestamp, requestId, request.revision, id)
     ], 'draft.generate', `Bozza da ${extraction.extracted.length} voci attestate${extraction.info?.applied?.length ? `, ${extraction.info.applied.length} informazioni del locale inserite` : ''}; ${extraction.notes.filter((n) => !['testo', 'inserito'].includes(n.kind)).length} cose da sistemare o confermare${extraction.notes.some((n) => n.kind === 'testo') ? ` (più ${extraction.notes.filter((n) => n.kind === 'testo').length} righe di testo dell’email)` : ''}.`, requestId,
       { sql: 'SELECT 1 FROM drafts WHERE id=?', args: [id] });
+    // Bozza Premium fatta a mano da Riccardo: le lingue chieste dal locale e le schede dei vini le completa
+    // comunque Jarvis (come quando la bozza la fa lui), poi solo un avviso con il link, nessuna domanda.
+    if (creative && db.actor !== 'jarvis') {
+      const queued = await enrollPrep({ get: missions.setting, put: missions.putSetting }, db, { draftId: id, requestId, plan: 'premium', steps: ['lingue', 'schede', 'pronta'], notifyOnly: true }).catch(() => false);
+      if (queued) extraction.warnings.push('Lingue richieste e schede dei vini: le completa Jarvis tra un paio di minuti, ti avviso su Telegram quando ha finito.');
+    }
     result = { id, extraction };
   } else if (type === 'preparePreview') {
     const draftId = identifier(p.draftId), revision = Number(p.revision);

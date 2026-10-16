@@ -17,10 +17,17 @@ function clauses(line) {
   // Una riga può contenere più informazioni: «aperti 12-14:30, chiusi il martedì. Telefono …, Instagram … e su Facebook …».
   const out = [];
   for (const sentence of line.split(/(?<=[.;!?])\s+(?=[A-ZÀ-Ýa-z])/)) {
-    const starts = [...sentence.matchAll(KEY_START)].map((m) => m.index).filter((i, k, a) => !k || i - a[k - 1] > 3);
+    // La stessa parola ripetuta («Coperto: non c'è coperto») non apre una nuova informazione.
+    const keys = [...sentence.matchAll(KEY_START)].filter((m, k, a) => !k || (m.index - a[k - 1].index > 3 && m[0].toLowerCase() !== a[k - 1][0].toLowerCase()));
+    const starts = keys.map((m) => m.index);
     if (!starts.length) { out.push(sentence); continue; }
     if (starts[0] > 0) out.push(sentence.slice(0, starts[0]));
-    starts.forEach((start, k) => out.push(sentence.slice(start, starts[k + 1] ?? sentence.length)));
+    starts.forEach((start, k) => {
+      const part = sentence.slice(start, starts[k + 1] ?? sentence.length);
+      // «Telefono e WhatsApp: 333 …»: un numero solo per tutte e due, la parte vuota resta attaccata.
+      if (k && /^(?:tel\.?|telefono|cell\.?|cellulare)\s*(?:e|o|\/|,)?\s*$/i.test(out[out.length - 1] || '')) out[out.length - 1] += part;
+      else out.push(part);
+    });
   }
   return out.map((c) => c.replace(/^[\s,;]+|[\s,;]+$/g, '').replace(/\s+(?:oppure|e|o|e su|su|seguiteci su|o su)$/i, '').trim()).filter(Boolean);
 }
@@ -35,6 +42,15 @@ function phoneIn(text) {
   const list = [...new Set((keyword ? found : italian).map((n) => n.replace(/[./-]/g, ' ').replace(/\s+/g, ' ').replace(/^0039/, '+39')))];
   if (list.length > 1) return { doubt: `Ho trovato più numeri (${list.join(', ')}): quale metto nel menu?` };
   return { value: list[0] };
+}
+
+// Link per lasciare una recensione (Google, TripAdvisor…): va nel pulsante «Lascia una recensione» del Premium.
+function reviewIn(text) {
+  const t = String(text);
+  const url = t.match(/https?:\/\/[^\s"<>«»]+/i);
+  if (!url || !/recension|review|tripadvisor|g\.page\/r\//i.test(t)) return null;
+  const link = url[0].replace(/[.,;)»]+$/, '').replace(/^http:/i, 'https:');
+  return { value: link };
 }
 
 function instagramIn(text) {
@@ -157,12 +173,18 @@ export function extractVenueInfo(sourceText, { protectedWords = [] } = {}) {
         continue;
       }
       if (/\bcoperto\b/i.test(clause)) { put('coperto', coverIn(clause)); continue; }
+      const rv = reviewIn(clause); if (rv) { put('recensioni', rv); continue; }
       const fb = facebookIn(clause); if (fb) { put('facebook', fb); continue; }
       const ig = instagramIn(clause); if (ig) { put('instagram', ig); continue; }
       const hr = hoursIn(clause);
       const ph = phoneIn(hr ? clause.replace(new RegExp(TIME.source, 'g'), ' ') : clause);
       if (hr) hours.push({ ...hr, line: index + 1, source: original, fixed, clause });
-      if (ph && (!hr || /\b(?:tel|telefono|cell|cellulare|numero|whatsapp|chiamate)\b/i.test(clause))) put('telefono', ph);
+      if (ph && (!hr || /\b(?:tel|telefono|cell|cellulare|numero|whatsapp|chiamate)\b/i.test(clause))) {
+        // «WhatsApp: …» è il numero del pulsante «Prenota su WhatsApp», non un secondo telefono.
+        const wa = /\bwhats\s?app\b/i.test(clause);
+        if (wa) put('whatsapp', ph);
+        if (!wa || /\b(?:tel|telefono|cell|cellulare|chiamate)\b/i.test(clause)) put('telefono', ph);
+      }
     }
   });
   if (!found.indirizzo) for (const [k, raw] of lines.entries()) {
@@ -195,7 +217,8 @@ export function withoutVenueInfo(sourceText, info) {
 }
 
 const FERIE = new RegExp(`\\bferie\\b|\\bchiusura\\s+(?:estiva|invernale|annuale|per ferie)\\b|\\b(?:ad|in|a|per|durante)\\s+(?:gennaio|febbraio|marzo|aprile|maggio|giugno|luglio|agosto|settembre|ottobre|novembre|dicembre)\\b.*\\bchi(?:us|ud)\\w*|\\bchi(?:us|ud)\\w*.*\\b(?:ad|in|a|per|durante)\\s+(?:gennaio|febbraio|marzo|aprile|maggio|giugno|luglio|agosto|settembre|ottobre|novembre|dicembre)\\b`);
-export const INFO_LABELS = { ferie: 'Chiusura per ferie', coperto: 'Coperto', telefono: 'Telefono', orari: 'Orari', instagram: 'Instagram', facebook: 'Facebook', indirizzo: 'Indirizzo' };
+export const INFO_LABELS = { ferie: 'Chiusura per ferie', coperto: 'Coperto', telefono: 'Telefono', whatsapp: 'WhatsApp', recensioni: 'Link recensioni', orari: 'Orari', instagram: 'Instagram', facebook: 'Facebook', indirizzo: 'Indirizzo' };
+const PREMIUM_BUTTONS = new Set(['whatsapp', 'recensioni']);
 const show = (field, value) => (field === 'coperto' ? `${value} €` : field === 'instagram' ? `@${value}` : value);
 
 /**
@@ -204,14 +227,25 @@ const show = (field, value) => (field === 'coperto' ? `${value} €` : field ===
  */
 export function applyVenueInfo(menu, info, { source = 'testo ricevuto', overwrite = false } = {}) {
   const next = { ...menu }, applied = [], doubts = [], provenance = [], warnings = [];
-  for (const [field, entry] of Object.entries(info.found || {})) {
+  const premium = menu.premium && typeof menu.premium === 'object' && !Array.isArray(menu.premium);
+  for (const [rawField, entry] of Object.entries(info.found || {})) {
+    let field = rawField;
     if (entry.doubt || !entry.value) { doubts.push({ field, ...entry }); continue; }
-    const current = field === 'orari' ? (typeof menu.orari === 'object' ? menu.orari?.it : menu.orari) : menu[field];
+    // WhatsApp e recensioni sono pulsanti del Premium. Nello Standard il numero WhatsApp vale come telefono
+    // solo se il locale non ne ha scritto un altro; il link delle recensioni resta fuori.
+    const button = PREMIUM_BUTTONS.has(field);
+    if (button && !premium) {
+      if (field === 'whatsapp' && !info.found.telefono && !menu.telefono) field = 'telefono';
+      else { warnings.push(`${INFO_LABELS[field]} «${entry.value}» (riga ${entry.line}): c’è solo nel menu Premium, non l’ho inserito.`); continue; }
+    }
+    const inPremium = PREMIUM_BUTTONS.has(field);
+    const current = field === 'orari' ? (typeof menu.orari === 'object' ? menu.orari?.it : menu.orari) : inPremium ? menu.premium[field] : menu[field];
     if (String(current || '') === entry.value) continue;
     if (current && !overwrite) { doubts.push({ field, ...entry, doubt: `${INFO_LABELS[field]}: nel menu c’è «${current}», nel testo «${entry.value}». Quale tengo?` }); continue; }
-    next[field] = field === 'orari' ? { it: entry.value, ...(entry.en ? { en: entry.en } : {}) } : entry.value;
+    if (inPremium) next.premium = { ...(next.premium || {}), [field]: entry.value };
+    else next[field] = field === 'orari' ? { it: entry.value, ...(entry.en ? { en: entry.en } : {}) } : entry.value;
     applied.push({ field, value: entry.value, before: current || null, line: entry.line, source: entry.source, fixed: entry.fixed, check: entry.check || null, ...(entry.remark ? { remark: entry.remark } : {}) });
-    provenance.push({ path: field === 'orari' ? 'orari.it' : field, source: entry.line ? `riga ${entry.line}` : source, value: entry.value, status: 'confermato' });
+    provenance.push({ path: field === 'orari' ? 'orari.it' : inPremium ? `premium.${field}` : field, source: entry.line ? `riga ${entry.line}` : source, value: entry.value, status: 'confermato' });
     if (field === 'orari' && entry.en) provenance.push({ path: 'orari.en', source: 'Orari italiani riscritti in inglese da Jarvis (nessuna traduzione automatica)', value: entry.en, status: 'confermato' });
   }
   if (applied.length) warnings.push(`Inseriti dal testo: ${applied.map((a) => `${INFO_LABELS[a.field]} ${show(a.field, a.value)}${a.before ? ` (prima «${a.before}»)` : ''}${a.line ? ` (riga ${a.line})` : ''}${a.fixed ? ' — corretto un refuso, controlla' : ''}${a.check ? ` — ${a.check}` : ''}`).join('; ')}.`);
