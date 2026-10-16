@@ -4,6 +4,7 @@ Si aggiunge una voce a ogni pull request che cambia un comportamento di Jarvis o
 
 ## 16 ottobre 2026
 
+- Numero WhatsApp sconosciuto: oltre ai pulsanti su Telegram si risponde a parole, anche al telefono quando Jarvis chiama («è un privato, ignoralo», «è un locale, registralo»; con più numeri in attesa basta il nome, altrimenti Jarvis chiede quale). Quello che Jarvis fa durante una telefonata resta scritto su Telegram («☎️ Dalla telefonata: …»).
 - Richiesta a voce o al telefono su un locale senza menu online (per esempio «dai un'occhiata al Bacaro Al Collio»): Jarvis non apre più una pratica di modifica su un altro locale citato prima (era finita su Trattoria Blanch). Dice che quel locale non ha ancora un menu online, oppure chiede su quale menu intervenire.
 - **Prove email Standard e Premium.** Nell'email del locale «WhatsApp: …» non è più un secondo telefono in conflitto (prima telefono e WhatsApp restavano entrambi fuori): nel Premium va nel pulsante «Prenota su WhatsApp» (`premium.whatsapp`), nello Standard vale come telefono solo se non ce n'è un altro. Un link per le recensioni (Google, TripAdvisor) scritto nell'email va nel pulsante «Lascia una recensione» del Premium. «Telefono e WhatsApp: …» vale per tutti e due; «Coperto: non c'è coperto» non viene più letto come coperto senza importo.
 - Bozza Premium generata a mano da Riccardo: le lingue chieste dal locale (fino a 4) e le schede dei vini le completa comunque Jarvis, come quando la bozza la fa lui; alla fine solo un avviso con il link, nessuna domanda.

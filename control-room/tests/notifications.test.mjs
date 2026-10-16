@@ -136,3 +136,37 @@ test('avvisi: un numero WhatsApp sconosciuto chiede «è un locale?» e il tocco
     assert.equal(db.sqlite.prepare("SELECT COUNT(*) n FROM requests WHERE source_channel='whatsapp'").get().n, 1);
   });
 });
+
+test('avvisi: al numero WhatsApp sconosciuto si risponde anche a parole (telefonata, Telegram, Control Room)', async () => {
+  const { importWhatsAppMessage, contactVerdict } = await import('../cloudflare/functions/_lib/whatsapp-in.js');
+  assert.equal(contactVerdict('è un privato, ignoralo'), 'private');
+  assert.equal(contactVerdict('no, non è un locale'), 'private');
+  assert.equal(contactVerdict('sì è un locale, registralo'), 'venue');
+  assert.equal(contactVerdict('come va la pratica di Blanch?'), null);
+  assert.equal(contactVerdict('è un locale'), 'venue');
+  assert.equal(contactVerdict('è privato'), 'private');
+  assert.equal(contactVerdict('apri la pratica di Blanch'), null);
+  await withServices(async (calls) => {
+    const db = database(), env = { ...(await linked(db, { voice: false })), WHATSAPP_PRIVATE_FILTER: 'true' };
+    await missions.announceExternal(db, env);
+    const msg = (id, waId, name, text) => ({ id, waId, profileName: name, messageType: 'text', content: { text, raw: { type: 'text', text: { body: text } } } });
+    // Prima dell'annuncio la frase non tocca niente: segue la strada di sempre.
+    await importWhatsAppMessage(db, env, msg('wamid.a', '393330000011', 'Marco', 'Ciao, ci vediamo stasera?'));
+    await missions.announceExternal(db, env);
+    await missions.telegramUpdate(db, env, { message: { chat: { id: 42, type: 'private' }, text: 'è un privato, ignoralo' } });
+    assert.match(sent(calls).at(-1).text, /^Va bene, Marco è privato/);
+    assert.match(db.sqlite.prepare("SELECT value FROM jarvis_settings WHERE key='wa_block'").get().value, /393330000011/);
+    // Due numeri in attesa: «è un locale» senza dire quale chiede quale, coi pulsanti.
+    await importWhatsAppMessage(db, env, msg('wamid.b', '393330000012', 'Bar Centrale', 'Vi mando il listino'));
+    await importWhatsAppMessage(db, env, msg('wamid.c', '393330000013', 'Giulia', 'Ciao!'));
+    await missions.announceExternal(db, env);
+    await missions.telegramUpdate(db, env, { message: { chat: { id: 42, type: 'private' }, text: 'è un locale' } });
+    const ask = sent(calls).at(-1);
+    assert.match(ask.text, /^Ho più numeri WhatsApp in attesa/);
+    assert.deepEqual(ask.reply_markup.inline_keyboard.flat().map((b) => b.callback_data).sort(), ['wak:393330000012', 'wak:393330000013']);
+    // Col nome nella frase sceglie da solo e apre la pratica.
+    await missions.telegramUpdate(db, env, { message: { chat: { id: 42, type: 'private' }, text: 'il bar centrale è un locale, registralo' } });
+    assert.match(sent(calls).at(-1).text, /^Fatto: Bar Centrale è un locale\. Ho aperto la pratica/);
+    assert.equal(db.sqlite.prepare("SELECT COUNT(*) n FROM requests WHERE source_channel='whatsapp'").get().n, 1);
+  });
+});

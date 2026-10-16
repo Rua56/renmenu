@@ -812,6 +812,12 @@ export async function jarvisPhone(env, input = {}) {
         }
       } catch { /* la telefonata continua lo stesso */ }
     }
+    // Il resto (risposte e azioni fatte a voce) resta scritto anche su Telegram, con la richiesta detta al telefono:
+    // Riccardo ritrova lì cosa ha chiesto e cosa ha fatto Jarvis.
+    const rest = out.messages.filter((m) => m.kind === 'text' && m.picked !== 'tap' && !tapOnTelegram(m.buttons) && !/https?:\/\//.test(m.text || '')).map((m) => m.text).filter(Boolean);
+    if (rest.length) {
+      try { await sendTelegram(env, chat, `☎️ Dalla telefonata: «${text.slice(0, 200)}»\n\n${rest.join('\n\n').slice(0, 3000)}`, null); } catch { /* la telefonata continua lo stesso */ }
+    }
   }
   const said = out.messages.map((m) => (m.picked === 'tap' ? '' : m.say)).filter(Boolean).join(' ');
   const options = asked.filter(([, data]) => String(data).split(':')[0] !== 'pub').map(([label]) => label);

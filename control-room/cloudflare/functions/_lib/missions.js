@@ -35,7 +35,7 @@ import { pickButton } from './short-reply.js';
 import { normalizePhone, parseClientPhone } from './phone-number.js';
 import { HABITS, HABITS_KEY, habitOf, isAuto, parseHabits, recordChoice, rulesView, setRule } from './habits.js';
 import { AGENT_VERSION, callOutcome, callOwner, ensureAgent, phoneNumber, twilioNumber } from './phone.js';
-import { approveSender, blockSender, takeUnannouncedHeld } from './whatsapp-in.js';
+import { approveSender, blockSender, contactVerdict, heldSenders, pickHeld, takeUnannouncedHeld } from './whatsapp-in.js';
 import { lastReadingTest, startReadingTest } from './reading-test.js';
 import { LATER_MS, MUTE_MS, REPEAT_MS, activeInitiatives, loadInitiatives } from './initiative.js';
 import { draftClientReply, lastMessage, originalSubject, sendWhatsAppReply } from './client-reply.js';
@@ -836,14 +836,9 @@ export function createMissions(deps) {
     }
     if (verb === 'wak' || verb === 'wap') {
       // wak: il numero WhatsApp è un locale (pratica dai messaggi in attesa) · wap: è privato, sempre ignorato
-      const out = verb === 'wak' ? await approveSender(db, env, missionId, { fetchImpl: deps.fetchImpl }) : await blockSender(db, missionId);
       await ack(verb === 'wak' ? 'È un locale' : 'Privato');
       await clear();
-      const who = out.name || `+${missionId}`;
-      const text = !out.ok ? 'Numero non valido.' : verb === 'wap' ? `Va bene, ${who} è privato: i suoi messaggi restano solo sul tuo telefono e non te lo chiedo più.`
-        : `Fatto: ${who} è un locale. ${out.imported ? `Ho aperto la pratica con ${out.imported === 1 ? 'il suo messaggio' : `i suoi ${out.imported} messaggi`}.` : 'I suoi prossimi messaggi diventano pratiche.'}`;
-      if (out.ok) await auditedBatch(jarvisDb(db), [], 'jarvis.whatsapp_contact', `Numero WhatsApp segnato come ${verb === 'wak' ? 'locale' : 'privato'} da Riccardo.`, out.requestId || null).catch(() => {});
-      await sendTg(db, env, chat, text, null, deps.fetchImpl);
+      await sendTg(db, env, chat, await markContact(db, env, verb, missionId), null, deps.fetchImpl);
       return;
     }
     if (verb === 'pia' || verb === 'piano') {
@@ -942,6 +937,9 @@ export function createMissions(deps) {
     // «togli i locali di prova»: elenco e pulsante di conferma.
     if (TEST_CLEAN.test(text)) { const offer = await testCleanOffer(db); await sendTg(db, env, chat, offer.text, offer.buttons || null, deps.fetchImpl, { stacked: true }); return; }
     // «il numero di Trattoria Blanch è 333…»: telefono sulla scheda cliente.
+    // «è un privato, ignoralo» / «è un locale»: risposta a parole all'avviso di un numero WhatsApp sconosciuto.
+    const contact = await contactTurn(db, env, text);
+    if (contact) { await sendTg(db, env, chat, contact.text, contact.buttons || null, deps.fetchImpl, { stacked: true }); return; }
     const phoned = await clientPhoneTurn(db, text);
     if (phoned) { await sendTg(db, env, chat, phoned, null, deps.fetchImpl); return; }
     // «menu da stampare di Al Tralcio»: link alla versione A4 (stessa grafica, QR in fondo).
@@ -1188,6 +1186,8 @@ export function createMissions(deps) {
     const guarded = await guardTurn(db, heard.text);
     if (guarded) { await reply(db, env, chat, `«${heard.text.trim()}»\n\n${guarded}`, true); return; }
     if (TEST_CLEAN.test(heard.text)) { const offer = await testCleanOffer(db); await sendTg(db, env, chat, `«${heard.text.trim()}»\n\n${offer.text}`, offer.buttons || null, deps.fetchImpl, { stacked: true }); return; }
+    const contact = await contactTurn(db, env, heard.text);
+    if (contact) { await sendTg(db, env, chat, `«${heard.text.trim()}»\n\n${contact.text}`, contact.buttons || null, deps.fetchImpl, { stacked: true }); return; }
     const phoned = await clientPhoneTurn(db, heard.text);
     if (phoned) { await reply(db, env, chat, `«${heard.text.trim()}»\n\n${phoned}`, true); return; }
     const printable = await printTurn(db, heard.text);
@@ -1719,6 +1719,31 @@ export function createMissions(deps) {
   }
   // «il numero di Trattoria Blanch è 333 1234567»: lo salva sulla scheda cliente (+39…), così i
   // messaggi WhatsApp da quel numero finiscono subito tra le pratiche del locale giusto.
+  /** Numero WhatsApp sconosciuto: «è un locale» (wak) apre la pratica coi messaggi in attesa, «privato» (wap) lo ignora per sempre. */
+  async function markContact(db, env, verb, waId, name = '') {
+    const out = verb === 'wak' ? await approveSender(db, env, waId, { fetchImpl: deps.fetchImpl }) : await blockSender(db, waId);
+    const who = out.name || name || `+${waId}`;
+    if (!out.ok) return 'Numero non valido.';
+    await auditedBatch(jarvisDb(db), [], 'jarvis.whatsapp_contact', `Numero WhatsApp segnato come ${verb === 'wak' ? 'locale' : 'privato'} da Riccardo.`, out.requestId || null).catch(() => {});
+    return verb === 'wap' ? `Va bene, ${who} è privato: i suoi messaggi restano solo sul tuo telefono e non te lo chiedo più.`
+      : `Fatto: ${who} è un locale. ${out.imported ? `Ho aperto la pratica con ${out.imported === 1 ? 'il suo messaggio' : `i suoi ${out.imported} messaggi`}.` : 'I suoi prossimi messaggi diventano pratiche.'}`;
+  }
+  // La stessa decisione a parole (al telefono, su Telegram o nella Control Room): «è un privato, ignoralo», «è un locale».
+  // Vale solo mentre c'è un numero in attesa già annunciato; altrimenti la frase segue la strada di sempre.
+  async function contactTurn(db, env, text) {
+    const verdict = contactVerdict(text);
+    if (!verdict) return null;
+    const held = await heldSenders(db).catch(() => []);
+    if (!held.length) return null;
+    const { contact, choices } = pickHeld(text, held);
+    const verb = verdict === 'venue' ? 'wak' : 'wap';
+    if (!contact) {
+      const label = (h) => `${h.name || 'senza nome'} (+${h.waId})`;
+      return { text: `Ho più numeri WhatsApp in attesa: ${choices.map(label).join(', ')}. Quale ${verdict === 'venue' ? 'è il locale' : 'è privato'}?`,
+        buttons: choices.slice(0, 6).map((h) => [`${verdict === 'venue' ? 'Locale' : 'Privato'}: ${label(h)}`.slice(0, 60), `${verb}:${h.waId}`]) };
+    }
+    return { text: await markContact(db, env, verb, contact.waId, contact.name) };
+  }
   async function clientPhoneTurn(db, text) {
     const asked = parseClientPhone(text);
     if (!asked) return null;
@@ -2711,7 +2736,7 @@ export function createMissions(deps) {
       await sendTg(db, env, chat, `WhatsApp da un numero che non conosco: ${who}${h.preview ? `, «${h.preview}»` : ''}. È un locale? Se è una chat privata non apro niente e non te lo chiedo più.`,
         [['Sì, è un locale: apri la pratica', `wak:${h.waId}`], ['No, è privato: ignoralo', `wap:${h.waId}`]], deps.fetchImpl, { stacked: true }).catch(() => null);
       // Può essere un cliente nuovo: anche questo è un avviso importante.
-      await phoneAlert(db, env, chat, `WhatsApp da un numero che non conosco, ${h.name || 'senza nome'}: potrebbe essere un locale. Guarda su Telegram.`, `wa:${h.waId}`).catch(() => null);
+      await phoneAlert(db, env, chat, `WhatsApp da un numero che non conosco, ${h.name || 'senza nome'}: potrebbe essere un locale. Dimmi pure qui se è un locale da registrare o un privato da ignorare.`, `wa:${h.waId}`).catch(() => null);
     }
     return fresh.length + held.length;
   }
