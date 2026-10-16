@@ -4,7 +4,7 @@
 // Eccezione: i locali di PROVA il cui menu è stato tolto dal sito (15 ottobre 2026, su richiesta di Riccardo) si possono
 // cancellare del tutto, anche con pratiche chiuse: il loro QR non porta più a niente.
 const OPEN_BLOCKED = new Set(['completata']);
-export const RETIRED_MENUS = Object.freeze(new Set(['al-chiostro-bistrot', 'buffet-alla-valletta', 'caffe-bon-bon', 'demo', 'demo-premium', 'enoteca-il-calice-storto', 'la-chincaglieria-gastronomica', 'osteria-al-tralcio', 'pub-underground']));
+export const RETIRED_MENUS = Object.freeze(new Set(['al-chiostro-bistrot', 'buffet-alla-valletta', 'caffe-bon-bon', 'demo', 'demo-premium', 'enoteca-il-calice-storto', 'la-chincaglieria-gastronomica', 'osteria-al-tralcio', 'pub-underground', 'riccardo-the-best-one']));
 const DONE_MISSIONS = new Set(['pubblicazione', 'verifica', 'completata']);
 
 export async function deletionPlan(db, { getOne, rows }, { requestId = null, clientId = null, retired = false }) {
