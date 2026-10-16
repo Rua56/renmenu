@@ -4,6 +4,7 @@ Si aggiunge una voce a ogni pull request che cambia un comportamento di Jarvis o
 
 ## 16 ottobre 2026
 
+- Numero WhatsApp sconosciuto associato a un locale a parole: «è un locale, associalo a Osteria Codelli 23» (anche riformulato dal telefono, «Riccardo dice che è il titolare di …») mette il numero sulla scheda del cliente e porta il messaggio in attesa tra le sue pratiche, invece di finire come promemoria. Lo stesso vale per «il numero di X è …», anche se il numero era già salvato.
 - Numero WhatsApp sconosciuto: oltre ai pulsanti su Telegram si risponde a parole, anche al telefono quando Jarvis chiama («è un privato, ignoralo», «è un locale, registralo»; con più numeri in attesa basta il nome, altrimenti Jarvis chiede quale). Quello che Jarvis fa durante una telefonata resta scritto su Telegram («☎️ Dalla telefonata: …»).
 - Tolto dal sito il menu di prova «Riccardo The Best One» (scelta di Riccardo, 16 ottobre): online restano solo i clienti veri. Aggiunto a `RETIRED_MENUS`, così la sorveglianza e «togli i locali di prova» lo trattano come gli altri menu di prova tolti.
 - Richiesta a voce o al telefono su un locale senza menu online (per esempio «dai un'occhiata al Bacaro Al Collio»): Jarvis non apre più una pratica di modifica su un altro locale citato prima (era finita su Trattoria Blanch). Dice che quel locale non ha ancora un menu online, oppure chiede su quale menu intervenire.
