@@ -56,7 +56,7 @@ export function sha256HexSync(text) {
 const FORWARD_MARK = /^\s*(?:-{2,}\s*(?:forwarded message|messaggio inoltrato|original message|messaggio originale)\s*-{2,}|inizio messaggio inoltrato:?|begin forwarded message:?)\s*$/i;
 const FORWARD_HEADER = /^\s*(?:da|from|data|date|inviato|sent|oggetto|subject|a|to|cc|ccn|bcc|rispondi a|reply-to)\s*:/i;
 export function unforwardSubject(subject) {
-  return String(subject || '').replace(/^\s*(?:(?:fwd?|i|inoltro|tr|wg|r|re|ris)\s*:\s*)+/i, '').trim();
+  return String(subject || '').replace(/^\s*(?:(?:fwd?|i|inoltro|tr|wg|r|re|ris|oggetto|subject)\s*:\s*)+/i, '').trim();
 }
 export function unforwardText(text) {
   const lines = String(text || '').replace(/\r\n?/g, '\n').split('\n');

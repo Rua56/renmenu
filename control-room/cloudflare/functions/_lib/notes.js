@@ -96,7 +96,7 @@ export function reviewNotes({ sourceText = '', uncertain = [], extracted = [], m
   return notes;
 }
 
-const INFO = { coperto: 'Coperto', telefono: 'Telefono', orari: 'Orari', instagram: 'Instagram', facebook: 'Facebook', indirizzo: 'Indirizzo', ferie: 'Chiusura per ferie' };
+const INFO = { coperto: 'Coperto', telefono: 'Telefono', whatsapp: 'WhatsApp (pulsante «Prenota»)', recensioni: 'Link per le recensioni', orari: 'Orari', instagram: 'Instagram', facebook: 'Facebook', indirizzo: 'Indirizzo', ferie: 'Chiusura per ferie' };
 export const NOTE_LABELS = { premium: 'Premium su misura', inserito: 'Inserito da Jarvis', conferma: 'Da confermare', piatto: 'Righe del menu non lette', correzione: 'Correzioni da applicare', foto: 'Righe dubbie delle foto', piano: 'Piano', tema: 'Tema grafico', coperto: 'Coperto', orari: 'Orari', contatti: 'Contatti', allergeni: 'Allergeni', lingue: 'Lingue', testo: 'Altro testo dell’email', preventivo: 'Domanda su prezzi e tempi', ferie: 'Chiusura per ferie', storia: 'Storia del locale', galleria: 'Foto e galleria', schede: 'Schede dei vini', dicitura: 'Dicitura richiesta', stile: 'Stile richiesto', logo: 'Logo', allegati: 'Allegati citati', servizio: 'Servizio compreso' };
 
 /** Riassunto breve per Telegram/notifiche: prima le cose che richiedono un intervento. */

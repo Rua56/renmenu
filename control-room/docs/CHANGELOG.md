@@ -4,6 +4,10 @@ Si aggiunge una voce a ogni pull request che cambia un comportamento di Jarvis o
 
 ## 16 ottobre 2026
 
+- **Prove email Standard e Premium.** Nell'email del locale «WhatsApp: …» non è più un secondo telefono in conflitto (prima telefono e WhatsApp restavano entrambi fuori): nel Premium va nel pulsante «Prenota su WhatsApp» (`premium.whatsapp`), nello Standard vale come telefono solo se non ce n'è un altro. Un link per le recensioni (Google, TripAdvisor) scritto nell'email va nel pulsante «Lascia una recensione» del Premium. «Telefono e WhatsApp: …» vale per tutti e due; «Coperto: non c'è coperto» non viene più letto come coperto senza importo.
+- Bozza Premium generata a mano da Riccardo: le lingue chieste dal locale (fino a 4) e le schede dei vini le completa comunque Jarvis, come quando la bozza la fa lui; alla fine solo un avviso con il link, nessuna domanda.
+- Foto di un menu a parte mandata con l'email (nome del file come «menu-del-pranzo.jpg», «menu-bambini.jpg»): i suoi piatti vanno in sezioni proprie («Menu del pranzo · Primi») e la formula a prezzo fisso («Menu completo … 16,00») sotto «Menu del pranzo», invece di mescolarsi alle sezioni della carta (`_lib/photo-sections.js`).
+- Oggetto dell'email scritto con «Oggetto:» davanti: il prefisso si toglie come «Re:» e «I:».
 - Traduzione: «Gnocchi di casa» tradotto «Homemade gnocchi» non viene più scartato come «informazione aggiunta» (prima restava un nome senza inglese che bloccava l'affidamento).
 - Menu già bilingui letti dalle foto: l'inglese stampato tra parentesi sotto il piatto («(Potatoes with jowls pork) (3)») diventa la traduzione inglese del nome e non finisce più nella descrizione italiana; i titoli «Contorni / side dishes» si dividono in italiano e inglese; l'inglese tra parentesi nel nome («(only by reservation)») esce dal nome italiano.
 - I numeri degli allergeni scritti senza parentesi sotto il piatto («(Fried potato dough) 1-9», «> 3») non vengono più presi per prezzi o per piatti nuovi.
