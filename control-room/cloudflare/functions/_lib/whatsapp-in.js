@@ -245,13 +245,14 @@ export async function heldSenders(db) {
 }
 
 // Risposta a parole (telefonata, Telegram, Control Room) all'avviso «WhatsApp da un numero che non conosco».
-const SAYS_PRIVATE = /(?:^|[\s,.;:!])(?:è|e'|é)\s+(?:un[ao]?\s+|una\s+)?(?:privat[oa]|chat\s+privata|amic[oa]|parente|conoscente)\b|\bnon\s+(?:è|e')\s+un\s+(?:locale|cliente|ristorante|bar)\b|\bignor(?:al[oa]|are|a\s+(?:quel|il|questo)\s+numero)\b|\b(?:è\s+)?(?:un\s+)?numero\s+privato\b/i;
-const SAYS_VENUE = /(?:^|[\s,.;:!])(?:è|e'|é)\s+(?:un[ao]?\s+)?(?:locale|cliente|ristorante|bar|trattoria|osteria|pizzeria)\b|\bregistr(?:al[oa]|are\s+(?:il\s+)?numero)\b|\bapri(?:gli)?\s+(?:la\s+)?pratica\b(?!\s+(?:di|del|della|dello|dei|per|a|al|alla)\b)/i;
+// Al telefono l'agente riformula in terza persona («Riccardo dice che il contatto di Vlad è un suo amico privato,
+// non un locale. Chiede di ignorarlo»): le frasi possono essere lunghe e indirette.
+const SAYS_PRIVATE = /\bprivat[oa]\b|\bnon\s+(?:è\s+)?(?:un|una)\s+(?:locale|cliente|ristorante|bar)\b|\bignor(?:al[oa]|arl[oa]|are|a)\b|\b(?:amic[oa]|parente|conoscente|familiare)\b/i;
+const SAYS_VENUE = /(?:^|[\s,.;:!])(?:è|e'|é)\s+(?:un[ao]?\s+|il\s+|di\s+)?(?:locale|cliente|ristorante|bar|trattoria|osteria|pizzeria|titolare)\b|\bregistr(?:al[oa]|arl[oa]|are)\b|\b(?:associ|colleg|abbin)(?:al[oa]|arl[oa]|are|a)\b|\bapri(?:gli)?\s+(?:la\s+)?pratica\b(?!\s+(?:di|del|della|dello|dei|per|a|al|alla)\b)/i;
 /** 'private' | 'venue' | null. «non è un locale» vale come privato. */
 export function contactVerdict(text) {
   const line = String(text || '');
-  // Frase breve: «Blanch è un cliente da tre anni, …» non è la risposta all'avviso.
-  if (line.length > 90) return null;
+  if (line.length > 400) return null;
   if (SAYS_PRIVATE.test(line)) return 'private';
   if (SAYS_VENUE.test(line)) return 'venue';
   return null;

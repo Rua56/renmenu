@@ -170,3 +170,26 @@ test('avvisi: al numero WhatsApp sconosciuto si risponde anche a parole (telefon
     assert.equal(db.sqlite.prepare("SELECT COUNT(*) n FROM requests WHERE source_channel='whatsapp'").get().n, 1);
   });
 });
+
+test('avvisi: frasi riformulate dal telefono e «associalo a <locale>» mettono il numero sulla scheda del cliente', async () => {
+  const { importWhatsAppMessage, contactVerdict } = await import('../cloudflare/functions/_lib/whatsapp-in.js');
+  // Così le passa l'agente al telefono (16 ottobre): in terza persona e indirette.
+  assert.equal(contactVerdict('Riccardo dice che il contatto WhatsApp di Vlad è un suo amico privato, non un locale. Chiede di segnalarlo come privato e di ignorarlo.'), 'private');
+  assert.equal(contactVerdict('Riccardo dice che il numero è di Paolo, il titolare di Osteria Codelli 23: è un locale, associalo alla pratica di Osteria Codelli 23.'), 'venue');
+  await withServices(async (calls) => {
+    const db = database(), env = { ...(await linked(db, { voice: false })), WHATSAPP_PRIVATE_FILTER: 'true' };
+    const s = db.sqlite;
+    s.prepare("INSERT INTO clients (id,name,plan,created_at,updated_at) VALUES ('cod','Osteria Codelli 23','premium','2026-10-10','2026-10-10')").run();
+    await missions.announceExternal(db, env);
+    await importWhatsAppMessage(db, env, { id: 'wamid.k1', waId: '393477905309', profileName: 'Pao', messageType: 'text', content: { text: 'Ciao, ecco la carta dei vini', raw: { type: 'text', text: { body: 'Ciao, ecco la carta dei vini' } } } });
+    await missions.announceExternal(db, env);
+    // Una frase lunga che non parla del contatto non tocca niente.
+    await missions.telegramUpdate(db, env, { message: { chat: { id: 42, type: 'private' }, text: 'ricordami che domani devo passare da un amico per il menu di Blanch, è importante' } });
+    assert.equal(s.prepare("SELECT phone FROM clients WHERE id='cod'").get().phone, null);
+    await missions.telegramUpdate(db, env, { message: { chat: { id: 42, type: 'private' }, text: 'Riccardo dice che il numero è di Paolo, il titolare di Osteria Codelli 23: è un locale, associalo alla pratica di Osteria Codelli 23.' } });
+    assert.match(sent(calls).at(-1).text, /^Fatto: il numero \+393477905309 \(Pao\) ora è sulla scheda di «Osteria Codelli 23»/);
+    assert.equal(s.prepare("SELECT phone FROM clients WHERE id='cod'").get().phone, '+393477905309');
+    const req = s.prepare("SELECT client_id FROM requests WHERE source_channel='whatsapp'").all();
+    assert.deepEqual(req.map((r) => r.client_id), ['cod'], 'il messaggio in attesa va tra le pratiche di Codelli');
+  });
+});

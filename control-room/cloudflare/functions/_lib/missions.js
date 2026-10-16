@@ -940,7 +940,7 @@ export function createMissions(deps) {
     // «è un privato, ignoralo» / «è un locale»: risposta a parole all'avviso di un numero WhatsApp sconosciuto.
     const contact = await contactTurn(db, env, text);
     if (contact) { await sendTg(db, env, chat, contact.text, contact.buttons || null, deps.fetchImpl, { stacked: true }); return; }
-    const phoned = await clientPhoneTurn(db, text);
+    const phoned = await clientPhoneTurn(db, text, env);
     if (phoned) { await sendTg(db, env, chat, phoned, null, deps.fetchImpl); return; }
     // «menu da stampare di Al Tralcio»: link alla versione A4 (stessa grafica, QR in fondo).
     const printable = await printTurn(db, text);
@@ -1188,7 +1188,7 @@ export function createMissions(deps) {
     if (TEST_CLEAN.test(heard.text)) { const offer = await testCleanOffer(db); await sendTg(db, env, chat, `«${heard.text.trim()}»\n\n${offer.text}`, offer.buttons || null, deps.fetchImpl, { stacked: true }); return; }
     const contact = await contactTurn(db, env, heard.text);
     if (contact) { await sendTg(db, env, chat, `«${heard.text.trim()}»\n\n${contact.text}`, contact.buttons || null, deps.fetchImpl, { stacked: true }); return; }
-    const phoned = await clientPhoneTurn(db, heard.text);
+    const phoned = await clientPhoneTurn(db, heard.text, env);
     if (phoned) { await reply(db, env, chat, `«${heard.text.trim()}»\n\n${phoned}`, true); return; }
     const printable = await printTurn(db, heard.text);
     if (printable) { await reply(db, env, chat, `«${heard.text.trim()}»\n\n${printable}`, true); return; }
@@ -1736,8 +1736,29 @@ export function createMissions(deps) {
     if (!verdict) return null;
     const held = await heldSenders(db).catch(() => []);
     if (!held.length) return null;
+    // Frase lunga: deve parlare di quel contatto (numero, WhatsApp, il suo nome), non di altro che nomina «un amico».
+    const line = String(text).toLowerCase();
+    const aboutContact = /\b(?:numer[oi]|contatt[oi]|whatsapp|messaggi?o?|scritto|chiamat[oa])\b/.test(line) || held.some((h) => h.name && h.name.toLowerCase().split(/\s+/).some((w) => w.length >= 3 && line.includes(w)));
+    if (line.length > 60 && !aboutContact) return null;
     const { contact, choices } = pickHeld(text, held);
     const verb = verdict === 'venue' ? 'wak' : 'wap';
+    // «è il titolare di Osteria Codelli 23, associalo alla pratica»: il numero va sulla scheda di quel cliente, così il
+    // messaggio in attesa e i prossimi finiscono tra le sue pratiche (non in un «Nuovo contatto WhatsApp»).
+    if (contact && verb === 'wak') {
+      const clients = await rows(db, 'SELECT id,name,menu_id,phone FROM clients').catch(() => []);
+      const venue = namedClient(text, clients);
+      if (venue) {
+        const phone = `+${contact.waId}`;
+        const other = clients.find((c) => c.id !== venue.id && c.phone && c.phone.replace(/\D/g, '') === contact.waId);
+        if (other) return { text: `Il numero ${phone} è già sulla scheda di «${other.name}»: toglilo da lì nella Control Room, poi ridimmelo.` };
+        if (venue.phone !== phone) {
+          await auditedBatch(jarvisDb(db), [db.prepare('UPDATE clients SET phone=?,revision=revision+1,updated_at=? WHERE id=?').bind(phone, now(), venue.id)],
+            'client.phone', `Telefono di «${venue.name}»: ${venue.phone ? `${venue.phone} → ` : ''}${phone} (numero WhatsApp di ${contact.name || 'un contatto'}, detto da Riccardo).`, null);
+        }
+        const done = await markContact(db, env, 'wak', contact.waId, contact.name);
+        return { text: `Fatto: il numero ${phone}${contact.name ? ` (${contact.name})` : ''} ora è sulla scheda di «${venue.name}»${venue.phone && venue.phone !== phone ? ` (prima c'era ${venue.phone})` : ''}. ${done.replace(/^Fatto: [^.]*\.\s*/, '')}` };
+      }
+    }
     if (!contact) {
       const label = (h) => `${h.name || 'senza nome'} (+${h.waId})`;
       return { text: `Ho più numeri WhatsApp in attesa: ${choices.map(label).join(', ')}. Quale ${verdict === 'venue' ? 'è il locale' : 'è privato'}?`,
@@ -1745,7 +1766,18 @@ export function createMissions(deps) {
     }
     return { text: await markContact(db, env, verb, contact.waId, contact.name) };
   }
-  async function clientPhoneTurn(db, text) {
+  // Cliente nominato in una frase lunga («associalo alla pratica di Osteria Codelli 23»): tutte le parole distintive del nome.
+  const GENERIC_NAME = new Set(['osteria', 'trattoria', 'ristorante', 'pizzeria', 'locanda', 'enoteca', 'birreria', 'agriturismo', 'caffe', 'bar', 'the', 'del', 'della', 'dei', 'alla', 'al']);
+  function namedClient(text, clients) {
+    const plain = (t) => String(t || '').toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/[^a-z0-9]+/g, ' ').trim();
+    const hay = ` ${plain(text)} `;
+    const hits = clients.filter((c) => {
+      const words = plain(c.name).split(' ').filter((w) => w && !GENERIC_NAME.has(w) && (w.length >= 3 || /\d/.test(w)));
+      return words.length && words.every((w) => hay.includes(` ${w} `));
+    });
+    return hits.length === 1 ? hits[0] : null;
+  }
+  async function clientPhoneTurn(db, text, env = {}) {
     const asked = parseClientPhone(text);
     if (!asked) return null;
     if (!asked.number) return `Dimmi il numero, per esempio: «il numero di ${asked.venue} è 333 1234567». Lo salvo sulla scheda del locale.`;
@@ -1757,10 +1789,15 @@ export function createMissions(deps) {
     const other = clients.find((c) => c.id !== client.id && c.phone && c.phone.replace(/\D/g, '') === phone.slice(1));
     if (other) return `Il numero ${phone} è già sulla scheda di «${other.name}». Toglilo da lì nella Control Room prima di darlo a «${client.name}».`;
     const old = clients.find((c) => c.id === client.id)?.phone || null;
-    if (old === phone) return `«${client.name}» ha già il numero ${phone}.`;
-    await auditedBatch(jarvisDb(db), [db.prepare('UPDATE clients SET phone=?,revision=revision+1,updated_at=? WHERE id=?').bind(phone, now(), client.id)],
-      'client.phone', `Telefono di «${client.name}»: ${old ? `${old} → ` : ''}${phone} (detto da Riccardo).`, null);
-    return `Fatto: il numero di «${client.name}» è ${phone}${old ? ` (prima era ${old})` : ''}. Quando scrive su WhatsApp da questo numero, Jarvis riconosce il locale e mette il messaggio tra le sue pratiche.`;
+    if (old !== phone) {
+      await auditedBatch(jarvisDb(db), [db.prepare('UPDATE clients SET phone=?,revision=revision+1,updated_at=? WHERE id=?').bind(phone, now(), client.id)],
+        'client.phone', `Telefono di «${client.name}»: ${old ? `${old} → ` : ''}${phone} (detto da Riccardo).`, null);
+    }
+    // Messaggi WhatsApp di quel numero ancora in attesa («è un locale?»): ora sono del cliente.
+    const waiting = (await heldSenders(db).catch(() => [])).find((h) => h.waId === phone.slice(1));
+    const imported = waiting ? (await approveSender(db, env, waiting.waId, { fetchImpl: deps.fetchImpl }).catch(() => null))?.imported || 0 : 0;
+    if (old === phone) return `«${client.name}» ha già il numero ${phone}.${imported ? ` Ho aggiunto alle sue pratiche ${imported === 1 ? 'il messaggio WhatsApp che aspettava' : `i ${imported} messaggi WhatsApp che aspettavano`}.` : ''}`;
+    return `Fatto: il numero di «${client.name}» è ${phone}${old ? ` (prima era ${old})` : ''}. Quando scrive su WhatsApp da questo numero, Jarvis riconosce il locale e mette il messaggio tra le sue pratiche.${imported ? ` Ho già aggiunto ${imported === 1 ? 'il messaggio che aspettava' : `i ${imported} messaggi che aspettavano`}.` : ''}`;
   }
   const PRINT_ASK = /\b(?:men[uù]|carta)\s+(?:da\s+)?stamp(?:are|abile|a)\b|\bversione\s+(?:da\s+)?stamp(?:are|abile|a)\b|\bstampa(?:re)?\s+(?:il\s+)?men[uù]\b/i;
   async function printTurn(db, text) {
