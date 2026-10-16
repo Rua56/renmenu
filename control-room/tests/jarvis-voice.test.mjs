@@ -159,6 +159,23 @@ describe('Comandi vocali di Jarvis', () => {
       assert.equal(await db.prepare('SELECT COUNT(*) AS n FROM jarvis_missions').bind().first().n, 0, 'niente affidato né pubblicato');
     } finally { globalThis.fetch = previous; db.close(); }
   });
+  it('locale nominato senza menu online: nessuna pratica su un altro locale (Bacaro finito su Blanch, 16 ottobre)', async () => {
+    const db = database();
+    const previous = globalThis.fetch;
+    globalThis.fetch = fakeFetch;
+    try {
+      calls.length = 0;
+      await db.prepare("INSERT INTO clients (id,name,email,plan,menu_id,internal_notes,revision,created_at,updated_at) VALUES ('c1','Osteria Viva','o@example.com','standard','osteria-viva','',1,'2026-10-01','2026-10-01')").bind().run();
+      await db.prepare("INSERT INTO clients (id,name,plan,internal_notes,revision,created_at,updated_at) VALUES ('c2','Bacaro Al Collio','premium','',1,'2026-10-16','2026-10-16')").bind().run();
+      await missions.putSetting(db, 'telegram_chat_id', '42');
+      const said = 'dai un’occhiata alla richiesta del Bacaro Al Collio e dimmi cosa serve fare';
+      const env = testEnv(db, { TELEGRAM_BOT_TOKEN: TOKEN, GITHUB_PROVIDER: 'live', GITHUB_TOKEN: 't', GITHUB_FETCH: fakeFetch, TRANSLATION_PROVIDER: 'disabled',
+        AI: aiSaying('', { intent: 'aggiorna_menu', locale: 'Bacaro Al Collio', risposta: '' }) });
+      await missions.telegramUpdate(db, env, { message: { chat: { id: 42, type: 'private' }, text: said } });
+      assert.equal(db.prepare('SELECT COUNT(*) AS n FROM requests').bind().first().n, 0, 'nessuna pratica aperta');
+      assert.match(calls.filter((c) => c.method === 'sendMessage').at(-1).body.text, /Bacaro Al Collio» non ha ancora un menu online/);
+    } finally { globalThis.fetch = previous; db.close(); }
+  });
   it('«pubblica» a voce: mai pubblicazione diretta, solo il pulsante SÌ', async () => {
     const db = database();
     const previous = globalThis.fetch;
