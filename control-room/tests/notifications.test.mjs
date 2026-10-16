@@ -193,3 +193,60 @@ test('avvisi: frasi riformulate dal telefono e «associalo a <locale>» mettono 
     assert.deepEqual(req.map((r) => r.client_id), ['cod'], 'il messaggio in attesa va tra le pratiche di Codelli');
   });
 });
+
+test('WhatsApp dei locali: testo nella pratica già aperta, nuova pratica solo col sì di Riccardo, vocali mai letti', async () => {
+  const { importWhatsAppMessage, senderStatus } = await import('../cloudflare/functions/_lib/whatsapp-in.js');
+  await withServices(async (calls) => {
+    const db = database(), s = db.sqlite;
+    const env = { ...(await linked(db, { voice: false })), WHATSAPP_PRIVATE_FILTER: 'true' };
+    s.prepare("INSERT INTO clients (id,name,plan,phone,created_at,updated_at) VALUES ('cod','Osteria Codelli 23','premium','+393477905309','2026-10-10','2026-10-10')").run();
+    s.prepare("INSERT INTO clients (id,name,plan,phone,created_at,updated_at) VALUES ('bla','Trattoria Blanch','premium','+393477658816','2026-10-10','2026-10-10')").run();
+    s.prepare("INSERT INTO requests (id,client_id,subject,source_channel,source_text,kind,status,plan,revision,created_at,updated_at) VALUES ('rc','cod','Menu Premium · Osteria Codelli 23','email','Menu del locale','nuovo','in_attesa','premium',1,'2026-10-10','2026-10-10')").run();
+    s.prepare("INSERT INTO requests (id,client_id,subject,source_channel,source_text,kind,status,plan,revision,created_at,updated_at) VALUES ('rb','bla','Menu Blanch','email','x','nuovo','completata','premium',1,'2026-10-05','2026-10-05')").run();
+    await missions.putSetting(db, 'external_seen_at', '2026-01-01T00:00:00.000Z');
+    const text = (id, waId, name, body) => ({ id, waId, profileName: name, messageType: 'text', content: { text: body, raw: { type: 'text', text: { body } } } });
+    const count = () => s.prepare('SELECT COUNT(*) n FROM requests').get().n;
+
+    // Codelli 23 ha già una pratica aperta (arrivata per email): il messaggio va lì.
+    const out = await importWhatsAppMessage(db, env, text('wamid.c1', '393477905309', 'Pao', 'Il prezzo della carbonara diventa 13 euro'));
+    assert.deepEqual([out.kind, out.requestId], ['appended', 'rc']);
+    assert.equal(count(), 2, 'nessuna pratica nuova');
+    // Un vocale: nessuna pratica, nessun testo salvato.
+    const voice = { id: 'wamid.c2', waId: '393477905309', profileName: 'Pao', messageType: 'audio', content: { raw: { type: 'audio', audio: { id: 'media1', mime_type: 'audio/ogg' } } } };
+    assert.equal((await importWhatsAppMessage(db, env, voice)).kind, 'voice');
+    assert.equal((await importWhatsAppMessage(db, env, voice)).kind, 'duplicate');
+    assert.equal(count(), 2);
+    assert.doesNotMatch(s.prepare("SELECT source_text FROM requests WHERE id='rc'").get().source_text, /vocale|audio/);
+    await missions.announceExternal(db, env);
+    const notices = sent(calls).slice(-2).map((m) => m.text);
+    assert.match(notices[0], /«Il prezzo della carbonara diventa 13 euro»\. L'ho aggiunto alla pratica già aperta «Menu Premium · Osteria Codelli 23», non ne ho aperta una nuova/);
+    assert.doesNotMatch(notices[0], /Menu del locale/, 'solo il messaggio nuovo, non tutta la pratica');
+    assert.match(notices[1], /^«Osteria Codelli 23» ti ha mandato un vocale su WhatsApp\. I vocali non li ascolto e non apro pratiche: chiedigli di scriverti la richiesta/);
+
+    const { contactVerdict } = await import('../cloudflare/functions/_lib/whatsapp-in.js');
+    assert.equal(contactVerdict('Sì, aprila'), 'venue');
+    assert.equal(contactVerdict('No, lascia stare'), 'private');
+    assert.equal(contactVerdict('Non aprire niente'), 'private');
+    // Blanch non ha pratiche aperte: Jarvis chiede prima di aprirne una.
+    assert.equal((await importWhatsAppMessage(db, env, text('wamid.b1', '393477658816', 'Blanch', 'Togliete il baccalà dal menu'))).kind, 'held');
+    assert.equal(count(), 2);
+    await missions.announceExternal(db, env);
+    const ask = sent(calls).at(-1);
+    assert.match(ask.text, /^«Trattoria Blanch» ti ha scritto su WhatsApp: «Togliete il baccalà dal menu»\. Non ha pratiche aperte: ne apro una nuova\?/);
+    assert.deepEqual(ask.reply_markup.inline_keyboard.flat().map((b) => b.callback_data), ['wak:393477658816', 'wap:393477658816']);
+    // «No»: niente pratica, ma il locale non diventa un contatto privato.
+    await missions.telegramUpdate(db, env, { callback_query: { id: 'q1', data: 'wap:393477658816', message: { chat: { id: 42 }, message_id: 9 } } });
+    assert.match(sent(calls).at(-1).text, /non apro nessuna pratica per il messaggio di Blanch/);
+    assert.equal(await senderStatus(db, '393477658816'), 'allowed');
+    assert.equal(count(), 2);
+    // Al messaggio dopo richiede; «sì» apre la pratica.
+    await importWhatsAppMessage(db, env, text('wamid.b2', '393477658816', 'Blanch', 'Aggiungete i tortelli a 14 euro'));
+    await missions.announceExternal(db, env);
+    await missions.telegramUpdate(db, env, { callback_query: { id: 'q2', data: 'wak:393477658816', message: { chat: { id: 42 }, message_id: 10 } } });
+    assert.match(sent(calls).at(-1).text, /^Fatto: ho aperto una pratica nuova con il messaggio di Blanch/);
+    const fresh = s.prepare("SELECT client_id,source_text FROM requests WHERE source_channel='whatsapp'").all();
+    assert.equal(fresh.length, 1);
+    assert.equal(fresh[0].client_id, 'bla');
+    assert.match(fresh[0].source_text, /Aggiungete i tortelli a 14 euro/);
+  });
+});

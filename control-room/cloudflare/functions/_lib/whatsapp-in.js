@@ -65,18 +65,25 @@ export async function downloadWhatsAppMedia(env, mediaId, fetchImpl) {
   } catch { return { ok: false, reason: 'DOWNLOAD_FAILED' }; }
 }
 
-// Pratica WhatsApp ancora aperta dello stesso numero, toccata nelle ultime GROUP_HOURS ore.
+// Pratica WhatsApp ancora aperta dello stesso numero, toccata nelle ultime GROUP_HOURS ore; se non c'è,
+// la pratica ancora in lavorazione del cliente di quel numero, arrivata da qualsiasi canale (email, Control Room):
+// un messaggio del titolare su un menu che stiamo già preparando va lì, non apre una pratica nuova (Riccardo, 16 ottobre).
+const OPEN_CASE = "('nuova','materiale_ricevuto','in_analisi','dati_da_confermare','bozza_pronta','in_revisione','in_attesa')";
 async function openRequestFor(db, waId, since) {
-  return db.prepare(`SELECT r.id,r.source_text,r.status FROM requests r JOIN clients c ON c.id=r.client_id
+  const recent = await db.prepare(`SELECT r.id,r.source_text,r.status FROM requests r JOIN clients c ON c.id=r.client_id
     WHERE (c.phone=? OR c.phone=?) AND r.source_channel='whatsapp' AND r.status IN ('nuova','dati_da_confermare') AND r.updated_at>=?
     ORDER BY r.updated_at DESC LIMIT 1`).bind(`+${waId}`, waId, since).first();
+  if (recent) return recent;
+  return db.prepare(`SELECT r.id,r.source_text,r.status FROM requests r JOIN clients c ON c.id=r.client_id
+    WHERE (c.phone=? OR c.phone=?) AND r.status IN ${OPEN_CASE} AND COALESCE(r.is_ai_test_fixture,0)=0
+    ORDER BY r.updated_at DESC LIMIT 1`).bind(`+${waId}`, waId).first();
 }
 
 /**
- * Registra un messaggio WhatsApp. deps: { fetchImpl, now }.
- * Restituisce { kind: 'new'|'appended'|'duplicate'|'ignored', requestId, stored, mediaError }.
+ * Registra un messaggio WhatsApp. deps: { fetchImpl, now, confirmed } (confirmed: Riccardo ha detto di aprire la pratica).
+ * Restituisce { kind: 'new'|'appended'|'held'|'voice'|'duplicate'|'ignored', requestId, stored, mediaError }.
  */
-export async function importWhatsAppMessage(db, env, message, { fetchImpl = globalThis.fetch, now = new Date() } = {}) {
+export async function importWhatsAppMessage(db, env, message, { fetchImpl = globalThis.fetch, now = new Date(), confirmed = false } = {}) {
   const parts = whatsappParts(message);
   if (parts.unsupported && !['audio', 'video', 'sticker', 'location', 'contacts'].includes(parts.unsupported)) {
     // Reazioni, conferme e messaggi di sistema: niente pratica.
@@ -94,8 +101,25 @@ export async function importWhatsAppMessage(db, env, message, { fetchImpl = glob
     }
     if (status === 'unknown') return holdMessage(db, message, name, stamp);
   }
-  const line = parts.text || (parts.media ? `[${parts.media.mime === 'application/pdf' ? 'PDF' : 'foto'} allegata]` : `[messaggio ${parts.unsupported} non letto: chiedi al locale di scriverlo o mandare una foto]`);
+  // Vocali e video: Jarvis non li ascolta e non apre pratiche (Riccardo, 16 ottobre). Resta solo l'avviso
+  // «fatti mandare il testo o le foto»; il numero sta nel motivo, così l'avviso sa di quale locale si tratta.
+  if (['audio', 'video'].includes(parts.unsupported)) {
+    const out = await persistIgnoredExternalEvent(db, { source: 'whatsapp', sourceEventId: message.id, reason: `voice_note:${String(message.waId).replace(/\D/g, '').slice(0, 20)}` });
+    return { kind: out.deduplicated ? 'duplicate' : 'voice', requestId: null, stored: 0 };
+  }
+  if (parts.unsupported) {
+    const out = await persistIgnoredExternalEvent(db, { source: 'whatsapp', sourceEventId: message.id, reason: `type_${String(parts.unsupported).slice(0, 40)}` });
+    return { kind: out.deduplicated ? 'duplicate' : 'ignored', requestId: null, stored: 0 };
+  }
+  const line = parts.text || `[${parts.media.mime === 'application/pdf' ? 'PDF' : 'foto'} allegata]`;
   const open = await openRequestFor(db, message.waId, iso(new Date(now.getTime() - GROUP_HOURS * 3_600_000)));
+  // Nessuna pratica aperta: prima di aprirne una nuova Jarvis chiede a Riccardo (il messaggio resta in attesa).
+  // Vale col filtro dei contatti privati acceso (il numero di Riccardo in coesistenza), cioè in produzione.
+  if (!open && !confirmed && privateFilterOn(env)) {
+    const already = await db.prepare("SELECT 1 AS x FROM external_events WHERE source='whatsapp' AND source_event_id=?").bind(message.id).first();
+    if (already) return { kind: 'duplicate', requestId: null, stored: 0 };
+    return holdMessage(db, message, name, stamp, { confirm: true });
+  }
   let requestId, kind;
   if (open) {
     const gate = await db.prepare("INSERT INTO external_events (id,source,source_event_id,request_id,status,reason,received_at) VALUES (?,?,?,?,'imported','grouped',?) ON CONFLICT(source,source_event_id) DO NOTHING")
@@ -107,7 +131,7 @@ export async function importWhatsAppMessage(db, env, message, { fetchImpl = glob
   } else {
     const record = whatsappRecordFromMessage(message);
     record.sourceText = `${name ? `WhatsApp da ${name} (+${message.waId})` : `WhatsApp da +${message.waId}`}\n\n${line}`;
-    if (parts.media || parts.text) { record.externalStatus = 'imported'; record.requestStatus = 'nuova'; record.reason = null; }
+    { record.externalStatus = 'imported'; record.requestStatus = 'nuova'; record.reason = null; }
     record.subject = parts.media && !parts.text ? 'Menu da WhatsApp' : 'Richiesta WhatsApp';
     const out = await persistIncomingExternalEvent(db, record);
     if (out.deduplicated) return { kind: 'duplicate', requestId: null, stored: 0 };
@@ -161,8 +185,9 @@ export async function senderStatus(db, waId) {
   return client ? 'allowed' : 'unknown';
 }
 
-// Mette da parte il messaggio di un numero sconosciuto: niente pratica finché Riccardo non decide.
-async function holdMessage(db, message, name, stamp) {
+// Mette da parte il messaggio di un numero sconosciuto (o di un locale senza pratiche aperte, confirm):
+// niente pratica finché Riccardo non decide.
+async function holdMessage(db, message, name, stamp, { confirm = false } = {}) {
   const held = await readJson(db, HELD_KEY, {});
   const cutoff = Date.parse(stamp) - HELD_DAYS * 86_400_000;
   for (const [waId, entry] of Object.entries(held)) if (!(Date.parse(entry?.at) >= cutoff)) delete held[waId];
@@ -174,6 +199,7 @@ async function holdMessage(db, message, name, stamp) {
   }].slice(-MAX_HELD_MESSAGES);
   entry.at = stamp;
   if (name) entry.name = name;
+  if (confirm) entry.confirm = true;
   delete held[message.waId];
   held[message.waId] = entry;
   const numbers = Object.keys(held);
@@ -191,7 +217,7 @@ export async function takeUnannouncedHeld(db, now = new Date()) {
   await writeJson(db, HELD_KEY, held, iso(now));
   return fresh.map(([waId, e]) => {
     const said = e.messages.map((m) => whatsappParts(m)).map((p) => p.text || (p.media ? `[${p.media.mime === 'application/pdf' ? 'PDF' : 'foto'}]` : `[${p.unsupported}]`));
-    return { waId, name: e.name || '', count: e.messages.length, preview: said.join(' · ').replace(/\s+/g, ' ').slice(0, 200) };
+    return { waId, name: e.name || '', count: e.messages.length, confirm: Boolean(e.confirm), preview: said.join(' · ').replace(/\s+/g, ' ').slice(0, 200) };
   });
 }
 
@@ -216,39 +242,40 @@ export async function approveSender(db, env, waId, deps = {}) {
   await writeJson(db, HELD_KEY, held, stamp);
   let requestId = null, imported = 0;
   for (const message of entry?.messages || []) {
-    const out = await importWhatsAppMessage(db, env, message, deps);
+    const out = await importWhatsAppMessage(db, env, message, { ...deps, confirmed: true });
     if (out.requestId) requestId = out.requestId;
     if (out.kind === 'new' || out.kind === 'appended') imported += 1;
   }
-  return { ok: true, name: entry?.name || '', imported, requestId };
+  return { ok: true, name: entry?.name || '', imported, requestId, confirm: Boolean(entry?.confirm) };
 }
 
 /** «Privato»: il numero viene ignorato per sempre e i suoi messaggi in attesa cancellati. */
 export async function blockSender(db, waId, deps = {}) {
   if (!/^\d{6,20}$/.test(String(waId))) return { ok: false, reason: 'INVALID_NUMBER' };
   const stamp = iso(deps.now || new Date());
-  await removeFrom(db, ALLOW_KEY, waId, stamp);
-  await addTo(db, BLOCK_KEY, waId, stamp);
   const held = await readJson(db, HELD_KEY, {});
   const name = held[waId]?.name || '';
+  // Un locale che ha scritto senza pratiche aperte: «no» vuol dire solo «non aprire la pratica», non «privato».
+  const confirm = Boolean(held[waId]?.confirm);
+  if (!confirm) { await removeFrom(db, ALLOW_KEY, waId, stamp); await addTo(db, BLOCK_KEY, waId, stamp); }
   delete held[waId];
   await writeJson(db, HELD_KEY, held, stamp);
-  return { ok: true, name };
+  return { ok: true, name, confirm };
 }
 
 /** Numeri in attesa già annunciati a Riccardo, dal più recente: quelli su cui può dire «è un locale» o «è privato». */
 export async function heldSenders(db) {
   const held = await readJson(db, HELD_KEY, {});
   return Object.entries(held).filter(([, e]) => e?.notified)
-    .map(([waId, e]) => ({ waId, name: e.name || '', at: e.at || e.first_at || '' }))
+    .map(([waId, e]) => ({ waId, name: e.name || '', at: e.at || e.first_at || '', confirm: Boolean(e.confirm) }))
     .sort((a, b) => String(b.at).localeCompare(String(a.at)));
 }
 
 // Risposta a parole (telefonata, Telegram, Control Room) all'avviso «WhatsApp da un numero che non conosco».
 // Al telefono l'agente riformula in terza persona («Riccardo dice che il contatto di Vlad è un suo amico privato,
 // non un locale. Chiede di ignorarlo»): le frasi possono essere lunghe e indirette.
-const SAYS_PRIVATE = /\bprivat[oa]\b|\bnon\s+(?:è\s+)?(?:un|una)\s+(?:locale|cliente|ristorante|bar)\b|\bignor(?:al[oa]|arl[oa]|are|a)\b|\b(?:amic[oa]|parente|conoscente|familiare)\b/i;
-const SAYS_VENUE = /(?:^|[\s,.;:!])(?:è|e'|é)\s+(?:un[ao]?\s+|il\s+|di\s+)?(?:locale|cliente|ristorante|bar|trattoria|osteria|pizzeria|titolare)\b|\bregistr(?:al[oa]|arl[oa]|are)\b|\b(?:associ|colleg|abbin)(?:al[oa]|arl[oa]|are|a)\b|\bapri(?:gli)?\s+(?:la\s+)?pratica\b(?!\s+(?:di|del|della|dello|dei|per|a|al|alla)\b)/i;
+const SAYS_PRIVATE = /\bprivat[oa]\b|\bnon\s+(?:è\s+)?(?:un|una)\s+(?:locale|cliente|ristorante|bar)\b|\bignor(?:al[oa]|arl[oa]|are|a)\b|\b(?:amic[oa]|parente|conoscente|familiare)\b|\blascia(?:lo|la)?\s+(?:stare|perdere)\b|\bnon\s+(?:la\s+)?aprire\b/i;
+const SAYS_VENUE = /(?:^|[\s,.;:!])(?:è|e'|é)\s+(?:un[ao]?\s+|il\s+|di\s+)?(?:locale|cliente|ristorante|bar|trattoria|osteria|pizzeria|titolare)\b|\bregistr(?:al[oa]|arl[oa]|are)\b|\b(?:associ|colleg|abbin)(?:al[oa]|arl[oa]|are|a)\b|\baprila\b|\bapri(?:gli)?\s+(?:la\s+|una\s+)?(?:nuova\s+)?pratica\b(?!\s+(?:di|del|della|dello|dei|per|a|al|alla)\b)/i;
 /** 'private' | 'venue' | null. «non è un locale» vale come privato. */
 export function contactVerdict(text) {
   const line = String(text || '');

@@ -836,7 +836,7 @@ export function createMissions(deps) {
     }
     if (verb === 'wak' || verb === 'wap') {
       // wak: il numero WhatsApp è un locale (pratica dai messaggi in attesa) · wap: è privato, sempre ignorato
-      await ack(verb === 'wak' ? 'È un locale' : 'Privato');
+      await ack(verb === 'wak' ? 'Fatto' : 'Va bene');
       await clear();
       await sendTg(db, env, chat, await markContact(db, env, verb, missionId), null, deps.fetchImpl);
       return;
@@ -1726,6 +1726,8 @@ export function createMissions(deps) {
     const who = out.name || name || `+${waId}`;
     if (!out.ok) return 'Numero non valido.';
     await auditedBatch(jarvisDb(db), [], 'jarvis.whatsapp_contact', `Numero WhatsApp segnato come ${verb === 'wak' ? 'locale' : 'privato'} da Riccardo.`, out.requestId || null).catch(() => {});
+    if (out.confirm) return verb === 'wap' ? `Va bene, non apro nessuna pratica per il messaggio di ${who}.`
+      : `Fatto: ho aperto una pratica nuova con ${out.imported === 1 ? 'il messaggio' : `i ${out.imported} messaggi`} di ${who}.`;
     return verb === 'wap' ? `Va bene, ${who} è privato: i suoi messaggi restano solo sul tuo telefono e non te lo chiedo più.`
       : `Fatto: ${who} è un locale. ${out.imported ? `Ho aperto la pratica con ${out.imported === 1 ? 'il suo messaggio' : `i suoi ${out.imported} messaggi`}.` : 'I suoi prossimi messaggi diventano pratiche.'}`;
   }
@@ -2753,12 +2755,25 @@ export function createMissions(deps) {
   async function announceExternal(db, env) {
     const seen = await setting(db, 'external_seen_at').catch(() => null);
     if (!seen) { await putSetting(db, 'external_seen_at', now()); return 0; }
-    const fresh = await rows(db, `SELECT e.source,e.received_at,e.status,r.id AS request_id,r.source_text,c.name FROM external_events e
+    const fresh = await rows(db, `SELECT e.source,e.received_at,e.status,e.reason,r.id AS request_id,r.subject,r.source_text,c.name FROM external_events e
       LEFT JOIN requests r ON r.id=e.request_id LEFT JOIN clients c ON c.id=r.client_id
-      WHERE e.received_at>? AND e.status IN ('imported','needs_review') ORDER BY e.received_at ASC LIMIT 20`, seen).catch(() => []);
+      WHERE e.received_at>? AND (e.status IN ('imported','needs_review') OR (e.status='ignored' AND e.reason LIKE 'voice_note:%')) ORDER BY e.received_at ASC LIMIT 20`, seen).catch(() => []);
     for (const event of fresh) {
       const from = event.source === 'whatsapp' ? 'WhatsApp' : 'Gmail';
-      const said = String(event.source_text || '').replace(/\s+/g, ' ').trim();
+      // Vocale o video: nessuna pratica, solo la richiesta di farsi mandare testo o foto (Riccardo, 16 ottobre).
+      if (String(event.reason || '').startsWith('voice_note:')) {
+        const waId = String(event.reason).slice(11);
+        const client = await Promise.resolve().then(() => getOne(db, 'SELECT name FROM clients WHERE phone=? OR phone=? LIMIT 1', `+${waId}`, waId)).catch(() => null);
+        await notify(db, env, null, 'vocale WhatsApp', `${client?.name ? `«${client.name}»` : `Il numero +${waId}`} ti ha mandato un vocale su WhatsApp. I vocali non li ascolto e non apro pratiche: chiedigli di scriverti la richiesta (prezzi, piatti da aggiungere o togliere) o di mandarti le foto del menu.`).catch(() => null);
+        continue;
+      }
+      // Aggiunto a una pratica già aperta: si mostra solo l'ultimo messaggio, non tutta la pratica.
+      const grouped = event.reason === 'grouped';
+      const said = String(grouped ? String(event.source_text || '').split(/\n\n/).at(-1) : event.source_text || '').replace(/\s+/g, ' ').trim();
+      if (grouped) {
+        await notify(db, env, event.request_id || null, `messaggio ${from}`, `Nuovo messaggio ${from} da ${event.name || 'un contatto'}${said ? `: «${said.slice(0, 300)}${said.length > 300 ? '…' : ''}»` : ''}. L'ho aggiunto alla pratica già aperta «${String(event.subject || 'senza titolo').slice(0, 80)}», non ne ho aperta una nuova.`, 'importante').catch(() => null);
+        continue;
+      }
       await notify(db, env, event.request_id || null, `messaggio ${from}`, `Nuovo messaggio ${from} da ${event.name || 'un contatto nuovo'}${said ? `: «${said.slice(0, 300)}${said.length > 300 ? '…' : ''}»` : ' (non è un testo: guardalo nella Control Room)'}. L'ho messo tra le pratiche da verificare.`, 'importante').catch(() => null);
     }
     if (fresh.length) await putSetting(db, 'external_seen_at', fresh.at(-1).received_at);
@@ -2770,6 +2785,15 @@ export function createMissions(deps) {
     const chat = held.length ? await setting(db, 'telegram_chat_id') : null;
     for (const h of held) {
       if (!chat || !telegramReady(env)) break;
+      if (h.confirm) {
+        // Locale noto senza pratiche aperte: prima di aprirne una nuova chiede a Riccardo.
+        const client = await Promise.resolve().then(() => getOne(db, 'SELECT name FROM clients WHERE phone=? OR phone=? LIMIT 1', `+${h.waId}`, h.waId)).catch(() => null);
+        const venue = client?.name ? `«${client.name}»` : `${h.name || 'Un locale'} (+${h.waId})`;
+        await sendTg(db, env, chat, `${venue} ti ha scritto su WhatsApp${h.preview ? `: «${h.preview}»` : ''}. Non ha pratiche aperte: ne apro una nuova?`,
+          [['Sì, apri la pratica', `wak:${h.waId}`], ['No, lascia stare', `wap:${h.waId}`]], deps.fetchImpl, { stacked: true }).catch(() => null);
+        await phoneAlert(db, env, chat, `${client?.name || h.name || 'Un locale'} ti ha scritto su WhatsApp e non ha pratiche aperte. Dimmi pure qui se apro una pratica nuova.`, `wa:${h.waId}`).catch(() => null);
+        continue;
+      }
       const who = `${h.name ? `${h.name} ` : ''}(+${h.waId})`;
       await sendTg(db, env, chat, `WhatsApp da un numero che non conosco: ${who}${h.preview ? `, «${h.preview}»` : ''}. È un locale? Se è una chat privata non apro niente e non te lo chiedo più.`,
         [['Sì, è un locale: apri la pratica', `wak:${h.waId}`], ['No, è privato: ignoralo', `wap:${h.waId}`]], deps.fetchImpl, { stacked: true }).catch(() => null);
