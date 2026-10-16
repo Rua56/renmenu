@@ -2299,7 +2299,15 @@ export function createMissions(deps) {
   // Modifica a voce di un menu già online: pratica + bozza dal menu su main, con le sole parole di Riccardo.
   async function voiceUpdate(db, env, utterance, spokenVenue, clues = { locales: [], dishes: [] }) {
     const clients = await rows(db, "SELECT id,name,menu_id,plan FROM clients WHERE menu_id IS NOT NULL AND menu_id<>''");
+    // Locale nominato ma senza menu online (per esempio una pratica nuova come «Bacaro Al Collio»): mai ripiegare
+    // su un altro locale citato prima nella conversazione (16 ottobre: una domanda sul Bacaro era finita su Trattoria Blanch).
+    if (spokenVenue && !matchVenue(spokenVenue, clients).client) {
+      const all = await rows(db, 'SELECT id,name,menu_id,menu_url FROM clients').catch(() => []);
+      const other = matchVenue(spokenVenue, all.map((c) => ({ ...c, menu_id: c.menu_id || '' }))).client;
+      if (other && !other.menu_id && !other.menu_url) return `«${other.name}» non ha ancora un menu online: non ho aperto nessuna pratica di modifica. La sua richiesta la trovi tra le pratiche in Revisione.`;
+    }
     const { client, candidates } = pickLocale(spokenVenue, clues, clients);
+    if (client && spokenVenue && !matchVenue(spokenVenue, [client]).client && !candidates.length) return `Non trovo un locale con menu online che si chiami «${spokenVenue}». Su quale menu devo intervenire?`;
     if (client && /^nuovo contatto/i.test(client.name || '') && !(spokenVenue && matchVenue(spokenVenue, [client]).client)) return 'Su quale menu devo intervenire? Dimmi il nome del locale.';
     if (!client && spokenVenue) {
       // Locale con un menu in formato proprio (per esempio Trattoria Blanch): Jarvis lo conosce ma non può ancora modificarlo.
