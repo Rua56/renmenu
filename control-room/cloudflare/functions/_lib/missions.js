@@ -35,7 +35,7 @@ import { pickButton } from './short-reply.js';
 import { normalizePhone, parseClientPhone } from './phone-number.js';
 import { HABITS, HABITS_KEY, habitOf, isAuto, parseHabits, recordChoice, rulesView, setRule } from './habits.js';
 import { AGENT_VERSION, callOutcome, callOwner, ensureAgent, phoneNumber, twilioNumber } from './phone.js';
-import { approveSender, blockSender, contactVerdict, heldSenders, pickHeld, takeUnannouncedHeld } from './whatsapp-in.js';
+import { approveSender, blockSender, contactVerdict, heldSenders, pickHeld, saysReallyPrivate, senderStatus, takeUnannouncedHeld } from './whatsapp-in.js';
 import { lastReadingTest, startReadingTest } from './reading-test.js';
 import { LATER_MS, MUTE_MS, REPEAT_MS, activeInitiatives, loadInitiatives } from './initiative.js';
 import { draftClientReply, lastMessage, originalSubject, sendWhatsAppReply } from './client-reply.js';
@@ -1432,6 +1432,12 @@ export function createMissions(deps) {
     if (plan.modelName) await putSetting(db, 'gemini_good', JSON.stringify([plan.modelName])).catch(() => {});
     if (plan.unavailable) return { text: `Non riesco a interpretare la modifica adesso: i modelli non rispondono. Riprova tra qualche minuto, oppure correggi la bozza di «${name}» in Revisione.` };
     const checked = validateOps(plan.ops, menu, utterance);
+    // Dati del locale uguali a quelli già in bozza («Nome del locale: Osteria Codelli 23» su Codelli 23): niente da cambiare,
+    // e la checklist non si azzera per niente.
+    const sameLocal = (op) => op.tipo === 'locale' && !['whatsapp', 'recensioni'].includes(op.campo)
+      && String((menu[op.campo] && typeof menu[op.campo] === 'object' ? menu[op.campo].it : menu[op.campo]) ?? '').trim().toLowerCase() === String(op.nome ?? '').trim().toLowerCase();
+    if (!checked.problems.length && checked.ops.length && checked.ops.every(sameLocal)) return { text: `La bozza di «${name}» ha già questi dati: non ho cambiato niente.`, keep: true };
+    checked.ops = checked.ops.filter((op) => !sameLocal(op));
     if (checked.problems.length) await noteMiss(db, utterance, checked.problems.slice(0, 3).join(' | '), draft.request_id);
     if (checked.problems.length) return { text: `Per la bozza di «${name}» non applico nulla, perché:\n${checked.problems.slice(0, 5).map((p) => `• ${p}`).join('\n')}\n\nRiscrivimi la correzione con i nomi e i prezzi precisi.` };
     if (!checked.ops.length) await noteMiss(db, utterance, plan.dubbio || 'nessuna modifica precisa', draft.request_id);
@@ -1721,11 +1727,13 @@ export function createMissions(deps) {
   // «il numero di Trattoria Blanch è 333 1234567»: lo salva sulla scheda cliente (+39…), così i
   // messaggi WhatsApp da quel numero finiscono subito tra le pratiche del locale giusto.
   /** Numero WhatsApp sconosciuto: «è un locale» (wak) apre la pratica coi messaggi in attesa, «privato» (wap) lo ignora per sempre. */
-  async function markContact(db, env, verb, waId, name = '') {
-    const out = verb === 'wak' ? await approveSender(db, env, waId, { fetchImpl: deps.fetchImpl }) : await blockSender(db, waId);
+  async function markContact(db, env, verb, waId, name = '', { hard = false } = {}) {
+    const out = verb === 'wak' ? await approveSender(db, env, waId, { fetchImpl: deps.fetchImpl }) : await blockSender(db, waId, { hard });
     const who = out.name || name || `+${waId}`;
     if (!out.ok) return 'Numero non valido.';
     await auditedBatch(jarvisDb(db), [], 'jarvis.whatsapp_contact', `Numero WhatsApp segnato come ${verb === 'wak' ? 'locale' : 'privato'} da Riccardo.`, out.requestId || null).catch(() => {});
+    // L'ultima decisione resta 30 minuti: «no, scusa, è un privato» subito dopo la corregge (contactTurn).
+    await putSetting(db, 'wa_last_contact', JSON.stringify({ waId, name: who, verb: out.confirm && verb === 'wap' ? 'skip' : verb, requestId: out.requestId || null, at: now() })).catch(() => {});
     if (out.confirm) return verb === 'wap' ? `Va bene, non apro nessuna pratica per il messaggio di ${who}.`
       : `Fatto: ho aperto una pratica nuova con ${out.imported === 1 ? 'il messaggio' : `i ${out.imported} messaggi`} di ${who}.`;
     return verb === 'wap' ? `Va bene, ${who} è privato: i suoi messaggi restano solo sul tuo telefono e non te lo chiedo più.`
@@ -1736,7 +1744,17 @@ export function createMissions(deps) {
   async function contactTurn(db, env, text) {
     const verdict = contactVerdict(text);
     if (!verdict) return null;
+    const hard = verdict === 'private' && saysReallyPrivate(text);
     const held = await heldSenders(db).catch(() => []);
+    // Correzione a caldo: «è un locale» e subito dopo «no, è un privato» (telefonata del 20 ottobre). Il numero era
+    // già uscito dall'attesa, quindi la seconda frase non trovava più niente e l'amico restava tra i locali.
+    const last = await setting(db, 'wa_last_contact').then((raw) => { try { return JSON.parse(raw || 'null'); } catch { return null; } }).catch(() => null);
+    const recent = last && Date.now() - Date.parse(last.at) < 30 * MINUTE;
+    const named = recent && last.name && String(text).toLowerCase().includes(String(last.name).toLowerCase().split(/\s+/)[0]);
+    const correcting = /\b(?:no|anzi|scusa|sbagliato|sbagliando|correggo|mi\s+sono\s+sbagliato|ho\s+sbagliato|volevo\s+dire)\b/i.test(String(text));
+    if (recent && last.verb === 'wak' && verdict === 'private' && hard && (!held.length || named || (correcting && !held.some((h) => String(h.at) > String(last.at)))) && !held.some((h) => h.waId === last.waId)) {
+      return { text: await undoVenue(db, env, last) };
+    }
     if (!held.length) return null;
     // Frase lunga: deve parlare di quel contatto (numero, WhatsApp, il suo nome), non di altro che nomina «un amico».
     const line = String(text).toLowerCase();
@@ -1766,7 +1784,25 @@ export function createMissions(deps) {
       return { text: `Ho più numeri WhatsApp in attesa: ${choices.map(label).join(', ')}. Quale ${verdict === 'venue' ? 'è il locale' : 'è privato'}?`,
         buttons: choices.slice(0, 6).map((h) => [`${verdict === 'venue' ? 'Locale' : 'Privato'}: ${label(h)}`.slice(0, 60), `${verb}:${h.waId}`]) };
     }
-    return { text: await markContact(db, env, verb, contact.waId, contact.name) };
+    return { text: await markContact(db, env, verb, contact.waId, contact.name, { hard }) };
+  }
+  // «È un locale» detto per sbaglio: il numero diventa privato e la pratica appena aperta coi suoi messaggi
+  // (ancora senza bozza) si cancella, così non resta un «Nuovo contatto WhatsApp» da eliminare a mano.
+  async function undoVenue(db, env, last) {
+    const stamp = now();
+    await blockSender(db, last.waId, { hard: true });
+    await auditedBatch(jarvisDb(db), [], 'jarvis.whatsapp_contact', 'Numero WhatsApp segnato come privato da Riccardo (correzione subito dopo «è un locale»).', null).catch(() => {});
+    await putSetting(db, 'wa_last_contact', JSON.stringify({ ...last, verb: 'wap', at: stamp })).catch(() => {});
+    let removed = false;
+    if (last.requestId) {
+      try {
+        const request = await getOne(db, "SELECT id,status FROM requests WHERE id=? AND source_channel='whatsapp' AND status IN ('nuova','dati_da_confermare')", last.requestId);
+        const drafts = request ? await getOne(db, 'SELECT COUNT(*) n FROM drafts WHERE request_id=?', request.id) : null;
+        if (request && !drafts?.n) removed = (await deleteOne(db, env, { requestId: request.id })).ok;
+      } catch { removed = false; }
+    }
+    const blocked = await senderStatus(db, last.waId) === 'blocked';
+    return `${blocked ? `Corretto: ${last.name} è privato, i suoi messaggi restano solo sul tuo telefono` : `Corretto: niente pratica per ${last.name}`}${removed ? ' e ho tolto la pratica che avevo appena aperto' : ''}.`;
   }
   // Cliente nominato in una frase lunga («associalo alla pratica di Osteria Codelli 23»): tutte le parole distintive del nome.
   const GENERIC_NAME = new Set(['osteria', 'trattoria', 'ristorante', 'pizzeria', 'locanda', 'enoteca', 'birreria', 'agriturismo', 'caffe', 'bar', 'the', 'del', 'della', 'dei', 'alla', 'al']);

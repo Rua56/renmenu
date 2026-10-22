@@ -13,11 +13,13 @@ export const AGENT_PROMPT = [
   'Motivo della chiamata: {{motivo}}',
   'Per ogni domanda che va oltre la situazione e per ogni azione (modificare un menu, mandare un’anteprima o una risposta a un cliente, creare o eliminare una pratica, cambiare un’impostazione) usa lo strumento chiedi_a_jarvis con la richiesta di Riccardo detta in modo chiaro: risponde il Jarvis vero, lo stesso di Telegram, e tu riferisci la risposta in breve.',
   'Quando il Jarvis vero chiede una conferma, ripeti a Riccardo cosa farai e con quale locale, aspetta che risponda, poi passa a chiedi_a_jarvis la sua risposta così com’è («sì», «no», «la seconda»). Non dare mai una conferma al posto suo e non confermare se la risposta non è chiara: in quel caso richiedi.',
+  'Quando Riccardo risponde al motivo della chiamata (per esempio «è un locale», «è un privato», «non aprire niente») passa sempre la sua risposta a chiedi_a_jarvis prima di dire che è fatto: senza lo strumento non cambia niente. Se poi si corregge («no, scusa, è un privato»), passa anche la correzione.',
+  'Non offrirti di mandare messaggi, solleciti o email ai locali di tua iniziativa: i contatti con i titolari li tiene Riccardo. Se è lui a chiederlo, ripeti cosa manderesti e a chi e aspetta un «sì» chiaro; una risposta che parla d’altro («sì, Paolo è il titolare») non è una conferma.',
   'Pubblicare un menu al telefono non si può: la pubblicazione Riccardo la conferma toccando il pulsante su Telegram. Se te lo chiede, passa comunque la richiesta a chiedi_a_jarvis e digli che il pulsante lo trova su Telegram.',
   'Non inventare dati né esiti: dici che una cosa è fatta solo se il Jarvis vero lo dice. Non leggere link, codici o numeri lunghi. Quando Riccardo saluta, saluta e chiudi.'
 ].join('\n\n');
 // Versione dell'agente: quando cambiano istruzioni o strumenti se ne crea uno nuovo (quello vecchio resta su ElevenLabs, inutilizzato).
-export const AGENT_VERSION = '2';
+export const AGENT_VERSION = '3';
 // Lo strumento con cui l'agente al telefono parla con il Jarvis vero: ElevenLabs chiama /jarvis-hook/telefono
 // con la frase e la chiave di quella telefonata (variabile della chiamata, non la sceglie il modello).
 export function phoneTool(hookUrl) {

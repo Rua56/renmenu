@@ -250,3 +250,30 @@ test('WhatsApp dei locali: testo nella pratica già aperta, nuova pratica solo c
     assert.match(fresh[0].source_text, /Aggiungete i tortelli a 14 euro/);
   });
 });
+
+test('avvisi: «è un locale» e subito dopo «no, è un privato» corregge; «è un privato» blocca anche un numero già tra i locali', async () => {
+  const { importWhatsAppMessage, senderStatus } = await import('../cloudflare/functions/_lib/whatsapp-in.js');
+  await withServices(async (calls) => {
+    const db = database(), s = db.sqlite, env = { ...(await linked(db, { voice: false })), WHATSAPP_PRIVATE_FILTER: 'true' };
+    await missions.announceExternal(db, env);
+    const msg = (id, body) => ({ id, waId: '393333802906', profileName: 'alessio☀️', messageType: 'text', content: { text: body, raw: { type: 'text', text: { body } } } });
+    await importWhatsAppMessage(db, env, msg('wamid.al1', 'Ola pupo'));
+    await missions.announceExternal(db, env);
+    // Al telefono, 20 ottobre: prima «è un locale», poi la correzione.
+    await missions.telegramUpdate(db, env, { message: { chat: { id: 42, type: 'private' }, text: 'è un locale, registralo' } });
+    assert.equal(s.prepare("SELECT COUNT(*) n FROM requests WHERE source_channel='whatsapp'").get().n, 1);
+    await missions.telegramUpdate(db, env, { message: { chat: { id: 42, type: 'private' }, text: 'no scusa, mi sono sbagliato: è un privato, ignoralo' } });
+    assert.match(sent(calls).at(-1).text, /^Corretto: alessio☀️ è privato.*ho tolto la pratica che avevo appena aperto/);
+    assert.equal(await senderStatus(db, '393333802906'), 'blocked');
+    assert.equal(s.prepare("SELECT COUNT(*) n FROM requests WHERE source_channel='whatsapp'").get().n, 0);
+
+    // Un numero già tra i locali (senza scheda cliente) che riscrive: «è un privato» lo blocca davvero.
+    s.prepare("UPDATE jarvis_settings SET value='[\"393333802906\"]' WHERE key='wa_allow'").run();
+    s.prepare("UPDATE jarvis_settings SET value='[]' WHERE key='wa_block'").run();
+    s.prepare("UPDATE jarvis_settings SET value='null' WHERE key='wa_last_contact'").run();
+    await importWhatsAppMessage(db, env, msg('wamid.al2', 'Stasera ci sei?'));
+    await missions.announceExternal(db, env);
+    await missions.telegramUpdate(db, env, { message: { chat: { id: 42, type: 'private' }, text: 'è un privato, lascia stare' } });
+    assert.equal(await senderStatus(db, '393333802906'), 'blocked');
+  });
+});
