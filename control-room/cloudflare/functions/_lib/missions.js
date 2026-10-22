@@ -2833,8 +2833,8 @@ export function createMissions(deps) {
       const who = `${h.name ? `${h.name} ` : ''}(+${h.waId})`;
       await sendTg(db, env, chat, `WhatsApp da un numero che non conosco: ${who}${h.preview ? `, «${h.preview}»` : ''}. È un locale? Se è una chat privata non apro niente e non te lo chiedo più.`,
         [['Sì, è un locale: apri la pratica', `wak:${h.waId}`], ['No, è privato: ignoralo', `wap:${h.waId}`]], deps.fetchImpl, { stacked: true }).catch(() => null);
-      // Può essere un cliente nuovo: anche questo è un avviso importante.
-      await phoneAlert(db, env, chat, `WhatsApp da un numero che non conosco, ${h.name || 'senza nome'}: potrebbe essere un locale. Dimmi pure qui se è un locale da registrare o un privato da ignorare.`, `wa:${h.waId}`).catch(() => null);
+      // Niente telefonata per i numeri sconosciuti: quasi sempre sono amici (7 chiamate su 9 dal 16 al 22 ottobre).
+      // Basta Telegram coi pulsanti (scelta di Riccardo, 22 ottobre); per i locali noti resta la chiamata qui sopra.
     }
     return fresh.length + held.length;
   }

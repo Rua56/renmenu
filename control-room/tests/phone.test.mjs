@@ -210,3 +210,17 @@ test('telefonata: «è un privato, ignoralo» decide sul numero WhatsApp sconosc
     assert.match(db.raw.prepare("SELECT value FROM jarvis_settings WHERE key='wa_block'").get().value, /393330000021/);
   });
 });
+
+test('numero WhatsApp sconosciuto: solo Telegram, nessuna telefonata (scelta del 22 ottobre)', async (t) => {
+  t.mock.timers.enable({ apis: ['Date'], now: Date.parse('2026-10-22T08:00:00Z') }); // 10:00 a Roma
+  const { importWhatsAppMessage } = await import('../cloudflare/functions/_lib/whatsapp-in.js');
+  await withServices({}, async (calls) => {
+    const db = database(), env = { ...(await linked(db)), WHATSAPP_PRIVATE_FILTER: 'true' };
+    await missions.putSetting(db, 'owner_phone', '+393331234567');
+    await missions.announceExternal(db, env);
+    await importWhatsAppMessage(db, env, { id: 'wamid.u1', waId: '393330000077', profileName: 'Manu', messageType: 'text', content: { text: 'Ciao!', raw: { type: 'text', text: { body: 'Ciao!' } } } });
+    await missions.announceExternal(db, env);
+    assert.ok(calls.some((c) => c.href.endsWith('/sendMessage') && /numero che non conosco/.test(c.body?.text || '')), 'la domanda arriva su Telegram');
+    assert.equal(calls.filter((c) => c.href.endsWith('/twilio/outbound-call')).length, 0, 'nessuna telefonata');
+  });
+});
