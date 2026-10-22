@@ -93,8 +93,16 @@ const RX = {
 export function guessIntent(text, { locales = [], dishes = [] } = {}) {
   // Il nome del locale non conta come parola chiave («Riccardo sei il migliore» non è il numero sei).
   const names = new Set(locales.flatMap((c) => keyWords(c.name)));
-  const t = words(fixTypos(text, COMMAND_WORDS, names)).filter((w) => !names.has(w)).join(' ');
+  // «da sei giorni», «tre settimane fa»: un tempo, non un prezzo da cambiare (sollecito del 21 ottobre).
+  // Anche le cifre del nome («Osteria Codelli 23») non sono un prezzo.
+  const plainNames = locales.map((c) => words(c.name).join(' ')).filter(Boolean);
+  const t = plainNames.reduce((acc, n) => ` ${acc} `.split(` ${n} `).join(' '), words(fixTypos(text, COMMAND_WORDS, names)).join(' ')).trim()
+    .split(/\s+/).filter((w) => !names.has(w)).join(' ')
+    .replace(/\b(?:\d+|un[ao]?|due|tre|quattro|cinque|sei|sette|otto|nove|dieci|quindici|venti|trenta)\s+(?:minut\w*|or[ae]|giorn[oi]|settiman[ae]|mes[ei]|ann[oi])\b/g, ' ');
   const venue = locales[0]?.name || dishes[0]?.client?.name || '';
+  // Messaggi ai locali («manda un sollecito a Paolo», «scrivi a Blanch che…»): non sono correzioni della bozza.
+  // Li decide il modello (risposta), le parole chiave non li trasformano in modifiche.
+  if (/\b(?:sollecit\w*|ricordagli|ricordale)\b|\b(?:manda\w*|invia\w*|scriv\w*)\s+(?:un\s+)?(?:messaggio|mail|email|whatsapp)\b/.test(t)) return { intent: 'risposta', locale: venue };
   if (RX.affida.test(t)) return { intent: 'affida_pratica', locale: venue };
   if (RX.cancella.test(t) && !dishes.length) return { intent: 'cancella_pratica', locale: venue };
   if (RX.piano.test(t) && !dishes.length && !RX.crea.test(t)) return { intent: 'cambia_piano', locale: venue };

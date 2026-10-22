@@ -256,7 +256,10 @@ export async function blockSender(db, waId, deps = {}) {
   const held = await readJson(db, HELD_KEY, {});
   const name = held[waId]?.name || '';
   // Un locale che ha scritto senza pratiche aperte: «no» vuol dire solo «non aprire la pratica», non «privato».
-  const confirm = Boolean(held[waId]?.confirm);
+  // «È un privato» detto chiaro (hard) invece lo blocca, se il numero non è sulla scheda di un cliente:
+  // serve quando un amico era finito tra i locali per sbaglio (alessio, 20 ottobre).
+  const client = deps.hard ? await db.prepare('SELECT id FROM clients WHERE phone=? OR phone=? LIMIT 1').bind(`+${waId}`, waId).first() : null;
+  const confirm = Boolean(held[waId]?.confirm) && !(deps.hard && !client);
   if (!confirm) { await removeFrom(db, ALLOW_KEY, waId, stamp); await addTo(db, BLOCK_KEY, waId, stamp); }
   delete held[waId];
   await writeJson(db, HELD_KEY, held, stamp);
@@ -276,6 +279,9 @@ export async function heldSenders(db) {
 // non un locale. Chiede di ignorarlo»): le frasi possono essere lunghe e indirette.
 const SAYS_PRIVATE = /\bprivat[oa]\b|\bnon\s+(?:è\s+)?(?:un|una)\s+(?:locale|cliente|ristorante|bar)\b|\bignor(?:al[oa]|arl[oa]|are|a)\b|\b(?:amic[oa]|parente|conoscente|familiare)\b|\blascia(?:lo|la)?\s+(?:stare|perdere)\b|\bnon\s+(?:la\s+)?aprire\b/i;
 const SAYS_VENUE = /(?:^|[\s,.;:!])(?:è|e'|é)\s+(?:un[ao]?\s+|il\s+|di\s+)?(?:locale|cliente|ristorante|bar|trattoria|osteria|pizzeria|titolare)\b|\bregistr(?:al[oa]|arl[oa]|are)\b|\b(?:associ|colleg|abbin)(?:al[oa]|arl[oa]|are|a)\b|\baprila\b|\bapri(?:gli)?\s+(?:la\s+|una\s+)?(?:nuova\s+)?pratica\b(?!\s+(?:di|del|della|dello|dei|per|a|al|alla)\b)/i;
+const SAYS_REALLY_PRIVATE = /\bprivat[oa]\b|\bnon\s+(?:è\s+)?(?:un|una)\s+(?:locale|cliente|ristorante|bar)\b|\b(?:amic[oa]|parente|conoscente|familiare)\b/i;
+/** true se la frase dice proprio «è un privato» (non solo «non aprire la pratica»). */
+export function saysReallyPrivate(text) { return SAYS_REALLY_PRIVATE.test(String(text || '')); }
 /** 'private' | 'venue' | null. «non è un locale» vale come privato. */
 export function contactVerdict(text) {
   const line = String(text || '');

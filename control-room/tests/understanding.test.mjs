@@ -51,3 +51,11 @@ test('comprensione: nomi lunghi, anteprima al locale e cambio di piano', () => {
   assert.deepEqual(guessIntent('cambia il piano del Tralcio in premium', { locales: [venues[1]] }), { intent: 'cambia_piano', locale: 'Osteria Al Tralcio' });
   assert.equal(guessIntent('apri una nuova pratica per Bar Centrale piano standard').intent, 'crea_pratica');
 });
+
+test('sollecito ai locali e «da sei giorni»: non diventano una modifica della bozza (telefonata del 21 ottobre)', () => {
+  const locales = [{ name: 'Osteria Codelli 23', menu_id: '' }];
+  const said = 'Manda un sollecito a Paolo, titolare di Osteria Codelli 23, per la lista dei vini: la bozza del menu è in revisione da sei giorni e aspetta la lista dei vini per andare avanti.';
+  assert.equal(guessIntent(said, { locales }).intent, 'risposta');
+  assert.notEqual(guessIntent('la bozza di Osteria Codelli 23 è ferma da sei giorni', { locales }).intent, 'aggiorna_menu');
+  assert.equal(guessIntent('il coperto di Osteria Codelli 23 è 3 euro', { locales }).intent, 'aggiorna_menu');
+});
