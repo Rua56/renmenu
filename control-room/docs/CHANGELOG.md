@@ -2,6 +2,10 @@
 
 Si aggiunge una voce a ogni pull request che cambia un comportamento di Jarvis o della Control Room, insieme all'aggiornamento di README, policy e funzionamento quando serve. Le voci più recenti stanno in alto.
 
+## 24 ottobre 2026
+
+- **Jarvis sugli occhiali (Ray-Ban Meta Display).** `/occhiali` (o «collega gli occhiali») crea una chiave nuova e manda su Telegram il QR per installare la web app sugli occhiali e il link della pagina del telefono; la chiave di prima smette di valere, «/occhiali spegni» la toglie. La web app (`jarvis-meta-display.vercel.app`, fuori da questo repository) chiama `/jarvis-hook/occhiali` con la chiave: stesso cervello della Control Room (`jarvisAsk`), sulle lenti solo testo e pulsanti; link, foto e file arrivano su Telegram e la pubblicazione si conferma sempre e solo toccando su Telegram (i pulsanti `pub:` non arrivano alle lenti e vengono rifiutati). L'ultima risposta resta salvata (`glasses_last`) così gli occhiali mostrano anche quella chiesta a voce dal telefono. CORS solo per l'origine della web app. Test in `tests/glasses.test.mjs`.
+
 ## 16 ottobre 2026
 
 - WhatsApp dei locali (scelta di Riccardo, 16 ottobre): testo e foto di un locale che ha già una pratica in lavorazione (anche arrivata per email) finiscono in quella pratica e l'avviso mostra solo il messaggio nuovo. Se il locale non ha pratiche aperte Jarvis chiede prima «ne apro una nuova?» (Telegram, telefono o a parole: «sì, aprila» / «no, lascia stare»; il no non rende il numero privato). I vocali e i video non si leggono e non aprono pratiche: Jarvis avvisa di farsi mandare la richiesta scritta o le foto.
