@@ -30,7 +30,7 @@ import { AGENDA_KEY, parseStored as parseAgenda } from '../../_lib/agenda.js';
 import { understandClientRequest } from '../../_lib/request-ai.js';
 import { BOTTLE_QUEUE, createMissions } from '../../_lib/missions.js';
 import { spokenText, telegramCapture } from '../../_lib/cr-chat.js';
-import { GLASSES_KEY, GLASSES_LAST, glassesText } from '../../_lib/glasses.js';
+import { GLASSES_FEED, GLASSES_KEY, GLASSES_LAST, feedAfter, glassesButtons, glassesText } from '../../_lib/glasses.js';
 import { previewCard } from '../../_lib/menu-diff.js';
 import { pickButton } from '../../_lib/short-reply.js';
 import { noteStatement } from '../../_lib/memory.js';
@@ -834,9 +834,17 @@ export async function jarvisGlasses(env, input = {}) {
   let saved = null; try { saved = JSON.parse(await missions.setting(db, GLASSES_KEY) || 'null'); } catch { saved = null; }
   if (!saved?.key || !sameSecret(String(input.chiave || ''), saved.key)) return { ok: false, status: 403, error: 'Occhiali non collegati: scrivi /occhiali a Jarvis su Telegram.' };
   const readLast = async () => { try { return JSON.parse(await missions.setting(db, GLASSES_LAST) || 'null'); } catch { return null; } };
+  const readFeed = async () => { try { const feed = JSON.parse(await missions.setting(db, GLASSES_FEED) || '[]'); return Array.isArray(feed) ? feed : []; } catch { return []; } };
   if (input.azione === 'ultimo') {
     const last = await readLast();
-    return { ok: true, ultimo: last && last.id !== String(input.dopo || '') ? last : null };
+    // Con dopoAvviso gli occhiali ricevono anche gli avvisi arrivati su Telegram dopo l'ultimo visto.
+    const alerts = 'dopoAvviso' in input ? feedAfter(await readFeed(), String(input.dopoAvviso || '')) : {};
+    return { ok: true, ultimo: last && last.id !== String(input.dopo || '') ? last : null, ...alerts };
+  }
+  // «Pronto per te»: le decisioni già preparate, una per una (stessi pulsanti della Control Room, mai la pubblicazione).
+  if (input.azione === 'pronto') {
+    const { items } = await jarvisReady(env);
+    return { ok: true, items: items.map((item) => ({ kind: item.kind, text: glassesText(item.text), say: item.say || '', buttons: glassesButtons(item.buttons) })).filter((item) => item.text) };
   }
   const text = String(input.text || '').replace(/\s+/g, ' ').trim().slice(0, 1000);
   const press = String(input.press || '').trim().slice(0, 64);
@@ -849,7 +857,13 @@ export async function jarvisGlasses(env, input = {}) {
   // La chiave si cambia solo da Telegram; pubblicare resta un tocco su Telegram.
   if (/^\/?occhiali\b/i.test(text)) return remember(text, [{ kind: 'text', text: 'La chiave degli occhiali si cambia solo da Telegram.', say: 'La chiave degli occhiali si cambia solo da Telegram.', buttons: [] }]);
   if (press.split(':')[0] === 'pub') return { ok: false, status: 409, error: 'La pubblicazione si conferma solo su Telegram.' };
-  const label = press ? ((await readLast())?.messages || []).flatMap((m) => m.buttons || []).find(([, data]) => data === press)?.[0] || 'Pulsante' : text;
+  // Un pulsante di un avviso arrivato su Telegram vale anche dalle lenti, come il tocco su Telegram.
+  const alertButtons = press ? (await readFeed()).flatMap((item) => item.buttons || []) : [];
+  if (press && alertButtons.some(([, data]) => data === press)) {
+    let offered = []; try { offered = JSON.parse(await missions.setting(db, 'cr_buttons') || '[]'); } catch { offered = []; }
+    await missions.putSetting(db, 'cr_buttons', JSON.stringify([...new Set([press, ...(Array.isArray(offered) ? offered : [])])].slice(0, 60)));
+  }
+  const label = press ? [...((await readLast())?.messages || []).flatMap((m) => m.buttons || []), ...alertButtons].find(([, data]) => data === press)?.[0] || 'Pulsante' : text;
   let out;
   try { out = await jarvisAsk(env, { text, press }); }
   catch (error) { return { ok: false, status: error?.status || 500, error: String(error?.message || 'Jarvis non risponde.').slice(0, 200) }; }

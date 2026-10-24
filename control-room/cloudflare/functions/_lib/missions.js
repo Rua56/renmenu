@@ -14,7 +14,7 @@ import { clientMailConfig, sendClientMail } from './client-mail.js';
 import { briefingDue, buildBriefing, romeDay } from './briefing.js';
 import { COMMANDS, COMMANDS_VERSION, KEYBOARD_VERSION, MENU_BUTTON, answerCallback, clearButtons, downloadTelegramFile, randomToken, sendDocument, sendMenuKeyboard, sendPhoto, sendTelegram, sendVoice, setMyCommands, telegramReady, TELEGRAM_HOOK_URL } from './telegram.js';
 import { buildMenuQr, menuLink } from './qr.js';
-import { GLASSES_KEY, glassesAppLink, glassesPhoneLink, glassesQr } from './glasses.js';
+import { GLASSES_FEED, GLASSES_KEY, addToFeed, glassesAppLink, glassesPhoneLink, glassesQr } from './glasses.js';
 import { isBlanchBottleSection, isBlanchSlug, publicMenuJsonUrl, publicMenuPageUrl } from './blanch.js';
 import { CHAT_MODEL, chat as freeChat, matchVenue, planFromText, speak, transcribe, understand, venueSaid } from './voice.js';
 import { classifyRequest } from './autopilot.js';
@@ -192,7 +192,15 @@ export function createMissions(deps) {
   async function sendTg(db, env, chat, text, buttons, fetchImpl, options) {
     const sent = await sendTelegram(env, chat, text, buttons, fetchImpl, options);
     if (Array.isArray(buttons) && buttons.length) await putSetting(db, 'tg_buttons', JSON.stringify({ at: now(), text: String(text).slice(0, 600), buttons: buttons.slice(0, 12), messageId: sent?.result?.message_id || null })).catch(() => {});
+    if (!deps.captured) await glassesFeed(db, text, buttons, options).catch(() => {});
     return sent;
+  }
+  // Con gli occhiali collegati, ogni messaggio di Jarvis su Telegram compare anche sulle lenti (vedi _lib/glasses.js).
+  // Quelli chiesti dagli occhiali, dal telefono o dalla Control Room no: lì la risposta arriva già.
+  async function glassesFeed(db, text, buttons, options) {
+    if (!(await setting(db, GLASSES_KEY))) return;
+    let feed = []; try { feed = JSON.parse(await setting(db, GLASSES_FEED) || '[]'); } catch { feed = []; }
+    await putSetting(db, GLASSES_FEED, JSON.stringify(addToFeed(feed, { id: uid(), at: now(), text, buttons, quiet: Boolean(options?.silent) })));
   }
 
   // Ogni messaggio va sia nella Control Room (riquadro JARVIS) sia su Telegram, se collegato.

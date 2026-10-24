@@ -109,3 +109,43 @@ test('/jarvis-hook/occhiali: CORS solo per la web app, corpo text/plain senza pr
     assert.equal((await post(GLASSES_ORIGIN, { chiave: 'sbagliata', text: 'ciao' })).status, 403);
   });
 });
+
+test('avvisi sulle lenti: i messaggi di Jarvis su Telegram arrivano agli occhiali, senza la pubblicazione', async () => {
+  await withTelegram(async () => {
+    const db = database(), env = await linked(db);
+    await missions.ping(db, env, 'Prima degli occhiali.', null, 'normale');
+    assert.equal(await missions.setting(db, 'glasses_feed'), null, 'senza occhiali collegati non si salva niente');
+    const key = 'k'.repeat(64);
+    await missions.putSetting(db, 'glasses_key', JSON.stringify({ key, at: new Date().toISOString() }));
+    const start = await jarvisGlasses(env, { chiave: key, azione: 'ultimo', dopoAvviso: '' });
+    assert.deepEqual(start.avvisi, [], 'al primo giro nessun avviso vecchio');
+    await missions.ping(db, env, 'Osteria Al Tralcio ha risposto: va bene così. https://renmenu.com/x', [['Sì, pubblica', 'pub:m1'], ['Non ora', 'later:m1']], 'importante');
+    const out = await jarvisGlasses(env, { chiave: key, azione: 'ultimo', dopoAvviso: start.avvisoId });
+    assert.equal(out.avvisi.length, 1);
+    const [alert] = out.avvisi;
+    assert.match(alert.text, /^Osteria Al Tralcio ha risposto: va bene così\./);
+    assert.doesNotMatch(alert.text, /https?:/);
+    assert.match(alert.text, /Per pubblicare tocca il pulsante su Telegram/);
+    assert.deepEqual(alert.buttons, [['Non ora', 'later:m1']]);
+    assert.equal(out.avvisoId, alert.id);
+    assert.deepEqual((await jarvisGlasses(env, { chiave: key, azione: 'ultimo', dopoAvviso: alert.id })).avvisi, []);
+    // Le risposte chieste dagli occhiali non tornano come avvisi; il pulsante di un avviso vale dalle lenti.
+    await jarvisGlasses(env, { chiave: key, text: '/stato' });
+    assert.equal(JSON.parse(await missions.setting(db, 'glasses_feed')).length, 1);
+    const pressed = await jarvisGlasses(env, { chiave: key, press: 'later:m1' });
+    assert.equal(pressed.ok, true);
+    assert.equal(pressed.domanda, 'Non ora');
+  });
+});
+
+test('«Pronto per te» sulle lenti: elenco delle decisioni senza pulsanti di pubblicazione', async () => {
+  await withTelegram(async () => {
+    const db = database(), env = await linked(db);
+    await missions.putSetting(db, 'glasses_key', JSON.stringify({ key: 'k'.repeat(64), at: new Date().toISOString() }));
+    const out = await jarvisGlasses(env, { chiave: 'k'.repeat(64), azione: 'pronto' });
+    assert.equal(out.ok, true);
+    assert.ok(Array.isArray(out.items));
+    assert.ok(out.items.every((item) => item.buttons.every(([, data]) => !data.startsWith('pub:'))));
+    assert.equal((await jarvisGlasses(env, { chiave: 'sbagliata', azione: 'pronto' })).status, 403);
+  });
+});
