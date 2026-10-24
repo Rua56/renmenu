@@ -2,10 +2,12 @@
 // - /jarvis-hook/telegram: aggiornamenti del bot (header segreto impostato con setWebhook);
 // - /jarvis-hook/tick: l'orologio (Worker con cron) con il segreto JARVIS_CLOCK_SECRET;
 // - /jarvis-hook/mail-in: le email di menu@renmenu.com dal Worker email, con il segreto degli allegati;
-// - /jarvis-hook/telefono: l'agente vocale durante una telefonata, con la chiave valida solo per quella chiamata.
-// Nessun dato viene restituito: solo esiti sintetici.
-import { autoPrepareTick, enrollIdleDrafts, geminiConfig, jarvisPhone, linkPendingMailFiles, missions, readPendingMaterials, receivePendingMail, runAutopilot } from '../control-room/api/[[route]].js';
+// - /jarvis-hook/telefono: l'agente vocale durante una telefonata, con la chiave valida solo per quella chiamata;
+// - /jarvis-hook/occhiali: la web app degli occhiali e del telefono, con la chiave creata da /occhiali.
+// Nessun dato viene restituito, salvo le risposte di Jarvis a telefono e occhiali: solo esiti sintetici.
+import { autoPrepareTick, enrollIdleDrafts, geminiConfig, jarvisGlasses, jarvisPhone, linkPendingMailFiles, missions, readPendingMaterials, receivePendingMail, runAutopilot } from '../control-room/api/[[route]].js';
 import { sameSecret } from '../_lib/telegram.js';
+import { glassesCors } from '../_lib/glasses.js';
 import { chat } from '../_lib/voice.js';
 import { serveMedia } from '../_lib/public-media.js';
 import { previewUrl } from '../_lib/approvals.js';
@@ -14,7 +16,7 @@ import { readingTestStep } from '../_lib/reading-test.js';
 import { MAX_RAW_BYTES, importIncomingMail } from '../_lib/mail-in.js';
 import { visitReadyText } from '../_lib/visit.js';
 
-const reply = (body, status = 200) => new Response(JSON.stringify(body), { status, headers: { 'Content-Type': 'application/json', 'Cache-Control': 'no-store' } });
+const reply = (body, status = 200, extra = {}) => new Response(JSON.stringify(body), { status, headers: { 'Content-Type': 'application/json', 'Cache-Control': 'no-store', ...extra } });
 
 export async function onRequest(context) {
   const { request, env } = context;
@@ -44,6 +46,21 @@ export async function onRequest(context) {
   // Foto del menu Premium confermate da Riccardo (servono all'anteprima e al menu).
   const media = path.match(/^\/jarvis-hook\/media\/([^/]+)$/);
   if (media) return serveMedia(request, env, media[1]);
+  // Occhiali Meta Display e pagina del telefono (web app su Vercel): chiave di /occhiali nel corpo, CORS per quella sola origine.
+  // Il corpo arriva come text/plain (richiesta «semplice», senza preflight); OPTIONS risponde comunque.
+  if (path === '/jarvis-hook/occhiali') {
+    const cors = glassesCors(request);
+    if (request.method === 'OPTIONS') return new Response(null, { status: 204, headers: cors });
+    if (request.method !== 'POST' || !env.DB?.prepare) return reply({ ok: false }, 404, cors);
+    if (Number(request.headers.get('content-length') || 0) > 20_000) return reply({ ok: false }, 413, cors);
+    try {
+      const body = JSON.parse(await request.text() || '{}');
+      const out = await jarvisGlasses(env, body && typeof body === 'object' ? body : {});
+      return reply(out, out.status || 200, cors);
+    } catch {
+      return reply({ ok: false, error: 'Jarvis non risponde: riprova tra poco.' }, 500, cors);
+    }
+  }
   if (request.method !== 'POST' || !env.DB?.prepare) return reply({ ok: false }, 404);
   try {
     if (path === '/jarvis-hook/telegram') {

@@ -22,7 +22,7 @@
 
 L'accesso alla Control Room è protetto due volte: Cloudflare Access davanti all'host e verifica lato server della firma del token (RS256/JWKS, emittente, audience, scadenza, tipo ed email del proprietario) su ogni pagina e ogni API. Le scritture accettano solo richieste dello stesso sito. Se la configurazione manca, l'accesso è negato.
 
-Gli ingressi pubblici di Jarvis stanno fuori da Access ma sono protetti da segreti: `/jarvis-hook/telegram` (segreto del bot), `/jarvis-hook/tick` (segreto dell'orologio), `/jarvis-hook/mail-files` (segreto dello script Gmail), `/jarvis-hook/mail-in` (le email di `menu@renmenu.com` dal Worker email, stesso segreto), `/jarvis-hook/media/<hash>` (solo le foto Premium confermate da Riccardo, indispensabili per l'anteprima).
+Gli ingressi pubblici di Jarvis stanno fuori da Access ma sono protetti da segreti: `/jarvis-hook/telegram` (segreto del bot), `/jarvis-hook/tick` (segreto dell'orologio), `/jarvis-hook/mail-files` (segreto dello script Gmail), `/jarvis-hook/mail-in` (le email di `menu@renmenu.com` dal Worker email, stesso segreto), `/jarvis-hook/media/<hash>` (solo le foto Premium confermate da Riccardo, indispensabili per l'anteprima), `/jarvis-hook/occhiali` (la web app degli occhiali Meta Display e del telefono, con la chiave creata da `/occhiali` su Telegram; CORS solo per `jarvis-meta-display.vercel.app`).
 
 ## Cosa fa Jarvis
 
@@ -33,6 +33,7 @@ Il dettaglio è in [`control-room/docs/jarvis-funzionamento.md`](control-room/do
 - **Bozza e revisione:** voci, prezzi (anche calice/bottiglia), percorsi degustazione, coperto, contatti, inglese tradotto come bozza; ogni dato porta la sua fonte.
 - **Missione:** dopo l'affido, Jarvis manda l'anteprima al locale, applica le modifiche chiare, chiede il SÌ a Riccardo, pubblica, verifica online, manda link e QR a Riccardo e, se il locale ha un'email, anche al locale, poi sorveglia il menu a 6 ore, 2 giorni e 7 giorni.
 - **Aggiornamenti:** per un menu già online la bozza parte dal file pubblicato, con lo stesso identificativo e lo stesso QR.
+- **Occhiali:** `/occhiali` collega la web app per i Ray-Ban Meta Display: domande dal telefono o dalle lenti, risposte e pulsanti sulle lenti, pubblicazione sempre su Telegram.
 - **Assistente:** briefing alle 8 (lunedì-sabato), stato, diario della settimana (`/settimana`), riflessione del lunedì con al massimo 3 proposte di miglioramento (Fallo, Non ora, Mai; `/proposte`, `/rifletti`), memoria per locale, risposte a voce.
 
 ## Avvio locale e prove

@@ -30,6 +30,7 @@ import { AGENDA_KEY, parseStored as parseAgenda } from '../../_lib/agenda.js';
 import { understandClientRequest } from '../../_lib/request-ai.js';
 import { BOTTLE_QUEUE, createMissions } from '../../_lib/missions.js';
 import { spokenText, telegramCapture } from '../../_lib/cr-chat.js';
+import { GLASSES_KEY, GLASSES_LAST, glassesText } from '../../_lib/glasses.js';
 import { previewCard } from '../../_lib/menu-diff.js';
 import { pickButton } from '../../_lib/short-reply.js';
 import { noteStatement } from '../../_lib/memory.js';
@@ -823,6 +824,61 @@ export async function jarvisPhone(env, input = {}) {
   const options = asked.filter(([, data]) => String(data).split(':')[0] !== 'pub').map(([label]) => label);
   const risposta = [said, options.length ? `Riccardo può rispondere: ${options.join(', ')}.` : '', sentPublish ? 'La pubblicazione si conferma solo toccando il pulsante che ho appena mandato su Telegram.' : sentToTelegram ? 'Link e immagini li ho appena mandati su Telegram.' : ''].filter(Boolean).join(' ');
   return { ok: true, risposta: risposta.slice(0, 1500) || 'Fatto.' };
+}
+// Occhiali (web app sugli occhiali Meta Display e pagina del telefono, vedi _lib/glasses.js): stesso cervello della
+// Control Room con la chiave creata da /occhiali. Sulle lenti arrivano testo e pulsanti; link, foto, file e la
+// pubblicazione (che si conferma solo toccando) vanno su Telegram. L'ultima risposta resta salvata: gli occhiali
+// la leggono anche quando la domanda arriva dal telefono.
+export async function jarvisGlasses(env, input = {}) {
+  const db = env.DB;
+  let saved = null; try { saved = JSON.parse(await missions.setting(db, GLASSES_KEY) || 'null'); } catch { saved = null; }
+  if (!saved?.key || !sameSecret(String(input.chiave || ''), saved.key)) return { ok: false, status: 403, error: 'Occhiali non collegati: scrivi /occhiali a Jarvis su Telegram.' };
+  const readLast = async () => { try { return JSON.parse(await missions.setting(db, GLASSES_LAST) || 'null'); } catch { return null; } };
+  if (input.azione === 'ultimo') {
+    const last = await readLast();
+    return { ok: true, ultimo: last && last.id !== String(input.dopo || '') ? last : null };
+  }
+  const text = String(input.text || '').replace(/\s+/g, ' ').trim().slice(0, 1000);
+  const press = String(input.press || '').trim().slice(0, 64);
+  if (!text && !press) return { ok: false, status: 422, error: 'Di’ o scegli qualcosa.' };
+  const remember = async (domanda, messages) => {
+    const last = { id: uid(), at: now(), domanda: domanda.slice(0, 200), messages };
+    await missions.putSetting(db, GLASSES_LAST, JSON.stringify(last));
+    return { ok: true, ...last };
+  };
+  // La chiave si cambia solo da Telegram; pubblicare resta un tocco su Telegram.
+  if (/^\/?occhiali\b/i.test(text)) return remember(text, [{ kind: 'text', text: 'La chiave degli occhiali si cambia solo da Telegram.', say: 'La chiave degli occhiali si cambia solo da Telegram.', buttons: [] }]);
+  if (press.split(':')[0] === 'pub') return { ok: false, status: 409, error: 'La pubblicazione si conferma solo su Telegram.' };
+  const label = press ? ((await readLast())?.messages || []).flatMap((m) => m.buttons || []).find(([, data]) => data === press)?.[0] || 'Pulsante' : text;
+  let out;
+  try { out = await jarvisAsk(env, { text, press }); }
+  catch (error) { return { ok: false, status: error?.status || 500, error: String(error?.message || 'Jarvis non risponde.').slice(0, 200) }; }
+  const chat = await missions.setting(db, 'telegram_chat_id');
+  let sentToTelegram = false, sentPublish = false;
+  if (chat && telegramReady(env)) {
+    for (const m of out.messages) {
+      const publish = tapOnTelegram(m.buttons);
+      try {
+        if ((m.kind === 'image' || m.kind === 'file') && String(m.src || '').startsWith('data:')) {
+          const bytes = Uint8Array.from(atob(m.src.split(',')[1] || ''), (c) => c.charCodeAt(0));
+          if (m.kind === 'image') await sendPhoto(env, chat, bytes, m.text || 'Dagli occhiali.');
+          else await sendDocument(env, chat, bytes, m.name || 'file', m.src.slice(5, m.src.indexOf(';')) || 'application/octet-stream', m.text || 'Dagli occhiali.');
+          sentToTelegram = true;
+        } else if (publish || /https?:\/\//.test(m.text || '')) {
+          await sendTelegram(env, chat, `👓 Dagli occhiali\n\n${m.text}`, m.buttons?.length ? m.buttons : null);
+          sentToTelegram = true; sentPublish ||= publish;
+        }
+      } catch { /* sulle lenti la risposta arriva lo stesso */ }
+    }
+  }
+  const messages = out.messages.filter((m) => m.kind === 'text' || m.kind === 'note').map((m) => ({
+    kind: m.kind, text: glassesText(m.text), say: m.say || '',
+    buttons: (m.buttons || []).filter(([, data]) => String(data).split(':')[0] !== 'pub').slice(0, 8)
+  })).filter((m) => m.text || m.buttons.length);
+  if (sentPublish) messages.push({ kind: 'note', text: 'Per pubblicare tocca il pulsante che ti ho mandato su Telegram.', say: 'Per pubblicare tocca il pulsante che ti ho mandato su Telegram.', buttons: [] });
+  else if (sentToTelegram) messages.push({ kind: 'note', text: 'Link e immagini sono su Telegram.', say: '', buttons: [] });
+  if (!messages.length) messages.push({ kind: 'text', text: 'Fatto.', say: 'Fatto.', buttons: [] });
+  return remember(label, messages);
 }
 // «Pronto per te» e briefing a voce: le decisioni che Jarvis ha già preparato, ognuna con i suoi pulsanti.
 // I pulsanti valgono come quelli offerti nella conversazione (stesso elenco cr_buttons).

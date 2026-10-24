@@ -12,8 +12,9 @@ import { assessReply, proposeReplyChanges, referenceCode, sha256Hex, stripQuoted
 import { sendOwnerNotification } from './owner-notifications.js';
 import { clientMailConfig, sendClientMail } from './client-mail.js';
 import { briefingDue, buildBriefing, romeDay } from './briefing.js';
-import { COMMANDS, COMMANDS_VERSION, KEYBOARD_VERSION, MENU_BUTTON, answerCallback, clearButtons, downloadTelegramFile, sendDocument, sendMenuKeyboard, sendPhoto, sendTelegram, sendVoice, setMyCommands, telegramReady, TELEGRAM_HOOK_URL } from './telegram.js';
+import { COMMANDS, COMMANDS_VERSION, KEYBOARD_VERSION, MENU_BUTTON, answerCallback, clearButtons, downloadTelegramFile, randomToken, sendDocument, sendMenuKeyboard, sendPhoto, sendTelegram, sendVoice, setMyCommands, telegramReady, TELEGRAM_HOOK_URL } from './telegram.js';
 import { buildMenuQr, menuLink } from './qr.js';
+import { GLASSES_KEY, glassesAppLink, glassesPhoneLink, glassesQr } from './glasses.js';
 import { isBlanchBottleSection, isBlanchSlug, publicMenuJsonUrl, publicMenuPageUrl } from './blanch.js';
 import { CHAT_MODEL, chat as freeChat, matchVenue, planFromText, speak, transcribe, understand, venueSaid } from './voice.js';
 import { classifyRequest } from './autopilot.js';
@@ -964,6 +965,21 @@ export function createMissions(deps) {
       const to = env.OWNER_EMAIL || '';
       const out = config.ok && to ? await sendClientMail({ env, to, subject: 'Prova di invio di Jarvis da renmenu.com', text: `Se leggi questa email, Jarvis può scrivere ai locali da ${config.sender}.\n\nLe risposte a questo indirizzo tornano a Jarvis.\n\nJarvis · RenMenu`, idempotencyKey: `renmenu-prova-${Date.now()}`, fetchImpl: deps.fetchImpl }) : { ok: false, reason: config.ok ? 'OWNER_EMAIL mancante' : config.reason };
       await sendTg(db, env, chat, out.ok ? `Email di prova partita da ${config.sender} a ${to}. Controlla la casella (anche lo spam).` : `L’email di prova non è partita: ${out.reason}.`, null, deps.fetchImpl);
+      return;
+    }
+    // /occhiali: chiave nuova per la web app degli occhiali (QR da inquadrare + link); «/occhiali spegni» la toglie.
+    if (/^\/occhiali\b/i.test(text) || /^(?:jarvis[,\s]+)?collega (?:gli )?occhiali\b/i.test(text.trim())) {
+      if (/\b(?:spegni|scollega|no|off|togli)\b/i.test(text)) {
+        await db.prepare('DELETE FROM jarvis_settings WHERE key=?').bind(GLASSES_KEY).run();
+        await sendTg(db, env, chat, 'Occhiali scollegati: la chiave non vale più. Scrivi /occhiali per crearne una nuova.', null, deps.fetchImpl);
+        return;
+      }
+      const key = randomToken(32);
+      await putSetting(db, GLASSES_KEY, JSON.stringify({ key, at: now() }));
+      await auditedBatch(jarvisDb(db), [], 'jarvis.glasses_key', 'Nuova chiave per gli occhiali (quella di prima non vale più).', null).catch(() => {});
+      await sendTg(db, env, chat, `👓 Occhiali collegati con una chiave nuova (quella di prima non vale più).\n\n1. Inquadra il QR qui sotto con la fotocamera del telefono (app Meta AI in modalità sviluppatore): Jarvis si installa sugli occhiali.\n2. Per parlarmi dal telefono e leggere la risposta sulle lenti apri: ${glassesPhoneLink(key)}\n\nNon girare questo messaggio: chi ha il link può parlare con me. «/occhiali spegni» toglie la chiave.`, null, deps.fetchImpl);
+      try { await sendPhoto(env, chat, await glassesQr(key), 'Jarvis per gli occhiali', deps.fetchImpl); }
+      catch { await sendTg(db, env, chat, `Il QR non è partito. Link da aprire sugli occhiali: ${glassesAppLink(key)}`, null, deps.fetchImpl); }
       return;
     }
     // /chiamami (o «chiamami», «telefonami»): Jarvis telefona a Riccardo con la sua voce. A pagamento: solo su richiesta.

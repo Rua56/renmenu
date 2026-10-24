@@ -44,13 +44,14 @@ export const COMMANDS = [
   ['regole', 'Cosa fa Jarvis da solo (regole imparate)', '🎓 Le mie regole'],
   ['voce', 'Avvisi a voce', '🔊 Avvisi a voce'],
   ['chiamami', 'Jarvis ti telefona adesso', '📞 Chiamami'],
+  ['occhiali', 'Collega Jarvis agli occhiali Meta Display', '👓 Occhiali'],
   ['claude', 'Claude acceso o spento', '🧠 Claude sì/no'],
   ['proposte', 'Proposte del lunedì', '🗂 Proposte del lunedì'],
   ['rifletti', 'Rifletti sulla settimana adesso', '🔁 Rifletti ora'],
   ['provalettura', 'Prova di lettura dei menu', '🔬 Prova lettura'],
   ['provaemail', 'Email di prova da renmenu.com', '📧 Email di prova']
 ];
-export const COMMANDS_VERSION = '5';
+export const COMMANDS_VERSION = '6';
 // Pulsante fisso «☰ Menu» sotto il campo di scrittura (tastiera di risposta persistente): toccarlo manda MENU_BUTTON.
 export const MENU_BUTTON = '☰ Menu';
 export const KEYBOARD_VERSION = '1';
